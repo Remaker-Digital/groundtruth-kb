@@ -32,15 +32,11 @@ import argparse
 import hashlib
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
-if str(PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_SRC))
 
 EVALUATOR_ID = "superseded-sot-leakage"
 EVALUATOR_VERSION = 1

@@ -34,7 +34,6 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-import sys
 from pathlib import Path
 from typing import Any
 
@@ -166,7 +165,6 @@ def apply(
     exists; if so the step is a no-op.
     """
     # Import lazily so the read-only default path has no API dependency.
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "groundtruth-kb" / "src"))
     from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
 
     plan = detect(db_path)

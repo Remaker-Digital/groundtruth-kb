@@ -8,13 +8,15 @@ authentication boundary before it can be enabled.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Coroutine
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from fastapi import FastAPI, Query, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse, Response
 from fastapi.routing import APIRoute
+from starlette.middleware.base import RequestResponseEndpoint
 
 from groundtruth_kb.bridge.native import (
     AbandonRequest,
@@ -63,6 +65,7 @@ Domain = Literal[
     "project-formal-links",
     "terms",
     "harnesses",
+    "deliberations",
 ]
 
 
@@ -74,15 +77,15 @@ class CanonicalJSONResponse(Response):
 
 
 class CanonicalRequest(Request):
-    async def json(self):
+    async def json(self) -> Any:
         return parse_json_bytes(await self.body())
 
 
 class CanonicalRoute(APIRoute):
-    def get_route_handler(self):
+    def get_route_handler(self) -> Callable[[Request], Coroutine[Any, Any, Response]]:
         handler = super().get_route_handler()
 
-        async def canonical_request(request: Request):
+        async def canonical_request(request: Request) -> Response:
             return await handler(CanonicalRequest(request.scope, request.receive))
 
         return canonical_request
@@ -106,7 +109,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     finalization = NativeProjectFinalization(bridge)
 
     @app.middleware("http")
-    async def local_cli_boundary(request: Request, call_next):
+    async def local_cli_boundary(request: Request, call_next: RequestResponseEndpoint) -> Response:
         if request.headers.get("origin") is not None:
             return JSONResponse({"code": "browser_origin_refused", "message": "Use the GT-KB CLI"}, status_code=403)
         if (
@@ -121,7 +124,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         return response
 
     @app.exception_handler(PostgresKernelError)
-    async def domain_error(_request: Request, error: PostgresKernelError):
+    async def domain_error(_request: Request, error: PostgresKernelError) -> JSONResponse:
         if error.code == "not_found":
             status = 404
         elif error.code in {"cas_conflict", "retryable_conflict"}:
@@ -133,7 +136,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         return JSONResponse(error.to_json_dict(), status_code=status)
 
     @app.exception_handler(RequestValidationError)
-    async def invalid_request(_request: Request, error: RequestValidationError):
+    async def invalid_request(_request: Request, error: RequestValidationError) -> JSONResponse:
         # Validation diagnostics identify fields but do not echo submitted bodies.
         return JSONResponse(
             {
@@ -152,6 +155,11 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def registry_path_observations() -> Response:
         return _result(service.registry_path_observations())
 
+    @app.get("/v1/specifications/snapshot")
+    def specification_snapshot(request: Request) -> Response:
+        _query_fields(request, set())
+        return _result(service.specification_snapshot())
+
     @app.post("/v1/sessions/bind")
     def bind_session(request: BindSession) -> Response:
         return _result(bridge.bind(request))
@@ -159,6 +167,11 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.get("/v1/sessions/binding")
     def session_binding(native_context_id: str) -> Response:
         return _result(bridge.session(native_context_id))
+
+    @app.get("/v1/sessions/context")
+    def session_context(request: Request, native_context_id: str) -> Response:
+        _query_fields(request, {"native_context_id"})
+        return _result(bridge.session_context(native_context_id))
 
     @app.post("/v1/bridge/check-effects")
     def bridge_check_effects(request: EffectCheckRequest) -> Response:
@@ -240,6 +253,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         component: str | None = None,
         test_type: str | None = None,
         parent_project_id: str | None = None,
+        repository_ref: str | None = None,
         project_id: str | None = None,
         application_scope: str | None = None,
         dependent_project_id: str | None = None,
@@ -248,6 +262,8 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         lifecycle_status: str | None = None,
         authority_level: str | None = None,
         scope: str | None = None,
+        source_type: str | None = None,
+        work_item_id: str | None = None,
     ) -> Response:
         accepted = {
             "after",
@@ -262,6 +278,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             "component",
             "test_type",
             "parent_project_id",
+            "repository_ref",
             "project_id",
             "application_scope",
             "dependent_project_id",
@@ -270,6 +287,8 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             "lifecycle_status",
             "authority_level",
             "scope",
+            "source_type",
+            "work_item_id",
         }
         _query_fields(request, accepted)
         filters = {
@@ -284,6 +303,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
                 "component": component,
                 "test_type": test_type,
                 "parent_project_id": parent_project_id,
+                "repository_ref": repository_ref,
                 "project_id": project_id,
                 "application_scope": application_scope,
                 "dependent_project_id": dependent_project_id,
@@ -292,6 +312,8 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
                 "lifecycle_status": lifecycle_status,
                 "authority_level": authority_level,
                 "scope": scope,
+                "source_type": source_type,
+                "work_item_id": work_item_id,
             }.items()
             if value is not None
         }
@@ -322,9 +344,25 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def commit_failed(project_id: Identifier, request: CommitFailure) -> Response:
         return _result(finalization.failure(project_id, request))
 
+    @app.get("/v1/{domain}/{record_id}/history")
+    def history(domain: Domain, record_id: Identifier) -> Response:
+        return _result(service.history(domain, record_id))
+
     @app.get("/v1/{domain}/{record_id}")
     def show(domain: Domain, record_id: Identifier) -> Response:
         return _result(service.show(domain, record_id))
+
+    @app.put("/v1/deliberations/{record_id}")
+    async def refuse_deliberation_write(record_id: Identifier, request: Request) -> Response:
+        # Historical reasoning records are read-only (SPEC-2098 v2). Read the body before refusing so the refusal
+        # itself is delivered: a method-mismatch 405 that leaves the request body unread can surface to the client
+        # as a connection reset on Windows.
+        await request.body()
+        raise PostgresKernelError(
+            "read_only_domain",
+            "Deliberations are historical reasoning records; the native service offers no write route",
+            details={"domain": "deliberations", "id": record_id},
+        )
 
     @app.put("/v1/harnesses/{record_id}")
     def amend_harness(record_id: Identifier, request: HarnessMutation) -> Response:
@@ -332,7 +370,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
 
     @app.put("/v1/specifications/{record_id}")
     def amend_specification(record_id: Identifier, request: SpecMutation) -> Response:
-        return _result(service.amend_specification(record_id, request))
+        return _result(service.amend_specification(record_id, request, project_root=bridge.project_root))
 
     @app.put("/v1/terms/{record_id}")
     def amend_term(record_id: Identifier, request: TermMutation) -> Response:
@@ -340,7 +378,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
 
     @app.put("/v1/tests/{record_id}")
     def amend_test(record_id: Identifier, request: TestMutation) -> Response:
-        return _result(service.amend_test(record_id, request))
+        return _result(service.amend_test(record_id, request, project_root=bridge.project_root))
 
     @app.put("/v1/test-plans/{record_id}")
     def amend_test_plan(record_id: Identifier, request: TestPlanMutation) -> Response:
@@ -352,7 +390,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
 
     @app.put("/v1/projects/{record_id}")
     def amend_project(record_id: Identifier, request: ProjectMutation) -> Response:
-        return _result(service.amend_project(record_id, request))
+        return _result(service.amend_project(record_id, request, project_root=bridge.project_root))
 
     @app.put("/v1/projects/{record_id}/authorization")
     def set_project_authorization(record_id: Identifier, request: ProjectAuthorizationChange) -> Response:

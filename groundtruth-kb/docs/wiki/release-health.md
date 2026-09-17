@@ -82,15 +82,16 @@ groundtruth-kb/.venv/Scripts/python.exe scripts/update_wiki_pages.py update --wi
 The updater does not push. Any wiki publish step is a separate external Git
 operation and must use the in-root source pages as the content source.
 
-Live git, dispatcher, and GitHub workflow probes are opt-in during dashboard
+Live git, native service/bridge and GitHub workflow probes are opt-in during dashboard
 refresh:
 
 ```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB --probe-live
+gt --config E:\GT-KB\groundtruth.toml dashboard refresh --runtime-root E:\GT-KB\.groundtruth\dashboard-health --json --probe-live
 ```
 
-Use live probes for release signoff only after confirming the host-local
-dispatcher and GitHub CLI probes are healthy.
+These are read-only observations from the selected configuration and host. A
+completed refresh does not establish release signoff; missing measurements remain
+unavailable and the applicable release checks still need their own evidence.
 
 ## Release Signoff Rule
 

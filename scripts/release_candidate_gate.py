@@ -252,7 +252,7 @@ def _check_dev_environment_inventory(max_age_hours: int | None = None) -> None:
     generated_at = payload.get("generated_at")
     redaction_status = (payload.get("redaction") or {}).get("status")
     print(
-        f"PASS development environment inventory ({relative_path.as_posix()}, generated {generated_at}, redaction {redaction_status})"
+        f"PASS inventory structure/freshness/privacy ({relative_path.as_posix()}, generated {generated_at}, redaction {redaction_status}); actual-host qualification remains unqualified"
     )
 
 
@@ -280,9 +280,6 @@ def _check_dev_environment_inventory_drift() -> None:
 
 def _check_sot_registry_authority() -> None:
     """Fail release on incoherent identity, incomplete membership, or pruned census."""
-    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
-    if str(package_src) not in sys.path:
-        sys.path.insert(0, str(package_src))
     try:
         from groundtruth_kb.project.registry_control_plane import validate_registry
 
@@ -306,9 +303,6 @@ def _check_sot_registry_authority() -> None:
 
 
 def _standing_backlog_health_helpers():
-    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
-    if str(package_src) not in sys.path:
-        sys.path.insert(0, str(package_src))
     from groundtruth_kb.project.doctor import check_standing_backlog_health  # noqa: PLC0415
 
     return check_standing_backlog_health
@@ -326,25 +320,20 @@ def _check_standing_backlog_health() -> None:
     print(f"PASS standing backlog health ({warn_count} warning findings)")
 
 
-def _agent_red_app_root_minimization_helpers():
-    package_src = PROJECT_ROOT / "groundtruth-kb" / "src"
-    if str(package_src) not in sys.path:
-        sys.path.insert(0, str(package_src))
-    from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization  # noqa: PLC0415
+def _application_isolation_helpers():
+    from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state
 
-    return validate_app_root_minimization
+    return evaluate_isolation_state
 
 
-def _check_agent_red_app_root_minimization() -> None:
-    validate_app_root_minimization = _agent_red_app_root_minimization_helpers()
-    result = validate_app_root_minimization(
-        PROJECT_ROOT / "applications" / "Agent_Red",
-        project_root=PROJECT_ROOT,
-        tracked_only=True,
+def _check_registered_application_roots() -> None:
+    evaluate_isolation_state = _application_isolation_helpers()
+    result = evaluate_isolation_state(PROJECT_ROOT)
+    if result["verdicts"]:
+        raise GateFailure("Application registry checks: " + "; ".join(row["details"] for row in result["verdicts"]))
+    print(
+        f"PASS application registry checks ({len(result['slots_status'])} applications); native lifecycle qualification is separate"
     )
-    if not result.ok:
-        raise GateFailure("Agent Red app-root minimization: " + result.first_error_message())
-    print(f"PASS Agent Red app-root minimization ({len(result.actual_entries)} top-level artifacts)")
 
 
 def _check_isolation_program_backstop() -> None:
@@ -414,7 +403,6 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
             "platform_tests/scripts/test_gtkb_scoped_client.py",
             "platform_tests/scripts/test_gtkb_dashboard_control_plane.py",
             "platform_tests/scripts/test_gtkb_overlay.py",
-            "platform_tests/scripts/test_session_self_initialization.py",
             "platform_tests/scripts/test_groundtruth_governance_adoption.py",
             "platform_tests/scripts/test_codex_hook_parity.py",
             "platform_tests/scripts/test_run_spec_derived_tests.py",
@@ -427,7 +415,6 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
             "platform_tests/scripts/test_wrap_scan_hygiene_skip_dirs.py",
             "platform_tests/scripts/test_wrap_scan_consistency_allowlist.py",
             "platform_tests/scripts/test_rehearse_isolation.py",
-            "platform_tests/scripts/test_standing_backlog_harvest.py",
             "platform_tests/scripts/test_isolation_program_backstop.py",
             "applications/Agent_Red/tests/integrations/test_cosmos_schema_extensions.py",
             "applications/Agent_Red/tests/integrations/test_action_executor.py",
@@ -443,9 +430,7 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
         timeout=300,
     )
 
-    # Per Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY (bridge -006 GO):
-    # spec-event-surfacer hook + supporting upstream tests for managed-artifact
-    # registry, scaffold, upgrade, and doctor coverage of the new hook entries.
+    # Verify retired-hook absence and retained scaffold/upgrade/doctor behavior.
     # Run in a separate pytest invocation with --rootdir so the upstream
     # `groundtruth-kb/tests/conftest.py` doesn't collide with `tests/conftest.py`,
     # and so the project-root pyproject.toml `testpaths=["tests"]` doesn't
@@ -515,7 +500,7 @@ def main() -> int:
         "--dev-inventory-max-age-hours",
         type=int,
         default=None,
-        help="Maximum allowed age for docs/release/dev-environment-inventory.json.",
+        help="Maximum allowed age for .groundtruth/inventory/dev-environment-inventory.json.",
     )
     args = parser.parse_args()
 
@@ -527,7 +512,7 @@ def main() -> int:
         _check_secret_ci_workflow_present()
         _check_tracked_secret_scan()
         _check_standing_backlog_health()
-        _check_agent_red_app_root_minimization()
+        _check_registered_application_roots()
         _check_no_window_spawn_audit()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)

@@ -58,7 +58,7 @@ def test_native_project_commit_runs_actual_normal_hooks_preserving_foreign_index
     foreign.write_bytes(b"foreign unstaged work\x00")
     foreign_index = git(checkout, "ls-files", "--stage", "--", foreign.name).stdout
     result = invoke(config, message)
-    assert result.exit_code == 0, (result.output, result.exception)
+    assert result.exit_code == 0, f"{result.output}\nexception: {result.exception!r}"
     assert base(checkout) != parent
     assert base(checkout) == base(integration(root))
     assert git(checkout, "ls-files", "--stage", "--", foreign.name).stdout == foreign_index

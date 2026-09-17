@@ -308,7 +308,8 @@ def _dispatch_duplicate_candidate(project_root: Path) -> AuditCandidate | None:
         return None
     rules = _load_toml_dict(rules_path)
     harness = _load_json_dict(harness_path)
-    rule_harnesses = rules.get("harnesses") if isinstance(rules.get("harnesses"), dict) else {}
+    harnesses = rules.get("harnesses")
+    rule_harnesses = harnesses if isinstance(harnesses, dict) else {}
     rules_has_fields = any(
         isinstance(record, dict) and all(field in record for field in _DISPATCH_DUPLICATE_FIELDS)
         for record in rule_harnesses.values()

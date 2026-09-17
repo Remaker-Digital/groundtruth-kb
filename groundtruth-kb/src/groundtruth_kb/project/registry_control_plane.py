@@ -15,15 +15,24 @@ import random
 import sqlite3
 import stat
 import subprocess
+import sys
 import time
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from groundtruth_kb.config import GTConfig
+from groundtruth_kb.project.operational_control_config import (
+    REGISTRY_CONTROL_UNITS,
+    OperationalControlConfigError,
+    ResolvedOperationalControl,
+    control_value,
+    load_operational_control_catalog,
+    resolve_operational_controls,
+)
 from groundtruth_kb.project.sot_registry import (
     SoTArtifact,
     _load_toml_bytes,
@@ -93,49 +102,31 @@ class RegistryPaths:
         return cls(root, canonical)
 
 
-_DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS = 300.0
-
-_REGISTRY_LOCK_TIMEOUT_ENV = "GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS"
-
-_REGISTRY_LOCK_INITIAL_BACKOFF_SECONDS = 0.05
-
-_REGISTRY_LOCK_MAX_BACKOFF_SECONDS = 1.0
-
-_REGISTRY_LOCK_BACKOFF_FACTOR = 2.0
-
-
-def _resolve_registry_lock_timeout(explicit: float | None) -> float:
-    """Resolve the control-plane lock acquisition timeout in seconds.
-
-    Precedence: an explicit caller value wins; otherwise the
-    ``GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS`` environment variable; otherwise a
-    generous default. Per DELIB-202667722 (timer governance: relaxed-first,
-    config-backed, no invisible hard-coded values) and WI-5788, the default is
-    generous so sustained concurrent registry writers wait through
-    control-plane.lock contention instead of hard-failing at the retired 30s
-    deadline. Only the acquisition-wait deadline is resolved here; lock
-    ordering, exclusivity, acquisition, and release semantics are unchanged. A
-    lock timeout fails open to the generous default (never fail-closed): a
-    registry operation that errored merely because the env var was unset or
-    malformed would be worse than the contention it guards against.
-    """
-    if explicit is not None:
-        return explicit
-    raw = os.environ.get(_REGISTRY_LOCK_TIMEOUT_ENV)
-    if raw is not None:
-        try:
-            value = float(raw)
-        except ValueError:
-            return _DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
-        if value > 0:
-            return value
-    return _DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
+def _registry_controls(project_root: Path) -> Mapping[str, ResolvedOperationalControl]:
+    """Retain one validated control snapshot for the entire registry write."""
+    try:
+        controls = resolve_operational_controls(
+            load_operational_control_catalog(project_root), list(REGISTRY_CONTROL_UNITS)
+        )
+        for key, unit in REGISTRY_CONTROL_UNITS.items():
+            control_value(controls, key, unit=unit)
+        return controls
+    except OperationalControlConfigError as exc:
+        raise RegistryControlPlaneError(f"operational_controls: {exc}") from exc
 
 
 class _RegistryFileLock:
-    def __init__(self, path: Path, timeout: float | None = None) -> None:
+    def __init__(self, path: Path, *, controls: Mapping[str, ResolvedOperationalControl]) -> None:
         self.path = path
-        self.timeout = _resolve_registry_lock_timeout(timeout)
+        if len({value.catalog_sha256 for value in controls.values()}) != 1:
+            raise RegistryControlPlaneError("Registry lock requires one control snapshot")
+        self.catalog_sha256 = next(iter(controls.values())).catalog_sha256
+        self.timeout = float(control_value(controls, "registry.lock.acquire_seconds", unit="seconds"))
+        self.initial_backoff = float(control_value(controls, "registry.lock.initial_backoff_seconds", unit="seconds"))
+        self.max_backoff = float(control_value(controls, "registry.lock.max_backoff_seconds", unit="seconds"))
+        self.backoff_factor = float(control_value(controls, "registry.lock.backoff_factor", unit="ratio"))
+        self.jitter_min = float(control_value(controls, "registry.lock.jitter_min_ratio", unit="ratio"))
+        self.jitter_max = float(control_value(controls, "registry.lock.jitter_max_ratio", unit="ratio"))
         self._handle: Any = None
 
     def __enter__(self) -> _RegistryFileLock:
@@ -144,12 +135,12 @@ class _RegistryFileLock:
         # Byte-range locks may extend beyond EOF. Seeding a byte before
         # acquisition races another holder and is itself denied on Windows.
         deadline = time.monotonic() + self.timeout
-        backoff = _REGISTRY_LOCK_INITIAL_BACKOFF_SECONDS
+        backoff = self.initial_backoff
         attempt = 0
         while True:
             try:
                 self._handle.seek(0)
-                if os.name == "nt":
+                if sys.platform == "win32":
                     import msvcrt
 
                     msvcrt.locking(self._handle.fileno(), msvcrt.LK_NBLCK, 1)
@@ -167,8 +158,8 @@ class _RegistryFileLock:
                 # Bounded exponential backoff with jitter so contending waiters
                 # stagger instead of hammering the lock at a fixed rate
                 # (WI-5869). The sleep never exceeds the remaining budget.
-                backoff = min(backoff * _REGISTRY_LOCK_BACKOFF_FACTOR, _REGISTRY_LOCK_MAX_BACKOFF_SECONDS)
-                jitter = backoff * random.uniform(0.5, 1.0)
+                backoff = min(backoff * self.backoff_factor, self.max_backoff)
+                jitter = backoff * random.uniform(self.jitter_min, self.jitter_max)
                 sleep_seconds = min(jitter, max(0.0, remaining))
                 if sleep_seconds > 0:
                     time.sleep(sleep_seconds)
@@ -178,7 +169,7 @@ class _RegistryFileLock:
             return
         try:
             self._handle.seek(0)
-            if os.name == "nt":
+            if sys.platform == "win32":
                 import msvcrt
 
                 msvcrt.locking(self._handle.fileno(), msvcrt.LK_UNLCK, 1)
@@ -584,14 +575,18 @@ def census_registry(
     return tuple(entries)
 
 
-def _declaration_lock_path(project_root: Path) -> Path:
+def _declaration_lock_path(
+    project_root: Path, controls: Mapping[str, ResolvedOperationalControl] | None = None
+) -> Path:
     """Reuse the OS writer mutex in this checkout's Git metadata directory."""
+    controls = _registry_controls(project_root) if controls is None else controls
     result = subprocess.run(
         ["git", "-C", str(project_root), "rev-parse", "--absolute-git-dir", "--show-toplevel"],
+        env={key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")},
         capture_output=True,
         text=True,
         encoding="utf-8",
-        timeout=10,
+        timeout=float(control_value(controls, "registry.git_probe_seconds", unit="seconds")),
     )
     lines = result.stdout.splitlines()
     if result.returncode or len(lines) != 2 or Path(lines[1]).resolve() != project_root.resolve():
@@ -727,29 +722,19 @@ def _validate_registry_effects(
         ):
             _validate_relinquished_coverage(paths.project_root, old, resolver)
     required = {self_record.authority_spec_id, *(record.authority_spec_id for record in affected)}
-    if config.authority_url:
-        from urllib.parse import quote
+    if not config.authority_url:
+        raise RegistryControlPlaneError("No authority_url is configured for the selected project")
+    from urllib.parse import quote
 
-        from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+    from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
-        client = AuthorityClient(config.authority_url)
-        try:
-            formals = {
-                ident: client.request("GET", f"/v1/specifications/{quote(ident, safe='')}")
-                for ident in sorted(required)
-            }
-        except AuthorityClientError as exc:
-            raise RegistryControlPlaneError(f"{exc.code}: {exc}") from exc
-    else:
-        from groundtruth_kb.db import KnowledgeDB
-
-        db = KnowledgeDB(config.db_path, read_only=True)
-        try:
-            formals = {ident: db.get_spec(ident) for ident in sorted(required)}
-        except sqlite3.Error as exc:
-            raise RegistryControlPlaneError(f"Cannot read current formal sources: {exc}") from exc
-        finally:
-            db.close()
+    client = AuthorityClient(config.authority_url)
+    try:
+        formals = {
+            ident: client.request("GET", f"/v1/specifications/{quote(ident, safe='')}") for ident in sorted(required)
+        }
+    except AuthorityClientError as exc:
+        raise RegistryControlPlaneError(f"{exc.code}: {exc}") from exc
     invalid = sorted(
         ident for ident, formal in formals.items() if not isinstance(formal, dict) or formal.get("status") != "active"
     )
@@ -787,7 +772,7 @@ def _render_registry_update(payload: bytes, records: Sequence[SoTArtifact]) -> b
 
 
 def _update_registry(
-    build,
+    build: Callable[[tuple[SoTArtifact, ...]], tuple[SoTArtifact, ...]],
     *,
     checked_ids: set[str],
     project_root: Path | None = None,
@@ -802,8 +787,9 @@ def _update_registry(
     except ValueError as exc:
         raise RegistryCoverageError("The declaration must be inside the selected project root") from exc
     selected = _registry_config(paths.project_root, config)
+    controls = _registry_controls(paths.project_root)
 
-    def prepare():
+    def prepare() -> tuple[bytes, bytes, dict[str, Any]]:
         before_bytes = paths.registry_path.read_bytes()
         before = tuple(_load_toml_bytes(before_bytes))
         before_digest = _sha256_bytes(before_bytes)
@@ -831,6 +817,7 @@ def _update_registry(
             {
                 "changed": bool(changed_ids),
                 "dry_run": dry_run,
+                "control_catalog_sha256": next(iter(controls.values())).catalog_sha256,
                 "before_digest": before_digest,
                 "declaration_digest": _sha256_bytes(rendered),
                 "record_count": len(after),
@@ -840,7 +827,7 @@ def _update_registry(
 
     if dry_run:
         return prepare()[2]
-    with _RegistryFileLock(_declaration_lock_path(paths.project_root)):
+    with _RegistryFileLock(_declaration_lock_path(paths.project_root, controls), controls=controls):
         before, after, result = prepare()
         # Direct owner edits do not take this cooperative writer mutex.
         if paths.registry_path.read_bytes() != before:
@@ -859,7 +846,7 @@ def register_artifacts(records: Sequence[SoTArtifact], **options: Any) -> dict[s
     if not additions or len({record.id for record in additions}) != len(additions):
         raise RegistryCoverageError("Registration requires a nonempty set of unique IDs")
 
-    def build(current):
+    def build(current: tuple[SoTArtifact, ...]) -> tuple[SoTArtifact, ...]:
         existing = {record.id: record for record in current}
         replacements = {
             record.id: record
@@ -928,7 +915,7 @@ def transition_artifact(
     selected_ids = {artifact_id, *removals}
     removed_ids = set(removals) | ({artifact_id} if remove else set())
 
-    def build(current):
+    def build(current: tuple[SoTArtifact, ...]) -> tuple[SoTArtifact, ...]:
         missing = selected_ids - {record.id for record in current}
         if missing:
             raise RegistryCoverageError(f"Registry ID not found: {', '.join(sorted(missing))}")

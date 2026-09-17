@@ -54,7 +54,6 @@ def test_no_destructive_operations_in_bundle() -> None:
     bundle_should_not_modify = [
         PROJECT_ROOT / ".claude" / "settings.json",
         PROJECT_ROOT / ".codex" / "hooks.json",
-        PROJECT_ROOT / "scripts" / "session_self_initialization.py",
     ]
     # We can't time-travel, but we can assert these files exist (sanity) and
     # were not deleted by the bundle.

@@ -1,7 +1,7 @@
 """Predecessor results through native readiness, effects and real Git workspaces."""
 
 import json
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from threading import Event
 
@@ -9,6 +9,7 @@ import pytest
 from groundtruth_kb.bridge import native as native_bridge
 from groundtruth_kb.bridge.native import NativeBridgeService
 from groundtruth_kb.native_authority import Mutation, SpecMutation, _related, _write
+from groundtruth_kb.postgres_kernel import PostgresKernelError
 
 from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, work_fields
 from platform_tests.groundtruth_kb.test_native_authority_service import native as native
@@ -249,11 +250,12 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
 
     def pause(*args, **kwargs):
         entered.set()
-        assert release.wait(timeout=10)
+        # Held until the concurrent amendment has been refused by the kernel's bounded lock wait (5 s) - the
+        # bound covers that wait plus client round trips on a slow host; it is not a kernel timeout.
+        assert release.wait(timeout=30)
         return original(*args, **kwargs)
 
-    def writer():
-        writer_started.set()
+    def amend_predecessor():
         return service.amend_specification(
             "SPEC-PREDECESSOR",
             SpecMutation(
@@ -264,6 +266,10 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
             ),
         )
 
+    def writer():
+        writer_started.set()
+        return amend_predecessor()
+
     with monkeypatch.context() as patch:
         patch.setattr(native_bridge, "publish_context_work", pause)
         with ThreadPoolExecutor(max_workers=2) as pool:
@@ -272,13 +278,18 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
             change = pool.submit(writer)
             try:
                 assert writer_started.wait(timeout=10)
-                with pytest.raises(TimeoutError):
-                    change.result(timeout=0.2)
+                # The change cannot cross the effect: while the effect holds the predecessor row the kernel's
+                # bounded lock wait refuses the amendment with its typed error and writes nothing.
+                with pytest.raises(PostgresKernelError) as refused_change:
+                    change.result(timeout=25)
+                assert refused_change.value.code == "retryable_conflict", refused_change.value.message
+                assert client.get("/v1/specifications/SPEC-PREDECESSOR").json()["version"] == 1
             finally:
                 release.set()
             result = effect.result(timeout=15)
             assert result.status_code == 200, result.text
-            assert change.result(timeout=15)["version"] == 2
+    # Synchronized on the effect's completion: the same amendment now acquires the row and completes.
+    assert amend_predecessor()["version"] == 2
     assert (root / "second.py").read_text() == "dependent_result = 3\n"
     assert readiness(client)["predecessors"][0]["reason"] == "predecessor_scope_changed"
     refused = client.post("/v1/bridge/chain-2/publish-work", json=body)

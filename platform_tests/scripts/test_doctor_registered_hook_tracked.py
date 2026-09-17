@@ -23,8 +23,7 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-_PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
-for _p in (str(REPO_ROOT), str(_PACKAGE_SRC)):
+for _p in (str(REPO_ROOT),):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 

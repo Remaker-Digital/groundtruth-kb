@@ -52,8 +52,8 @@ TOKENS: dict[str, re.Pattern[str]] = {
     "NO-ACTION": re.compile(r"\bNO-ACTION\b"),
     "DEFERRED": re.compile(r"\bDEFERRED\b"),
     "PAUTH": re.compile(r"\bPAUTH\b"),
-    "project_authorizations": re.compile(r"\bproject_authorizations\b"),
     "DECISION-NNNN": re.compile(r"\bDECISION-\d{3,}\b"),
+    "project_authorizations": re.compile(r"\bproject_authorizations\b"),
     ".gtkb-state": re.compile(r"\.gtkb-state\b"),
     "harness-state/": re.compile(r"\bharness-state/"),
     "formal-artifact-approvals": re.compile(r"formal-artifact-approvals"),
@@ -70,9 +70,9 @@ EXEMPT_FILES = frozenset({"groundtruth-kb/src/groundtruth_kb/bridge/vocabulary.p
 MUST_BE_CLEAN: tuple[str, ...] = (".githooks/pre-commit",)
 
 
-def _iter_files() -> Iterator[Path]:
+def _iter_files(project_root: Path = PROJECT_ROOT) -> Iterator[Path]:
     for surface in SURFACES:
-        root = PROJECT_ROOT / surface
+        root = project_root / surface
         if root.is_file():
             yield root
             continue
@@ -81,7 +81,7 @@ def _iter_files() -> Iterator[Path]:
         for path in sorted(root.rglob("*")):
             if not path.is_file():
                 continue
-            if EXCLUDED_PARTS & set(path.relative_to(PROJECT_ROOT).parts):
+            if EXCLUDED_PARTS & set(path.relative_to(project_root).parts):
                 continue
             if path.suffix.lower() not in SCANNED_SUFFIXES:
                 continue
@@ -92,11 +92,11 @@ def _count_tokens(text: str) -> dict[str, int]:
     return {name: len(pattern.findall(text)) for name, pattern in TOKENS.items()}
 
 
-def scan() -> dict[str, dict[str, int]]:
+def scan(project_root: Path = PROJECT_ROOT) -> dict[str, dict[str, int]]:
     """Return {relative path: {token: count}} for every file with at least one hit."""
     inventory: dict[str, dict[str, int]] = {}
-    for path in _iter_files():
-        rel = path.relative_to(PROJECT_ROOT).as_posix()
+    for path in _iter_files(project_root):
+        rel = path.relative_to(project_root).as_posix()
         if rel in EXEMPT_FILES:
             continue
         try:
@@ -168,10 +168,20 @@ def test_purged_surfaces_stay_clean() -> None:
     assert dirty == {}, f"purged surfaces reference retired concepts again: {dirty}"
 
 
-def test_every_token_is_still_present_somewhere_or_retired_from_the_list() -> None:
-    """Keep TOKENS honest: a token that no surface references any more should be
-    removed from the list so the ratchet keeps asserting only live drift."""
+def test_purged_tokens_keep_a_zero_allowance(tmp_path: Path) -> None:
+    """A retired concept that no surface references any more stays in TOKENS: reaching zero establishes a zero
+    allowance, and the first reintroduction anywhere in a scanned surface is a regression finding."""
     current = scan()
     seen = {token for counts in current.values() for token in counts}
-    unused = sorted(set(TOKENS) - seen)
-    assert unused == [], f"retired tokens with no remaining references (remove them from TOKENS): {unused}"
+    purged = sorted(set(TOKENS) - seen)
+    assert "DECISION-NNNN" in purged, "DECISION-NNNN has been reintroduced somewhere; the baseline check names the file"
+    assert not [p for p in _differences(_load_baseline(), current) if "DECISION-NNNN" in p], (
+        "no finding for a purged token"
+    )
+    (tmp_path / "scripts").mkdir()
+    (tmp_path / "scripts" / "reintroduced.py").write_text("# refers to DECISION-1234 again\n", encoding="utf-8")
+    reintroduced = scan(tmp_path)
+    assert reintroduced == {"scripts/reintroduced.py": {"DECISION-NNNN": 1}}
+    assert _differences({}, reintroduced) == [
+        "scripts/reintroduced.py: DECISION-NNNN rose from 0 to 1 (a retired concept was reintroduced)"
+    ]

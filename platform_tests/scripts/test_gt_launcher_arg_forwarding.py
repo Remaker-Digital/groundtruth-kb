@@ -26,7 +26,8 @@ LAUNCHER = PROJECT_ROOT / "scripts" / "gt.ps1"
 VENV_PYTHON = PROJECT_ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe"
 
 MULTILINE_ARG = "alpha\nbeta"
-NO_SUCH_COMMAND = re.compile(r"No such command '(.*?)'\.", re.DOTALL)
+# Click's usage error for an unknown command, or the CLI group's own refusal of a name with no native route.
+NO_SUCH_COMMAND = re.compile(r"No such command '(.*?)'\.|'(.*?)' has no native authority route\.", re.DOTALL)
 
 
 def _powershell() -> str:
@@ -44,6 +45,10 @@ def _run(*args: str) -> subprocess.CompletedProcess[str]:
         pytest.skip("the gt.ps1 launcher targets the Windows project venv layout")
     if not LAUNCHER.is_file():
         pytest.fail(f"launcher missing at {LAUNCHER}")
+    if not VENV_PYTHON.is_file():
+        # The launcher resolves the interpreter by in-root relative path; a qualification clone has no project
+        # interpreter, so the forwarding cases are measured only where the production layout exists.
+        pytest.skip(f"project interpreter missing at {VENV_PYTHON}; the launcher is exercised on the production host")
     return subprocess.run(
         [_powershell(), "-NoProfile", "-File", str(LAUNCHER), *args],
         capture_output=True,
@@ -80,7 +85,7 @@ def _rejected_command_payload(result: subprocess.CompletedProcess[str]) -> str:
     stream = result.stderr + "\n" + result.stdout
     match = NO_SUCH_COMMAND.search(stream)
     assert match is not None, "CLI did not echo the rejected command back:\n" + stream
-    return match.group(1)
+    return next(group for group in match.groups() if group is not None)
 
 
 def test_newline_bearing_argument_arrives_as_a_single_argument() -> None:
@@ -101,17 +106,20 @@ def test_multiline_argument_is_not_truncated_at_the_first_newline() -> None:
     assert payload == _rejected_command_payload(_run_direct(MULTILINE_ARG))
 
 
-def test_trailing_flag_survives_after_a_newline_bearing_argument() -> None:
+def test_trailing_flag_survives_after_a_newline_bearing_argument(tmp_path: Path) -> None:
     """Case 3: trailing flags after a multi-line value survive.
 
-    ``--json`` stands in as the observable trailing flag: when it reaches the
-    CLI the read-only listing emits JSON, and when it is discarded the same
-    command emits the human-readable table instead.
+    ``--format json`` stands in as the observable trailing flag on an authority-free
+    read-only command: when it reaches the CLI the tree classification is emitted
+    as JSON, and when it is discarded the same command emits the Markdown report.
     """
-    result = _run("backlog", "list", "--contains", MULTILINE_ARG, "--json")
+    tree = tmp_path / "tree"
+    tree.mkdir()
+    (tree / MULTILINE_ARG.replace("\n", "_")).write_text("x\n", encoding="utf-8")
+    result = _run("project", "classify-tree", "--dir", str(tree), "--ignore-glob", MULTILINE_ARG, "--format", "json")
     assert result.returncode == 0, result.stderr
-    assert result.stdout.strip() == "[]", (
-        f"trailing --json did not reach the CLI after a newline-bearing argument; got: {result.stdout!r}"
+    assert result.stdout.lstrip().startswith("{"), (
+        f"trailing --format json did not reach the CLI after a newline-bearing argument; got: {result.stdout!r}"
     )
 
 

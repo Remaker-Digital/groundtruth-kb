@@ -5,6 +5,11 @@ GT-KB coordinates a specific artifact response through the native CLI. Use
 to read the dispatched attempt and its current requirements. The owner selects
 work until Dispatcher Next is independently qualified and activated.
 
+A bridge message is authoritative at receipt and has no continuing authority.
+Re-query canonical domain state before later actions. A successor context obtains
+its own claim; the original author need not return. Independent review requires
+a distinct eligible context.
+
 Each receiving context claims only the next artifact it will deliver. A claim
 confers no continuing ownership of a work item, project or other context's work.
 Harnesses use their own configuration and communicate through CLI services and

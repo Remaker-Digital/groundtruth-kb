@@ -36,18 +36,18 @@ gt --version
 
 ## Fastest path: project init
 
-For a profile-based scaffold with templates, hooks, rules, seed data, and
-optional git initialization, use:
+For a profile-based scaffold of a registered application (templates, hooks,
+rules and profile-tiered CI) under a GT-KB host, use:
 
 ```bash
-gt project init my-project --profile local-only --owner "Your Organization" --init-git
+gt --config <host>/groundtruth.toml project init my-project --project-id <PROJECT> --host-root <host> --owner "Your Organization" --profile local-only
 ```
 
-Alternatively, for a lightweight same-day prototype:
-
-```bash
-gt bootstrap-desktop my-project --owner "Your Organization" --init-git
-```
+`gt project init` is the single initializer: the application must be
+registered (`gt application register`), the execution project must carry
+`repository_ref = application:<name>`, the target must be empty, and no local
+database or commit is created. The retired `gt bootstrap-desktop` prototype
+path has no replacement command. See [`gt project init`](reference/cli.md#gt-project-init).
 
 Then continue with the remaining steps if you want to understand the underlying
 manual setup.

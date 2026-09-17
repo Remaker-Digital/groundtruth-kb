@@ -136,7 +136,11 @@ def test_formal_link_writer_cannot_rewrite_other_artifact_or_completion_evidence
     before = history_count(service)
     result = change(client, "FOREIGN", version=1, **fields())
     assert result.status_code == 422 and result.json()["error"]["code"] == "invalid_formal_link"
-    assert client.get("/v1/project-formal-links/FOREIGN").status_code == 404
+    readback = client.get("/v1/project-formal-links/FOREIGN")
+    if other_type == "git_commit":
+        assert readback.status_code == 404
+    else:
+        assert readback.status_code == 200 and readback.json()["artifact_type"] == other_type
     assert client.get("/v1/project-formal-links").json()["records"] == []
     with service.kernel.transaction(read_only=True) as tx:
         preserved = tx.get("project_artifact_links", {"id": "FOREIGN"})
@@ -356,3 +360,207 @@ def test_real_cli_formal_link_record_readback_retirement_and_unavailable_refusal
     assert unavailable.returncode != 0 and "authority_unavailable" in unavailable.stdout + unavailable.stderr
     assert client.get("/v1/project-formal-links/LINK-CLI").json() == before
     assert history_count(service) == history
+
+
+def _import_obsolete_project_link(service, artifact_type, record_id="OBSOLETE"):
+    row = {column: None for column in TABLE_SPECS["project_artifact_links"].columns}
+    row.update(
+        id=record_id,
+        version=1,
+        project_id="PROJECT-1",
+        artifact_type=artifact_type,
+        artifact_ref="historical-reference",
+        relationship="historical-link",
+        status="active",
+        changed_at=datetime.now(UTC).isoformat(),
+        changed_by="migration-fixture",
+        change_reason="Represent an imported historical relationship",
+    )
+    return service.kernel.mutate_current(
+        table="project_artifact_links",
+        identity={"id": record_id},
+        expected_version=0,
+        new_state=row,
+        actor="qualification",
+        reason="Imported relationship fixture",
+    )
+
+
+@pytest.mark.parametrize("artifact_type", ["bridge_thread", "completion_guard"])
+def test_obsolete_link_retirement_preserves_identity_project_and_formal_roots(native, artifact_type):
+    service, client, _, _ = native
+    seed(client)
+    _import_obsolete_project_link(service, artifact_type)
+    original_project = client.get("/v1/projects/PROJECT-1").json()
+    original_roots = client.get("/v1/project-formal-links").json()
+    with service.kernel.transaction(read_only=True) as tx:
+        original = tx.get("project_artifact_links", {"id": "OBSOLETE"})
+    history = history_count(service)
+    result = change(client, "OBSOLETE", version=1, status="retired")
+    assert result.status_code == 200, result.text
+    row = result.json()
+    assert row["version"] == 2 and row["status"] == "retired"
+    for key in ("id", "project_id", "artifact_type", "artifact_ref", "relationship", "notes"):
+        assert row[key] == original[key]
+    expected_project = {
+        **original_project,
+        "artifact_links": [link for link in original_project["artifact_links"] if link["id"] != "OBSOLETE"],
+    }
+    assert client.get("/v1/projects/PROJECT-1").json() == expected_project
+    assert client.get("/v1/project-formal-links/OBSOLETE").json() == row
+    assert client.get("/v1/project-formal-links").json() == original_roots
+    assert history_count(service) == history + 1
+    for version, values, code in (
+        (1, {"status": "retired"}, "cas_conflict"),
+        (2, {"status": "active"}, "invalid_formal_link"),
+        (2, {"status": "retired", "artifact_ref": "other"}, "invalid_formal_link"),
+    ):
+        refused = change(client, "OBSOLETE", version=version, **values)
+        assert refused.status_code == (409 if code == "cas_conflict" else 422)
+        assert refused.json()["error"]["code"] == code
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.get("project_artifact_links", {"id": "OBSOLETE"}) == row
+    assert history_count(service) == history + 1
+
+
+@pytest.mark.parametrize("artifact_type", ["bridge_thread", "completion_guard", "git_commit"])
+def test_obsolete_link_retirement_cannot_retarget_add_notes_or_retire_commit_evidence(native, artifact_type):
+    service, client, _, _ = native
+    seed(client)
+    _import_obsolete_project_link(service, artifact_type)
+    with service.kernel.transaction(read_only=True) as tx:
+        before = tx.get("project_artifact_links", {"id": "OBSOLETE"})
+    history = history_count(service)
+    attempts = [
+        {"status": "retired", "notes": "rewrite evidence"},
+        {"status": "retired", "project_id": "PROJECT-OTHER"},
+        {"status": "retired", "artifact_ref": "other"},
+    ]
+    if artifact_type == "git_commit":
+        attempts.append({"status": "retired"})
+    for values in attempts:
+        result = change(client, "OBSOLETE", version=1, **values)
+        assert result.status_code == 422 and result.json()["error"]["code"] == "invalid_formal_link"
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.get("project_artifact_links", {"id": "OBSOLETE"}) == before
+    assert history_count(service) == history
+
+
+@pytest.mark.parametrize("status", ["verified", "retired", "cancelled"])
+@pytest.mark.parametrize("artifact_type", ["bridge_thread", "completion_guard"])
+def test_obsolete_link_retirement_preserves_closed_projects(native, status, artifact_type):
+    service, client, _, _ = native
+    seed(client)
+    _import_obsolete_project_link(service, artifact_type)
+    with service.kernel.transaction() as tx:
+        original = tx.get("project_artifact_links", {"id": "OBSOLETE"})
+        project = tx.get("projects", {"id": "PROJECT-1"})
+        tx.mutate(
+            table="projects",
+            identity={"id": "PROJECT-1"},
+            expected_version=project["version"],
+            new_state={**project, "status": status},
+            actor="qualification",
+            reason="Closed project fixture",
+        )
+    history = history_count(service)
+    result = change(client, "OBSOLETE", version=1, status="retired")
+    assert result.status_code == 422 and result.json()["error"]["code"] == "project_closed"
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.get("project_artifact_links", {"id": "OBSOLETE"}) == original
+    assert history_count(service) == history
+
+
+def test_concurrent_obsolete_retirement_records_one_transition(native):
+    service, client, _, _ = native
+    seed(client)
+    _import_obsolete_project_link(service, "bridge_thread")
+    barrier = Barrier(2)
+    history = history_count(service)
+
+    def retire(_):
+        barrier.wait(timeout=10)
+        try:
+            return service.amend_project_formal_link(
+                "OBSOLETE",
+                ProjectFormalLinkMutation(
+                    expected_version=1,
+                    actor="qualification",
+                    reason="Concurrent retirement",
+                    fields={"status": "retired"},
+                ),
+            )
+        except PostgresKernelError as error:
+            return error.code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        outcomes = list(pool.map(retire, range(2)))
+    assert sum(isinstance(result, dict) for result in outcomes) == 1, outcomes
+    assert next(result for result in outcomes if isinstance(result, str)) in {"cas_conflict", "retryable_conflict"}
+    assert history_count(service) == history + 1
+    with service.kernel.transaction(read_only=True) as tx:
+        row = tx.get("project_artifact_links", {"id": "OBSOLETE"})
+    assert row["version"] == 2 and row["status"] == "retired"
+
+
+def test_retirement_route_cannot_create_an_obsolete_relationship(native):
+    service, client, _, _ = native
+    seed(client)
+    history = history_count(service)
+    for values in (
+        {"status": "retired"},
+        {"project_id": "PROJECT-1", "artifact_ref": "historical", "status": "retired"},
+        {"project_id": "PROJECT-1", "artifact_ref": "historical", "artifact_type": "completion_guard"},
+    ):
+        result = change(client, "NEVER-CREATED", **values)
+        assert result.status_code == 422
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.get("project_artifact_links", {"id": "NEVER-CREATED"}) is None
+    assert history_count(service) == history
+
+
+@pytest.mark.parametrize("artifact_type", ["bridge_thread", "completion_guard"])
+def test_real_cli_retires_obsolete_link_with_project_readback(membership_cli, tmp_path, artifact_type):
+    service, client, cli, stop = membership_cli
+    _import_obsolete_project_link(service, artifact_type)
+    document = tmp_path / "retirement.json"
+    document.write_text(json.dumps({"status": "retired"}), encoding="utf-8")
+    before = client.get("/v1/projects/PROJECT-1").json()
+    command = [
+        "projects",
+        "formal-links",
+        "record",
+        "--id",
+        "OBSOLETE",
+        "--fields-file",
+        str(document),
+        "--expected-version",
+        "1",
+        "--actor",
+        "qualification",
+        "--change-reason",
+        "Retire obsolete link",
+        "--json",
+    ]
+    result = cli(*command)
+    assert result.returncode == 0, result.stdout + result.stderr
+    after = json.loads(result.stdout)
+    readback = cli("projects", "show", "PROJECT-1", "--json")
+    assert readback.returncode == 0, readback.stdout + readback.stderr
+    shown = json.loads(readback.stdout)
+    assert shown == {
+        **before,
+        "artifact_links": [link for link in before["artifact_links"] if link["id"] != "OBSOLETE"],
+    }
+    direct = cli("projects", "formal-links", "show", "OBSOLETE", "--json")
+    assert direct.returncode == 0, direct.stdout + direct.stderr
+    assert json.loads(direct.stdout) == after
+    assert after["status"] == "retired" and after["artifact_type"] == artifact_type
+    assert client.get("/v1/projects/PROJECT-1").json() == shown
+    history = history_count(service)
+    stop()
+    unavailable = cli(*command)
+    assert unavailable.returncode != 0 and "authority_unavailable" in unavailable.stdout + unavailable.stderr
+    assert history_count(service) == history
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.get("project_artifact_links", {"id": "OBSOLETE"}) == after

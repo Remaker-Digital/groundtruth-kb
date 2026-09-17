@@ -14,8 +14,14 @@ import time
 from pathlib import Path
 
 import pytest
+import tomlkit
 
 from groundtruth_kb.project import registry_control_plane
+from groundtruth_kb.project.operational_control_config import (
+    CATALOG_RELATIVE_PATH,
+    load_operational_control_catalog,
+    set_operational_controls,
+)
 from groundtruth_kb.project.registry_control_plane import (
     RegistryCoverageError,
     RegistryResolver,
@@ -66,41 +72,36 @@ def test_opaque_container_authorizes_operations_without_claiming_child_identity(
     assert resolver.resolve_operation_path("outside.json") is None
 
 
-def test_registry_lock_timeout_generous_default_and_env_override(
+def _controls(root: Path, timeout: float | None = None):
+    """Create explicit isolated control input using the checked-in source schema."""
+    source = Path(__file__).resolve().parents[2] / CATALOG_RELATIVE_PATH
+    target = root / CATALOG_RELATIVE_PATH
+    document = tomlkit.parse(source.read_text(encoding="utf-8"))
+    if timeout is not None:
+        for row in document["controls"]:
+            if row["id"] == "registry.lock.acquire_seconds":
+                row["value"] = str(timeout)
+            elif row["id"] == "registry.lock.max_backoff_seconds":
+                row["value"] = "0.01"
+            elif row["id"] == "registry.lock.initial_backoff_seconds":
+                row["value"] = "0.001"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(tomlkit.dumps(document), encoding="utf-8")
+    return registry_control_plane._registry_controls(root)
+
+
+def test_registry_lock_uses_canonical_values_and_ignores_environment(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """WI-5788: control-plane lock acquisition timeout is generous + env-configurable.
-
-    Precedence: explicit caller value > ``GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS``
-    env var > generous default. A missing/malformed/non-positive env var fails
-    open to the generous default (never fail-closed), and the default is well
-    above the retired 30s deadline that hard-failed under sustained concurrent
-    writers. Lock semantics are unchanged; only the acquisition-wait deadline
-    is resolved here.
-    """
-    lock_path = tmp_path / "control-plane.lock"
-
-    # Generous default when no env var is set (fail-open, not the retired 30s).
-    monkeypatch.delenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", raising=False)
-    default_timeout = registry_control_plane._RegistryFileLock(lock_path).timeout
-    assert default_timeout == registry_control_plane._DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
-    assert default_timeout >= 120.0
-    assert default_timeout != 30.0
-
-    # Env var overrides the default.
-    monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", "45.5")
-    assert registry_control_plane._RegistryFileLock(lock_path).timeout == 45.5
-
-    # Explicit caller value wins over both env var and default.
-    assert registry_control_plane._RegistryFileLock(lock_path, timeout=3.0).timeout == 3.0
-
-    # Malformed or non-positive env values fail open to the generous default.
-    for bad in ("not-a-number", "0", "-5"):
-        monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", bad)
-        assert (
-            registry_control_plane._RegistryFileLock(lock_path).timeout
-            == registry_control_plane._DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
-        )
+    controls = _controls(tmp_path, 45.5)
+    for injected in ("3.0", "not-a-number", "0", "-5"):
+        monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", injected)
+        lock = registry_control_plane._RegistryFileLock(tmp_path / "control-plane.lock", controls=controls)
+        assert lock.timeout == 45.5
+        assert lock.catalog_sha256 == load_operational_control_catalog(tmp_path).catalog_sha256
+    (tmp_path / CATALOG_RELATIVE_PATH).unlink()
+    with pytest.raises(registry_control_plane.RegistryControlPlaneError, match="unavailable_catalog"):
+        registry_control_plane._registry_controls(tmp_path)
 
 
 def test_census_uses_only_git_and_application_root_boundaries(tmp_path: Path) -> None:
@@ -137,12 +138,12 @@ def test_registry_lock_backoff_and_jitter_stay_under_deadline(tmp_path: Path, mo
     monkeypatch.setattr(time, "sleep", lambda sec: sleeps.append(sec))
 
     # Hold the lock with a competing handle so acquisition retries.
-    blocker = registry_control_plane._RegistryFileLock(lock_path, timeout=0.4)
+    blocker = registry_control_plane._RegistryFileLock(lock_path, controls=_controls(tmp_path, 0.4))
     blocker.__enter__()
     try:
         with (
             pytest.raises(registry_control_plane.RegistryFileLockAcquisitionTimeout),
-            registry_control_plane._RegistryFileLock(lock_path, timeout=0.4),
+            registry_control_plane._RegistryFileLock(lock_path, controls=_controls(tmp_path, 0.4)),
         ):
             pass
     finally:
@@ -150,7 +151,7 @@ def test_registry_lock_backoff_and_jitter_stay_under_deadline(tmp_path: Path, mo
 
     assert sleeps, "acquisition loop must retry with backoff sleeps"
     # All sleeps are positive and bounded by the max backoff.
-    assert all(0 < sec <= registry_control_plane._REGISTRY_LOCK_MAX_BACKOFF_SECONDS for sec in sleeps)
+    assert all(0 < sec <= blocker.max_backoff for sec in sleeps)
     # Backoff grows (roughly) over attempts (jitter allows some variance).
     assert sleeps[0] <= sleeps[-1] * 2.0 + 0.1
 
@@ -160,12 +161,12 @@ def test_registry_lock_typed_timeout_exception(tmp_path: Path, monkeypatch: pyte
     ``RegistryFileLockAcquisitionTimeout`` (subclass of RegistryControlPlaneError).
     """
     lock_path = tmp_path / "control-plane.lock"
-    blocker = registry_control_plane._RegistryFileLock(lock_path, timeout=0.2)
+    blocker = registry_control_plane._RegistryFileLock(lock_path, controls=_controls(tmp_path, 0.2))
     blocker.__enter__()
     try:
         with (
             pytest.raises(registry_control_plane.RegistryFileLockAcquisitionTimeout) as excinfo,
-            registry_control_plane._RegistryFileLock(lock_path, timeout=0.2),
+            registry_control_plane._RegistryFileLock(lock_path, controls=_controls(tmp_path, 0.2)),
         ):
             pass
         assert isinstance(excinfo.value, registry_control_plane.RegistryControlPlaneError)
@@ -174,15 +175,25 @@ def test_registry_lock_typed_timeout_exception(tmp_path: Path, monkeypatch: pyte
         blocker.__exit__(None, None, None)
 
 
-def test_registry_lock_env_timeout_wiring(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """WI-5869: the GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS env var drives the
-    acquisition deadline and is honored (already covered in WI-5788; re-assert
-    after the backoff refactor).
-    """
-    monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", "22.5")
-    assert registry_control_plane._RegistryFileLock(tmp_path / "control-plane.lock").timeout == 22.5
-    monkeypatch.delenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", raising=False)
-    assert (
-        registry_control_plane._RegistryFileLock(tmp_path / "control-plane.lock").timeout
-        == registry_control_plane._DEFAULT_REGISTRY_LOCK_TIMEOUT_SECONDS
-    )
+def test_registry_lock_reload_keeps_current_operation_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    controls = _controls(tmp_path, 22.5)
+    lock_path = tmp_path / "control-plane.lock"
+    active = registry_control_plane._RegistryFileLock(lock_path, controls=controls)
+    with active:
+        path = tmp_path / CATALOG_RELATIVE_PATH
+        before = load_operational_control_catalog(tmp_path)
+        proposed = tomlkit.parse(path.read_text(encoding="utf-8"))
+        for row in proposed["controls"]:
+            if row["id"] == "registry.lock.acquire_seconds":
+                row["value"] = "33.5"
+        result = set_operational_controls(
+            tmp_path, tomlkit.dumps(proposed).encode(), expected_sha256=before.catalog_sha256
+        )
+        assert result["changed"]
+        monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", "1")
+        successor = registry_control_plane._RegistryFileLock(
+            lock_path, controls=registry_control_plane._registry_controls(tmp_path)
+        )
+        assert active.timeout == 22.5
+        assert successor.timeout == 33.5
+        assert active.catalog_sha256 != successor.catalog_sha256

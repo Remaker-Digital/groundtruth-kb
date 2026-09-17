@@ -177,6 +177,22 @@ def _walk_candidate_files(project_root: Path) -> list[tuple[Path, str]]:
     return candidates
 
 
+def domain_coverage(project_root: Path) -> dict[str, int]:
+    """Count the candidate files the scan walks inside and outside the neutral baseline.
+
+    Coverage is proven by files walked, not by references found: a neutral baseline names no generated target, so a
+    zero reference count there is the expected state, while a zero file count means the domain was not searched.
+    """
+    baseline_files = 0
+    other_files = 0
+    for _path, source_path in _walk_candidate_files(project_root):
+        if source_path.startswith(".harness-baseline-configuration/"):
+            baseline_files += 1
+        else:
+            other_files += 1
+    return {"neutral_baseline_files": baseline_files, "other_files": other_files}
+
+
 def classify_reference(*, source_path: str, line: str, target: str) -> str:
     """Classify one reference. Deterministic and order-sensitive.
 

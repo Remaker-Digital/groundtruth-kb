@@ -34,10 +34,7 @@ from typing import Any
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB = REPO_ROOT / "groundtruth.db"
 DEFAULT_FIXTURE = REPO_ROOT / "applications" / "Agent_Red" / "tests" / "fixtures" / "ci_membase_seed.json"
-TEST_FILES = (
-    REPO_ROOT / "platform_tests" / "scripts" / "test_groundtruth_governance_adoption.py",
-    REPO_ROOT / "platform_tests" / "scripts" / "test_standing_backlog_harvest.py",
-)
+TEST_FILES = (REPO_ROOT / "platform_tests" / "scripts" / "test_groundtruth_governance_adoption.py",)
 
 SPEC_ID_PREFIXES = ("GOV-", "PB-", "ADR-", "DCL-", "SPEC-", "REQ-")
 
@@ -53,7 +50,8 @@ def discover_required_ids(test_files: tuple[Path, ...] = TEST_FILES) -> tuple[li
 
     Returns (spec_ids, deliberation_ids), each sorted and deduplicated. Scans
     every file in ``test_files`` so a single fixture covers multiple test
-    modules (governance_adoption + standing_backlog_harvest, currently).
+    modules (governance_adoption, currently; the standing-backlog harvest
+    module was retired with its MemBase audit under GOV-SOT-SINGLETON-001).
     """
     ids_in_calls: set[str] = set()
     ids_in_dicts: set[str] = set()

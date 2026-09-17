@@ -1,27 +1,29 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
-GroundTruth KB — F8 Provenance Reconciliation.
+GroundTruth KB — F8 Provenance Reconciliation over the native authority.
 
-Five detectors that inspect the knowledge database for provenance drift:
+Five read-only detectors inspect the current specification records of the
+selected authority for provenance drift:
 
   - ``find_orphaned_assertions`` — assertion targets whose files no longer exist
-  - ``find_stale_specs`` — specs unchanged across an N-snapshot window while
-    their section continued to evolve (with a changed_at fallback path)
+  - ``find_stale_specs`` — specs unchanged for ``staleness_threshold_days``
+    inside a section that changed within ``section_activity_days``
   - ``find_authority_conflicts`` — stated vs inferred specs with structural
     assertion-target overlap inside the same (section, scope)
   - ``find_duplicate_specs`` — specs with near-identical titles (token overlap)
   - ``find_expired_provisionals`` — provisional specs whose replacement
-    (looked up via ``provisional_until``) has reached lifecycle
-    ``status in {'implemented', 'verified'}``
+    (looked up via ``provisional_until``) carries ``implementation_verified_at``
+
+Every detector reads through a :class:`SpecSource`: a read-only view of the
+current specification records in the native record shape (``id``, ``title``,
+``status``, ``section``, ``scope``, ``authority``, ``assertions`` as a JSON
+list, ``provisional_until``, ``implementation_verified_at``, ``changed_at``).
+:class:`NativeSpecSource` pages ``GET /v1/specifications`` of the configured
+authority. Nothing here writes: findings are reports, not verdicts or gates.
 
 All detectors return a :class:`ReconciliationReport` holding a category label
-and a list of finding dicts.  Reports are deterministic: callers can pass them
-directly to a CLI aggregator and expect the same output for the same KB.
-
-Approved scope: bridge/gtkb-spec-pipeline-f8-003.md,
-bridge/gtkb-phase4-implementation-007.md,
-bridge/gtkb-phase4-implementation-009.md,
-bridge/gtkb-phase4-implementation-010.md.
+and a list of finding dicts.  Reports are deterministic: the same records give
+the same output.
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -29,12 +31,15 @@ Licensed under AGPL-3.0-or-later.
 
 from __future__ import annotations
 
+import json
 import re
 import string
+from collections.abc import Iterable, Sequence
+from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
 from groundtruth_kb.assertions import (
     AssertionTarget,
@@ -42,9 +47,92 @@ from groundtruth_kb.assertions import (
     _safe_glob,
     _safe_resolve,
 )
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+from groundtruth_kb.postgres_kernel import canonical_json_bytes
 
-if TYPE_CHECKING:
-    from groundtruth_kb.db import KnowledgeDB
+ACTIVE_STATUS = "active"
+"""Native lifecycle status of a current, load-bearing specification."""
+
+DETECTOR_CATEGORIES: tuple[str, ...] = (
+    "orphaned_assertions",
+    "stale_specs",
+    "authority_conflicts",
+    "duplicate_specs",
+    "expired_provisionals",
+)
+"""Every detector category in the canonical run order."""
+
+
+# ---------------------------------------------------------------------------
+# Specification sources
+# ---------------------------------------------------------------------------
+
+
+class SpecSource(Protocol):
+    """Read-only source of current specification records in the native shape."""
+
+    def list_specs(self, *, status: str | None = None, authority: str | None = None) -> list[dict[str, Any]]:
+        """Return the current records matching every given filter, in deterministic ID order."""
+        ...
+
+
+class NativeSpecSource:
+    """Page ``GET /v1/specifications`` of the selected authority; never writes.
+
+    Pages are read with ``limit``/``after`` until ``next_after`` is null.  The
+    ``status`` filter is a native list filter and is passed through as a query
+    parameter; the list route accepts no ``authority`` query field, so
+    ``authority`` is applied client-side over the listed records.  Each
+    distinct ``status`` listing is read once per instance, so one
+    reconciliation run is one bounded read of current state.  A malformed
+    page (wrong shape, missing or duplicate identities, a cursor that does not
+    advance) is an ``invalid_response`` error, never a partial corpus.
+    """
+
+    page_size = 500
+
+    def __init__(self, client: AuthorityClient) -> None:
+        self.client = client
+        self._listings: dict[str | None, list[dict[str, Any]]] = {}
+
+    def list_specs(self, *, status: str | None = None, authority: str | None = None) -> list[dict[str, Any]]:
+        records = self._listing(status)
+        if authority is not None:
+            return [record for record in records if record.get("authority") == authority]
+        return list(records)
+
+    def _listing(self, status: str | None) -> list[dict[str, Any]]:
+        cached = self._listings.get(status)
+        if cached is not None:
+            return cached
+        records: list[dict[str, Any]] = []
+        identities: set[str] = set()
+        cursors: set[str] = set()
+        after: str | None = None
+        while True:
+            page = self.client.request(
+                "GET",
+                "/v1/specifications",
+                query={"status": status, "after": after, "limit": self.page_size},
+            )
+            if not isinstance(page, dict) or not isinstance(page.get("records"), list) or "next_after" not in page:
+                raise AuthorityClientError("invalid_response", "Expected a complete specification page")
+            for record in page["records"]:
+                if not isinstance(record, dict) or not isinstance(record.get("id"), str) or not record["id"]:
+                    raise AuthorityClientError("invalid_response", "Expected specification identities in the page")
+                if record["id"] in identities:
+                    raise AuthorityClientError("invalid_response", "Duplicate specification in the listed corpus")
+                identities.add(record["id"])
+                records.append(record)
+            next_after = page["next_after"]
+            if next_after is None:
+                break
+            if not isinstance(next_after, str) or not next_after or not page["records"] or next_after in cursors:
+                raise AuthorityClientError("invalid_response", "Specification pagination did not advance")
+            cursors.add(next_after)
+            after = next_after
+        self._listings[status] = records
+        return records
 
 
 # ---------------------------------------------------------------------------
@@ -90,20 +178,38 @@ def _parse_iso(ts: str | None) -> datetime | None:
     return parsed
 
 
+def _is_timestamp(value: Any) -> bool:
+    """True for a datetime or a parseable ISO-8601 string; null and junk are not timestamps."""
+    if isinstance(value, datetime):
+        return True
+    return isinstance(value, str) and _parse_iso(value) is not None
+
+
+def _spec_assertions(spec: dict[str, Any]) -> list[Any]:
+    """Return the spec's assertion list.
+
+    Native records carry ``assertions`` as a JSON list.  A JSON string (an
+    older projection of the same field) is decoded; any other shape yields no
+    assertions rather than a crash.
+    """
+    value = spec.get("assertions")
+    if isinstance(value, str):
+        with suppress(json.JSONDecodeError):
+            value = json.loads(value)
+    return value if isinstance(value, list) else []
+
+
 def _iter_spec_targets(spec: dict[str, Any]) -> list[AssertionTarget]:
-    """Extract typed assertion targets from a spec's parsed assertions list.
+    """Extract typed assertion targets from a spec's assertions list.
 
     Mirrors ``impact._targets_for_spec`` so F2 and F8 share the exact same
     extraction path.  Non-dict assertion children (plain text) are silently
     dropped by ``_extract_assertion_targets`` — this is the F8 "plain-text
     safety" guarantee.
     """
-    assertions = spec.get("assertions_parsed") or spec.get("_assertions_parsed") or []
     targets: list[AssertionTarget] = []
-    if not isinstance(assertions, list):
-        return targets
-    for a in assertions:
-        targets.extend(_extract_assertion_targets(a))
+    for assertion in _spec_assertions(spec):
+        targets.extend(_extract_assertion_targets(assertion))
     return targets
 
 
@@ -168,13 +274,13 @@ def _target_file_exists(
 
 
 def find_orphaned_assertions(
-    db: KnowledgeDB,
+    source: SpecSource,
     *,
     project_root: Path | None = None,
 ) -> ReconciliationReport:
     """Find assertion targets whose backing files no longer exist.
 
-    Iterates every current spec, extracts its typed assertion targets via
+    Iterates every active spec, extracts its typed assertion targets via
     the shared ``_extract_assertion_targets`` helper, and reports each
     target whose resolved path (glob or literal) yields zero matches.
 
@@ -187,18 +293,16 @@ def find_orphaned_assertions(
     targets).
 
     Args:
-        db: Knowledge database.
+        source: Current specification records.
         project_root: Root used to resolve relative paths.  Defaults to the
-            database's configured project root or the current working
-            directory if no configuration is available.
+            current working directory.
     """
-    root = _resolve_project_root(db, project_root)
+    root = Path(project_root) if project_root is not None else Path.cwd()
     findings: list[dict[str, Any]] = []
 
-    for spec in db.list_specs():
+    for spec in source.list_specs(status=ACTIVE_STATUS):
         spec_id = spec.get("id")
-        targets = _iter_spec_targets(spec)
-        for target in targets:
+        for target in _iter_spec_targets(spec):
             if not target.file_target:
                 continue
             if _target_file_exists(target, root):
@@ -217,157 +321,67 @@ def find_orphaned_assertions(
     return ReconciliationReport(category="orphaned_assertions", findings=findings)
 
 
-def _resolve_project_root(
-    db: KnowledgeDB,
-    project_root: Path | None,
-) -> Path:
-    """Return a usable project_root for file resolution.
-
-    Priority: explicit argument → ``db.project_root`` attribute → cwd.
-    """
-    if project_root is not None:
-        return Path(project_root)
-    attr = getattr(db, "project_root", None)
-    if attr is not None:
-        return Path(attr)
-    return Path.cwd()
-
-
 # ---------------------------------------------------------------------------
 # Detector 2: Stale specs
 # ---------------------------------------------------------------------------
 
 
 def find_stale_specs(
-    db: KnowledgeDB,
+    source: SpecSource,
     *,
-    staleness_threshold_sessions: int = 5,
     staleness_threshold_days: int = 90,
     section_activity_days: int = 30,
+    now: datetime | None = None,
 ) -> ReconciliationReport:
-    """Detect specs that have become stale inside an evolving section.
+    """Detect active specs that stopped changing while their section kept evolving.
 
-    Snapshot-backed primary path (per bridge/gtkb-phase4-implementation-007.md
-    lines 108-159 and bridge/gtkb-phase4-implementation-009.md):
+    A spec is stale iff its ``changed_at`` is older than
+    ``now - staleness_threshold_days`` AND another active spec in the same
+    ``section`` has ``changed_at`` within the last ``section_activity_days``.
 
-        1. ``all_post_change`` = snapshots with
-           ``captured_at > spec.changed_at``
-        2. If ``len(all_post_change) < N``, fall back to the ``changed_at``
-           path for this spec.
-        3. Sort descending by ``captured_at``; take the N most recent →
-           ``S_N``.
-        4. ``T_window_start = S_N[-1].captured_at``  — the oldest of those
-           N snapshots, i.e. the earliest edge of the N-session evidence
-           window.
-        5. The spec is stale iff some OTHER spec in the same ``section``
-           has ``changed_at > T_window_start`` — activity inside the
-           evidence window, not before it.
+    Specs with no ``section`` (no same-section signal to compare against) or
+    no parseable ``changed_at`` are never reported.  ``now`` must be
+    timezone-aware; it defaults to the current UTC time.
 
-    Fallback path (triggered when the spec has fewer than N post-change
-    snapshots):
-
-        - Spec is stale iff ``spec.changed_at`` is older than
-          ``now - staleness_threshold_days`` AND another spec in the same
-          section has ``changed_at`` within the last
-          ``section_activity_days``.
-
-    Specs with no ``section`` are never reported (no same-section signal
-    to compare against).
+    The N-session snapshot evidence window of the SQLite era has no native
+    record source (session snapshots are retired), so the ``changed_at``
+    window is the only path and every finding carries ``reason: changed_at``.
     """
-    now = datetime.now(UTC)
-    stale_cutoff = now - timedelta(days=staleness_threshold_days)
-    activity_cutoff = now - timedelta(days=section_activity_days)
+    current = now if now is not None else datetime.now(UTC)
+    stale_cutoff = current - timedelta(days=staleness_threshold_days)
+    activity_cutoff = current - timedelta(days=section_activity_days)
 
-    snapshots = db.get_snapshot_history(limit=1000)
-    # Sorted descending by captured_at already (get_snapshot_history contract).
-    _raw_snapshots: list[tuple[datetime | None, dict[str, Any]]] = [
-        (_parse_iso(s.get("captured_at")), s) for s in snapshots
-    ]
-    parsed_snapshots: list[tuple[datetime, dict[str, Any]]] = [(t, s) for t, s in _raw_snapshots if t is not None]
+    dated: list[tuple[dict[str, Any], str, datetime]] = []
+    by_section: dict[str, list[tuple[Any, datetime]]] = {}
+    for spec in source.list_specs(status=ACTIVE_STATUS):
+        section = spec.get("section")
+        changed_at = _parse_iso(spec.get("changed_at"))
+        if not section or changed_at is None:
+            continue
+        dated.append((spec, section, changed_at))
+        by_section.setdefault(section, []).append((spec.get("id"), changed_at))
 
     findings: list[dict[str, Any]] = []
-    all_specs = db.list_specs()
-
-    # Pre-index by section for cheap same-section lookups.
-    by_section: dict[str, list[dict[str, Any]]] = {}
-    for s in all_specs:
-        section = s.get("section")
-        if not section:
-            continue
-        by_section.setdefault(section, []).append(s)
-
-    for spec in all_specs:
-        section = spec.get("section")
-        if not section:
+    for spec, section, changed_at in dated:
+        if changed_at >= stale_cutoff:
             continue
         spec_id = spec.get("id")
-        spec_changed_at = _parse_iso(spec.get("changed_at"))
-        if spec_changed_at is None:
+        has_recent_activity = any(
+            other_id != spec_id and other_changed >= activity_cutoff for other_id, other_changed in by_section[section]
+        )
+        if not has_recent_activity:
             continue
-
-        post_change = [(t, s) for (t, s) in parsed_snapshots if t > spec_changed_at]
-
-        used_snapshot_path = False
-        reason: str | None = None
-        window_start: datetime | None = None
-
-        if len(post_change) >= staleness_threshold_sessions:
-            used_snapshot_path = True
-            selected = post_change[:staleness_threshold_sessions]
-            # Already sorted DESC by captured_at → selected[-1] is the
-            # oldest of the N most recent → the evidence-window start.
-            window_start = selected[-1][0]
-            reason = "snapshot_window"
-
-        if used_snapshot_path:
-            assert window_start is not None
-            others = [o for o in by_section.get(section, []) if o.get("id") != spec_id]
-            has_activity = False
-            for other in others:
-                other_changed = _parse_iso(other.get("changed_at"))
-                if other_changed is None:
-                    continue
-                if other_changed > window_start:
-                    has_activity = True
-                    break
-            if has_activity:
-                findings.append(
-                    {
-                        "type": "stale_spec",
-                        "spec_id": spec_id,
-                        "section": section,
-                        "reason": reason,
-                        "window_start": window_start.isoformat(),
-                        "snapshots_observed": len(post_change),
-                        "threshold_sessions": staleness_threshold_sessions,
-                    }
-                )
-            continue
-
-        # Fallback path — explicit bounded windows.
-        if spec_changed_at >= stale_cutoff:
-            continue
-        others = [o for o in by_section.get(section, []) if o.get("id") != spec_id]
-        has_recent_activity = False
-        for other in others:
-            other_changed = _parse_iso(other.get("changed_at"))
-            if other_changed is None:
-                continue
-            if other_changed >= activity_cutoff:
-                has_recent_activity = True
-                break
-        if has_recent_activity:
-            findings.append(
-                {
-                    "type": "stale_spec",
-                    "spec_id": spec_id,
-                    "section": section,
-                    "reason": "changed_at_fallback",
-                    "changed_at": spec.get("changed_at"),
-                    "threshold_days": staleness_threshold_days,
-                    "section_activity_days": section_activity_days,
-                }
-            )
+        findings.append(
+            {
+                "type": "stale_spec",
+                "spec_id": spec_id,
+                "section": section,
+                "reason": "changed_at",
+                "changed_at": spec.get("changed_at"),
+                "threshold_days": staleness_threshold_days,
+                "section_activity_days": section_activity_days,
+            }
+        )
 
     return ReconciliationReport(category="stale_specs", findings=findings)
 
@@ -377,13 +391,13 @@ def find_stale_specs(
 # ---------------------------------------------------------------------------
 
 
-def find_authority_conflicts(db: KnowledgeDB) -> ReconciliationReport:
+def find_authority_conflicts(source: SpecSource) -> ReconciliationReport:
     """Find stated-vs-inferred specs with overlapping assertion targets.
 
-    A conflict is reported when a ``stated`` spec and an ``inferred`` spec
-    share the SAME ``section`` AND the SAME ``scope`` AND have at least
-    one ``file_target`` string in common after alias resolution and
-    composition flattening.
+    A conflict is reported when an active ``stated`` spec and an active
+    ``inferred`` spec share the SAME ``section`` AND the SAME ``scope`` AND
+    have at least one ``file_target`` string in common after alias resolution
+    and composition flattening.
 
     This is the F8-003 "structural overlap" rule: no semantic similarity,
     only ``file_target`` string identity.  Alias overlap (``target``,
@@ -391,22 +405,20 @@ def find_authority_conflicts(db: KnowledgeDB) -> ReconciliationReport:
     and glob-string overlap (``*`` patterns) are all handled by the
     shared extractor producing identical ``file_target`` strings.
     """
-    stated = db.list_specs(authority="stated")
-    inferred = db.list_specs(authority="inferred")
+    stated = source.list_specs(status=ACTIVE_STATUS, authority="stated")
+    inferred = source.list_specs(status=ACTIVE_STATUS, authority="inferred")
 
     findings: list[dict[str, Any]] = []
     for inf in inferred:
         inf_section = inf.get("section")
         inf_scope = inf.get("scope")
-        inf_targets = _iter_spec_targets(inf)
-        inf_files = {t.file_target for t in inf_targets if t.file_target}
+        inf_files = {t.file_target for t in _iter_spec_targets(inf) if t.file_target}
         if not inf_files:
             continue
         for st in stated:
             if st.get("section") != inf_section or st.get("scope") != inf_scope:
                 continue
-            st_targets = _iter_spec_targets(st)
-            st_files = {t.file_target for t in st_targets if t.file_target}
+            st_files = {t.file_target for t in _iter_spec_targets(st) if t.file_target}
             overlap = inf_files & st_files
             if not overlap:
                 continue
@@ -430,11 +442,11 @@ def find_authority_conflicts(db: KnowledgeDB) -> ReconciliationReport:
 
 
 def find_duplicate_specs(
-    db: KnowledgeDB,
+    source: SpecSource,
     *,
     title_token_overlap_threshold: float = 0.9,
 ) -> ReconciliationReport:
-    """Find spec pairs whose titles share >= ``title_token_overlap_threshold``
+    """Find active spec pairs whose titles share >= ``title_token_overlap_threshold``
     of their tokens.
 
     Tokenization is lowercase + punctuation-strip + whitespace-split.
@@ -443,9 +455,8 @@ def find_duplicate_specs(
     reported once (``spec_a.id < spec_b.id`` order) to keep output
     deterministic and avoid duplicated reports.
     """
-    specs = db.list_specs()
     tokens_by_spec: list[tuple[str, set[str]]] = []
-    for spec in specs:
+    for spec in source.list_specs(status=ACTIVE_STATUS):
         spec_id = spec.get("id")
         if not spec_id:
             continue
@@ -484,57 +495,120 @@ def find_duplicate_specs(
 # ---------------------------------------------------------------------------
 
 
-def find_expired_provisionals(db: KnowledgeDB) -> ReconciliationReport:
-    """Find provisional specs whose replacement has shipped.
+def find_expired_provisionals(source: SpecSource) -> ReconciliationReport:
+    """Find active provisional specs whose replacement has a verified implementation.
 
-    Iterates :meth:`KnowledgeDB.get_provisional_specs` (which already
-    filters on ``authority='provisional' AND provisional_until IS NOT NULL``),
-    then checks each provisional's replacement spec's lifecycle ``status``.
+    A provisional spec is one with ``authority == 'provisional'`` and a
+    ``provisional_until`` reference to its replacement.  It is 'expired' when
+    the referenced replacement record exists and carries
+    ``implementation_verified_at``: the native marker that the replacement's
+    implementation was verified.  The SQLite lifecycle statuses
+    ``implemented``/``verified`` do not exist natively (``status`` is
+    ``active``, ``superseded`` or ``retired``), so the verification timestamp
+    is the equivalent signal.  A replacement without it, or a dangling
+    reference, does NOT expire the provisional: it remains load-bearing until
+    its replacement has actually shipped.
 
-    A provisional spec is 'expired' when:
-
-        (a) the provisional spec itself satisfies
-            ``authority == 'provisional'`` AND ``provisional_until IS NOT NULL``
-            — this is exactly what ``get_provisional_specs`` returns, so
-            callers do not need to re-filter;
-        (b) the replacement spec, looked up by id from ``provisional_until``,
-            has lifecycle ``status in {'implemented', 'verified'}``.
-
-    Replacements still at lifecycle ``status='specified'`` or
-    ``'deprecated'``, or replacements that are themselves provisional,
-    do NOT trigger expiration.  The provisional remains load-bearing
-    until its replacement has actually shipped.
-
-    Note on field separation: ``provisional`` is an AUTHORITY value, not
-    a STATUS value.  Do not filter on ``spec.status == 'provisional'`` —
-    no spec ever has that status.  The current F1 schema keeps authority
-    (source) and status (lifecycle) strictly orthogonal.
-
-    Relies on existing F1 support:
-
-        - ``db.get_provisional_specs()``       (groundtruth_kb/db.py:1048-1059)
-        - ``specifications.authority='provisional'`` pairing with
-          ``specifications.provisional_until``  (groundtruth_kb/db.py:515-527)
+    Note on field separation: ``provisional`` is an AUTHORITY value, not a
+    STATUS value.  Do not filter on ``spec.status == 'provisional'`` — no
+    spec ever has that status.  Authority (source) and status (lifecycle)
+    stay strictly orthogonal.
     """
+    by_id: dict[str, dict[str, Any]] = {
+        spec["id"]: spec for spec in source.list_specs() if isinstance(spec.get("id"), str)
+    }
     findings: list[dict[str, Any]] = []
-    for provisional in db.get_provisional_specs():
+    for provisional in source.list_specs(status=ACTIVE_STATUS, authority="provisional"):
         replacement_id = provisional.get("provisional_until")
-        if not replacement_id:
-            continue  # defensive; get_provisional_specs already filters this
-        replacement = db.get_spec(replacement_id)
+        if not isinstance(replacement_id, str) or not replacement_id:
+            continue
+        replacement = by_id.get(replacement_id)
         if replacement is None:
             continue  # dangling replacement reference is a separate concern
-        if replacement.get("status") in ("implemented", "verified"):
-            findings.append(
-                {
-                    "type": "expired_provisional",
-                    "spec_id": provisional["id"],
-                    "replacement_spec_id": replacement_id,
-                    "replacement_status": replacement["status"],
-                }
-            )
+        verified_at = replacement.get("implementation_verified_at")
+        if not _is_timestamp(verified_at):
+            continue
+        findings.append(
+            {
+                "type": "expired_provisional",
+                "spec_id": provisional.get("id"),
+                "replacement_spec_id": replacement_id,
+                "replacement_status": replacement.get("status"),
+                "replacement_implementation_verified_at": (
+                    verified_at.isoformat() if isinstance(verified_at, datetime) else verified_at
+                ),
+            }
+        )
 
     return ReconciliationReport(
         category="expired_provisionals",
         findings=findings,
     )
+
+
+# ---------------------------------------------------------------------------
+# Composition (shared by the CLI and by tests)
+# ---------------------------------------------------------------------------
+
+
+def run_detectors(
+    source: SpecSource,
+    categories: Iterable[str],
+    *,
+    project_root: Path | None = None,
+    staleness_threshold_days: int = 90,
+    section_activity_days: int = 30,
+) -> list[ReconciliationReport]:
+    """Run the selected detectors in canonical order and return one report each.
+
+    ``categories`` selects by :data:`DETECTOR_CATEGORIES` label; the order of
+    the selection does not matter and unknown labels are a ``ValueError``.
+    """
+    selected = set(categories)
+    unknown = sorted(selected - set(DETECTOR_CATEGORIES))
+    if unknown:
+        raise ValueError(f"Unknown reconciliation detector(s): {', '.join(unknown)}")
+    reports: list[ReconciliationReport] = []
+    for category in DETECTOR_CATEGORIES:
+        if category not in selected:
+            continue
+        if category == "orphaned_assertions":
+            reports.append(find_orphaned_assertions(source, project_root=project_root))
+        elif category == "stale_specs":
+            reports.append(
+                find_stale_specs(
+                    source,
+                    staleness_threshold_days=staleness_threshold_days,
+                    section_activity_days=section_activity_days,
+                )
+            )
+        elif category == "authority_conflicts":
+            reports.append(find_authority_conflicts(source))
+        elif category == "duplicate_specs":
+            reports.append(find_duplicate_specs(source))
+        else:
+            reports.append(find_expired_provisionals(source))
+    return reports
+
+
+def format_report_text(reports: Sequence[ReconciliationReport], *, per_report_limit: int = 50) -> str:
+    """Render reports as the CLI's text output.
+
+    One ``[category] N finding(s)`` block per report with up to
+    ``per_report_limit`` canonical-JSON finding lines (the remainder is
+    counted), then ``Total findings across N detector(s): M``.
+    """
+    lines: list[str] = []
+    total = 0
+    for report in reports:
+        lines.append("")
+        lines.append(f"[{report.category}] {len(report.findings)} finding(s)")
+        total += len(report.findings)
+        for finding in report.findings[:per_report_limit]:
+            label = finding.get("spec_id") or finding.get("spec_a") or finding.get("inferred_spec") or "?"
+            lines.append(f"  - {label}: {canonical_json_bytes(finding).decode('utf-8').strip()}")
+        if len(report.findings) > per_report_limit:
+            lines.append(f"  ... ({len(report.findings) - per_report_limit} more)")
+    lines.append("")
+    lines.append(f"Total findings across {len(reports)} detector(s): {total}")
+    return "\n".join(lines) + "\n"

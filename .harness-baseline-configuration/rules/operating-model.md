@@ -62,8 +62,19 @@ investigation. Independently investigate the complete affected formal closure;
 stored proposal citations cannot hide a removed canonical relationship or
 replace a missing, inactive or contradictory requirement.
 
+Use `gt backlog record --id <WI-ID> --fields-file <JSON> --expected-version <N>
+--actor <context> --change-reason <reason>` to amend current open work. Progress,
+description, priority and predecessor changes preserve any existing evidence
+gaps while they are reconciled. New implementation work and changes to its
+specification or test links require a complete executable evidence pair and an
+active test-plan phase. A planning amendment does not establish readiness:
+proposal publication rechecks evidence and the current work-item version.
+Read back the work and membership after the amendment. See
+`DCL-STANDING-BACKLOG-DB-SCHEMA-001` and `GOV-STANDING-BACKLOG-001`.
+
 Sources: `GOV-ARTIFACT-AUTHORITY-HIERARCHY-001`,
-`GOV-SOT-SINGLETON-001`, `DCL-CANONICAL-CARRIER-NONAUTHORITY-001`,
+`GOV-SOT-SINGLETON-001`, `GOV-SPEC-CAPTURE-TRANSPARENCY-001`,
+`DCL-CANONICAL-CARRIER-NONAUTHORITY-001`,
 `GOV-PROJECT-REQUIRES-LINKED-SPECIFICATIONS-001`,
 `DCL-IMPLEMENTATION-PROPOSAL-SPEC-LINKAGE-MANDATORY-001`,
 `DCL-SPEC-RELEVANCE-CLOSURE-001`.
@@ -90,6 +101,10 @@ chain per work item. A claim reserves delivery of one exact next artifact with
 a current predecessor, version, intended status and fence. It does not assign
 ownership of a work item, thread or future action. A successor context obtains
 its own claim from current state.
+
+A bridge message is authoritative at receipt and has no continuing authority.
+Re-query canonical domain state before later actions. The response is assigned
+to an eligible successor context, never reserved for the previous author.
 
 Harnesses are independent and unaware of peers. All coordination goes through
 the CLI, Bridge and dispatcher; no harness contacts or inspects another harness.

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -295,7 +296,7 @@ class ProjectLifecycleService:
         project_id: str,
         changed_by: str,
         change_reason: str,
-        link,
+        link: Callable[[], dict[str, Any] | None],
         missing_message: str,
     ) -> dict[str, Any]:
         conn = self.db._get_conn()

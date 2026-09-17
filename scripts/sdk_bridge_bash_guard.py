@@ -92,14 +92,15 @@ class BridgeDeliveryIncomplete(RuntimeError):
     code = "bridge_delivery_incomplete"
 
 
-def bridge_completion_target(prompt, skill, document, version):
-    """Require the assigned successor for a headless GT-KB bridge task."""
-    required = (
-        document is not None
-        or version is not None
-        or skill in {"bridge-review", "verification"}
-        or re.search(r"(?m)^::init gtkb (?:pb|lo)\s*$", prompt) is not None
-    )
+def bridge_completion_target(skill, document, version):
+    """Require an exact successor for an explicitly selected bridge workload.
+
+    Initialization binds a context; it does not assign bridge work. Prompt prose
+    and init markers are never a substitute for the launcher's target arguments.
+    Bridge-only skills require those arguments, and partial targets fail before
+    model execution. Every explicit target still requires canonical delivery.
+    """
+    required = document is not None or version is not None or skill in {"bridge-review", "verification"}
     if not required:
         return None
     if not isinstance(document, str) or not document.strip() or type(version) is not int or version < 1:

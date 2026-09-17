@@ -53,8 +53,8 @@ jobs:
       #     imageToDeploy: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }}
       # ---
 
-      - name: Run post-deploy assertions
-        run: |
-          pip install groundtruth-kb
-          gt --config groundtruth.toml assert
-          echo "Post-deploy assertions passed"
+      # Post-deploy specification assertions need the private GT-KB authority;
+      # run them from a workstation that can reach it:
+      #   gt --config groundtruth.toml assert
+      - name: Record the deployed image
+        run: echo "Deployed ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ inputs.image_tag }} to ${{ inputs.environment }}"

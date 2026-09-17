@@ -424,3 +424,77 @@ def test_glob_inventory_reports_unreadable_matching_directory(tmp_path: Path, mo
     assert expansions[0].blocking
     assert expansions[0].files == ()
     assert "glob source is unreadable" in expansions[0].detail
+
+
+@pytest.mark.parametrize("lifecycle", ["active", "generated", "deprecated", "archive"])
+@pytest.mark.parametrize("entrypoint", ["record", "expansion", "inventory"])
+def test_current_inventory_refuses_snapshot_record_without_coverage(tmp_path, monkeypatch, lifecycle, entrypoint):
+    from dataclasses import replace
+
+    declaration = tmp_path / "config/registry/sot-artifacts.toml"
+    declaration.parent.mkdir(parents=True)
+    declaration.write_text(_artifact_toml("member", "control_surface", "active", "member"), encoding="utf-8")
+    snapshot = load_registry_snapshot(project_root=tmp_path)
+    invalid = replace(snapshot.records[0], lifecycle=lifecycle, coverage_mode=None)
+    incomplete = replace(snapshot, records=(invalid,))
+    before = declaration.read_bytes()
+
+    def unexpected_filesystem_observation(*_args, **_kwargs):
+        pytest.fail("Missing coverage must be refused before expanding a declared object")
+
+    monkeypatch.setattr(string_scan, "_record_objects", unexpected_filesystem_observation)
+    with pytest.raises(InventoryScanError, match="member.*coverage_mode"):
+        if entrypoint == "record":
+            string_scan.ArtifactRecord.from_sot(invalid)
+        elif entrypoint == "expansion":
+            string_scan._expand_artifact_files(invalid, tmp_path)
+        else:
+            string_scan.registered_artifact_inventory(tmp_path, snapshot=incomplete)
+    assert declaration.read_bytes() == before
+    assert not (tmp_path / "member").exists()
+
+
+@pytest.mark.parametrize("failure", [PermissionError, FileNotFoundError])
+def test_scan_refuses_unreadable_registered_file_instead_of_returning_empty_success(tmp_path, monkeypatch, failure):
+    declaration = tmp_path / "config/registry/sot-artifacts.toml"
+    declaration.parent.mkdir(parents=True)
+    declaration.write_text(_artifact_toml("member", "control_surface", "active", "member.txt"), encoding="utf-8")
+    member = tmp_path / "member.txt"
+    member.write_text("critical fixture\n", encoding="utf-8")
+    before = {
+        path.relative_to(tmp_path).as_posix(): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()
+    }
+    original_read = Path.read_text
+
+    def unavailable(path, *args, **kwargs):
+        if path == member:
+            raise failure("controlled fixture read failure")
+        return original_read(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", unavailable)
+    with pytest.raises(InventoryScanError, match="member.txt"):
+        scan_inventory_strings(tmp_path, ["critical fixture"])
+    assert before == {
+        path.relative_to(tmp_path).as_posix(): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()
+    }
+
+
+@pytest.mark.parametrize("needle", ["critical fixture", "absent literal"])
+def test_scan_text_keeps_blocking_coverage_findings_with_or_without_hits(tmp_path, needle):
+    declaration = tmp_path / "config/registry/sot-artifacts.toml"
+    declaration.parent.mkdir(parents=True)
+    declaration.write_text(
+        _artifact_toml("present", "control_surface", "active", "present.txt")
+        + _artifact_toml("missing", "control_surface", "active", "missing.txt"),
+        encoding="utf-8",
+    )
+    (tmp_path / "present.txt").write_text("critical fixture\n", encoding="utf-8")
+    report = scan_inventory_strings(tmp_path, [needle])
+    assert len(report["missing_artifacts"]) == 1
+    text = emit_markdown_ledger(report)
+    assert "## Coverage Findings" in text
+    assert "missing (missing.txt): missing_active_file" in text
+    if needle == "absent literal":
+        assert "coverage findings remain" in text
+    else:
+        assert "## Critical Hits" in text

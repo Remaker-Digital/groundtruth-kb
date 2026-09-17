@@ -1,90 +1,78 @@
-"""Doc-code consistency test for the bridge transition table.
+"""Static bridge-guidance consistency for TEST-11783.
 
-WI-5827 / TEST-11783, re-sourced by WI-7118 (spec `GOV-FILE-BRIDGE-AUTHORITY-001`,
-`SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001`).
-
-Two things changed at WI-7118 and both matter to this test:
-
-* The code of record moved. It is now the single `TRANSITIONS` constant in
-  `groundtruth_kb.bridge.vocabulary`, not `ORDINARY_TRANSITIONS` plus
-  `POST_GO_REPORT_AUGMENTATIONS` in the resolver. The augmentation map is
-  retired, not relocated: it was the only mechanism by which the successor
-  relation consulted thread history, which clause 4 forbids.
-* The document of record moved. This test now reads the neutral baseline at
-  `.harness-baseline-configuration/rules/file-bridge-protocol.md`. It
-  previously read `config/agent-control/gtkb-file-bridge-protocol.md`, which
-  canon section 8 classifies as forbidden drift, and additionally asserted
-  against the generated `.claude` projection. Binding a test to generated
-  output makes the projection authoritative, which is exactly the inversion
-  canon section 8 prohibits; the projector's own `--check` verifies that
-  projections match the baseline.
+Read the authored neutral baseline and the selected package vocabulary. These
+checks establish documented status, routing and successor agreement only;
+test_native_bridge.py separately exercises the native service and its guards.
+Headings, wrapping and grouped rows are presentation choices, not authority.
 """
 
 from __future__ import annotations
 
 import re
-import sys
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
-
-from groundtruth_kb.bridge.vocabulary import (  # noqa: E402
+from groundtruth_kb.bridge.vocabulary import (
     CANONICAL_STATUSES,
+    HISTORICAL_INERT_STATUSES,
+    LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
+    LOYAL_OPPOSITION_AUTHORED_STATUSES,
+    NON_DISPATCHABLE_STATUSES,
     PERMITTED_ON_WRITE,
+    PRIME_ACTIONABLE_STATUSES,
+    PRIME_AUTHORED_STATUSES,
+    THREAD_START_STATUSES,
     TRANSITIONS,
 )
 
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_DOC = PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "file-bridge-protocol.md"
-
-TABLE_HEADING = "## Post-Verdict Transition Table"
-STATUS_HEADING = "## Statuses"
-POST_IMPL_HEADING = "## Post-Implementation Verification"
-
-_ROW_RE = re.compile(r"^\|\s*([A-Z][A-Z-]*)\s*\|\s*([A-Z, -]+?)\s*\|\s*$")
 
 
 def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def _section(text: str, heading: str) -> str:
-    start = text.index(heading)
-    end = text.find("\n## ", start + len(heading))
-    return text[start:end] if end != -1 else text[start:]
-
-
-def _parse_table(section: str) -> dict[str, frozenset[str]]:
-    table: dict[str, frozenset[str]] = {}
-    for raw_line in section.splitlines():
-        line = raw_line.strip()
+def _parse_table(text: str, headers: tuple[str, ...]) -> dict[str, tuple[str, ...]]:
+    """Read one named table, expanding grouped keys and rejecting duplicates."""
+    rows: dict[str, tuple[str, ...]] = {}
+    active = False
+    for line in text.splitlines():
+        line = line.strip()
         if not line.startswith("|"):
+            if active:
+                break
             continue
-        if line.replace("|", "").replace("-", "").strip() == "":
-            continue  # separator row
-        match = _ROW_RE.match(line)
-        if match is None:
-            continue  # header row, or a prose row this table does not own
-        key = match.group(1).strip()
-        values = frozenset(v.strip() for v in match.group(2).split(",") if v.strip())
-        table[key] = values
-    return table
+        cells = tuple(cell.strip().strip("`") for cell in line.strip("|").split("|"))
+        if cells == headers:
+            assert not active, "Duplicate table header"
+            active = True
+            continue
+        if not active or all(re.fullmatch(r":?-+:?", cell) for cell in cells):
+            continue
+        assert len(cells) == len(headers), f"Malformed table row: {line}"
+        for key in cells[0].split(","):
+            key = key.strip().strip("`")
+            assert key and key not in rows, f"Duplicate or empty status: {key}"
+            rows[key] = cells[1:]
+    assert rows, f"Missing table: {headers}"
+    return rows
+
+
+def _documented_transitions() -> dict[str, frozenset[str]]:
+    rows = _parse_table(_read(BASELINE_DOC), ("Current status", "Permitted next status"))
+    return {
+        status: frozenset() if cells[0] == "None" else frozenset(s.strip() for s in cells[0].split(","))
+        for status, cells in rows.items()
+    }
 
 
 def test_baseline_table_matches_the_single_vocabulary() -> None:
-    """The rendered table equals the code of record.
-
-    `WITHDRAWN` is compared out: canon gives it no successors, the constant
-    holds an empty frozenset for it, and an empty markdown cell is not a
-    renderable row. The document says so in prose instead.
-    """
-    rendered = _parse_table(_section(_read(BASELINE_DOC), TABLE_HEADING))
-    expected = {k: v for k, v in TRANSITIONS.items() if v}
-    assert rendered == expected
-    assert "`WITHDRAWN` and `SUPERSEDED` are terminal and have no successors" in _section(
-        _read(BASELINE_DOC), TABLE_HEADING
-    )
+    """All successors, including starts and empty terminal rows, are documented."""
+    rendered = _documented_transitions()
+    assert rendered.pop("start") == THREAD_START_STATUSES
+    assert rendered == TRANSITIONS
+    assert not rendered["WITHDRAWN"]
+    assert not rendered["SUPERSEDED"]
 
 
 def test_report_phase_and_proposal_phase_share_no_token() -> None:
@@ -104,55 +92,67 @@ def test_report_phase_and_proposal_phase_share_no_token() -> None:
 
 
 def test_no_go_row_never_allows_new_or_ready() -> None:
-    assert "NEW" not in TRANSITIONS["NO-GO"]
-    assert "READY" not in TRANSITIONS["NO-GO"]
-    rendered = _parse_table(_section(_read(BASELINE_DOC), TABLE_HEADING))
-    assert "NEW" not in rendered["NO-GO"]
-    assert "READY" not in rendered["NO-GO"]
+    for table in (TRANSITIONS, _documented_transitions()):
+        assert "NEW" not in table["NO-GO"]
+        assert "READY" not in table["NO-GO"]
+        assert table["NO-GO"] == frozenset({"REVISED", "WITHDRAWN", "VERDICT-REJECTED", "SUPERSEDED"})
 
 
 def test_vocabulary_is_exactly_canon_twelve() -> None:
-    assert len(CANONICAL_STATUSES) == 12
-    assert (
-        frozenset(
-            {
-                "NEW",
-                "REVISED",
-                "READY",
-                "VERDICT-REJECTED",
-                "BLOCKED",
-                "GO",
-                "NO-GO",
-                "NOT-READY",
-                "SUPERSEDED",
-                "VERIFIED",
-                "WITHDRAWN",
-                "ADVISORY",
-            }
-        )
-        == CANONICAL_STATUSES
+    expected = frozenset(
+        {
+            "NEW",
+            "REVISED",
+            "READY",
+            "VERDICT-REJECTED",
+            "BLOCKED",
+            "GO",
+            "NO-GO",
+            "NOT-READY",
+            "SUPERSEDED",
+            "VERIFIED",
+            "WITHDRAWN",
+            "ADVISORY",
+        }
     )
+    assert expected == CANONICAL_STATUSES
     assert PERMITTED_ON_WRITE == CANONICAL_STATUSES
-    status_section = _section(_read(BASELINE_DOC), STATUS_HEADING)
-    for status in CANONICAL_STATUSES:
-        assert f"| {status} |" in status_section, f"{status} missing from baseline table"
+    rows = _parse_table(_read(BASELINE_DOC), ("Status", "Author", "Next responder"))
+    assert set(rows) == CANONICAL_STATUSES
+    for status, (author, responder) in rows.items():
+        expected_authors = set()
+        if status in PRIME_AUTHORED_STATUSES:
+            expected_authors.add("Prime Builder")
+        if status in LOYAL_OPPOSITION_AUTHORED_STATUSES:
+            expected_authors.add("Loyal Opposition")
+        actual_authors = {"Prime Builder", "Loyal Opposition"} if author == "Either role" else {author}
+        assert actual_authors == expected_authors, status
+        if status in PRIME_ACTIONABLE_STATUSES:
+            assert responder == "Prime Builder", status
+        elif status in LOYAL_OPPOSITION_ACTIONABLE_STATUSES:
+            assert responder == "Loyal Opposition", status
+        else:
+            assert status in NON_DISPATCHABLE_STATUSES and responder == "None", status
 
 
 def test_obsolete_statuses_are_inert_and_never_writable() -> None:
-    """Canon section 6: no alias or crosswalk exists for NO-ACTION or DEFERRED."""
-    for obsolete in ("NO-ACTION", "DEFERRED"):
+    rows = _parse_table(_read(BASELINE_DOC), ("Status", "Author", "Next responder"))
+    for obsolete in HISTORICAL_INERT_STATUSES:
         assert obsolete not in PERMITTED_ON_WRITE
         assert obsolete not in CANONICAL_STATUSES
-        # Inert means it has no forward transitions of its own beyond the
-        # read-time compatibility set, and never appears as a canonical target.
         assert obsolete not in TRANSITIONS
-    status_section = _section(_read(BASELINE_DOC), STATUS_HEADING)
-    assert "no alias or crosswalk exists" in status_section
+        assert all(obsolete not in targets for targets in TRANSITIONS.values())
+        assert obsolete not in rows
+    text = " ".join(_read(BASELINE_DOC).split())
+    assert "NO-ACTION and DEFERRED" in text
+    assert "Obsolete statuses do not become current aliases or grant claims" in text
 
 
 def test_post_implementation_section_names_ready() -> None:
-    section = _section(_read(BASELINE_DOC), POST_IMPL_HEADING)
-    assert "publishes as a `READY` entry" in section
-    assert "`bridge_kind: implementation_report`" in section
-    assert "It replaces the historical\n   use of `NEW` for reports." in section
-    assert "the corrected report publishes as `READY` again" in section
+    text = " ".join(_read(BASELINE_DOC).split())
+    assert "NEW proposal, GO, implementation, READY report, independent verification and VERIFIED" in text
+    assert "NOT-READY rejects a report and requires corrected READY" in text
+    assert "READY carries `bridge_kind: implementation_report`" in text
+    assert "NEW is never an implementation report" in text
+    assert "VERIFIED to VERIFIED requires canonical fresh-verification work" in text
+    assert "preserving its membership and existing artifact bytes" in text

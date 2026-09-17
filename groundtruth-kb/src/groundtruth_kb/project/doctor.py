@@ -10,13 +10,15 @@ import shutil
 import sqlite3
 import subprocess
 import sys
+from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, ParamSpec, TypeVar
 
 from groundtruth_kb import get_templates_dir
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -227,7 +229,6 @@ _LEGACY_ROOT_PATTERN_SCRIPT_NAMES = frozenset(
         "wrap_scan_hygiene.py",
     }
 )
-_LEGACY_ROOT_PATTERN_FILE_NAMES = frozenset({"hygiene-sweep-patterns.toml"})
 _LEGACY_ROOT_ALLOWED_CONTEXT_RE = re.compile(
     r"archive[- ]only|not a live|must not be (?:used|treated)|forbidden_aliases|retired|migration|migrate|"
     r"legacy[-_]root|hygiene|pattern|_LEGACY_ROOT_|No active control-surface",
@@ -672,37 +673,32 @@ def _check_application_scope_alignment(target: Path) -> ToolCheck:
         )
 
 
-def _check_core_spec_intake(target: Path) -> ToolCheck:
-    """Doctor-style health surface for core-spec intake (SPEC-CORE-INTAKE-001).
+def _check_core_spec_intake(
+    target: Path, *, project_id: str | None = None, client: AuthorityClient | None = None
+) -> ToolCheck:
+    """Report current canonical intake; configuration and context flags are not answers."""
+    from groundtruth_kb.config import GTConfig, GTConfigError
+    from groundtruth_kb.project.core_spec_intake import intake_enabled, next_question
 
-    Read-only: reports the next missing core application specification slot for an
-    enrolled adopter project, or pass when complete / not enrolled / opted out.
-    """
     name = "Core spec intake"
-    db_path = target / "groundtruth.db"
-    if not db_path.exists():
-        return ToolCheck(name=name, required=False, found=False, status="info", message="No groundtruth.db")
     try:
-        from groundtruth_kb.db import KnowledgeDB
-        from groundtruth_kb.project.core_spec_intake import (
-            find_enrolled_project_id,
-            intake_enabled,
-            next_question,
-        )
-
         if not intake_enabled(target):
             return ToolCheck(name=name, required=False, found=True, status="info", message="Opted out")
-        db = KnowledgeDB(db_path)
-        try:
-            project_id = find_enrolled_project_id(db)
-            if project_id is None:
-                return ToolCheck(
-                    name=name, required=False, found=True, status="pass", message="No enrolled intake project"
-                )
-            nxt = next_question(db, project_id)
-        finally:
-            db.close()
-        if nxt is None:
+        if not project_id:
+            return ToolCheck(
+                name=name,
+                required=False,
+                found=False,
+                status="warning",
+                message="Select the canonical project ID to inspect its core specifications",
+            )
+        if client is None:
+            config = GTConfig.load(config_path=target / "groundtruth.toml", discover=False)
+            if not config.authority_url:
+                raise ValueError("Configure the native authority before checking intake")
+            client = AuthorityClient(config.authority_url)
+        question = next_question(client, project_id)
+        if question is None:
             return ToolCheck(
                 name=name, required=False, found=True, status="pass", message=f"{project_id}: core specs complete"
             )
@@ -711,10 +707,215 @@ def _check_core_spec_intake(target: Path) -> ToolCheck:
             required=False,
             found=True,
             status="warning",
-            message=f"{project_id}: next missing slot '{nxt['label']}' ({nxt['name']})",
+            message=f"{project_id}: next missing slot '{question['label']}' ({question['name']})",
         )
-    except Exception as e:  # intentional-catch: validation tool, error -> info status
-        return ToolCheck(name=name, required=False, found=True, status="info", message=f"Check error: {e}")
+    except (AuthorityClientError, GTConfigError, OSError, ValueError) as error:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="fail",
+            message=f"{getattr(error, 'code', 'invalid_intake')}: {error}",
+        )
+
+
+NATIVE_DOCTOR_SCHEMA_VERSION = "1"
+
+
+def _check_native_application_registry(host: Path, repository_ref: str) -> ToolCheck:
+    """isolation:application-registry — the selected application is a catalog entry with a consistent marker.
+
+    Catalog-backed identities only: any number of registered applications is
+    ordinary, and no occupancy limit is inferred.
+    """
+    from groundtruth_kb.isolation.registry_check import ApplicationRegistryError, load_application_catalog
+    from groundtruth_kb.isolation.validation import check_slot_markers
+
+    name = "isolation:application-registry"
+    application = repository_ref.partition(":")[2]
+    try:
+        catalog = load_application_catalog(host)
+    except (ApplicationRegistryError, OSError, ValueError) as error:
+        return ToolCheck(name=name, required=True, found=False, status="fail", message=f"Application catalog: {error}")
+    if application not in catalog:
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"{application} is not registered in the host catalog; register it before qualification",
+        )
+    markers = check_slot_markers(host, application)
+    if markers["malformed"] or markers["mismatched"]:
+        issue = (markers["malformed"] or markers["mismatched"])[0]
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"Inconsistent application marker {issue['path']}: "
+            + str(issue.get("error") or f"names {issue.get('found_name')} instead of {application}"),
+        )
+    if not markers["app_toml_present"]:
+        return ToolCheck(
+            name=name, required=True, found=False, status="fail", message="The application marker is missing"
+        )
+    return ToolCheck(
+        name=name,
+        required=True,
+        found=True,
+        status="pass",
+        message=f"{application} is registered with a consistent marker ({len(catalog)} registered applications)",
+    )
+
+
+def inspect_native_application(client: AuthorityClient, project_id: str, host: Path) -> dict[str, Any]:
+    """Inspect retained application duties without running retired diagnostics.
+
+    The result is the schema-v1 machine-readable envelope: every check carries
+    its ``required`` flag and the ``overall`` verdict follows the report rules
+    (a required failure fails; a warning warns). ``status`` mirrors ``overall``
+    for existing consumers. No local store is opened and nothing is written.
+    """
+    from dataclasses import asdict
+    from urllib.parse import quote
+
+    from groundtruth_kb.config import GTConfig, GTConfigError
+    from groundtruth_kb.isolation.registry_check import (
+        ApplicationRegistryError,
+        application_slot_path,
+        resolve_project_repository,
+    )
+    from groundtruth_kb.project.scaffold import _git
+
+    project = client.request("GET", "/v1/projects/" + quote(project_id, safe=""))["project"]
+    if project["kind"] != "project" or not str(project.get("repository_ref") or "").startswith("application:"):
+        raise ValueError("Select an execution project with an application repository")
+    registry = _check_native_application_registry(host, project["repository_ref"])
+    try:
+        target = resolve_project_repository(host, project["repository_ref"])
+    except ApplicationRegistryError as error:
+        # A catalog or marker inconsistency is reported as the failing registry check; other refusals stand.
+        if registry.status != "fail":
+            raise ValueError(str(error)) from error
+        target = application_slot_path(host, project["repository_ref"].partition(":")[2])
+    checks: list[ToolCheck] = []
+    profile = "unknown"
+    try:
+        config = GTConfig.load(config_path=target / "groundtruth.toml", discover=False)
+        matches = config.project_root == target and config.authority_url == client.url
+        checks.append(
+            ToolCheck(
+                name="Native authority configuration",
+                required=True,
+                found=True,
+                status="pass" if matches else "fail",
+                message="Matches the selected application and authority"
+                if matches
+                else "Reconcile the selected configuration",
+            )
+        )
+        declared_text, _unreadable = _read_text_for_check(target / "groundtruth.toml", "groundtruth.toml")
+        if declared_text is not None:
+            with suppress(ValueError):
+                import tomllib
+
+                declared = tomllib.loads(declared_text)
+                profile = str(declared.get("project", {}).get("profile") or profile)
+    except (GTConfigError, OSError, ValueError) as error:
+        checks.append(
+            ToolCheck(
+                name="Native authority configuration", required=True, found=False, status="fail", message=str(error)
+            )
+        )
+    checks.append(registry)
+    hook = target / ".githooks/reference-transaction"
+    canonical = host / ".githooks/reference-transaction"
+    hook_matches = (
+        hook.is_file()
+        and canonical.is_file()
+        and hook.resolve() == hook
+        and hook.read_bytes() == canonical.read_bytes()
+        and _git(target, "config", "--get", "core.hooksPath", required=False) in {".githooks", "./.githooks"}
+    )
+    checks.append(
+        ToolCheck(
+            name="Native commit hook",
+            required=True,
+            found=hook.is_file(),
+            status="pass" if hook_matches else "fail",
+            message="Installed hook matches; behavioral commit qualification is separate"
+            if hook_matches
+            else "Install the current native commit hook",
+        )
+    )
+    from groundtruth_kb.project.scaffold import application_files, leaked_platform_paths
+
+    leaked = leaked_platform_paths(application_files(target))
+    checks.append(
+        ToolCheck(
+            name="Platform leakage",
+            required=True,
+            found=not leaked,
+            status="fail" if leaked else "pass",
+            message="Platform state or a local authority store is inside the application: " + ", ".join(leaked)
+            if leaked
+            else "No platform state or local authority store inside the application",
+        )
+    )
+    from groundtruth_kb.project.doctor_isolation import _check_isolation_chroma_regeneratable
+
+    checks.append(_check_isolation_chroma_regeneratable(target))
+    rules_dir = _projected_terminology_rules_dir(target)
+    if rules_dir is not None:
+        checks.append(_check_canonical_terminology(target, profile, rules_dir))
+    else:
+        checks.append(
+            ToolCheck(
+                name="canonical terminology",
+                required=False,
+                found=False,
+                status="info",
+                message="No projected terminology guidance (no harness selected); definitions come from the native CLI",
+            )
+        )
+    # The intake finding stays last: consumers read the current question from the final check.
+    checks.append(_check_core_spec_intake(target, project_id=project_id, client=client))
+    report = DoctorReport(checks=checks, profile=profile)
+    return {
+        "schema_version": NATIVE_DOCTOR_SCHEMA_VERSION,
+        "project_id": project_id,
+        "repository_ref": project["repository_ref"],
+        "target": str(target),
+        "profile": report.profile,
+        "overall": report.overall,
+        "status": report.overall,
+        "checks": [asdict(check) for check in report.checks],
+        "canonical_writes": 0,
+    }
+
+
+def format_native_doctor_report(result: dict[str, Any]) -> str:
+    """Human-readable form of the native application doctor envelope."""
+    icons = {"pass": "[OK]", "fail": "[FAIL]", "warning": "[WARN]", "info": "[INFO]"}
+    lines = [
+        "",
+        f"  GroundTruth Application Doctor — {result['project_id']} ({result['repository_ref']})",
+        f"  Profile: {result['profile']}  Target: {result['target']}",
+        "  " + "=" * 50,
+        "",
+    ]
+    for check in result["checks"]:
+        lines.append(f"  {icons[check['status']]:>6}  {check['name']}: {check['message']}")
+    lines.append("")
+    lines.append(f"  Overall: {icons[result['overall']]} {result['overall'].upper()}")
+    failed = [check for check in result["checks"] if check["status"] == "fail" and check["required"]]
+    if failed:
+        lines.append("")
+        lines.append("  Required checks failing:")
+        lines.extend(f"    - {check['name']}: {check['message']}" for check in failed)
+    lines.append("")
+    return "\n".join(lines)
 
 
 def _connect_readonly_sqlite(db_path: Path) -> sqlite3.Connection:
@@ -825,7 +1026,7 @@ def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str
         or selected["default_model"] not in models
     ):
         findings.append("default_model does not resolve to a provider model")
-    elif set(routing) != {provider}:
+    elif isinstance(routing, dict) and set(routing) != {provider}:
         findings.append("routing contains another provider's configuration")
     if findings:
         return ToolCheck(name=name, required=False, found=True, status="fail", message="; ".join(findings)), ()
@@ -959,48 +1160,63 @@ def _check_ollama_harness(target: Path) -> ToolCheck:
 
 
 def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
-    """WI-4778: surface Cursor headless dispatch readiness without activating it."""
+    """Report Cursor launch prerequisites and authentication, not qualification."""
 
-    check_name = "Cursor dispatch readiness"
+    check_name = "Cursor launch prerequisites"
     try:
-        from scripts.verify_cursor_dispatch import evaluate_readiness  # noqa: PLC0415
+        from groundtruth_kb.cursor_readiness import evaluate_readiness  # noqa: PLC0415
     except Exception as exc:  # noqa: BLE001  # intentional-catch: doctor must surface import drift
         return ToolCheck(
             name=check_name,
             required=False,
             found=False,
             status="warning",
-            message=f"scripts/verify_cursor_dispatch.py unavailable: {exc}",
+            message=f"Packaged Cursor readiness probe unavailable: {type(exc).__name__}",
         )
 
     try:
         result = evaluate_readiness(project_root=target)
-    except Exception as exc:  # noqa: BLE001  # intentional-catch: readiness probe is diagnostic
+    except Exception as exc:  # noqa: BLE001  # intentional-catch: launch probe is diagnostic
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="warning",
-            message=f"Cursor dispatch readiness probe failed: {exc}",
+            message=f"Cursor launch prerequisite probe failed: {type(exc).__name__}",
         )
 
-    if result.get("ready"):
-        dispatchable = "dispatchable" if result.get("dispatchable_now") else "ready but not currently selected"
+    valid_report = (
+        isinstance(result, dict)
+        and type(result.get("probe_passed")) is bool
+        and result.get("probe_scope") == "launch_prerequisites_and_authentication"
+        and result.get("authority_source") == "native_harness_record"
+        and result.get("harness_qualification") == "unqualified"
+    )
+    if not valid_report:
+        return ToolCheck(
+            name=check_name,
+            required=False,
+            found=True,
+            status="warning",
+            message="Cursor launch probe returned an unsupported report; harness qualification is unverified",
+        )
+
+    if result["probe_passed"] is True:
         return ToolCheck(
             name=check_name,
             required=False,
             found=True,
             status="pass",
-            message=f"Cursor headless Agent CLI readiness clean ({dispatchable})",
+            message="Cursor launch prerequisites and authentication passed; harness qualification is unverified",
         )
 
-    detail = str(result.get("first_failed_check") or "readiness check failed")
+    detail = str(result.get("first_failed_check") or "launch prerequisite or authentication check failed")
     return ToolCheck(
         name=check_name,
         required=False,
         found=True,
         status="warning",
-        message=f"Cursor headless dispatch unavailable: {detail}",
+        message=f"Cursor launch prerequisite or authentication check failed: {detail}",
     )
 
 
@@ -1260,8 +1476,6 @@ def _legacy_root_reference_is_allowed(relative_path: Path, lines: list[str], lin
     """Classify archive/migration/hygiene mentions as non-live references."""
     if relative_path.name in _LEGACY_ROOT_PATTERN_SCRIPT_NAMES:
         return True
-    if relative_path.name in _LEGACY_ROOT_PATTERN_FILE_NAMES:
-        return True
     start = max(0, line_index - 2)
     end = min(len(lines), line_index + 3)
     context = "\n".join(lines[start:end])
@@ -1367,115 +1581,6 @@ def _check_registered_hooks_tracked(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message="all registered hook scripts are git-tracked",
-    )
-
-
-def _check_raw_written_close_intent_no_action(target: Path) -> ToolCheck:
-    """WI-5811 (detection slice): WARN when an untracked NO-ACTION bridge file
-    reads as a close/disposal rather than a verdict correction.
-
-    The write-time bridge-compliance gate cannot intercept a hook-less harness
-    that writes ``bridge/*.md`` via a raw filesystem write. That is the exact
-    2026-07-31 Goose "auto-disposition" vector: 322 close-intent NO-ACTION files,
-    none written through a gated path (see
-    ``bridge/cleanup-evidence/goose-cursor-autonomous-loop-incident-20260731/``).
-    Write-time enforcement (``_no_action_close_intent_deny`` / the WI-5850
-    preflight-assertion-integrity guard) closes the Write-tool and governed-writer
-    paths; this read-time check closes the residual raw-write path by making such
-    artifacts DISCOVERABLE for quarantine even though no gate could block them.
-
-    Reuses the gate's validated close-intent detector via dynamic import (single
-    source of truth, no drift; N1 ∪ N2, measured 0/269 false-positive against the
-    lawful corpus). Scans only untracked bridge files — committed files are the
-    append-only audit trail and are out of scope for this working-tree detector.
-    Fail-soft ``warning`` (never ``fail``): a surfaced discoverability signal, not
-    a release block, since the artifact is already on disk and unblockable.
-    """
-    name = "raw-written close-intent NO-ACTION"
-    if not (target / "bridge").is_dir():
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=False,
-            status="info",
-            message="no bridge/ directory; nothing to verify",
-        )
-    gate_path = target / ".claude" / "hooks" / "bridge-compliance-gate.py"
-    if not gate_path.is_file():
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=False,
-            status="info",
-            message="bridge-compliance-gate.py absent; close-intent scan skipped",
-        )
-    try:
-        import importlib.util
-
-        spec = importlib.util.spec_from_file_location("_gtkb_bcg_doctor_close_intent", gate_path)
-        gate = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(gate)
-        detect = gate._no_action_close_intent_deny
-    except Exception:  # noqa: BLE001  # intentional-catch: detector unavailable must not crash doctor
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="info",
-            message="close-intent detector unavailable; scan skipped",
-        )
-
-    ok, out = _run_cmd(["git", "-C", str(target), "ls-files", "--others", "--exclude-standard", "bridge"])
-    if not ok:
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="info",
-            message="git ls-files unavailable; close-intent scan skipped",
-        )
-
-    hits: list[str] = []
-    for line in out.splitlines():
-        rel = line.strip().replace("\\", "/")
-        if not rel.endswith(".md"):
-            continue
-        # Scope to the LIVE top-level chain only: `bridge/<file>.md`. This mirrors
-        # the actionability parsers (status_driver / bridge_thread_files /
-        # versioned_files all use non-recursive glob("*.md")), and it excludes the
-        # `bridge/cleanup-evidence/**` quarantine subtree — files relocated there
-        # are already correctly dispositioned and must not re-alarm.
-        if rel.count("/") != 1:
-            continue
-        try:
-            content = _require_utf8_text(target / rel)
-        except OSError:
-            continue
-        try:
-            if detect(str(target / rel), content) is not None:
-                hits.append(rel)
-        except Exception:  # noqa: BLE001  # intentional-catch: one bad file must not abort the scan
-            continue
-
-    if hits:
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                "untracked NO-ACTION bridge files read as close/disposal rather than a "
-                "verdict correction (raw-write vector bypassed all write-time gates; "
-                "DCL-NO-ACTION-STATUS-SEMANTICS-001) — inspect and quarantine to "
-                "bridge/cleanup-evidence/: " + ", ".join(sorted(hits))
-            ),
-        )
-    return ToolCheck(
-        name=name,
-        required=False,
-        found=True,
-        status="pass",
-        message="no untracked close-intent NO-ACTION bridge files detected",
     )
 
 
@@ -2096,147 +2201,6 @@ def _check_sot_registry_completeness(target: Path) -> ToolCheck:
     )
 
 
-def _check_sot_read_discipline(target: Path) -> ToolCheck:
-    """Validate the SoT read-discipline hook coverage (DCL-SOT-READ-HOOK-CONTRACT-001).
-
-    4-layer assertion:
-
-    1. Canonical hook file presence (.claude/hooks/sot-read-discipline.py).
-    2. Codex adapter presence (.codex/gtkb-hooks/sot-read-discipline-bash-adapter.py).
-    3. Claude effective coverage: .claude/settings.json PreToolUse contains an entry
-       whose matcher string includes Read AND Grep AND Glob, AND whose command
-       resolves to the canonical hook.
-    4. Codex effective coverage: .codex/hooks.json PreToolUse contains an entry
-       with matcher "Bash" AND whose command resolves to the adapter. Anti-false-green:
-       if Codex registration uses Read/Grep/Glob matcher (an unsupported tool-event
-       surface per ADR-CODEX-HOOK-PARITY-FALLBACK-001 v2), the check fails with
-       explicit guidance.
-    5. Registry referential integrity: every forbidden_substitutes entry references
-       a real storage_path in the registry projection.
-
-    Severity is WARN-only during Slice 2A per the bridge proposal; promotion to FAIL
-    is a Slice 2B candidate after coverage audit.
-    """
-    check_name = "SoT read-discipline hook coverage"
-    canonical_hook = target / ".claude" / "hooks" / "sot-read-discipline.py"
-    codex_adapter = target / ".codex" / "gtkb-hooks" / "sot-read-discipline-bash-adapter.py"
-    claude_settings = target / ".claude" / "settings.json"
-    codex_hooks = target / ".codex" / "hooks.json"
-
-    warnings: list[str] = []
-
-    # Layer 1: canonical hook
-    if not canonical_hook.is_file():
-        warnings.append(f"canonical hook missing: {canonical_hook.relative_to(target).as_posix()}")
-
-    # Layer 2: Codex adapter
-    if not codex_adapter.is_file():
-        warnings.append(f"Codex adapter missing: {codex_adapter.relative_to(target).as_posix()}")
-
-    # Layer 3: Claude registration
-    if claude_settings.is_file():
-        try:
-            claude_data = json.loads(_require_utf8_text(claude_settings))
-        except (OSError, json.JSONDecodeError) as exc:
-            warnings.append(f"Claude settings.json unreadable: {exc}")
-            claude_data = {}
-        claude_pre = claude_data.get("hooks", {}).get("PreToolUse", []) if isinstance(claude_data, dict) else []
-        claude_hit = False
-        for entry in claude_pre if isinstance(claude_pre, list) else []:
-            if not isinstance(entry, dict):
-                continue
-            matcher = str(entry.get("matcher", ""))
-            if not all(tok in matcher for tok in ("Read", "Grep", "Glob")):
-                continue
-            for hook_entry in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
-                cmd = str(hook_entry.get("command", "") if isinstance(hook_entry, dict) else "")
-                if "sot-read-discipline.py" in cmd:
-                    claude_hit = True
-                    break
-            if claude_hit:
-                break
-        if not claude_hit:
-            warnings.append(
-                "Claude registration missing or matcher does not include Read+Grep+Glob "
-                "(per DCL-SOT-READ-HOOK-CONTRACT-001 v1)"
-            )
-    else:
-        warnings.append(".claude/settings.json absent — cannot verify Claude registration")
-
-    # Layer 4: Codex registration (anti-false-green)
-    if codex_hooks.is_file():
-        try:
-            codex_data = json.loads(_require_utf8_text(codex_hooks))
-        except (OSError, json.JSONDecodeError) as exc:
-            warnings.append(f".codex/hooks.json unreadable: {exc}")
-            codex_data = {}
-        _hooks = codex_data.get("hooks", {}) if isinstance(codex_data, dict) else {}
-        codex_pre = _hooks.get("PreToolUse", []) if isinstance(_hooks, dict) else []
-        codex_bash_hit = False
-        codex_false_green = False
-        for entry in codex_pre if isinstance(codex_pre, list) else []:
-            if not isinstance(entry, dict):
-                continue
-            matcher = str(entry.get("matcher", ""))
-            for hook_entry in entry.get("hooks", []) if isinstance(entry.get("hooks"), list) else []:
-                cmd = str(hook_entry.get("command", "") if isinstance(hook_entry, dict) else "")
-                if "sot-read-discipline" not in cmd:
-                    continue
-                if matcher == "Bash":
-                    codex_bash_hit = True
-                elif any(tok in matcher for tok in ("Read", "Grep", "Glob")):
-                    codex_false_green = True
-        if codex_false_green:
-            warnings.append(
-                "Codex registration uses Read/Grep/Glob matcher — these are NOT live Codex "
-                "tool-events (per ADR-CODEX-HOOK-PARITY-FALLBACK-001 v2). Use matcher 'Bash' "
-                "pointing at .codex/gtkb-hooks/sot-read-discipline-bash-adapter.py instead."
-            )
-        elif not codex_bash_hit:
-            warnings.append(
-                "Codex registration missing or matcher is not 'Bash' (per DCL-SOT-READ-HOOK-CONTRACT-001 v1)"
-            )
-    else:
-        warnings.append(".codex/hooks.json absent — cannot verify Codex registration")
-
-    # Layer 5: Registry referential integrity from one coherent generation.
-    try:
-        from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
-
-        rows = load_registry_snapshot(project_root=target).records
-        known_paths = {row.storage_path for row in rows if row.storage_path}
-        for row in rows:
-            for substitute in row.forbidden_substitutes:
-                if substitute and not any(known.endswith(substitute) or substitute in known for known in known_paths):
-                    warnings.append(
-                        f"forbidden_substitutes on {row.id!r} references {substitute!r} "
-                        "which does not match any known SoT storage_path"
-                    )
-                    break
-    except Exception as exc:  # intentional-catch: authority failure must be visible
-        warnings.append(f"coherent registry authority unavailable: {exc}")
-
-    if warnings:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message="; ".join(warnings[:5]) + (" (+more)" if len(warnings) > 5 else ""),
-        )
-
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message=(
-            "canonical hook + Codex adapter present; Claude+Codex registrations effective; "
-            "registry referential integrity OK"
-        ),
-    )
-
-
 def _check_sot_duplicate_guard(target: Path) -> ToolCheck:
     """Run the duplicate-SoT drift-prevention guard from the verified audit engine."""
     check_name = "SoT duplicate guard"
@@ -2550,21 +2514,15 @@ def _check_codex_skill_load_health(target: Path) -> ToolCheck:
     )
 
 
-def _load_canonical_terminology_config(target: Path) -> dict[str, object] | None:
-    """Load ``.claude/rules/canonical-terminology.toml`` or return ``None`` if absent/malformed.
+def _load_canonical_terminology_config(target: Path, rules_dir: str = ".claude/rules") -> dict[str, object] | None:
+    """Load the projected ``canonical-terminology.toml`` or return ``None`` if absent/malformed.
 
-    Returns the parsed TOML as a dict. ``None`` indicates the config is
-    missing — the caller should treat this as an ERROR (config is required
-    by the scaffold for every profile per SPEC-TERMINOLOGY-CONFIG-TOML).
-
-    The canonical-terminology config is a managed ``rule`` artifact in the
-    registry (``rule.canonical-terminology-config``), but its presence and
-    validity are enforced by this composite check, not by generic
-    ``_check_rules()`` Markdown enumeration.
+    ``None`` means the projection is missing or unreadable; the caller reports
+    that as a required failure and points at ``gt project upgrade --apply``.
     """
     import tomllib
 
-    toml_path = target / ".claude" / "rules" / "canonical-terminology.toml"
+    toml_path = target / rules_dir / "canonical-terminology.toml"
     if not toml_path.exists():
         return None
 
@@ -2583,10 +2541,9 @@ def _resolve_profile_config(
 ) -> dict[str, object] | None:
     """Resolve a profile's terminology config, handling ``extends`` inheritance.
 
-    Returns the effective config dict with ``required_startup_terms``,
-    ``required_files``, ``missing_severity``, and (optionally)
-    ``memory_md_location`` keys. Returns ``None`` when the profile is not
-    configured in the TOML.
+    Returns the effective config dict (``missing_severity``, optionally
+    ``memory_md_location`` and ``primer_path``). Returns ``None`` when the
+    profile is not configured in the TOML.
     """
     profiles = config.get("config")
     if not isinstance(profiles, dict):
@@ -2615,171 +2572,111 @@ def _resolve_profile_config(
     return effective
 
 
-def _check_canonical_terminology(target: Path, profile_name: str) -> ToolCheck:
-    """Check canonical-terminology surface per SPEC-TERMINOLOGY-DOCTOR-CHECK.
+RETRIEVAL_ROUTE_MARKERS: tuple[str, ...] = ("gt terms", "gt authority resolve")
+RETIRED_TERMINOLOGY_CONTRACT_KEYS: tuple[str, ...] = (
+    "required_files",
+    "required_startup_terms",
+    "required_primer_terms",
+)
 
-    Reads the profile-aware matrix from ``.claude/rules/canonical-terminology.toml``.
-    ERROR when required startup terms are missing from the profile's required
-    files; WARN when minor drift is detected. Runs for every profile, with the
-    required-term set selected by profile per SPEC-TERMINOLOGY-PROFILE-MATRIX.
 
-    The two canonical-terminology files are managed ``rule`` artifacts in
-    ``templates/managed-artifacts.toml`` (``rule.canonical-terminology`` and
-    ``rule.canonical-terminology-config``). Lifecycle (scaffold/upgrade) is
-    registry-driven; presence/validity is enforced by this composite check
-    rather than by generic ``_check_rules()`` Markdown enumeration.
+PROJECTED_RULES_DIRS: tuple[str, ...] = (
+    ".claude/rules",
+    ".codex/rules",
+    ".cursor/rules",
+    ".goose/rules",
+    ".agent/rules",
+)
 
-    Skipped (pass with 'not applicable') if the harness-memory override is in
-    effect and the requested file is MEMORY.md — projects whose harness holds
-    MEMORY.md outside the project repo opt in by setting
-    ``memory_md_location = "harness"`` in their profile block.
+
+def _projected_terminology_rules_dir(target: Path) -> str | None:
+    """The first projected rules directory carrying terminology guidance, if any harness is selected."""
+    candidates = list(PROJECTED_RULES_DIRS) + sorted(
+        p.relative_to(target).as_posix() for p in target.glob(".api-harness/*/rules") if p.is_dir()
+    )
+    for rules_dir in candidates:
+        guidance = (target / rules_dir / "canonical-terminology.toml", target / rules_dir / "canonical-terminology.md")
+        if any(path.exists() for path in guidance):
+            return rules_dir
+    return None
+
+
+def _check_canonical_terminology(target: Path, profile_name: str, rules_dir: str = ".claude/rules") -> ToolCheck:
+    """Check the projected terminology guidance (GOV-GLOSSARY-AS-DA-READ-SURFACE-001).
+
+    Canonical definitions are current records read through the native CLI; the
+    projected primer only teaches that retrieval route. The check fails when the
+    projected configuration or primer is missing or malformed, when the
+    selected profile is not configured, or when the primer does not name the
+    retrieval commands; it warns when the configuration still carries the
+    retired prompt-file term contract (required files, startup terms, primer
+    terms), which an upgrade re-projects. No file is a term census.
     """
-    config = _load_canonical_terminology_config(target)
+    name = "canonical terminology"
+    config = _load_canonical_terminology_config(target, rules_dir)
     if config is None:
         return ToolCheck(
-            name="canonical terminology",
+            name=name,
             required=True,
             found=False,
             status="fail",
             message=(
-                ".claude/rules/canonical-terminology.toml missing or malformed — "
+                f"{rules_dir}/canonical-terminology.toml missing or malformed — "
                 "run `gt project upgrade --apply` to restore."
             ),
         )
-
     profile_cfg = _resolve_profile_config(config, profile_name)
     if profile_cfg is None:
-        # Unknown profile in config — don't fail; warn.
         return ToolCheck(
-            name="canonical terminology",
-            required=False,
+            name=name,
+            required=True,
             found=True,
-            status="warning",
+            status="fail",
             message=f"profile {profile_name!r} not configured in canonical-terminology.toml",
         )
-
-    raw_terms = profile_cfg.get("required_startup_terms", [])
-    required_terms: list[str] = [t for t in raw_terms if isinstance(t, str)] if isinstance(raw_terms, list) else []
-    raw_files = profile_cfg.get("required_files", [])
-    required_files: list[str] = [f for f in raw_files if isinstance(f, str)] if isinstance(raw_files, list) else []
-    missing_severity_raw = profile_cfg.get("missing_severity", "ERROR")
-    missing_severity = str(missing_severity_raw).upper() if missing_severity_raw else "ERROR"
-    memory_md_location = profile_cfg.get("memory_md_location", "project")
-
-    # Verify the canonical-terminology glossary file exists.
-    glossary_md = target / ".claude" / "rules" / "canonical-terminology.md"
-    if not glossary_md.exists():
+    stale = [key for key in RETIRED_TERMINOLOGY_CONTRACT_KEYS if key in profile_cfg]
+    section = config.get("config")
+    defaults = section.get("defaults", {}) if isinstance(section, dict) else {}
+    configured = profile_cfg.get("primer_path") or defaults.get("primer_path")
+    primer_rel = str(configured or f"{rules_dir}/canonical-terminology.md").replace("{{HARNESS_RULES_DIR}}", rules_dir)
+    primer_text, unreadable = _read_text_for_check(target / primer_rel, primer_rel)
+    if primer_text is None:
         return ToolCheck(
-            name="canonical terminology",
+            name=name,
             required=True,
             found=False,
             status="fail",
-            message=(".claude/rules/canonical-terminology.md missing — run `gt project upgrade --apply` to restore."),
+            message=f"{primer_rel} missing or unreadable ({unreadable}) — run `gt project upgrade --apply` to restore.",
         )
-
-    # CONTRACT 1 (preserved): required_startup_terms must appear in every required_files entry.
-    # Track startup-file misses SEPARATELY from primer-file misses per Codex
-    # `gtkb-gov-term-primer-startup-2026-05-02-008.md` F1 — each contract emits at its own severity.
-    startup_missing: list[str] = []
-    for rel in required_files:
-        # harness-memory profile: MEMORY.md is out-of-repo; skip content check for it.
-        if rel == "MEMORY.md" and memory_md_location == "harness":
-            continue
-
-        abs_path = target / rel
-        if not abs_path.exists():
-            startup_missing.append(f"{rel}: file missing")
-            continue
-        try:
-            text = abs_path.read_text(encoding="utf-8", errors="replace")
-        except OSError as exc:
-            startup_missing.append(f"{rel}: unreadable ({exc})")
-            continue
-
-        for term in required_terms:
-            if term not in text:
-                startup_missing.append(f"{rel}: missing term {term!r}")
-
-    # CONTRACT 2 (Slice 1 of GTKB-GOV-TERM-PRIMER-STARTUP, S327):
-    # required_primer_terms must appear in the primer file (not in required_files).
-    # Per Codex `-004.md` F1 option 1 + `-008.md` F1: independent severity contract.
-    primer_missing: list[str] = []
-    raw_primer_terms = profile_cfg.get("required_primer_terms", [])
-    required_primer_terms: list[str] = (
-        [t for t in raw_primer_terms if isinstance(t, str)] if isinstance(raw_primer_terms, list) else []
-    )
-    primer_missing_severity_raw = profile_cfg.get("primer_missing_severity", missing_severity_raw)
-    primer_missing_severity = str(primer_missing_severity_raw).upper() if primer_missing_severity_raw else "ERROR"
-    if required_primer_terms:
-        defaults_section: dict[str, Any] = {}
-        try:
-            cfg_section = config.get("config") if isinstance(config, dict) else None
-            if isinstance(cfg_section, dict):
-                ds = cfg_section.get("defaults")
-                if isinstance(ds, dict):
-                    defaults_section = ds
-        except AttributeError:
-            defaults_section = {}
-        primer_path_str = (
-            profile_cfg.get("primer_path")
-            or defaults_section.get("primer_path")
-            or ".claude/rules/canonical-terminology.md"
-        )
-        primer_abs = target / str(primer_path_str)
-        if not primer_abs.exists():
-            primer_missing.append(f"{primer_path_str}: primer file missing")
-        else:
-            try:
-                primer_text = primer_abs.read_text(encoding="utf-8", errors="replace")
-                for term in required_primer_terms:
-                    if term not in primer_text:
-                        primer_missing.append(f"{primer_path_str}: missing primer term {term!r}")
-            except OSError as exc:
-                primer_missing.append(f"{primer_path_str}: unreadable ({exc})")
-
-    # Per Codex `-008.md` F1: apply each contract's severity independently;
-    # combine results with fail > warning > pass precedence.
-    def _severity_to_status(sev: str) -> Literal["pass", "fail", "warning"]:
-        if sev == "ERROR":
-            return "fail"
-        if sev == "WARN":
-            return "warning"
-        return "warning"
-
-    statuses: list[Literal["pass", "fail", "warning"]] = []
-    if startup_missing:
-        statuses.append(_severity_to_status(missing_severity))
-    if primer_missing:
-        statuses.append(_severity_to_status(primer_missing_severity))
-
-    if statuses:
-        # fail > warning > pass precedence.
-        if "fail" in statuses:
-            combined: Literal["pass", "fail", "warning"] = "fail"
-        elif "warning" in statuses:
-            combined = "warning"
-        else:
-            combined = "warning"
-        missing_report = startup_missing + primer_missing
+    absent = [marker for marker in RETRIEVAL_ROUTE_MARKERS if marker not in primer_text]
+    if absent:
         return ToolCheck(
-            name="canonical terminology",
+            name=name,
             required=True,
             found=True,
-            status=combined,
+            status="fail",
+            message=f"{primer_rel} does not teach the native retrieval route: missing {', '.join(absent)}",
+        )
+    if stale:
+        # Guidance present and correct, projection behind the baseline: drift, not absence.
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status="warning",
             message=(
-                f"Missing canonical terms in profile {profile_name!r} "
-                f"required files: {'; '.join(missing_report[:6])}" + ("; ..." if len(missing_report) > 6 else "")
+                "canonical-terminology.toml still declares the retired prompt-file term contract "
+                f"({', '.join(stale)}); run `gt project upgrade --apply` to re-project it"
             ),
         )
-
     return ToolCheck(
-        name="canonical terminology",
+        name=name,
         required=True,
         found=True,
         status="pass",
         message=(
-            f"Canonical-terminology surface OK — {len(required_terms)} required terms "
-            f"present in {len(required_files)} required files (profile: {profile_name})"
+            f"Projected terminology guidance present; {primer_rel} teaches `gt terms` / `gt authority resolve` "
+            f"(profile: {profile_name}); definitions are current canonical records, not file content"
         ),
     )
 
@@ -3170,16 +3067,14 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
     )
 
 
-_HARNESS_SCRATCHPAD_BOUNDARY_DOCS = (
-    Path("AGENTS.md"),
-    Path(".claude") / "rules" / "project-root-boundary.md",
-)
+# The boundary is declared by the projected rule; the neutral AGENTS.md is a pointer, not a boundary surface.
+_HARNESS_SCRATCHPAD_BOUNDARY_DOCS = (Path(".claude") / "rules" / "project-root-boundary.md",)
 _HARNESS_SCRATCHPAD_REQUIRED_TERMS = (
     "harness-local scratchpads",
     "non-authoritative",
-    "antigravity planning/brain files",
-    "codex automation memory",
-    "claude code auto-memory",
+    "per-harness planning/brain files",
+    "automation memory",
+    "harness auto-memory",
     "`memory.md` hierarchy",
     "formal gt-kb artifacts",
     "implementation reports",
@@ -3316,10 +3211,16 @@ def _toolcheck_from_utf8_error(fn_name: str, exc: DoctorCheckReadError) -> ToolC
     )
 
 
-def _utf8_named_fail(fn):  # type: ignore[no-untyped-def]
+_CheckParams = ParamSpec("_CheckParams")
+_CheckResult = TypeVar("_CheckResult")
+
+
+def _utf8_named_fail(
+    fn: Callable[_CheckParams, _CheckResult],
+) -> Callable[_CheckParams, _CheckResult | ToolCheck]:
     """Wrap a ToolCheck producer so undecodable files become FAIL, not abort."""
 
-    def wrapped(*args, **kwargs):  # type: ignore[no-untyped-def]
+    def wrapped(*args: _CheckParams.args, **kwargs: _CheckParams.kwargs) -> _CheckResult | ToolCheck:
         try:
             return fn(*args, **kwargs)
         except DoctorCheckReadError as exc:
@@ -3334,8 +3235,8 @@ def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
     """Verify harness-local scratchpads cannot become GT-KB authority.
 
     Implements WI-4681 / ``DELIB-20260619-HARNESS-SCRATCHPAD-NON-AUTHORITY``.
-    The check is deliberately narrow: it validates the two operator-facing
-    boundary surfaces and fails if those surfaces regress to granting positive
+    The check is deliberately narrow: it validates the projected boundary rule
+    and fails if that surface regresses to granting positive
     authority to Antigravity planning/brain files, Codex automation memory,
     Claude Code auto-memory, or the ``MEMORY.md`` hierarchy.
     """
@@ -3351,6 +3252,9 @@ def _check_harness_local_scratchpad_boundary(target: Path) -> ToolCheck:
         text, read_error = _read_text_for_check(path, rel_text)
         if read_error is not None:
             findings.append(read_error)
+            continue
+        if text is None:
+            findings.append(f"{rel_text} unreadable")
             continue
 
         lowered = text.lower()
@@ -3942,100 +3846,6 @@ def _check_standing_backlog_health(target: Path) -> ToolCheck:
     )
 
 
-def _work_tree_stray_age_hours(report: dict[str, Any]) -> list[float]:
-    ages: list[float] = []
-    for key in ("workspace_findings", "stash_findings", "worktree_findings"):
-        for finding in report.get(key, []):
-            if not isinstance(finding, dict) or finding.get("classification") != "stale":
-                continue
-            try:
-                ages.append(float(finding.get("age_hours", 0)))
-            except (TypeError, ValueError):
-                continue
-    return ages
-
-
-def _format_work_tree_stray_ages(ages: list[float]) -> str:
-    if not ages:
-        return "age_hours=none"
-    average = sum(ages) / len(ages)
-    return f"age_hours=min={min(ages):.1f} avg={average:.1f} max={max(ages):.1f}"
-
-
-def _format_auto_resolve_summary(report: dict[str, Any]) -> str:
-    summary = report.get("auto_resolve_summary")
-    if not isinstance(summary, dict):
-        plan = report.get("auto_resolve_plan")
-        if not isinstance(plan, dict):
-            return ""
-        counts = plan.get("counts", {})
-        if not isinstance(counts, dict):
-            return ""
-        summary = {
-            "dirty_paths": counts.get("dirty_paths", 0),
-            "actuator_actions": counts.get("actuator_actions", {}),
-        }
-    actions = summary.get("actuator_actions", {})
-    action_text = "none"
-    if isinstance(actions, dict) and actions:
-        action_text = ",".join(f"{key}={value}" for key, value in sorted(actions.items()) if value)
-    return f"; auto_resolve=dirty_paths={summary.get('dirty_paths', 0)} actions={action_text}"
-
-
-def _check_work_tree_strays(target: Path) -> ToolCheck:
-    """Read-only WI-4356 doctor visibility for stale work-tree strays."""
-    check_name = "work-tree strays"
-    try:
-        from groundtruth_kb.hygiene.strays import run_strays, stale_count  # noqa: PLC0415
-    except Exception as exc:  # intentional-catch: doctor check must fail soft
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=f"Work-tree strays: scan unavailable: {exc}",
-        )
-
-    try:
-        report = run_strays(target)
-    except Exception as exc:  # intentional-catch: git-state collection must fail soft
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=f"Work-tree strays: scan unavailable: {exc}",
-        )
-
-    counts = report.get("counts", {})
-    workspace = int(counts.get("workspace_stale", 0))
-    stash = int(counts.get("stash_stale", 0))
-    worktree = int(counts.get("worktree_stale", 0))
-    stale = stale_count(report)
-    if stale == 0:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="pass",
-            message="Work-tree strays: no stale workspace, stash, or worktree findings",
-        )
-
-    ages = _format_work_tree_stray_ages(_work_tree_stray_age_hours(report))
-    auto_resolve = _format_auto_resolve_summary(report)
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="warning",
-        message=(
-            f"Work-tree strays: {stale} stale "
-            f"(workspace={workspace}, stash={stash}, worktree={worktree}; {ages}{auto_resolve}); "
-            "run `gt hygiene strays` for read-only details"
-        ),
-    )
-
-
 def _check_obsolete_reference_purge(target: Path) -> ToolCheck:
     """Warn when an in-window retirement-class artifact lacks a paired purge WI.
 
@@ -4100,143 +3910,30 @@ def _check_obsolete_reference_purge(target: Path) -> ToolCheck:
     )
 
 
-_DB_SNAPSHOT_OUTPUT_ALLOWLIST = re.compile(
-    r"^[A-Za-z]:[/\\]Users[/\\][^/\\]+[/\\]AppData[/\\]Local[/\\]gtkb-snapshots[/\\]",
-)
+def _check_registered_application_roots(target: Path) -> ToolCheck:
+    """Report catalog, marker and artifact checks for every application slot."""
+    from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state
 
-
-def _check_db_snapshot_freshness(target: Path) -> ToolCheck:
-    """Check that a recent db snapshot exists (daily cadence expected)."""
-    check_name = "DB snapshot freshness"
-    try:
-        from groundtruth_kb.config import GTConfig  # noqa: PLC0415
-        from groundtruth_kb.db_snapshot import default_output_dir  # noqa: PLC0415
-
-        cfg = GTConfig.load(config_path=target / "groundtruth.toml")
-        out_dir = cfg.backup.snapshot_output_dir or default_output_dir(cfg)
-    except Exception as exc:  # intentional-catch: autogenerated check fix
+    name = "Registered application boundaries"
+    result = evaluate_isolation_state(target)
+    failures = result["verdicts"]
+    if failures:
         return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=f"Cannot resolve snapshot output directory: {exc}",
-        )
-    out_path = Path(out_dir)
-    if not out_path.is_dir():
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=f"Snapshot directory does not exist yet: {out_path}",
-        )
-    snapshots = sorted(out_path.glob("groundtruth-*.db"), key=lambda p: p.stat().st_mtime, reverse=True)
-    if not snapshots:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=False,
-            status="warning",
-            message=f"No snapshot files found in {out_path}",
-        )
-    newest = snapshots[0]
-    age_hours = (datetime.now(tz=UTC) - datetime.fromtimestamp(newest.stat().st_mtime, tz=UTC)).total_seconds() / 3600
-    if age_hours > 48:
-        return ToolCheck(
-            name=check_name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Newest snapshot is {age_hours:.0f}h old (>{48}h): {newest.name}",
-        )
-    return ToolCheck(
-        name=check_name,
-        required=False,
-        found=True,
-        status="pass",
-        message=f"Newest snapshot {newest.name} is {age_hours:.0f}h old",
-    )
-
-
-def _check_db_snapshot_output_allowlist(target: Path) -> ToolCheck:
-    """Enforce the DB-Snapshot Output Exception allowlist bound."""
-    check_name = "DB snapshot output allowlist"
-    try:
-        from groundtruth_kb.config import GTConfig  # noqa: PLC0415
-        from groundtruth_kb.db_snapshot import default_output_dir  # noqa: PLC0415
-
-        cfg = GTConfig.load(config_path=target / "groundtruth.toml")
-        out_dir = str(cfg.backup.snapshot_output_dir or default_output_dir(cfg))
-    except Exception as exc:  # intentional-catch: autogenerated check fix
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=False,
-            status="warning",
-            message=f"Cannot resolve snapshot output directory: {exc}",
-        )
-    if _DB_SNAPSHOT_OUTPUT_ALLOWLIST.match(out_dir):
-        return ToolCheck(
-            name=check_name,
+            name=name,
             required=True,
             found=True,
-            status="pass",
-            message=f"Snapshot output {out_dir} matches allowlist",
-        )
-    return ToolCheck(
-        name=check_name,
-        required=True,
-        found=True,
-        status="fail",
-        message=(
-            f"Snapshot output {out_dir} does NOT match the DB-Snapshot Output "
-            f"Exception allowlist in project-root-boundary.md"
-        ),
-    )
-
-
-def _check_agent_red_app_root_minimization(target: Path) -> ToolCheck:
-    """Run the Agent Red app-root minimization validator."""
-    check_name = "Agent Red app-root minimization"
-    app_root = target / "applications" / "Agent_Red"
-    if not app_root.exists() and not (target / "applications").exists():
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=False,
-            status="pass",
-            message="Agent Red app-root minimization skipped outside the GT-KB platform workspace",
-        )
-
-    try:
-        from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization  # noqa: PLC0415
-
-        result = validate_app_root_minimization(app_root, project_root=target, tracked_only=True)
-    except Exception as exc:  # intentional-catch: diagnostic doctor check should report, not crash
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=app_root.exists(),
             status="fail",
-            message=f"Agent Red app-root minimization validator failed to run: {exc}",
+            message="Application registry checks failed: " + "; ".join(row["details"] for row in failures[:3]),
         )
-
-    if result.ok:
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="pass",
-            message=f"Agent Red app-root minimization clean ({len(result.actual_entries)} top-level artifacts)",
-        )
-
+    count = len(result["slots_status"])
     return ToolCheck(
-        name=check_name,
-        required=True,
-        found=app_root.exists(),
-        status="fail",
-        message=f"Agent Red app-root minimization failed: {result.first_error_message()}",
+        name=name,
+        required=bool(count),
+        found=bool(count),
+        status="pass",
+        message=f"Registry checks passed for {count} applications; native lifecycle qualification is separate"
+        if count
+        else "No application slots configured; no application qualification performed",
     )
 
 
@@ -4299,7 +3996,6 @@ def run_doctor(
     if p.includes_bridge:
         checks.append(_check_active_legacy_root_references(target))
         checks.append(_check_registered_hooks_tracked(target))
-        checks.append(_check_raw_written_close_intent_no_action(target))
         checks.append(_check_skill_rename_reference_sweep(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_safety_gate_registration(target))
@@ -4308,7 +4004,6 @@ def run_doctor(
         checks.append(_check_codex_skill_load_health(target))
         checks.append(_check_managed_artifact_drift(target, profile))
         checks.append(_check_sot_registry_completeness(target))
-        checks.append(_check_sot_read_discipline(target))
         checks.append(_check_sot_duplicate_guard(target))
         for registration in artifacts_for_doctor(profile, class_="settings-hook-registration"):
             if isinstance(registration, SettingsHookRegistration):
@@ -4319,7 +4014,6 @@ def run_doctor(
         # in Slice 6 after a coverage audit.
         checks.append(_check_harness_projection_conformance(target))
         checks.append(_check_deliberation_search_backend(target))
-        checks.append(_check_work_tree_strays(target))
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
         # (deterministic obsolete-reference-purge pairing check).
         checks.append(_check_obsolete_reference_purge(target))
@@ -4341,9 +4035,6 @@ def run_doctor(
         checks.append(_check_cursor_dispatch_readiness(target))
         # WI-4431 / FAB-19: Skill health check (WARN/advisory only)
         checks.append(_check_skill_health(target))
-        # FAB-03: DB snapshot checks
-        checks.append(_check_db_snapshot_freshness(target))
-        checks.append(_check_db_snapshot_output_allowlist(target))
 
     # Isolation checks per Phase 9 §4 (GTKB-ISOLATION-017 Slice 1).
     # Local import avoids a circular dependency: doctor_isolation imports
@@ -4352,7 +4043,7 @@ def run_doctor(
 
     _PRODUCT_ROOT = Path(__file__).resolve().parents[3]
     checks.extend(run_isolation_checks(target, profile, product_root=_PRODUCT_ROOT))
-    checks.append(_check_agent_red_app_root_minimization(target))
+    checks.append(_check_registered_application_roots(target))
 
     # Auto-install pass
     if auto_install:

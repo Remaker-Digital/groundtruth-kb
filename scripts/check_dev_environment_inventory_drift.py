@@ -98,9 +98,12 @@ def _read_public_inventory(path: Path) -> dict[str, Any]:
 def generate_current_public_inventory(project_root: Path) -> dict[str, Any]:
     if str(project_root) not in sys.path:
         sys.path.insert(0, str(project_root))
-    from scripts.collect_dev_environment_inventory import collect_inventory  # noqa: PLC0415
+    from scripts.collect_dev_environment_inventory import InventoryError, collect_inventory  # noqa: PLC0415
 
-    public, _private = collect_inventory(project_root)
+    try:
+        public, _private = collect_inventory(project_root)
+    except InventoryError as error:
+        raise DriftCheckError(str(error)) from error
     return public
 
 

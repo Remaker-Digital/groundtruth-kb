@@ -24,7 +24,8 @@ from groundtruth_kb.project.doctor_isolation import run_isolation_checks
 
 
 def _checks_by_name(adopter: Path, product_root: Path) -> dict[str, object]:
-    return {c.name: c for c in run_isolation_checks(adopter, "dual-agent", product_root=product_root)}
+    # The native fixture yields the disposable host; the application must not sit under the product checkout.
+    return {c.name: c for c in run_isolation_checks(adopter, "dual-agent", product_root=product_root.parent)}
 
 
 def test_check_1_adopter_root_placement_fails_when_under_product_root(tmp_path: Path) -> None:
@@ -39,15 +40,12 @@ def test_check_1_adopter_root_placement_fails_when_under_product_root(tmp_path: 
 def test_check_2_service_endpoint_fails_when_raw_db(
     clean_adopter: tuple[Path, Path],
 ) -> None:
-    """Check #2 fires ``status="fail"`` when ``[service].endpoint`` is a raw DB path."""
+    """Check #2 fires ``status="fail"`` when the only configured endpoint is a raw DB path."""
     adopter, doctor_root = clean_adopter
     toml = adopter / "groundtruth.toml"
-    text = toml.read_text(encoding="utf-8")
-    text = text.replace(
-        'endpoint = "configure-me://placeholder/v1"',
-        'endpoint = "groundtruth.db"',
-    )
-    toml.write_text(text, encoding="utf-8")
+    lines = [line for line in toml.read_text(encoding="utf-8").splitlines() if not line.startswith("authority_url")]
+    lines += ["", "[service]", 'endpoint = "groundtruth.db"']
+    toml.write_text("\n".join(lines) + "\n", encoding="utf-8")
     by_name = _checks_by_name(adopter, doctor_root)
     assert by_name["isolation:service-endpoint"].status == "fail"
 
@@ -82,21 +80,21 @@ def test_check_8_release_readiness_warns_on_wrong_header(
     """Check #8 fires ``status="warning"`` when the header omits "application"."""
     adopter, doctor_root = clean_adopter
     rr = adopter / "memory" / "release-readiness.md"
+    rr.parent.mkdir(parents=True, exist_ok=True)
     rr.write_text("# Platform release readiness\n\nGT-KB ready\n", encoding="utf-8")
     by_name = _checks_by_name(adopter, doctor_root)
     assert by_name["isolation:release-readiness-app-subject-header"].status == "warning"
 
 
-def test_check_9_chroma_warns_when_db_missing(
+def test_check_9_chroma_warns_without_configured_authority(
     clean_adopter: tuple[Path, Path],
 ) -> None:
-    """Check #9 fires ``status="warning"`` when chroma cache exists without a DB."""
+    """Check #9 fires ``status="warning"`` when a cache exists but no native authority is configured."""
     adopter, doctor_root = clean_adopter
     chroma = adopter / ".groundtruth-chroma"
     chroma.mkdir(parents=True, exist_ok=True)
-    db = adopter / "groundtruth.db"
-    if db.exists():
-        db.unlink()
+    toml = adopter / "groundtruth.toml"
+    toml.write_text(toml.read_text(encoding="utf-8").replace("authority_url", "retired_url"), encoding="utf-8")
     by_name = _checks_by_name(adopter, doctor_root)
     assert by_name["isolation:chroma-regeneratable"].status == "warning"
 
@@ -108,7 +106,7 @@ def test_check_9_chroma_warns_when_db_missing(
         "isolation:service-endpoint",
         "isolation:work-subject",
         "isolation:no-writable-product-paths",
-        "isolation:hooks-point-to-wrappers",
+        "isolation:hook-settings-structure",
         "isolation:workstream-focus-hook-absent",
         "isolation:release-readiness-app-subject-header",
         "isolation:chroma-regeneratable",

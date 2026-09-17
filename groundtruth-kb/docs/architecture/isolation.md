@@ -122,7 +122,7 @@ verification suite. Each isolation check returns one of `pass` / `fail` /
 | `isolation:service-endpoint` | `fail` for raw-DB endpoints (e.g., `groundtruth.db`); `pass` for scoped service URLs; `warning` for unrecognized shapes. | Adopter's `[service].endpoint` points at the raw database file. Remediation: replace with a scoped service URL or the placeholder `configure-me://placeholder/v1`. |
 | `isolation:work-subject` | `pass` when `current_subject=application`; `info` when state file is absent (defaults to application); `warning` when an unexpected subject is set. | A platform-subject session left state behind in the adopter root. Remediation: edit `.claude/session/work-subject.json` or remove it to restore the default. |
 | `isolation:no-writable-product-paths` | `fail` when at least one product-scope path is writable from the adopter session. | The session has filesystem write permission on a `gt-kb-managed` path. Remediation: depends on the deployment; the check is a detection contract, not a filesystem-permission setter. |
-| `isolation:hooks-point-to-wrappers` | `pass` for wrapper-shaped daemon configuration; `warning` for embedded inline logic. | Adopter's `.claude/settings.json` has a hook command with embedded shell logic instead of a wrapper invocation. Remediation: refactor the registration to invoke a script under `.claude/hooks/` or `${CLAUDE_PLUGIN_ROOT}`. |
+| `isolation:hook-settings-structure` | `info` when settings are absent; `warning` for unreadable JSON or malformed object/group/handler structure; `pass` for valid structure. | Repair malformed settings before upgrade. Custom command spelling does not establish wrapper behavior, availability, ownership, or native authority. This check never executes handlers and does not require deleting or rewrapping adopter customizations. |
 | `isolation:workstream-focus-hook-absent` | `pass` when absent; `warning` when present. | The deprecated `.claude/hooks/workstream-focus.py` reappeared. Remediation: delete the file. |
 | `isolation:release-readiness-app-subject-header` | `pass` when the file leads with an application-subject header; `warning` when the header omits "application" or combines GT-KB readiness with green keywords. | Adopter's `memory/release-readiness.md` claims GT-KB platform readiness alongside adopter readiness. Remediation: scope the file to the adopter only and rename the header. |
 | `isolation:chroma-regeneratable` | `pass` when chroma is absent or paired with a non-empty `groundtruth.db`; `warning` when chroma exists without a usable database. | An orphaned `.groundtruth-chroma/` directory exists but the database that feeds it is missing or empty. Remediation: regenerate the database or remove the orphan cache. |
@@ -135,78 +135,39 @@ not a feature.
 
 ## Upgrading an existing project with `gt project upgrade`
 
-`gt project upgrade` applies registry diffs (missing managed files, drift
-repairs, settings registrations, gitignore patterns) and writes a rollback
-receipt. Upgrade is gated by isolation pre-flight: a non-compliant adopter
-must opt into one-shot migration via `--accept-migration`.
+`gt project upgrade` brings a registered application's managed files (the
+harness configuration projected from the host baseline, the CI workflows and
+the other files `gt project init` owns) to the host's current baseline. It
+previews by default and never commits:
 
 ```bash
-gt project upgrade --dry-run        # plan without mutation
-gt project upgrade --apply          # apply (refuses on isolation failures)
-gt project upgrade --apply --accept-migration   # opt into one-shot migration
+gt --config <host>/groundtruth.toml project upgrade <APPLICATION> --project-id <PROJECT> --host-root <host>            # preview
+gt --config <host>/groundtruth.toml project upgrade <APPLICATION> --project-id <PROJECT> --host-root <host> --apply    # staged replacement
+gt --config <host>/groundtruth.toml project upgrade <APPLICATION> --project-id <PROJECT> --host-root <host> --recover  # restore from HEAD
 ```
 
-The flow per a successful `--apply`:
-
-1. **Pre-flight.** The isolation pre-flight runs first. Failing checks
-   partition into hard-refuse / auto-fixable / needs-adopter-input.
-2. **Branch.** A short-lived `gt-upgrade-payload-<id>` branch is created.
-3. **Migration auto-fixers.** When `--accept-migration` is set and the failing
-   set is auto-fixable only, the auto-fixer runs (replaces raw-DB endpoint with
-   the placeholder, deletes the legacy hook, normalizes the release-readiness
-   header, normalizes the work-subject state).
-4. **Payload.** File actions execute on the branch.
-5. **Merge.** The branch merges to the target branch with `--no-ff`.
-6. **Receipt.** A v1 JSON receipt is written under
-   `.claude/upgrade-receipts/active/<receipt_id>.json`. The receipt is the
-   evidence that lets `gt project rollback` undo the merge cleanly.
-
-Receipt fields and rollback semantics (filesystem vs tracked mode, payload
-boundary, etc.) are documented in
-[upgrade-receipts.md](../reference/upgrade-receipts.md).
-
-The Slice 4 partition determines what each isolation failure mode does:
-
-| Partition | Members | Behavior under `--apply` (no migration) | Behavior under `--apply --accept-migration` |
-|---|---|---|---|
-| Hard refuse | `isolation:adopter-root-placement` | `IsolationLocationFailureError` | Same — relocation cannot be auto-fixed. |
-| Auto-fixable | `isolation:service-endpoint`, `isolation:work-subject`, `isolation:workstream-focus-hook-absent`, `isolation:release-readiness-app-subject-header` | `IsolationMigrationRequiredError` | Auto-fixer runs; outcomes recorded in the receipt's `isolation_migration` block. |
-| Needs adopter input | `isolation:no-writable-product-paths`, `isolation:hooks-point-to-wrappers`, `isolation:chroma-regeneratable` | `IsolationMigrationRequiredError` | `IsolationNonAutoFixableError` — adopter must address manually. |
-
-Rollback reverses the merge while preserving the receipt:
-
-```bash
-gt project rollback              # consume the latest receipt
-gt project rollback --receipt-id <id>   # consume a specific receipt
-```
+- Managed files are replaced by staged writes; the application's own files
+  and its own hook registrations interleaved with managed ones are preserved.
+- Malformed input (an unreadable `groundtruth.toml`, a broken settings file) is
+  refused before any effect.
+- A managed file carrying uncommitted local work is refused until that work is
+  committed or discarded: recovery reads the application's own Git history
+  (`--recover` restores the committed managed files from `HEAD`).
+- Retired outputs are removed and never resurrected. There are no upgrade
+  receipts, payload branches, rollback commands or implicit commits.
 
 ---
 
 ## Migrating an existing mixed-root project
 
-Adopters that predate ADR-ISOLATION-APPLICATION-PLACEMENT-001 should rehearse
-the migration in a sandbox before running it against production state. The
-**Phase 8 rehearsal kit** at `scripts/rehearse_isolation.py` drives the
-non-destructive rehearsal pattern.
-
-The full recipe lives at
-`groundtruth-kb/templates/project/upgrade-rehearsal-recipe.md`. The recipe
-documents:
-
-- How to capture a snapshot of the existing adopter state.
-- How to invoke the rehearsal driver against the snapshot in a sandbox.
-- How to evaluate the rehearsal output before committing to the live migration.
-- How to invoke `gt project upgrade --apply --accept-migration` once the
-  rehearsal evidence is satisfactory.
-
-Migration policy under
-`DELIB-S328-ISOLATION-017-SLICE4-DECISIONS-1-3-7-OWNER-DIRECTIVE` v1:
-
-| Decision | Choice |
-|---|---|
-| Mandatory vs opt-in isolation for existing adopters | `mandatory_at_upgrade` — the upgrade refuses non-compliant adopters by default; `--accept-migration` is the documented opt-in. |
-| Backward-compatibility policy | `one_shot_migration_at_upgrade` — there is no extended deprecation window; the auto-fixer runs once and the adopter converges to the isolation-compliant shape. |
-| Phase 8 rehearsal-evidence integration | `out_of_band_recipe_only` — the rehearsal driver is documentation; the upgrade flow does not require attached rehearsal evidence at runtime. |
+An adopter that predates the application-placement decision joins a host by
+registering the application (`gt application register`) and initializing an
+empty application root with `gt project init`, then moving its own source,
+tests and configuration into that root. Its specifications, tests and work
+items live in the host authority; a local database is neither created nor
+migrated by the platform. `gt project doctor` reports the isolation findings
+of the result, and `gt project upgrade` keeps the managed files current
+afterwards.
 
 ---
 
@@ -298,9 +259,7 @@ operation outside the GT-KB CLI surface.
 ## See also
 
 - [cli.md](../reference/cli.md) — full `gt project init` / `gt project doctor` /
-  `gt project upgrade` / `gt project rollback` flag inventory.
-- [upgrade-receipts.md](../reference/upgrade-receipts.md) — receipt schema,
-  filesystem vs tracked mode, payload-boundary semantics.
+  `gt project upgrade` flag inventory.
 - [canonical-terminology.md](../reference/canonical-terminology.md) — full
   glossary including `application`, `platform`, `hosted application`,
   `MemBase`, `Deliberation Archive`, `bridge`, `dashboard`.

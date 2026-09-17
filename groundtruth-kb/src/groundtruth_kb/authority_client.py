@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Any
+import time
+from http.client import HTTPMessage
+from typing import IO, Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, ProxyHandler, Request, build_opener
@@ -19,7 +21,9 @@ class AuthorityClientError(Exception):
 
 
 class _NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
+    def redirect_request(
+        self, req: Request, fp: IO[bytes], code: int, msg: str, headers: HTTPMessage, newurl: str
+    ) -> None:
         return None
 
 
@@ -50,6 +54,7 @@ class AuthorityClient:
             data=canonical_json_bytes(body) if body is not None else None,
             headers={"Accept": "application/json", "Content-Type": "application/json"},
         )
+        started = time.monotonic()
         try:
             with self._opener.open(request, timeout=self.timeout) as response:
                 payload = response.read()
@@ -59,17 +64,35 @@ class AuthorityClient:
                 if not isinstance(result, dict):
                     raise ValueError("not an error object")
                 result = result.get("error", result)
+                if not isinstance(result, dict):
+                    raise ValueError("not an error object")
+                code = result.get("code", "authority_error")
+                message = result.get("message", "Authority refused this operation")
+                if not isinstance(code, str) or not isinstance(message, str):
+                    raise ValueError("invalid error fields")
             except Exception:  # intentional-catch: an unreadable error body collapses to the HTTP status
                 raise AuthorityClientError("authority_error", f"Authority returned HTTP {error.code}") from error
             raise AuthorityClientError(
-                result.get("code", "authority_error"),
-                result.get("message", "Authority refused this operation"),
+                code,
+                message,
                 details=result.get("details"),
             ) from error
         except (URLError, OSError, TimeoutError) as error:
+            # Name the cause and the timing so a refusal can be explained afterwards
+            # (a refused socket differs from an expired timeout); no retry, no
+            # widened timeout.
+            reason = getattr(error, "reason", None)
             raise AuthorityClientError(
                 "authority_unavailable",
                 "The configured authority is unavailable. Restore the service and read current state before retrying.",
+                details={
+                    "cause": type(reason if isinstance(reason, BaseException) else error).__name__,
+                    "cause_message": str(reason if reason is not None else error)[:200],
+                    "elapsed_seconds": round(time.monotonic() - started, 3),
+                    "timeout_seconds": self.timeout,
+                    "method": method,
+                    "path": path,
+                },
             ) from error
         try:
             return parse_json_bytes(payload)

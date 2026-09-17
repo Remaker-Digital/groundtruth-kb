@@ -7,8 +7,8 @@ Covers the three scope-A components:
 - `repair_codex_dotdir_acl.ps1` is PowerShell-7 compatible (Get-Acl/Set-Acl,
   not the .NET Core-removed `[System.IO.Directory]::GetAccessControl` statics
   that falsely reported `risky_deny_count=0` under pwsh).
-- `verify_codex_dispatch._check_codex_dotdir_acl(..., repair=True)` escalates a
-  Check to Apply when removable risky-Deny ACEs are found (opt-in, idempotent).
+- The Codex launch probe performs Check only. ACL repair remains an explicit
+  operator operation through the existing PowerShell script.
 """
 
 from __future__ import annotations
@@ -69,20 +69,26 @@ def _mode_capturing_run(modes: list[str], needs_repair_first: bool):
         mode = command[command.index("-Mode") + 1]
         modes.append(mode)
         needs = needs_repair_first and mode == "Check" and modes.count("Check") == 1
-        payload = {"ok": not needs, "needs_repair": needs, "risky_deny_count": 1 if needs else 0, "errors": []}
+        payload = {
+            "ok": not needs,
+            "needs_repair": needs,
+            "risky_deny_count": 1 if needs else 0,
+            "checked_count": 1,
+            "errors": [],
+        }
         return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
 
     return fake_run
 
 
-def test_auto_repair_escalates_check_to_apply(monkeypatch):
+def test_acl_findings_never_escalate_diagnostic_to_apply(monkeypatch):
     monkeypatch.setattr(verify.sys, "platform", "win32")
     monkeypatch.setattr(verify.shutil, "which", _fake_powershell)
     modes: list[str] = []
     monkeypatch.setattr(verify.subprocess, "run", _mode_capturing_run(modes, needs_repair_first=True))
-    verify._check_codex_dotdir_acl(Path("E:/GT-KB"), repair=True)
-    # Check found a removable deny -> Apply -> re-Check confirms clean.
-    assert modes == ["Check", "Apply", "Check"]
+    result = verify._check_codex_dotdir_acl(Path("E:/GT-KB"))
+    assert modes == ["Check"]
+    assert result["ok"] is False and result["needs_repair"] is True
 
 
 def test_default_check_is_read_only(monkeypatch):
@@ -90,7 +96,7 @@ def test_default_check_is_read_only(monkeypatch):
     monkeypatch.setattr(verify.shutil, "which", _fake_powershell)
     modes: list[str] = []
     monkeypatch.setattr(verify.subprocess, "run", _mode_capturing_run(modes, needs_repair_first=True))
-    verify._check_codex_dotdir_acl(Path("E:/GT-KB"), repair=False)
+    verify._check_codex_dotdir_acl(Path("E:/GT-KB"))
     # Without repair, the readiness probe never mutates: Check only.
     assert modes == ["Check"]
 
@@ -100,8 +106,7 @@ def test_no_apply_when_check_is_clean(monkeypatch):
     monkeypatch.setattr(verify.shutil, "which", _fake_powershell)
     modes: list[str] = []
     monkeypatch.setattr(verify.subprocess, "run", _mode_capturing_run(modes, needs_repair_first=False))
-    verify._check_codex_dotdir_acl(Path("E:/GT-KB"), repair=True)
-    # repair requested but nothing to repair -> no Apply escalation.
+    verify._check_codex_dotdir_acl(Path("E:/GT-KB"))
     assert modes == ["Check"]
 
 
@@ -113,12 +118,12 @@ def test_acl_check_preserves_no_window_launcher(monkeypatch):
 
     def fake_run(command, **kwargs):
         observed_kwargs.append(kwargs)
-        payload = {"ok": True, "needs_repair": False, "risky_deny_count": 0, "errors": []}
+        payload = {"ok": True, "needs_repair": False, "risky_deny_count": 0, "checked_count": 1, "errors": []}
         return subprocess.CompletedProcess(command, 0, stdout=json.dumps(payload), stderr="")
 
     monkeypatch.setattr(verify.subprocess, "run", fake_run)
 
-    result = verify._check_codex_dotdir_acl(Path("E:/GT-KB"), repair=False)
+    result = verify._check_codex_dotdir_acl(Path("E:/GT-KB"))
 
     assert result["ok"] is True
     assert observed_kwargs

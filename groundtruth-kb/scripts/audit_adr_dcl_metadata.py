@@ -1,17 +1,11 @@
-"""Audit ADR/DCL specification metadata population in groundtruth.db.
+"""Report current ADR/DCL metadata through the configured native authority.
 
-Read-only audit of the `specifications` table for ADR (architecture_decision)
-and DCL (design_constraint) records. Produces a structured report on
-population state of `tags`, `source_paths`, and `assertions` fields, identifies
-records needing backfill (the principal target identified in the parent
-scoping bridge gtkb-adr-evaluation-enforcement-2026-04-30), and recommends a
-`concern_tags` normalization decision based on observed tag distribution.
-
-Per `bridge/gtkb-adr-evaluation-enforcement-s0-audit-2026-04-30-006.md` (GO).
-
-Usage:
-    python audit_adr_dcl_metadata.py [--db PATH] [--format {json,markdown}]
+Usage: python audit_adr_dcl_metadata.py [--config PATH] [--format json|markdown]
                                       [--output PATH] [--frozen-timestamp ISO]
+
+Only native GET requests are used. Counts describe declaration population and
+tag usage; they do not establish architecture conformance or select a taxonomy.
+Pagination observes current records across requests, not one atomic snapshot.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -21,327 +15,183 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
-import sqlite3
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+from groundtruth_kb.config import GTConfig
 
-# Theme-tag heuristic: tags appearing in >=3 records OR matching explicit
-# governance/architecture theme markers are "theme" tags. Everything else is
-# "topic" tags.
-EXPLICIT_THEME_MARKERS: frozenset[str] = frozenset(
-    {
-        "design-constraint",
-        "mechanical-enforcement",
-        "governance",
-        "architecture",
-        "audit-trail",
-        "platform",
-        "platform-purity",
-    }
-)
-THEME_THRESHOLD = 3  # tag appearing in >= N records is theme-classified
+SCHEMA_VERSION = 2
+ARCHITECTURE_TYPES = frozenset({"architecture_decision", "design_constraint"})
 
 
-def _resolve_default_db_path() -> Path:
-    """Return the canonical groundtruth.db location for GT-KB."""
-    return Path(r"E:\GT-KB\groundtruth.db")
+def _query_records(client: AuthorityClient) -> list[dict[str, Any]]:
+    """Read every bounded native page without accepting duplicate identities."""
+    records: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    cursors: set[str] = set()
+    after = None
+    while True:
+        page = client.request("GET", "/v1/specifications", query={"limit": 1000, "after": after})
+        if not isinstance(page, dict) or not isinstance(page.get("records"), list) or "next_after" not in page:
+            raise ValueError("The authority returned an invalid specification page")
+        for record in page["records"]:
+            if not isinstance(record, dict) or not isinstance(record.get("id"), str) or not record["id"]:
+                raise ValueError("The authority returned a record without a valid identity")
+            if record["id"] in seen:
+                raise ValueError("The authority repeated a specification identity; read current state again")
+            seen.add(record["id"])
+            if record.get("type") in ARCHITECTURE_TYPES:
+                records.append(record)
+        after = page["next_after"]
+        if after is None:
+            return sorted(records, key=lambda record: record["id"])
+        if not isinstance(after, str) or not after or after in cursors or not page["records"]:
+            raise ValueError("The authority returned a non-progressing specification cursor")
+        cursors.add(after)
 
 
-def _connect_read_only(db_path: Path) -> sqlite3.Connection:
-    """Open groundtruth.db in read-only mode using URI parameter."""
-    if not db_path.is_file():
-        raise FileNotFoundError(f"groundtruth.db not found at {db_path}")
-    uri = f"file:{db_path.as_posix()}?mode=ro"
-    return sqlite3.connect(uri, uri=True)
-
-
-def _is_populated(value: str | None) -> bool:
-    """Return True iff value is a non-empty JSON list with at least 1 element."""
-    if value is None:
-        return False
-    stripped = value.strip()
-    if stripped in ("", "[]", "null", "None"):
-        return False
-    try:
-        parsed = json.loads(stripped)
-    except (json.JSONDecodeError, ValueError):
-        return False
-    return isinstance(parsed, list) and len(parsed) > 0
-
-
-def _categorize_tag(tag: str, count: int) -> str:
-    """Classify a tag as 'theme' or 'topic' per the documented heuristic."""
-    if tag in EXPLICIT_THEME_MARKERS:
-        return "theme"
-    if count >= THEME_THRESHOLD:
-        return "theme"
-    return "topic"
-
-
-def _query_records(conn: sqlite3.Connection) -> list[dict[str, Any]]:
-    """Fetch latest version per id for ADR/DCL specifications."""
-    cur = conn.cursor()
-    cur.execute(
-        """
-        SELECT id, type, MAX(version) AS v, tags, source_paths, assertions
-        FROM specifications
-        WHERE type IN ('architecture_decision', 'design_constraint')
-        GROUP BY id
-        ORDER BY id
-        """
-    )
-    return [
-        {
-            "id": row[0],
-            "type": row[1],
-            "version": row[2],
-            "tags": row[3],
-            "source_paths": row[4],
-            "assertions": row[5],
-        }
-        for row in cur.fetchall()
-    ]
+def _is_populated(value: Any) -> bool:
+    """A nonempty native array is populated; this does not assess its adequacy."""
+    return isinstance(value, list) and bool(value)
 
 
 def _compute_totals(records: list[dict[str, Any]]) -> dict[str, dict[str, int]]:
-    """Aggregate per-type population counts."""
     totals: dict[str, dict[str, int]] = {}
     for record in records:
-        type_key = record["type"]
         bucket = totals.setdefault(
-            type_key,
-            {"total": 0, "with_tags": 0, "with_source_paths": 0, "with_assertions": 0},
+            record["type"], {"total": 0, "with_tags": 0, "with_source_paths": 0, "with_assertions": 0}
         )
         bucket["total"] += 1
-        if _is_populated(record["tags"]):
-            bucket["with_tags"] += 1
-        if _is_populated(record["source_paths"]):
-            bucket["with_source_paths"] += 1
-        if _is_populated(record["assertions"]):
-            bucket["with_assertions"] += 1
+        for field in ("tags", "source_paths", "assertions"):
+            bucket["with_" + field] += int(_is_populated(record.get(field)))
     return totals
 
 
 def _missing_source_paths(records: list[dict[str, Any]]) -> list[dict[str, str]]:
-    """Return records lacking source_paths, sorted by id."""
     return sorted(
-        [
-            {"id": record["id"], "type": record["type"]}
-            for record in records
-            if not _is_populated(record["source_paths"])
-        ],
-        key=lambda x: x["id"],
+        [{"id": r["id"], "type": r["type"]} for r in records if not _is_populated(r.get("source_paths"))],
+        key=lambda record: record["id"],
     )
 
 
 def _tags_histogram(records: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Build tag-frequency histogram with theme/topic categorization."""
-    counter: Counter[str] = Counter()
+    counts: Counter[str] = Counter()
     for record in records:
-        if not _is_populated(record["tags"]):
-            continue
-        try:
-            tags = json.loads(record["tags"])
-        except (json.JSONDecodeError, ValueError):
-            continue
-        for tag in tags:
-            if isinstance(tag, str):
-                counter[tag] += 1
-
-    histogram = [
-        {
-            "tag": tag,
-            "count": count,
-            "category": _categorize_tag(tag, count),
-        }
-        for tag, count in counter.items()
-    ]
-    # Deterministic sort: category ascending, count descending, tag ascending.
-    histogram.sort(key=lambda x: (x["category"], -x["count"], x["tag"]))
-    return histogram
+        tags = record.get("tags")
+        if isinstance(tags, list):
+            counts.update({tag for tag in tags if isinstance(tag, str) and tag.strip()})
+    return [{"tag": tag, "count": count} for tag, count in sorted(counts.items(), key=lambda item: (-item[1], item[0]))]
 
 
-def _normalization_recommendation(histogram: list[dict[str, Any]]) -> dict[str, Any]:
-    """Recommend concern_tags normalization decision based on tag distribution."""
-    theme_count = sum(1 for h in histogram if h["category"] == "theme")
-    topic_count = sum(1 for h in histogram if h["category"] == "topic")
-    ambiguous = sum(1 for h in histogram if h["category"] == "topic" and h["count"] >= THEME_THRESHOLD - 1)
-    if theme_count >= 5 and topic_count >= 10:
-        decision = "normalize_to_taxonomy"
-        rationale = (
-            f"{theme_count} theme tags and {topic_count} topic tags observed; "
-            "the topic-tag spread is broad enough that a closed concern_tags "
-            "taxonomy would meaningfully reduce ambiguity for the validator."
-        )
-    else:
-        decision = "use_existing_tags"
-        rationale = (
-            f"{theme_count} theme tags and {topic_count} topic tags observed; "
-            "tag distribution is narrow enough that existing tags can serve "
-            "as concern_tags directly with low ambiguity cost."
-        )
-    return {
-        "decision": decision,
-        "rationale": rationale,
-        "evidence": {
-            "theme_tag_count": theme_count,
-            "topic_tag_count": topic_count,
-            "ambiguous_count": ambiguous,
-        },
-    }
-
-
-def build_report(
-    records: list[dict[str, Any]],
-    db_path: Path,
-    generated_at: str,
-) -> dict[str, Any]:
-    """Construct the full structured audit report."""
-    totals = _compute_totals(records)
+def build_report(records: list[dict[str, Any]], authority_url: str, generated_at: str) -> dict[str, Any]:
+    """Report observations without introducing another decision or audit state."""
     missing = _missing_source_paths(records)
-    histogram = _tags_histogram(records)
     return {
         "schema_version": SCHEMA_VERSION,
         "generated_at": generated_at,
-        "db_path": str(db_path),
-        "totals": totals,
+        "authority_url": authority_url,
+        "totals": _compute_totals(records),
+        "status_counts": dict(sorted(Counter(r.get("status") or "unspecified" for r in records).items())),
         "missing_source_paths": missing,
-        "tags_histogram": histogram,
-        "concern_tags_normalization_recommendation": _normalization_recommendation(histogram),
         "records_needing_backfill_count": len(missing),
+        "tags_histogram": _tags_histogram(records),
+        "evidence_limit": (
+            "Current ADR/DCL declarations observed across native pages. Includes inactive current rows, "
+            "identified in status_counts. Population and tag frequency do not establish content adequacy, "
+            "implementation, conformance, independent verification or a taxonomy decision."
+        ),
     }
 
 
+def render_json(report: dict[str, Any]) -> str:
+    return json.dumps(report, indent=2, sort_keys=True, ensure_ascii=False)
+
+
 def render_markdown(report: dict[str, Any]) -> str:
-    """Render the report as human-readable markdown."""
-    lines: list[str] = [
+    lines = [
         "# ADR/DCL Metadata Audit Report",
         "",
         f"Generated: {report['generated_at']}",
-        f"Database: `{report['db_path']}`",
+        f"Authority: `{report['authority_url']}`",
         f"Schema version: {report['schema_version']}",
+        "",
+        report["evidence_limit"],
         "",
         "## Totals",
         "",
         "| Type | Total | with tags | with source_paths | with assertions |",
         "|---|---|---|---|---|",
     ]
-    for type_key, bucket in sorted(report["totals"].items()):
+    for kind, bucket in sorted(report["totals"].items()):
         lines.append(
-            f"| {type_key} | {bucket['total']} | {bucket['with_tags']} | "
+            f"| {kind} | {bucket['total']} | {bucket['with_tags']} | "
             f"{bucket['with_source_paths']} | {bucket['with_assertions']} |"
         )
-    lines += [
-        "",
-        f"## Records needing backfill: {report['records_needing_backfill_count']}",
-        "",
-        "(Records lacking `source_paths`, sorted by id.)",
-        "",
-    ]
-    for entry in report["missing_source_paths"]:
-        lines.append(f"- `{entry['id']}` ({entry['type']})")
-    lines += [
-        "",
-        "## Tags histogram",
-        "",
-        "| Tag | Count | Category |",
-        "|---|---|---|",
-    ]
-    for entry in report["tags_histogram"]:
-        lines.append(f"| `{entry['tag']}` | {entry['count']} | {entry['category']} |")
-    rec = report["concern_tags_normalization_recommendation"]
-    lines += [
-        "",
-        "## concern_tags normalization recommendation",
-        "",
-        f"**Decision:** `{rec['decision']}`",
-        "",
-        f"**Rationale:** {rec['rationale']}",
-        "",
-        "**Evidence:**",
-        f"- Theme tag count: {rec['evidence']['theme_tag_count']}",
-        f"- Topic tag count: {rec['evidence']['topic_tag_count']}",
-        f"- Ambiguous (topic but high-frequency) count: {rec['evidence']['ambiguous_count']}",
-        "",
-    ]
+    lines.extend(
+        [
+            "",
+            "Current row statuses: "
+            + ", ".join(f"{status}: {count}" for status, count in report["status_counts"].items()),
+            "",
+            f"## Records needing backfill: {report['records_needing_backfill_count']}",
+            "",
+            "Records lacking source_paths; inspect the requirement before choosing a correction.",
+            "",
+        ]
+    )
+    lines.extend(f"- `{r['id']}` ({r['type']})" for r in report["missing_source_paths"])
+    lines.extend(
+        [
+            "",
+            "## Tags histogram",
+            "",
+            "Count is the number of observed records containing the tag.",
+            "",
+            "| Tag | Count |",
+            "|---|---|",
+        ]
+    )
+    lines.extend(f"| `{r['tag'].replace('|', '&#124;')}` | {r['count']} |" for r in report["tags_histogram"])
     return "\n".join(lines)
 
 
-def render_json(report: dict[str, Any]) -> str:
-    """Render the report as deterministic JSON."""
-    return json.dumps(report, indent=2, sort_keys=True)
-
-
 def _validate_iso_timestamp(value: str) -> str:
-    """Ensure --frozen-timestamp is a valid ISO 8601 string."""
     try:
-        # Accept Z suffix (Python 3.11+ handles fromisoformat) or explicit offset.
-        normalized = value.replace("Z", "+00:00")
-        dt.datetime.fromisoformat(normalized)
-    except ValueError as exc:
-        raise argparse.ArgumentTypeError(f"--frozen-timestamp {value!r} is not a valid ISO 8601 timestamp") from exc
+        dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError as error:
+        raise argparse.ArgumentTypeError(f"Invalid ISO 8601 timestamp: {value!r}") from error
     return value
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--db",
-        type=Path,
-        default=_resolve_default_db_path(),
-        help=f"Path to groundtruth.db. Default: {_resolve_default_db_path()}",
-    )
-    parser.add_argument(
-        "--format",
-        choices=["json", "markdown"],
-        default="json",
-        help="Output format. Default: json.",
-    )
-    parser.add_argument(
-        "--output",
-        type=Path,
-        default=None,
-        help="Write report to file instead of stdout. Default: stdout.",
-    )
-    parser.add_argument(
-        "--frozen-timestamp",
-        type=_validate_iso_timestamp,
-        default=None,
-        help=(
-            "Freeze the report's generated_at timestamp for deterministic "
-            "test snapshots. Format: ISO 8601. Default: current UTC time."
-        ),
-    )
-
+    parser.add_argument("--config", type=Path, help="Select the normal GroundTruth configuration with authority_url.")
+    parser.add_argument("--format", choices=["json", "markdown"], default="json")
+    parser.add_argument("--output", type=Path)
+    parser.add_argument("--frozen-timestamp", type=_validate_iso_timestamp)
     args = parser.parse_args(argv)
-
-    generated_at = args.frozen_timestamp if args.frozen_timestamp is not None else dt.datetime.now(dt.UTC).isoformat()
-
-    db_path = Path(args.db).resolve()
-
     try:
-        with _connect_read_only(db_path) as conn:
-            records = _query_records(conn)
-    except FileNotFoundError as exc:
-        sys.stderr.write(f"Error: {exc}\n")
+        config = GTConfig.load(config_path=args.config)
+        if not config.authority_url:
+            raise ValueError("No authority_url is configured; select a native configuration with --config")
+        client = AuthorityClient(config.authority_url)
+        records = _query_records(client)
+    except (AuthorityClientError, OSError, ValueError) as error:
+        sys.stderr.write(f"Error: {error}\n")
         return 2
-
-    report = build_report(records, db_path, generated_at)
-
+    timestamp = args.frozen_timestamp or dt.datetime.now(dt.UTC).isoformat()
+    report = build_report(records, client.url, timestamp)
     rendered = render_json(report) if args.format == "json" else render_markdown(report)
-
-    if args.output is not None:
+    if args.output:
         args.output.parent.mkdir(parents=True, exist_ok=True)
-        args.output.write_text(rendered, encoding="utf-8")
+        args.output.write_text(rendered + "\n", encoding="utf-8")
     else:
         print(rendered)
-
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

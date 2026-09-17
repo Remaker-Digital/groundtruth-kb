@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import fnmatch
 import json
+from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,7 @@ from groundtruth_kb.project.registry_control_plane import (
     _record_objects,
     load_registry_snapshot,
 )
-from groundtruth_kb.project.sot_registry import InvalidSoTRecord, SoTArtifact, UnknownDomain
+from groundtruth_kb.project.sot_registry import CoverageMode, InvalidSoTRecord, SoTArtifact, UnknownDomain
 
 REGISTRY_RELATIVE_PATH = Path("config") / "registry" / "sot-artifacts.toml"
 DEFAULT_CRITICAL_CLASSES = {
@@ -40,7 +41,7 @@ class ArtifactRecord:
     domain: str
     lifecycle: str
     storage_path: str
-    coverage_mode: str
+    coverage_mode: CoverageMode
     mutation_api: str
     health_check_function: str | None
 
@@ -50,6 +51,8 @@ class ArtifactRecord:
 
     @classmethod
     def from_sot(cls, record: SoTArtifact) -> ArtifactRecord:
+        if record.coverage_mode is None:
+            raise InventoryScanError(f"Current artifact {record.id!r} requires explicit coverage_mode")
         return cls(
             id=record.id,
             domain=record.domain,
@@ -125,7 +128,7 @@ def _expand_artifact_files(record: SoTArtifact, project_root: Path) -> ArtifactE
     if record.coverage_mode == "virtual":
         return ArtifactExpansion(artifact, path_class, f"declared_{path_class}", (), True, False)
 
-    def files_under(directory: Path):
+    def files_under(directory: Path) -> Iterator[Path]:
         for path in sorted(directory.iterdir(), key=lambda item: item.name.casefold()):
             kind = _path_object_kind(path)
             if kind == "directory":
@@ -147,7 +150,7 @@ def _expand_artifact_files(record: SoTArtifact, project_root: Path) -> ArtifactE
             )
         if not present:
             kind = {"recursive": "directory", "glob": "glob", "opaque_container": "opaque_container"}.get(
-                record.coverage_mode, "file"
+                artifact.coverage_mode, "file"
             )
             return ArtifactExpansion(artifact, path_class, f"missing_{record.lifecycle}_{kind}", (), False, True)
         if record.coverage_mode == "opaque_container":
@@ -276,8 +279,8 @@ def scan_inventory_strings(
         path = project_root / rel_path
         try:
             lines = path.read_text(encoding="utf-8", errors="replace").splitlines()
-        except OSError:
-            continue
+        except OSError as exc:
+            raise InventoryScanError(f"Cannot read registered artifact {rel_path}: {exc}") from exc
         for line_number, line in enumerate(lines, start=1):
             for match in literal_matches:
                 for column in _iter_line_hits(line, match):
@@ -377,9 +380,17 @@ def emit_markdown_ledger(payload: dict[str, Any]) -> str:
         f"- warn: {payload['summary']['warn']}",
         "",
     ]
+    missing = payload.get("missing_artifacts", [])
+    if missing:
+        lines.extend(["## Coverage Findings", ""])
+        for finding in missing:
+            lines.append(f"- {finding['artifact_id']} ({finding['storage_path']}): {finding['status']}")
+        lines.append("")
     hits = payload.get("hits", [])
     if not hits:
-        lines.append("No matches found.")
+        lines.append(
+            "No matches found in the files scanned; coverage findings remain." if missing else "No matches found."
+        )
         return "\n".join(lines) + "\n"
     for severity in ("critical", "warn"):
         severity_hits = [hit for hit in hits if hit["severity"] == severity]

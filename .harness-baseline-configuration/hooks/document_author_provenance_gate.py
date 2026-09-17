@@ -60,6 +60,8 @@ def _extract_patch_text(payload: dict[str, Any]) -> str:
         tool_input.get("patch"),
         tool_input.get("input"),
         tool_input.get("content"),
+        # Codex's native apply_patch carries the patch as the tool's command text.
+        tool_input.get("command"),
         payload.get("patch"),
     ]
     arguments = tool_input.get("arguments")

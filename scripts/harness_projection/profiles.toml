@@ -121,6 +121,10 @@ leftover_paths = [
   ".claude/rules/gtkb-loyal-opposition.mdc",
   ".claude/rules/gtkb-prime-builder.mdc",
   ".claude/hooks/implementation-start-gate.py",
+  # This retired generated skill also occurs without a previous manifest.
+  # Remove its known file, preserving any other files in the skill directory.
+  ".claude/skills/gtkb-check-deliberations/SKILL.md",
+  ".claude/hooks/advisory-router-scan.py",
 ]
 leftover_trees = [".claude/gtkb-hooks"]
 [harnesses.claude.hook_events]
@@ -151,10 +155,31 @@ rules_projection = true
 hooks_projection = "native_cwd_hooks_json"
 hooks_json_path = ".codex/hooks.json"
 stdin_adapter = "scripts/codex_hook_adapter.py"
-# The only declared leftover is the projected copy of the retired
-# implementation-start gate wrapper (owner ruling 2026-09-07, canon v8.92).
-leftover_paths = [".codex/hooks/implementation-start-gate.py"]
-# Unknown older output is preserved for classified cleanup at integration.
+# Native runtime settings are adaptation source here, never read back from a
+# generated target to derive the next projection. Values retain the existing
+# GT-KB project defaults; host policy and explicit runtime overrides still apply.
+config_toml = '''
+# Project runtime defaults; native hooks are registered in this target's hooks.json.
+approval_policy = "on-request"
+sandbox_mode = "danger-full-access"
+
+[features]
+hooks = true
+shell_snapshot = false
+
+# This setting applies to workspace-write mode. It does not establish that
+# networking is disabled under the danger-full-access mode above.
+[sandbox_workspace_write]
+network_access = false
+'''
+# Exact retired generated files: the implementation gate wrapper, the empty
+# obsolete command registry and the old plugin registration pointing into Goose.
+# Preserve neighboring files. config.toml is now derived from the profile above.
+leftover_paths = [
+  ".codex/hooks/implementation-start-gate.py",
+  ".codex/commands/registry.json",
+  ".codex/plugins/gtkb/hooks/hooks.json",
+]
 [harnesses.codex.hook_events]
 pre_tool_use = "PreToolUse"
 post_tool_use = "PostToolUse"
@@ -270,6 +295,132 @@ routing_projection = true
 hooks_projection = "settings_json"
 hooks_json_path = ".api-harness/openrouter/settings.json"
 
+# Exact retired files from the former generic OpenRouter destination.
+# Current provider outputs and unlisted local files are never cleanup targets.
+# Do not replace this list with removal of the shared .api-harness directory.
+leftover_paths = [
+  ".api-harness/.projection-manifest.json",
+  ".api-harness/hooks.json",
+  ".api-harness/hooks/_delib_common.py",
+  ".api-harness/hooks/_shell_payload.py",
+  ".api-harness/hooks/advisory-router-scan.py",
+  ".api-harness/hooks/assertion-check.py",
+  ".api-harness/hooks/bridge-axis-2-surface.py",
+  ".api-harness/hooks/bridge-proposal-wi-id-collision-gate.py",
+  ".api-harness/hooks/code-quality-baseline-proposal-check.py",
+  ".api-harness/hooks/credential-scan.py",
+  ".api-harness/hooks/delib-search-gate.py",
+  ".api-harness/hooks/delib-search-tracker.py",
+  ".api-harness/hooks/destructive-gate.py",
+  ".api-harness/hooks/directive-enforcement-adapter.py",
+  ".api-harness/hooks/document_author_provenance_gate.py",
+  ".api-harness/hooks/formal-artifact-approval-gate.py",
+  ".api-harness/hooks/glossary-expansion.py",
+  ".api-harness/hooks/gov09-capture.py",
+  ".api-harness/hooks/intake-classifier.py",
+  ".api-harness/hooks/kb-not-markdown.py",
+  ".api-harness/hooks/lo-file-safety-gate.py",
+  ".api-harness/hooks/narrative-artifact-approval-gate.py",
+  ".api-harness/hooks/owner-decision-capture.py",
+  ".api-harness/hooks/owner-decision-tracker.py",
+  ".api-harness/hooks/project-completion-surface.py",
+  ".api-harness/hooks/scanner-safe-writer.py",
+  ".api-harness/hooks/session-init-binding.py",
+  ".api-harness/hooks/session-start-governance.py",
+  ".api-harness/hooks/session-topic-envelope-router.py",
+  ".api-harness/hooks/sot-read-discipline.py",
+  ".api-harness/hooks/spec-before-code.py",
+  ".api-harness/hooks/spec-classifier.py",
+  ".api-harness/hooks/spec-event-surfacer.py",
+  ".api-harness/plugins/gtkb/hooks/hooks.json",
+  ".api-harness/routing.toml",
+  ".api-harness/rules/acting-prime-builder.md",
+  ".api-harness/rules/active-workspace.md",
+  ".api-harness/rules/backlog-approval-state.md",
+  ".api-harness/rules/bridge-essential.md",
+  ".api-harness/rules/canonical-terminology.md",
+  ".api-harness/rules/canonical-terminology.toml",
+  ".api-harness/rules/counterpart-review-gate.md",
+  ".api-harness/rules/dead-ends-and-false-positives.md",
+  ".api-harness/rules/decision-ledger.md",
+  ".api-harness/rules/deliberation-protocol.md",
+  ".api-harness/rules/file-bridge-protocol.md",
+  ".api-harness/rules/governance-emergency-bootstrap-protocol.md",
+  ".api-harness/rules/governance-principles.md",
+  ".api-harness/rules/gtkb-capability-import-policy.md",
+  ".api-harness/rules/loyal-opposition.md",
+  ".api-harness/rules/operating-model.md",
+  ".api-harness/rules/operating-role.md",
+  ".api-harness/rules/peer-solution-advisory-loop.md",
+  ".api-harness/rules/prime-builder-role.md",
+  ".api-harness/rules/prime-builder.md",
+  ".api-harness/rules/project-root-boundary.md",
+  ".api-harness/rules/report-depth-prime-builder-context.md",
+  ".api-harness/rules/report-depth.md",
+  ".api-harness/rules/session-bootstrap.md",
+  ".api-harness/rules/sot-read-discipline.md",
+  ".api-harness/skills/gtkb-adr/SKILL.md",
+  ".api-harness/skills/gtkb-advisory-disposition/SKILL.md",
+  ".api-harness/skills/gtkb-advisory-intake/SKILL.md",
+  ".api-harness/skills/gtkb-advisory-proposal/SKILL.md",
+  ".api-harness/skills/gtkb-alternatives-investigation/SKILL.md",
+  ".api-harness/skills/gtkb-arch-audit/SKILL.md",
+  ".api-harness/skills/gtkb-assert/SKILL.md",
+  ".api-harness/skills/gtkb-assertion-triage/SKILL.md",
+  ".api-harness/skills/gtkb-batch/SKILL.md",
+  ".api-harness/skills/gtkb-benchmarks/SKILL.md",
+  ".api-harness/skills/gtkb-bridge-config/SKILL.md",
+  ".api-harness/skills/gtkb-bridge-propose/SKILL.md",
+  ".api-harness/skills/gtkb-bridge-propose/helpers/write_bridge.py",
+  ".api-harness/skills/gtkb-bridge-reconciliation/SKILL.md",
+  ".api-harness/skills/gtkb-bridge/SKILL.md",
+  ".api-harness/skills/gtkb-bridge/helpers/impl_report_bridge.py",
+  ".api-harness/skills/gtkb-bridge/helpers/protected_write.py",
+  ".api-harness/skills/gtkb-bridge/helpers/revise_bridge.py",
+  ".api-harness/skills/gtkb-bridge/helpers/scan_bridge.py",
+  ".api-harness/skills/gtkb-bridge/helpers/show_thread_bridge.py",
+  ".api-harness/skills/gtkb-check-deliberations/SKILL.md",
+  ".api-harness/skills/gtkb-code-review-audit/SKILL.md",
+  ".api-harness/skills/gtkb-decision-capture/SKILL.md",
+  ".api-harness/skills/gtkb-decision-capture/helpers/record_decision.py",
+  ".api-harness/skills/gtkb-dispatcher-control/SKILL.md",
+  ".api-harness/skills/gtkb-formal-artifact-packet-helper/SKILL.md",
+  ".api-harness/skills/gtkb-grill-me-for-clarification/SKILL.md",
+  ".api-harness/skills/gtkb-harness-parity-review/SKILL.md",
+  ".api-harness/skills/gtkb-hygiene-investigation/SKILL.md",
+  ".api-harness/skills/gtkb-hygiene-reclaim/SKILL.md",
+  ".api-harness/skills/gtkb-hygiene-sweep/SKILL.md",
+  ".api-harness/skills/gtkb-lo-hygiene-assessment/SKILL.md",
+  ".api-harness/skills/gtkb-lo-opportunity-radar/SKILL.md",
+  ".api-harness/skills/gtkb-loyal-opposition-report/SKILL.md",
+  ".api-harness/skills/gtkb-managed-skill-adoption-review/SKILL.md",
+  ".api-harness/skills/gtkb-projects/SKILL.md",
+  ".api-harness/skills/gtkb-promote/SKILL.md",
+  ".api-harness/skills/gtkb-promote/references/validation-rules.md",
+  ".api-harness/skills/gtkb-proposal-review/SKILL.md",
+  ".api-harness/skills/gtkb-propose/SKILL.md",
+  ".api-harness/skills/gtkb-query/SKILL.md",
+  ".api-harness/skills/gtkb-query/references/api-reference.md",
+  ".api-harness/skills/gtkb-release-candidate-gate/SKILL.md",
+  ".api-harness/skills/gtkb-send-review/SKILL.md",
+  ".api-harness/skills/gtkb-session-wrap-scan/SKILL.md",
+  ".api-harness/skills/gtkb-session-wrap/SKILL.md",
+  ".api-harness/skills/gtkb-session-wrap/references/audit-checklist.md",
+  ".api-harness/skills/gtkb-session-wrap/references/handoff-template.md",
+  ".api-harness/skills/gtkb-skill-governance-lifecycle/SKILL.md",
+  ".api-harness/skills/gtkb-skill-rollout/SKILL.md",
+  ".api-harness/skills/gtkb-spec-intake/SKILL.md",
+  ".api-harness/skills/gtkb-spec-intake/helpers/spec_intake.py",
+  ".api-harness/skills/gtkb-spec/SKILL.md",
+  ".api-harness/skills/gtkb-spec/references/assertion-format.md",
+  ".api-harness/skills/gtkb-structural-hygiene-review/SKILL.md",
+  ".api-harness/skills/gtkb-sweep-commit/SKILL.md",
+  ".api-harness/skills/gtkb-sweep-commit/agents/openai.yaml",
+  ".api-harness/skills/gtkb-verify/SKILL.md",
+  ".api-harness/skills/gtkb-verify/helpers/write_verdict.py",
+  ".api-harness/skills/gtkb-work-item/SKILL.md",
+  ".api-harness/skills/gtkb-work-item/references/taxonomy.md",
+]
 [harnesses.openrouter.hook_events]
 pre_tool_use = "PreToolUse"
 post_tool_use = "PostToolUse"

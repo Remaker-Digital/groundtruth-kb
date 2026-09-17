@@ -68,6 +68,10 @@ def native(monkeypatch):
 
 
 def put(client, domain, record_id, fields, *, expected_version=0, **extra):
+    # Existing platform fixtures declare their repository explicitly. Tests of
+    # omitted references submit the raw native request instead of this helper.
+    if domain == "projects" and expected_version == 0 and extra.get("kind", "project") == "project":
+        fields = {"repository_ref": "platform", **fields}
     return client.put(
         f"/v1/{domain}/{record_id}",
         json={
@@ -165,6 +169,60 @@ def history_count(service):
     with service.kernel.transaction(read_only=True) as tx:
         tx.cursor.execute(sql.SQL("SELECT count(*) AS n FROM {}.record_history").format(sql.Identifier(tx.schema)))
         return tx.cursor.fetchone()["n"]
+
+
+def test_dashboard_reads_native_inventories_without_initialization_or_authority_mutations(
+    native, monkeypatch, tmp_path
+):
+    import sqlite3
+
+    from groundtruth_kb import dashboard
+
+    service, client, _, _ = native
+    seed(client)
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\nauthority_url="http://127.0.0.1:8765"\n', encoding="utf-8"
+    )
+    before = history_count(service)
+    bridge_before = client.get("/v1/bridge/state-report").json()
+
+    def read(self, method, path, *, query=None):
+        assert method == "GET"
+        response = client.get(path, params={key: value for key, value in (query or {}).items() if value is not None})
+        assert response.status_code == 200, response.text
+        return response.json()
+
+    monkeypatch.setattr(AuthorityClient, "request", read)
+    monkeypatch.setattr(dashboard, "_write_bridge_swimlane_safe", lambda *args: None)
+    db = tmp_path / "dashboard.sqlite"
+    assert dashboard.refresh_database(db, tmp_path)["status"] == "completed"
+    with sqlite3.connect(db) as connection:
+        snapshot = dict(connection.execute("SELECT metric_key, value FROM kpi_snapshots"))
+        model = json.loads(
+            connection.execute("SELECT value FROM dashboard_metadata WHERE key='raw_model_json'").fetchone()[0]
+        )
+    landing = json.loads((tmp_path / ".groundtruth/dashboard/dashboard-data.json").read_text(encoding="utf-8"))
+    assert landing["status"] == "partial"
+    assert landing["metrics"] == snapshot
+    assert landing["generated_at"] == model["generated_at"]
+    assert landing["started_at"] == model["dashboard_intelligence"]["data_freshness"]["started_at"]
+    assert set(landing) == {"status", "metrics", "generated_at", "started_at"}
+    assert snapshot["backlog_active_items"] == 1
+    assert snapshot["specification_current_total"] == 1
+    assert snapshot["contention_actionable_bridge_count"] == 0
+    assert model["metrics"]["tests"]["test_records"] == 1
+    assert model["dashboard_intelligence"]["quality_rollup"] == {}
+    assert history_count(service) == before
+    bridge_after = client.get("/v1/bridge/state-report").json()
+    assert {key: value for key, value in bridge_after.items() if key != "observed_at"} == {
+        key: value for key, value in bridge_before.items() if key != "observed_at"
+    }
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL("SELECT count(*) AS n FROM {}.session_init_bindings").format(sql.Identifier(tx.schema))
+        )
+        assert tx.cursor.fetchone()["n"] == 0
 
 
 def test_harness_installation_reads_current_metadata_without_role_or_history_writes(native, monkeypatch):
@@ -667,7 +725,18 @@ def test_task_context_refuses_inactive_transitive_requirement(native, status):
     )
     assert put(client, "specifications", "SPEC-1", {"affected_by": ["GOV-1"]}, expected_version=1).status_code == 200
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
-    assert put(client, "specifications", "GOV-1", {"status": status}, expected_version=1).status_code == 200
+    before_change = client.get("/v1/specifications/GOV-1").content
+    before_history = history_count(service)
+    change = put(client, "specifications", "GOV-1", {"status": status}, expected_version=1)
+    if status == "specified":
+        # Retain this old case identity as a refusal at the earlier write boundary.
+        assert change.status_code == 422
+        assert change.json()["code"] == "invalid_request"
+        assert client.get("/v1/specifications/GOV-1").content == before_change
+        assert history_count(service) == before_history
+        assert client.get("/v1/work-items/WI-1/context").status_code == 200
+        return
+    assert change.status_code == 200
     before = history_count(service)
     result = client.get("/v1/work-items/WI-1/context")
     assert result.status_code == 422, result.text
@@ -768,7 +837,356 @@ def test_task_context_requires_current_test_plan_instructions(native):
     assert history_count(service) == before
 
 
-def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_path):
+def test_new_specification_default_is_current_authority_and_amendments_preserve_explicit_state(native):
+    service, client, _, _ = native
+    seed(client)
+    created = put(client, "specifications", "GOV-DEFAULT", {"title": "Required constraint"})
+    assert created.status_code == 200
+    assert (created.json()["version"], created.json()["status"]) == (1, "active")
+    assert (
+        put(client, "specifications", "SPEC-1", {"affected_by": ["GOV-DEFAULT"]}, expected_version=1).status_code == 200
+    )
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    context = client.get("/v1/work-items/WI-1/context")
+    assert context.status_code == 200
+    assert "GOV-DEFAULT" in {r["id"] for r in context.json()["specifications"]}
+    inactive = put(client, "specifications", "GOV-DEFAULT", {"status": "superseded"}, expected_version=1)
+    assert inactive.status_code == 200
+    amended = put(
+        client, "specifications", "GOV-DEFAULT", {"description": "An explicit inactive state"}, expected_version=2
+    )
+    assert amended.status_code == 200 and amended.json()["status"] == "superseded"
+    inactive_context = client.get("/v1/work-items/WI-1/context")
+    assert inactive_context.status_code == 422
+    assert inactive_context.json()["error"]["code"] == "inactive_context_source"
+    before = client.get("/v1/specifications/GOV-DEFAULT").content
+    history = history_count(service)
+    stale = put(client, "specifications", "GOV-DEFAULT", {"status": "active"}, expected_version=2)
+    assert stale.status_code == 409 and stale.json()["error"]["code"] == "cas_conflict"
+    assert client.get("/v1/specifications/GOV-DEFAULT").content == before
+    assert history_count(service) == history
+
+
+@pytest.mark.parametrize(
+    "status", ["specified", "implemented", "verified", "accepted", "unknown", "ACTIVE", "", None, 1, True]
+)
+@pytest.mark.parametrize("existing", [False, True], ids=["create", "amend"])
+def test_specification_writer_rejects_noncanonical_status_without_partial_state(native, status, existing):
+    service, client, _, _ = native
+    if existing:
+        assert put(client, "specifications", "SPEC-STATE", {"title": "Required state"}).status_code == 200
+    before = client.get("/v1/specifications/SPEC-STATE").content
+    history = history_count(service)
+    result = put(
+        client,
+        "specifications",
+        "SPEC-STATE",
+        {"title": "Must not land", "status": status},
+        expected_version=int(existing),
+    )
+    assert result.status_code == 422
+    assert result.json()["code"] == "invalid_request"
+    assert client.get("/v1/specifications/SPEC-STATE").content == before
+    assert history_count(service) == history
+
+
+def _check_specification_authoring_cli(cli, client, service, tmp_path):
+    """Execute the baseline examples through real CLI/HTTP and check their limits."""
+    guide = Path(__file__).resolve().parents[2] / ".harness-baseline-configuration/skills/gtkb-spec"
+
+    def example(path):
+        text = path.read_text(encoding="utf-8")
+        return json.loads(text.split("```json\n", 1)[1].split("```", 1)[0])
+
+    fields = example(guide / "SKILL.md")
+    fields["assertions"] = example(guide / "references/assertion-format.md")
+    assert {a["type"] for a in fields["assertions"]} == {
+        "grep",
+        "grep_absent",
+        "glob",
+        "file_exists",
+        "count",
+        "json_path",
+        "all_of",
+        "any_of",
+    }
+    config = tmp_path / "config/example.toml"
+    config.parent.mkdir(exist_ok=True)
+    config.write_text("[service]\nport = 8765\n", encoding="utf-8")
+    payload = tmp_path / "spec-fields.json"
+    spec_id = "SPEC-CLI-AUTHORING"
+
+    def record(version, change):
+        payload.write_text(json.dumps(change), encoding="utf-8")
+        return cli(
+            "spec",
+            "record",
+            "--id",
+            spec_id,
+            "--fields-file",
+            str(payload),
+            "--expected-version",
+            str(version),
+            "--actor",
+            "authoring-qualification",
+            "--change-reason",
+            "Exercise native authoring and observation",
+            "--json",
+        )
+
+    created = record(0, fields)
+    assert created.returncode == 0, created.stderr
+    row = json.loads(created.stdout)
+    assert row["status"] == "active" and row["version"] == 1
+    assert all(row[k] == v for k, v in fields.items())
+    shown = cli("spec", "show", spec_id, "--json")
+    assert shown.returncode == 0 and json.loads(shown.stdout) == row
+
+    def observe(result, version):
+        before = client.get(f"/v1/specifications/{spec_id}").content
+        history = history_count(service)
+        observation = cli("assert", "--spec", spec_id, "--triggered-by", "authoring-qualification", "--json")
+        assert (observation.returncode == 0) == (result == "PASS"), observation.stderr
+        body = json.loads(observation.stdout)
+        detail = body["details"][0]
+        assert detail["evaluation_result"] == result
+        assert detail["spec_id"] == spec_id and detail["spec_version"] == version
+        assert client.get(f"/v1/specifications/{spec_id}").content == before
+        assert history_count(service) == history
+        return detail
+
+    assert observe("PASS", 1)["assertion_count"] == 8
+    config.write_text("[service]\nport = 8766\n", encoding="utf-8")
+    observed = observe("FAIL", 1)
+    assert [r["passed"] for r in observed["results"]] == [True, True, False, True, True, False, False, True]
+    config.write_text("[service]\nport = 8765\n", encoding="utf-8")
+    changed = record(1, {"constraints": {"behavioral_validation_required": True}})
+    assert changed.returncode == 0
+    row2 = json.loads(changed.stdout)
+    assert row2["version"] == 2 and all(row2[k] == v for k, v in fields.items())
+    assert observe("PARTIAL", 2)["results"][-1]["type"] == "behavioral_validation"
+    before = client.get(f"/v1/specifications/{spec_id}").content
+    history = history_count(service)
+    refused = record(1, {"title": "Stale draft"})
+    assert refused.returncode != 0 and "cas_conflict" in refused.stderr
+    assert client.get(f"/v1/specifications/{spec_id}").content == before
+    assert history_count(service) == history
+    unsupported = record(
+        2,
+        {
+            "constraints": {},
+            "assertions": [
+                {"type": kind, "description": "An unevaluated obligation"} for kind in ("http", "python", "exists")
+            ],
+        },
+    )
+    assert unsupported.returncode == 0
+    assert all(r["status"] == "UNASSESSED" for r in observe("UNASSESSED", 3)["results"])
+    retired = record(3, {"status": "retired"})
+    assert retired.returncode == 0
+    final = json.loads(retired.stdout)
+    assert final["version"] == 4 and final["retired_at"]
+    observe("NOT_APPLICABLE", 4)
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL(
+                "SELECT prior_state::text AS prior, new_state::text AS body FROM {}.record_history "
+                "WHERE record_type='specifications' AND record_id->>'id'=%s ORDER BY new_version"
+            ).format(sql.Identifier(tx.schema)),
+            (spec_id,),
+        )
+        rows = tx.cursor.fetchall()
+    assert len(rows) == 4
+    assert parse_json_bytes(rows[0]["body"].encode()) == row
+    assert parse_json_bytes(rows[1]["prior"].encode()) == row
+    assert parse_json_bytes(rows[1]["body"].encode()) == row2
+
+
+def test_documented_specification_authoring_uses_actual_http_without_legacy_storage(native, tmp_path):
+    """Keep the complete authoring scenario independent of the larger commit flow."""
+    service, client, _, service_name = native
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    url = f"http://127.0.0.1:{port}"
+    sentinel = tmp_path / "must-not-open.db"
+    sentinel.write_bytes(b"This is not a SQLite database.")
+    server_config = tmp_path / "server.toml"
+    server_config.write_text(
+        f'[groundtruth]\nproject_root="."\n[postgresql]\nservice="{service_name}"\n', encoding="utf-8"
+    )
+    client_config = tmp_path / "client.toml"
+    client_config.write_text(
+        f'[groundtruth]\nauthority_url="{url}"\ndb_path="must-not-open.db"\nproject_root="."\n', encoding="utf-8"
+    )
+    base_env = os.environ.copy()
+    base_env.pop("GT_AUTHORITY_URL", None)
+    package_file = Path(groundtruth_kb.__file__).resolve()
+    base_env.update(PYTHONPATH=str(package_file.parent.parent), GT_PROJECT_ROOT=str(tmp_path), GT_DB_PATH=str(sentinel))
+    client_env = {key: value for key, value in base_env.items() if not key.startswith(("PG", "GT_POSTGRES_"))}
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    probe = subprocess.run(
+        [sys.executable, "-P", "-c", "import groundtruth_kb; print(groundtruth_kb.__file__)"],
+        cwd=tmp_path,
+        env=client_env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        creationflags=flags,
+    )
+    assert probe.returncode == 0 and Path(probe.stdout.strip()).resolve() == package_file
+
+    def cli(*arguments):
+        return subprocess.run(
+            [sys.executable, "-P", "-m", "groundtruth_kb", "--config", str(client_config), *arguments],
+            cwd=tmp_path,
+            env=client_env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            creationflags=flags,
+        )
+
+    with (tmp_path / "service.log").open("wb") as log:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-P",
+                "-m",
+                "groundtruth_kb",
+                "--config",
+                str(server_config),
+                "service",
+                "serve",
+                "--port",
+                str(port),
+            ],
+            cwd=tmp_path,
+            env=base_env,
+            stdout=log,
+            stderr=log,
+            creationflags=flags,
+        )
+        try:
+            deadline = time.monotonic() + 30
+            http = AuthorityClient(url, timeout=1)
+            while True:
+                try:
+                    http.request("GET", "/v1/status")
+                    break
+                except AuthorityClientError:
+                    if process.poll() is not None or time.monotonic() >= deadline:
+                        pytest.fail("Native authority did not start; inspect disposable service.log")
+                    time.sleep(0.1)
+            _check_specification_authoring_cli(cli, client, service, tmp_path)
+        finally:
+            process.terminate()
+            process.wait(timeout=15)
+    assert sentinel.read_bytes() == b"This is not a SQLite database."
+
+
+def _check_architecture_authoring_cli(cli, client, service, tmp_path):
+    """Exercise documented versioned authoring through fresh CLI processes."""
+    description = "\n\n".join(
+        (
+            "## Context\nA canonical choice affects café and 漢字 clients.",
+            "## Decision\nUse the current native formal writer.",
+            "## Failed Approaches\nNo attempted alternative is established.",
+            "## Alternatives Considered\nA duplicate writer was rejected for conflicting state.",
+            "## Consequences\nClients read one versioned canonical result.",
+        )
+    )
+    fields = tmp_path / "architecture-fields.json"
+    fields.write_text(
+        json.dumps(
+            {
+                "type": "architecture_decision",
+                "title": "CLI architecture",
+                "status": "active",
+                "description": description,
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+    def record(version):
+        return cli(
+            "spec",
+            "record",
+            "--id",
+            "ADR-CLI-INFORMATION",
+            "--fields-file",
+            str(fields),
+            "--expected-version",
+            str(version),
+            "--actor",
+            "architecture-qualification",
+            "--change-reason",
+            "Preserve architecture information",
+            "--json",
+        )
+
+    initial_history = history_count(service)
+    created = record(0)
+    assert created.returncode == 0, created.stderr
+    first = json.loads(created.stdout)
+    assert first["version"] == 1 and first["description"] == description
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL(
+                "SELECT new_state::text AS body FROM {}.record_history WHERE record_type='specifications' AND record_id->>'id'=%s AND new_version=1"
+            ).format(sql.Identifier(tx.schema)),
+            ("ADR-CLI-INFORMATION",),
+        )
+        original_history = tx.cursor.fetchone()["body"]
+    shown = cli("spec", "show", "ADR-CLI-INFORMATION", "--json")
+    assert shown.returncode == 0 and json.loads(shown.stdout) == first
+    amended_description = description + "\nThe successor reads the preserved information."
+    fields.write_text(json.dumps({"description": amended_description}, ensure_ascii=False), encoding="utf-8")
+    amended = record(1)
+    assert amended.returncode == 0, amended.stderr
+    current = json.loads(amended.stdout)
+    assert current["version"] == 2 and current["description"] == amended_description
+    assert current["type"] == first["type"] and current["title"] == first["title"]
+    assert history_count(service) == initial_history + 2
+    before_refusal = client.get("/v1/specifications/ADR-CLI-INFORMATION").content
+    fields.write_text('{"description":"stale replacement must not land"}', encoding="utf-8")
+    refused = record(1)
+    assert refused.returncode != 0
+    assert client.get("/v1/specifications/ADR-CLI-INFORMATION").content == before_refusal
+    assert history_count(service) == initial_history + 2
+    shown_again = cli("spec", "show", "ADR-CLI-INFORMATION", "--json")
+    assert shown_again.returncode == 0 and json.loads(shown_again.stdout) == current
+    with service.kernel.transaction(read_only=True) as tx:
+        tx.cursor.execute(
+            sql.SQL(
+                "SELECT prior_state::text AS prior, new_state::text AS body FROM {}.record_history WHERE record_type='specifications' AND record_id->>'id'=%s ORDER BY new_version"
+            ).format(sql.Identifier(tx.schema)),
+            ("ADR-CLI-INFORMATION",),
+        )
+        history = tx.cursor.fetchall()
+    assert len(history) == 2 and history[0]["prior"] is None
+    assert history[0]["body"] == original_history
+    assert history[1]["prior"] == original_history
+    assert json.loads(history[1]["body"])["description"] == amended_description
+
+
+@pytest.fixture
+def native_cli_operational_controls(tmp_path):
+    """Install the current catalog required by the registry-writing CLI fixture."""
+    from groundtruth_kb.project.operational_control_config import CATALOG_RELATIVE_PATH
+
+    source = Path(__file__).resolve().parents[2] / CATALOG_RELATIVE_PATH
+    target = tmp_path / CATALOG_RELATIVE_PATH
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(source.read_bytes())
+    return target
+
+
+def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_path, native_cli_operational_controls):
     service, client, _, service_name = native
     seed(client)
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
@@ -894,6 +1312,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     if process.poll() is not None or time.monotonic() >= deadline:
                         pytest.fail("Native authority did not start; inspect disposable service.log")
                     time.sleep(0.1)
+            _check_architecture_authoring_cli(cli, client, service, tmp_path)
             # Test-phase listing is a current native domain read, not a legacy
             # SQLite history query under the backlog command. Exercise several
             # real revisions and both ordinary CLI output modes.
@@ -1016,6 +1435,11 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             )
             assert term_record.returncode == 0, term_record.stderr
             assert json.loads(term_record.stdout)["version"] == 1
+            legacy_term_paths = (
+                tmp_path / "groundtruth-kb/docs/reference/canonical-terminology-detail.md",
+                tmp_path / ".claude/rules/canonical-terminology.md",
+            )
+            assert all(not path.exists() for path in legacy_term_paths)
             term_before = history_count(service)
             term_show = cli("terms", "show", "PROJECT", "--json")
             assert term_show.returncode == 0
@@ -1030,6 +1454,27 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             term_status = cli("authority", "status", "--json")
             assert term_status.returncode == 0 and json.loads(term_status.stdout)["status"] == "pass"
             assert history_count(service) == term_before
+            # Conflicting local definitions must be inert, even in a fresh CLI
+            # process. A later canonical amendment is visible immediately.
+            legacy_term_bytes = b"### project\nA permanent assignment to the original agent.\n"
+            for path in legacy_term_paths:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(legacy_term_bytes)
+            stale_local = cli("authority", "resolve", "work group", "--scope", "platform", "--json")
+            assert stale_local.returncode == 0, stale_local.stderr
+            assert json.loads(stale_local.stdout)["record"]["definition"] == term_fields()["definition"]
+            assert history_count(service) == term_before
+            amended_term = put(
+                client, "terms", "PROJECT", {"definition": "A current complete outcome."}, expected_version=1
+            )
+            assert amended_term.status_code == 200, amended_term.text
+            amended_history = history_count(service)
+            current_term = cli("authority", "resolve", "project", "--scope", "platform", "--json")
+            assert current_term.returncode == 0, current_term.stderr
+            current_record = json.loads(current_term.stdout)["record"]
+            assert current_record["version"] == 2 and current_record["definition"] == "A current complete outcome."
+            assert history_count(service) == amended_history
+            assert all(path.read_bytes() == legacy_term_bytes for path in legacy_term_paths)
             for version, expected_result in ((0, "PASS"), (1, "PARTIAL")):
                 if version:
                     observation_fields["constraints"] = {"behavioral_validation_required": True}
@@ -1157,7 +1602,8 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     "session", "bind", "--native-context-id", context, "--init-keyword", f"::init gtkb {role}", "--json"
                 )
                 assert bound.returncode == 0, bound.stderr
-                session_id = json.loads(bound.stdout)["session_context_id"]
+                assert json.loads(bound.stdout)["status"] == "init_requested"
+                session_id = json.loads(bound.stdout)["binding"]["session_context_id"]
                 claim = cli(
                     "bridge",
                     "claim",
@@ -1286,6 +1732,12 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                 assert report["active_status_mix"] == [{"status": status, "count": 1}]
                 assert report["active_claim_count"] == 0
                 assert not {"harnesses", "registry_publication"} & report.keys()
+                assert datetime.fromisoformat(report["observed_at"]).tzinfo is not None
+                assert report["attempts"][0]["head_status"] == status
+                assert report["attempts"][0]["disposition"] == "active"
+                assert report["attempts"][0]["head_created_at"] is not None
+                assert report["attempts"][0]["next_artifact_claim"] is None
+                assert report["attempts"][0]["terminal_commit"] is None
                 if status == "VERIFIED":
                     assert json.loads(delivered.stdout)["project_ready_for_commit"] is True
             message = tmp_path / "project-commit.txt"
@@ -1320,6 +1772,12 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
         finally:
             process.terminate()
             process.wait(timeout=15)
+    before_term_outage_read = history_count(service)
+    unavailable_term = cli("authority", "resolve", "project", "--scope", "platform", "--json")
+    assert unavailable_term.returncode != 0 and "authority_unavailable" in unavailable_term.stderr
+    assert unavailable_term.stdout == ""
+    assert history_count(service) == before_term_outage_read
+    assert all(path.read_bytes() == legacy_term_bytes for path in legacy_term_paths)
     unavailable = cli("projects", "show", "PROJECT-1", "--json")
     assert unavailable.returncode != 0 and "authority_unavailable" in unavailable.stderr
     unavailable_context = cli("context", "work-item", "WI-1", "--json")
@@ -1447,3 +1905,27 @@ def test_a_malformed_imported_entry_does_not_break_valid_lookup_or_status(native
     assert status.status_code == 200 and status.json()["status"] == "fail"
     assert [r["id"] for r in status.json()["validation_issues"]] == ["OTHER"]
     assert history_count(service) == before
+
+
+@pytest.mark.parametrize("invalid_record", [None, [], "private-invalid-record"])
+def test_invalid_mutation_result_rolls_back_native_write(native, monkeypatch, invalid_record):
+    from groundtruth_kb.postgres_kernel import PostgresTransaction
+
+    service, client, _, _ = native
+    original = PostgresTransaction.mutate
+    before = client.get("/v1/projects").json()
+    writes = []
+
+    def invalid_readback(self, **request):
+        result = original(self, **request)
+        writes.append(result["record"]["id"])
+        return {**result, "record": invalid_record}
+
+    monkeypatch.setattr(PostgresTransaction, "mutate", invalid_readback)
+    response = put(client, "projects", "PROJECT-INVALID-READBACK", {"name": "Must roll back"})
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "mutation_readback_mismatch"
+    assert "private-invalid-record" not in response.text
+    assert writes == ["PROJECT-INVALID-READBACK"]
+    assert client.get("/v1/projects").json() == before
+    assert client.get("/v1/projects/PROJECT-INVALID-READBACK").status_code == 404

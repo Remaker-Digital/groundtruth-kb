@@ -91,7 +91,8 @@ PRESERVE_ANCHORS = [
     "memory/topics/canonical_vocabulary.md",
 ]
 
-INDEX_HEADINGS = ["## Session Bootstrap", "## Quick Reference", "## Recent Sessions"]
+# The owner's retention rule keeps session notes out of the index, so "## Recent Sessions" is not a heading here.
+INDEX_HEADINGS = ["## Session Bootstrap", "## Quick Reference"]
 
 # Index-only size ceiling. Pre-Slice-8 MEMORY.md was ~109 KB; the index is a
 # few KB. The ceiling proves the bulky session-state log was removed while

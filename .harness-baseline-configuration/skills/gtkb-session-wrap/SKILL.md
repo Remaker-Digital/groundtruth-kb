@@ -1,11 +1,8 @@
 ---
 name: gtkb-session-wrap
-description: Execute the GT-KB knowledge-first session wrap-up procedure. Collects durable session knowledge, updates governed memory surfaces, records blockers, syncs the current branch, and generates the next-session handoff prompt.
-argument-hint: [session-id]
-allowed-tools: Bash, Read, Write, Edit, Grep, Glob, Agent
+description: Harvest authorized canonical knowledge on explicit close or wrap and present an ephemeral continuation from current state.
+allowed-tools: Bash, Read, Write, Edit, Grep, Glob
 license: "Proprietary - (c) 2026 Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: knowledge-management
@@ -13,187 +10,74 @@ metadata:
     - references/audit-checklist.md
     - references/handoff-template.md
 ---
-# Session Wrap-Up
+# Close and wrap
 
-Run the mutating GT-KB session wrap-up. The purpose is knowledge collection first: preserve what future agents need to know, where the canonical state now lives, what evidence supports it, and what remains blocked.
+An explicit `::close` directs activity-scoped canonical knowledge harvest.
+An explicit `::wrap` directs context-wide canonical knowledge harvest within the
+already authorized work. A lifecycle notification or an opportunity before ending
+may present useful read-only guidance; it does not perform harvest or other
+mutations by itself. Disclose unavailable lifecycle-hook support instead of
+claiming that a hook ran.
 
-**Arguments:** `$ARGUMENTS[0]` = session ID, for example `S347`. If omitted, derive the session from `memory/MEMORY.md`, the current bridge/work item, or the latest owner-visible session marker.
+## Read the current assignment
 
-## Operating Rules
+Resolve this context's immutable binding with
+`gt session show --native-context-id <actual-native-context-id> --json`.
+Use its returned identity for attribution. Never derive identity from a recent
+session, memory file or handoff. Close and wrap clear the transient activity;
+they do not delete, retire, change or rebind the immutable context identity.
 
-- Stay inside `E:/GT-KB`.
-- Run or review `kb-session-wrap-scan` first when feasible. Treat wrap scanner outputs as evidence, not as the final wrap.
-- Use live state for branch, commit, bridge, work items, and tests. Never assume `main`, `develop`, or any release target.
-- Do not force-add `groundtruth.db`, `.env*`, snapshots, logs, transcript captures, or other ignored local evidence. Reference ignored evidence paths in reports when they matter.
-- Do not hide blocked knowledge writes. If MemBase, Deliberation Archive, formal-artifact approval, `session_prompts`, git, or external sync cannot be updated, record the blocker and the reason in the wrap summary.
-- Mutating wrap-up actions still require applicable bridge, formal-artifact, owner-approval, credential, release, and deployment gates.
+For assigned work, re-read `gt context work-item <WI-ID> --json`, the exact
+dispatched `gt bridge show <document> --content --json`, and Git status/HEAD in
+this context's registered checkout. A bridge message is authoritative at receipt
+and has no continuing authority. A claim reserves one next artifact. A successor
+obtains its own claim from canonical state; no previous agent must return.
 
-## Phase 0: Live Inventory
+## Harvest the authorized knowledge
 
-Collect the state that the handoff and memory updates must account for:
+Inspect the session's actual work and owner directions. Correct adequately
+defined facts and requirements directly in their existing canonical domains:
+formal records, projects, work items, tests and terminology as applicable.
+Use the supported native `record` or domain-specific command with the current
+version and authored provenance. Consult that command's help for its fields;
+read back every result. Do not invent a separate harvest service or bypass a
+refusal. Leave a specific unresolved condition when the supported writer cannot
+perform the required change.
 
-```bash
-git rev-parse --show-toplevel
-git status --short --branch
-git rev-parse HEAD
-python scripts/wrap_capture_transcript.py --session-id <SESSION_ID>
-python scripts/wrap_scan_hygiene.py --report-format markdown --write-report .groundtruth/session/wrap-scan-reports/<SESSION_ID>/wrap-scan-hygiene.md
-python scripts/wrap_scan_consistency.py --report-format markdown --write-report .groundtruth/session/wrap-scan-reports/<SESSION_ID>/wrap-scan-consistency.md
-```
+Apply owner decisions directly to the affected authoritative source or requested
+action. Interactive logs retain the conversation for later harvest. Do not copy
+bridge messages, prompts or transcripts into a session history or permission
+archive, or make a deliberation a required source of approval. Do not classify
+every message or noun merely to satisfy a collection checklist.
 
-Also inspect:
+Record test observations with the commands, exact tested inputs and coverage
+limits. A partial suite does not verify a whole requirement. Preserve unexecuted
+and failed obligations. The author of an implementation does not issue its
+independent verification. A work item becomes terminal through the complete
+project commit, not through a wrap summary or a changed prose label.
 
-- TAFE-backed bridge state and dispatcher status/health for latest bridge statuses and any GO/NO-GO/NEW/VERIFIED changes created this session. Do not consult or recreate aggregate queue artifacts as live queue sources.
-- `groundtruth.db` through the current `groundtruth_kb` CLI or `KnowledgeDB` helpers for current work item, spec, assertion, and `session_prompts` state.
-- `memory/MEMORY.md` for current status, recent sessions, and quick references.
-- Deliberation Archive records and Advisory Proposal bridge entries produced this session (independent-progress-assessments/ is retired; do not read from or recreate it).
-- ignored local evidence under `.groundtruth/session/`, `.gtkb-state/`, and generated reports that should be referenced but not committed.
+Finish or release this context's outstanding artifact action through the native
+bridge command and read back the outcome. If delivery is uncertain, inspect its
+exact canonical slot before retrying. Preserve another context's claims and
+unrelated bytes. Do not transfer a held claim to a suggested successor.
 
-## Knowledge Collection Matrix
+## Bound the effects and report
 
-Use this matrix before editing anything. Every row must be updated, explicitly deferred, or marked not applicable with a reason.
+Close, wrap and notifications never implicitly stage, commit, push, publish,
+deploy, change project authorization, activate a harness or dispatcher, clean
+unrelated work or send external messages. Existing explicit direction for a
+separate concrete effect remains subject to its review, scope and execution
+conditions; do not request the same authorization again.
 
-| Knowledge class | Durable home | Required wrap action |
-| --- | --- | --- |
-| Owner decisions, requirements, approvals, rejections | Deliberation Archive, spec intake records, formal-artifact approval packets | Confirm the DA/spec/approval evidence exists or record a blocker. Do not rely on chat recall. |
-| Completed implementation work | MemBase work items/spec status, bridge implementation report, tests/assertions | Reconcile work item/spec state, list changed artifacts, and cite verification evidence. |
-| Bridge state | TAFE-backed bridge state, dispatcher status/health, and versioned bridge files | Ensure proposals, reports, GO/NO-GO, and VERIFIED entries are current and latest-status accurate. Do not consult or recreate aggregate queue artifacts. |
-| Future work, unresolved blockers, drift risks | MemBase backlog/current work items or explicit deferred/blocker section | Create or link backlog candidates when authorized; otherwise preserve the candidate and reason. |
-| Session operating state | `memory/MEMORY.md` and wrap summary/report | Update current status, recent session notes, quick references, and known caveats. |
-| Cross-session continuity | `session_prompts` plus the handoff prompt | Insert a self-contained handoff prompt or record why insertion is blocked. |
-| Verification evidence | Test output, assertion output, wrap scanner outputs, bridge reports | Record commands, outcomes, failures, and any skipped verification with reasons. |
-| Ignored local evidence | Wrap summary references, not git staging | Name relevant ignored paths and explain whether they are evidence, scratch, or generated artifacts. |
+Use the [harvest checks](references/audit-checklist.md) for the selected work.
+Present a concise result: canonical changes and readbacks, observed tests and
+limitations, pending artifacts, unresolved choices and useful next actions.
+Suggestions do not dispatch work. When useful, present the
+[continuation template](references/handoff-template.md) as ephemeral owner-copyable
+text. It is not saved as a prompt object or recovery authority. A fresh context
+must be able to reconstruct its assignment through CLI and bridge without that
+text, prior-agent memory or contact with another harness.
 
-## Phase 1: Classify Session Knowledge
-
-Review the session transcript/context and classify:
-
-1. Decisions or requirements that need DA/spec capture.
-2. Specs implemented, verified, retired, or left unmet.
-3. Work items created, advanced, blocked, or completed.
-4. Bridge threads opened, approved, implemented, verified, or left waiting.
-5. Tests/assertions added or run.
-6. Procedure, skill, rule, or configuration changes that affect future agents.
-7. Local evidence that is useful but intentionally untracked.
-
-If a required artifact update is not authorized, do not improvise. Record the required owner/governance action in the wrap summary and handoff.
-
-## Phase 2: Update Durable Knowledge
-
-### 2.1 MemBase
-
-Use the current `groundtruth_kb` package/CLI or `KnowledgeDB("groundtruth.db")` helpers. Do not use deprecated knowledge-db helper imports.
-
-Update only records supported by this session's evidence:
-
-- promote specs through the governed assertion path when implemented or verified;
-- close or update work items with completion evidence;
-- add backlog/future-work candidates only under the standing backlog rules;
-- insert or update `session_prompts` with the handoff prompt;
-- record quality or assertion data only when the current API supports it.
-
-### 2.2 Deliberation Archive
-
-Run the session harvest when there are new deliberations or owner decisions:
-
-```bash
-python scripts/harvest_session_deliberations.py --apply --session <SESSION_ID>
-```
-
-Report created/skipped/warning counts. If harvest is blocked by formal-artifact approval, DB state, missing input, or tool failure, record the exact blocker and preserve the pending decision/requirement in the handoff.
-
-### 2.3 Memory
-
-Update `memory/MEMORY.md` with only durable, reusable facts:
-
-- current project/session status;
-- recent session summary with bridge/work item/spec IDs;
-- changed command surfaces, skills, rules, or safety gates;
-- next-session caveats that are likely to prevent recall drift.
-
-Keep it evidence-based. Do not invent verification that did not run.
-
-### 2.4 Reports And Procedures
-
-When a session produced an implementation report, review report, incident note, or procedure update, make sure it is linked from the relevant bridge thread, work item, or memory surface. If the report directory is ignored, reference the path in the wrap summary instead of force-adding it.
-
-## Phase 3: Verification And Hygiene
-
-Run the narrow verification relevant to the session's changes. Prefer repo-native commands already used by CI/config, for example:
-
-```bash
-python -m pytest <target> -q --tb=short
-python -m ruff check .
-python -m ruff format --check .
-```
-
-Also record:
-
-- assertion results and new failures;
-- wrap scanner outputs and unresolved findings;
-- bridge applicability/ADR-DCL preflight results when bridge-backed implementation occurred;
-- tests intentionally skipped, with the reason.
-
-New failures become work items or blockers. Existing tracked failures should be cited, not rediscovered from memory.
-
-## Phase 4: Git And External Sync
-
-Commit only intentional tracked changes. Review staged content before committing.
-
-```bash
-git status --short --branch
-git add <intentional tracked paths>
-git status --short
-git commit -m "<type>(<scope>): <summary>"
-git push origin <current-branch>
-```
-
-Use the current branch from `git status --short --branch`; do not hard-code `main`. Do not deploy, push docs/wiki, mutate external systems, or perform credential lifecycle actions unless that work has the applicable approval and verification evidence.
-
-## Phase 5: Handoff Prompt
-
-Generate a self-contained next-session prompt using `references/handoff-template.md`. It must include:
-
-- `::init gtkb pb` or the owner-approved init keyword for the next role;
-- project root, branch, commit, and dirty-state summary;
-- latest bridge state and any pending GO/NO-GO/NEW/VERIFIED implications;
-- MemBase work item/spec status for the session's work;
-- DA captures or harvest blockers;
-- tests/assertions/wrap scanner outcomes;
-- ignored local evidence paths that future agents may need to inspect;
-- blockers, risks, and next recommended actions.
-
-Insert the prompt into `session_prompts` when the current MemBase API permits it. If insertion fails, include the prompt text in the wrap report and record the `session_prompts` blocker explicitly.
-
-## Completion Output
-
-End with a compact wrap summary:
-
-```text
-Session Wrap-Up: <SESSION_ID>
-Branch/HEAD: <branch> @ <sha>
-
-[ ] Knowledge matrix accounted for
-[ ] MemBase updates completed or blockers recorded
-[ ] Deliberation Archive harvest completed or blockers recorded
-[ ] memory/MEMORY.md updated or no-op reason recorded
-[ ] Bridge state reconciled
-[ ] Verification commands recorded
-[ ] Ignored local evidence referenced, not force-added
-[ ] Current branch committed and pushed, or sync blocker recorded
-[ ] session_prompts handoff inserted, or blocker recorded
-```
-
-## Audit Session Check
-
-Every 5th session requires the additional checks in `references/audit-checklist.md`.
-
-## Skills applied disclosure (report-only)
-
-When completing this wrap summary, append a machine-parseable self-disclosure line listing skills you invoked during the session wrap. Use the shared emitter in `scripts/skill_disclosure.py`:
-
-- Call `format_skills_applied([...])` or author the equivalent line using the same canonical format.
-- Canonical format: `Skills applied: <comma-separated skill names>`; use `Skills applied: (none)` when none apply.
-- Report-only: this line is advisory input for future `gt skills check` (WI-4810); it does not gate publishing.
-
-Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Formal retrieval: DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001,
+PB-SESSION-WRAP-UP-PROACTIVE-001, DCL-ACTIVITY-CONTEXT-MANIFEST-001,
+ADR-SESSION-MARKER-AND-ACTIVITY-RECORD-MODEL-001.

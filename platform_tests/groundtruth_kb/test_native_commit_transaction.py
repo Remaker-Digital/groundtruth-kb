@@ -79,7 +79,8 @@ fi
         deadline = time.monotonic() + 40
         while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
             time.sleep(0.05)
-        assert ready.exists(), process.communicate(timeout=5)
+        # String messages survive pytest's repr elision; a refusal's diagnostic details stay in the evidence.
+        assert ready.exists(), "stdout: {}\nstderr: {}".format(*process.communicate(timeout=5))
         assert base(checkout) == parent
         with ThreadPoolExecutor(max_workers=1) as pool:
             mutation = pool.submit(
@@ -98,7 +99,7 @@ fi
             finally:
                 release.touch()
             output, error = process.communicate(timeout=30)
-            assert process.returncode == 0, (output, error)
+            assert process.returncode == 0, f"stdout: {output}\nstderr: {error}"
             response = mutation.result(timeout=15)
             committed_head = base(checkout)
             assert committed_head != parent

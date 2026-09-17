@@ -116,10 +116,8 @@ _STARTUP_INPUT_CONTENT_STATE_FIELDS = frozenset({"startup_prompt_preview"})
 STARTUP_RELAY_RENDER_TIMEOUT_SECONDS = 5.0
 # WI-5083: SessionStart 'source' values that mark a mid-session continuation
 # (resume/compact). A startup-input gate armed under one of these is never a
-# legitimate fresh-start relay window. Duplicated (not imported) in
-# scripts/session_self_initialization.py and
-# .codex/gtkb-hooks/session_wrapup_trigger_dispatch.py to keep each hot path
-# import-light; a parity test asserts the copies stay equal.
+# legitimate fresh-start relay window. This is the only definition; the
+# SQLite-era startup generator that duplicated it was retired (2026-09).
 _SESSION_CONTINUATION_SOURCES = frozenset({"resume", "compact"})
 
 
@@ -138,7 +136,7 @@ HARNESS_LIFECYCLE_GUARDS = {
 # ---- Role profiles (unchanged from prior module) -----------------------
 TOGGLEABLE_ROLE_PROFILES = {ROLE_PRIME_BUILDER, ROLE_LOYAL_OPPOSITION, ROLE_ACTING_PRIME_BUILDER}
 
-# Labels preserved (asserted by test_session_self_initialization.py:93-95).
+# Labels preserved (asserted by platform_tests/hooks/test_workstream_focus.py).
 FOCUS_LABELS = {
     FOCUS_APPLICATION: "Application Focus",
     FOCUS_GTKB_INFRASTRUCTURE: "GT-KB Infrastructure Focus",
@@ -279,7 +277,6 @@ CURRENT_REPO_BRIDGE_OR_GOVERNANCE_FILES = {
     "groundtruth.db",
     "groundtruth.toml",
     "scripts/check_harness_parity.py",
-    "scripts/session_self_initialization.py",
     "scripts/workstream_focus.py",
 }
 

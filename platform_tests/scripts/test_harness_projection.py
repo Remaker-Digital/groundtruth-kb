@@ -1,7 +1,7 @@
 """Verification tests for the harness projection framework.
 
-Landed by bridge/gtkb-baseline-correction-and-goose-projector-slice-1 (GO at
--004). Maps to GOV-HARNESS-NEUTRAL-BASELINE-001:
+Current authored derivation behavior under GOV-HARNESS-NEUTRAL-BASELINE-001.
+Native host invocation and complete baseline acceptance remain separate:
 
 - obligations 3 and 4 via actual projected output without peer-harness paths;
 - obligation 2/verification bullet 2 via ``test_projection_idempotent``
@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -254,11 +255,39 @@ def test_projected_markdown_stamped_after_frontmatter():
             )
 
 
+def _assert_optional_hook_registration(harness: str, native_event: str, *, event: str = "turn_end") -> None:
+    """Check manifest-driven registration without enabling or invoking a host hook."""
+    profiles = project_harness.load_profiles()
+    profile = dict(profiles["harnesses"][harness], name=harness)
+    tokens = project_harness.token_map(profile, profiles["baseline"])
+    manifest = tomllib.loads((BASELINE / "hooks/manifest.toml").read_text(encoding="utf-8"))
+    assert {hook["event"] for hook in manifest["hook"]} == {"pre_tool_use"}
+    original = json.dumps(manifest, sort_keys=True)
+    gaps: list[str] = []
+    before = project_harness.render_hooks_registration(profile, manifest, tokens, gaps)
+    assert before is not None and not gaps, gaps
+    before_hooks = json.loads(before[1])["hooks"]
+    assert native_event not in before_hooks
+    notification = {"event": event, "script": "qualification-notification.py", "blocking": False}
+    added = project_harness.render_hooks_registration(
+        profile, {**manifest, "hook": [*manifest["hook"], notification]}, tokens, gaps
+    )
+    assert added is not None and not gaps, gaps
+    after_hooks = json.loads(added[1])["hooks"]
+    assert {event: entries for event, entries in after_hooks.items() if event != native_event} == before_hooks
+    entries = after_hooks[native_event]
+    assert len(entries) == 1 and "qualification-notification.py" in entries[0]["command"]
+    assert not entries[0].get("blocking") and not entries[0].get("failClosed")
+    assert json.dumps(manifest, sort_keys=True) == original
+
+
 def test_projected_hooks_registration_is_native():
     plan = project_harness.build_plan("goose")
     hooks_json = plan.writes.get(".goose/plugins/gtkb/hooks/hooks.json")
     assert hooks_json is not None, "goose plugin hooks.json not rendered"
-    assert "PreToolUse" in hooks_json and "Stop" in hooks_json
+    assert set(json.loads(hooks_json)["hooks"]) == {"PreToolUse"}
+    _assert_optional_hook_registration("goose", "Stop")
+    _assert_optional_hook_registration("goose", "PostToolUse", event="post_tool_use")
     assert "$CLAUDE_PROJECT_DIR" not in hooks_json
 
 
@@ -329,8 +358,10 @@ def test_cursor_plan_maps_native_events_and_wraps_adapters() -> None:
     hooks = json.loads(plan.writes[".cursor/hooks.json"])
     events = set(hooks["hooks"])
     assert "preToolUse" in events
-    assert "postToolUse" in events
-    assert "stop" in events
+    assert "postToolUse" not in events
+    assert "stop" not in events
+    _assert_optional_hook_registration("cursor", "stop")
+    _assert_optional_hook_registration("cursor", "postToolUse", event="post_tool_use")
     assert "beforeSubmitPrompt" not in events
     assert "sessionStart" not in events
     assert "sessionStop" not in events
@@ -358,7 +389,6 @@ def test_cursor_plan_maps_native_events_and_wraps_adapters() -> None:
     assert all(entry.get("timeout") != 5 for entries in hooks["hooks"].values() for entry in entries)
 
     write_only = (
-        "spec-before-code.py",
         "kb-not-markdown.py",
         "destructive-gate.py",
         "credential-scan.py",
@@ -408,3 +438,41 @@ def test_write_mode_deletes_leftovers(tmp_path: Path, monkeypatch) -> None:
     assert project_harness.run("cursor", "write") == 0
     assert not leftover.exists()
     assert (tmp_path / ".cursor" / "hooks.json").is_file()
+
+
+@pytest.mark.parametrize("harness", ["claude", "codex", "cursor", "goose", "antigravity", "openrouter"])
+def test_projected_advisory_guidance_has_no_ledger_producer_or_grilling_hook(tmp_path, monkeypatch, harness):
+    """Project authored inputs in isolation, preserving unrelated local runtime files."""
+    import shutil
+    import subprocess
+
+    relative_paths = (
+        subprocess.check_output(["git", "ls-files", "-z", "--", ".harness-baseline-configuration"], cwd=PROJECT_ROOT)
+        .decode("utf-8")
+        .split("\0")
+    )
+    for relative in relative_paths:
+        source = PROJECT_ROOT / relative
+        if relative and source.is_file():
+            target = tmp_path / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+    shutil.copyfile(PROJECT_ROOT / "pyproject.toml", tmp_path / "pyproject.toml")
+    (tmp_path / "scripts").mkdir()
+    shutil.copyfile(
+        PROJECT_ROOT / "scripts/implementation_start_gate.py", tmp_path / "scripts/implementation_start_gate.py"
+    )
+    for name in ("codex_hook_adapter.py", "antigravity_hook_adapter.py"):
+        shutil.copyfile(PROJECT_ROOT / "scripts" / name, tmp_path / "scripts" / name)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    plan = project_harness.build_plan(harness)
+    assert plan.writes and not plan.gaps, plan.gaps
+    for relative, content in plan.writes.items():
+        assert "advisory-router-scan.py" not in relative and "advisory_grilling_gate_lint.py" not in relative
+        if relative.endswith(".json"):
+            assert "advisory-router-scan.py" not in content and "advisory_grilling_gate_lint.py" not in content
+    advisory = [text for path, text in plan.writes.items() if path.endswith("/gtkb-advisory-proposal/SKILL.md")]
+    assert len(advisory) == 1
+    assert "Either" in advisory[0] and "no work-item reservation" in advisory[0]
+    assert "governance_advisory" in advisory[0]
+    assert not (tmp_path / ".gtkb-state").exists()

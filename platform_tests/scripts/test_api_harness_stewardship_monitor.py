@@ -93,15 +93,13 @@ def project_root(tmp_path: Path) -> Path:
     )
     (hstate / "harness-identities.json").write_text(json.dumps({"B": "claude"}), encoding="utf-8")
 
-    api = tmp_path / ".api-harness"
-    api.mkdir()
-    (api / "routing.toml").write_text(
-        "schema_version = 1\n\n"
-        '[models.qwen-local]\nmodel_id = "qwen"\nprovider = "ollama"\n\n'
-        '[models.deepseek]\nmodel_id = "deepseek"\nprovider = "openrouter"\n\n'
-        '[routing]\ndefault_model = "qwen-local"\n',
-        encoding="utf-8",
-    )
+    for provider, key in (("ollama", "qwen-local"), ("openrouter", "deepseek")):
+        api = tmp_path / ".api-harness" / provider
+        api.mkdir(parents=True)
+        (api / "routing.toml").write_text(
+            f'[models.{key}]\nmodel_id="fixture"\nprovider="{provider}"\n[routing.{provider}]\ndefault_model="{key}"\n',
+            encoding="utf-8",
+        )
 
     rules = tmp_path / "config" / "dispatcher"
     rules.mkdir(parents=True)
@@ -144,7 +142,7 @@ def test_routing_surface_groups_by_provider(project_root: Path):
     assert surface["status"] == "ok"
     assert "qwen-local" in surface["per_provider"]["ollama"]
     assert "deepseek" in surface["per_provider"]["openrouter"]
-    assert surface["default_model"] == "qwen-local"
+    assert surface["default_models"] == {"ollama": "qwen-local", "openrouter": "deepseek"}
 
 
 def test_cost_quality_surface_reads_static_rules(project_root: Path):
@@ -338,3 +336,36 @@ def test_module_is_report_only_no_network_no_mutation():
         f"network/process import found: {imported_roots & _NETWORK_FORBIDDEN}"
     )
     assert not mutating_calls, f"mutating call(s) found: {mutating_calls}"
+
+
+def test_routing_surface_never_uses_shared_catalog_for_a_missing_provider(project_root):
+    missing = project_root / ".api-harness/ollama/routing.toml"
+    shared = project_root / ".api-harness/routing.toml"
+    shared.write_bytes(missing.read_bytes())
+    missing.unlink()
+    before = shared.read_bytes()
+    result = mon.read_routing_surface(project_root)
+    assert result == {
+        "status": "partial",
+        "per_provider": {"openrouter": ["deepseek"]},
+        "default_models": {"openrouter": "deepseek"},
+    }
+    assert shared.read_bytes() == before
+
+
+@pytest.mark.parametrize(
+    "catalog",
+    [
+        "not valid TOML !",
+        '[models.other]\nprovider="ollama"\n[routing.openrouter]\ndefault_model="other"',
+        '[models.own]\nprovider="openrouter"',
+        '[models.own]\nprovider="openrouter"\n[routing.openrouter]\ndefault_model="missing"',
+    ],
+)
+def test_routing_surface_unavailable_is_not_a_valid_empty_catalog(tmp_path, catalog):
+    path = tmp_path / ".api-harness/openrouter/routing.toml"
+    path.parent.mkdir(parents=True)
+    path.write_text(catalog, encoding="utf-8")
+    before = path.read_bytes()
+    assert mon.read_routing_surface(tmp_path) == {"status": "unknown", "per_provider": {}, "default_models": {}}
+    assert path.read_bytes() == before

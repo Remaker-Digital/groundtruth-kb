@@ -4,15 +4,11 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from click.testing import CliRunner
-
-REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
-
 from groundtruth_kb import cli  # noqa: E402
 from groundtruth_kb.governance import push_readiness  # noqa: E402
 from groundtruth_kb.governance.preflight_evidence import PreflightCheck, PreflightEvidence  # noqa: E402
@@ -134,3 +130,90 @@ def test_push_readiness_cli_emits_json_and_exit_code(monkeypatch, tmp_path: Path
     assert result.exit_code == 0, result.output
     assert json.loads(result.output)["status"] == "passed"
     assert (tmp_path / "push-readiness.json").exists()
+
+
+@pytest.mark.parametrize(
+    "fault,status,exit_code",
+    [
+        ("none", "partial", 0),
+        ("auth", "failed", 1),
+        ("remote", "failed", 1),
+        ("timeout", "inconclusive", 1),
+        ("advisory", "partial", 0),
+    ],
+)
+@pytest.mark.parametrize("json_output", [False, True])
+def test_readiness_route_is_explicit_and_preserves_noninteractive_boundary(
+    monkeypatch, tmp_path, fault, status, exit_code, json_output
+):
+    from groundtruth_kb.authority_client import AuthorityClient
+
+    selected = tmp_path / "selected"
+    caller = tmp_path / "caller"
+    selected.mkdir()
+    caller.mkdir()
+    config = selected / "groundtruth.toml"
+    config.write_text('[groundtruth]\nproject_root="."\nauthority_url="http://127.0.0.1:1"\n', encoding="utf-8")
+    sentinel = caller / "groundtruth.db"
+    sentinel.write_bytes(b"foreign database sentinel")
+    monkeypatch.chdir(caller)
+    for key in ["GT_PROJECT_ROOT", "GT_DB_PATH", "GT_AUTHORITY_URL"]:
+        monkeypatch.delenv(key, raising=False)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Push readiness must not access an authority or database")
+
+    monkeypatch.setattr(AuthorityClient, "request", forbidden)
+    monkeypatch.setattr("sqlite3.connect", forbidden)
+    monkeypatch.setattr("groundtruth_kb.postgres_kernel.PostgresKernel._connect", forbidden)
+    monkeypatch.setattr(push_readiness.shutil, "which", lambda name: "fixture-gh" if name == "gh" else None)
+    calls = []
+
+    def inspect(command, **kwargs):
+        command = list(command)
+        calls.append((command, kwargs))
+        if command == ["git", "config", "--get-all", "credential.helper"]:
+            if fault == "timeout":
+                raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+            return _completed(command, stdout="manager-core\ncache\n" if fault == "advisory" else "manager-core\n")
+        if command == ["gh", "auth", "status", "--hostname", "git.example.invalid"]:
+            return _completed(command, returncode=int(fault == "auth"), stdout="fixture auth status\n")
+        if command == ["git", "remote", "get-url", "reviewed"]:
+            return _completed(command, stdout="git@git.example.invalid:owner/repo.git\n")
+        assert command == ["git", "ls-remote", "--exit-code", "reviewed", "HEAD"]
+        assert kwargs["env"]["GIT_TERMINAL_PROMPT"] == "0"
+        assert kwargs["env"]["GCM_INTERACTIVE"] == "never"
+        return _completed(command, returncode=int(fault == "remote"), stdout="fixture remote response\n")
+
+    monkeypatch.setattr(push_readiness.subprocess, "run", inspect)
+    destination = caller / "evidence" / "readiness.json"
+    args = [
+        "--config",
+        str(config),
+        "push",
+        "readiness",
+        "--remote",
+        "reviewed",
+        "--hostname",
+        "git.example.invalid",
+        "--timeout-seconds",
+        "7",
+        "--evidence-file",
+        str(destination),
+    ]
+    if json_output:
+        args.append("--json")
+    result = CliRunner().invoke(cli.main, args)
+    assert result.exit_code == exit_code, result.output
+    assert len(calls) == 5
+    assert all(kwargs["cwd"] == selected and kwargs["timeout"] == 7 and kwargs["check"] is False for _, kwargs in calls)
+    packet = json.loads(destination.read_text(encoding="utf-8"))
+    assert packet["status"] == status
+    assert len(packet["checks"]) == 4
+    if json_output:
+        assert json.loads(result.output) == packet
+    else:
+        assert status in result.output.lower()
+        assert "remote-reachability" in result.output
+    assert sentinel.read_bytes() == b"foreign database sentinel"
+    assert not (selected / "groundtruth.db").exists()

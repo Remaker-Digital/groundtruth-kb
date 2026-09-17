@@ -1139,7 +1139,6 @@ class TestSchema:
             "test_procedures",
             "operational_procedures",
             "assertion_runs",
-            "session_prompts",
             "environment_config",
             "documents",
             "test_coverage",
@@ -1152,6 +1151,7 @@ class TestSchema:
             "quality_scores",
         }
         assert expected.issubset(tables)
+        assert "session_prompts" not in tables
         conn.close()
         db.close()
 

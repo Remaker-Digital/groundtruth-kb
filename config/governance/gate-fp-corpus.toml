@@ -47,8 +47,8 @@ command = 'Write-Output "regex Document:\s*(\S+) bridge/gtkb-example-001.md"'
 note = 'drive-shaped substring inside regex/prose is not a standalone filesystem token'
 
 [[bash_parser_pass]]
-command = 'Write-Output "E:\GT-KB\bridge\gtkb-example-001.md"'
-note = 'quoted in-root Windows absolute bridge path is allowed'
+command = 'Write-Output "{ROOT}\bridge\gtkb-example-001.md"'
+note = 'quoted Windows absolute path inside the checkout root is allowed; {ROOT} is the checkout the test supplies'
 
 [[bash_parser_pass]]
 command = 'Write-Output "regex \\-]+\.[\w]+)\b"'
@@ -57,10 +57,6 @@ note = 'double backslash in regex pattern should not be treated as a UNC absolut
 [[bash_parser_pass]]
 command = 'echo //some-comment'
 note = 'double forward slash in comment should not be treated as a UNC absolute path'
-
-[[bash_parser_pass]]
-command = 'type C:\Users\micha\.claude\settings.json'
-note = 'allow harness-specific settings files under the user profile directory'
 
 [[bash_parser_pass]]
 command = 'gt bridge show gtkb-wi4988-direct-harness-launch-guard'
@@ -81,6 +77,10 @@ note = 'PowerShell output/prose mentioning harness names is not a launch'
 [[bash_parser_block]]
 command = 'cat C:\Users\micha\secret.txt'
 note = 'genuine out-of-root drive-letter absolute'
+
+[[bash_parser_block]]
+command = 'type C:\Users\micha\.claude\settings.json'
+note = 'harness settings outside the checkout are the harness own state; containment grants no harness exemption (2026-09-14)'
 
 [[bash_parser_block]]
 command = 'type \\server\share\file'
@@ -144,13 +144,13 @@ note = 'Claude PowerShell matcher routes command text through the same root-boun
 path = 'bridge/gtkb-example-001.md'
 note = 'Codex apply_patch adapter treats in-root patch targets as allowed'
 
-[[codex_apply_patch_pass]]
-path = 'C:\Users\micha\.codex\skills\some-skill\SKILL.md'
-note = 'Codex apply_patch allows path under local harness-specific directory'
-
 [[codex_apply_patch_block]]
 path = 'C:\Users\micha\secret.txt'
 note = 'Codex apply_patch adapter still blocks genuine out-of-root absolute paths'
+
+[[codex_apply_patch_block]]
+path = 'C:\Users\micha\.codex\skills\some-skill\SKILL.md'
+note = 'a user-profile skill path is outside the checkout; containment grants no harness exemption (2026-09-14)'
 
 # --- WI-6026: argument-role awareness in the root-boundary Bash parser ---
 # The parser scanned the raw command string with no notion of argument role, so a

@@ -6,13 +6,16 @@ in the domain service; this module creates no approval or publication record.
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import subprocess
 import sys
 import tempfile
 import unicodedata
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import Any
 from urllib.parse import quote
 
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
@@ -22,7 +25,9 @@ class ProjectCommitError(RuntimeError):
     pass
 
 
-def _git(root: Path, *args: str, env=None, data=None, allow_absent=False) -> bytes:
+def _git(
+    root: Path, *args: str, env: Mapping[str, str] | None = None, data: bytes | None = None, allow_absent: bool = False
+) -> bytes:
     try:
         result = subprocess.run(
             [
@@ -46,11 +51,13 @@ def _git(root: Path, *args: str, env=None, data=None, allow_absent=False) -> byt
     return result.stdout
 
 
-def _text(root: Path, *args: str, **kwargs) -> str:
-    return _git(root, *args, **kwargs).decode("utf-8").strip()
+def _text(
+    root: Path, *args: str, env: Mapping[str, str] | None = None, data: bytes | None = None, allow_absent: bool = False
+) -> str:
+    return _git(root, *args, env=env, data=data, allow_absent=allow_absent).decode("utf-8").strip()
 
 
-def _index_entries(root: Path, env=None):
+def _index_entries(root: Path, env: Mapping[str, str] | None = None) -> dict[str, dict[str, str]]:
     result = {}
     identities = set()
     for entry in _git(root, "ls-files", "--stage", "-z", env=env).split(b"\0"):
@@ -72,7 +79,7 @@ def _index_entries(root: Path, env=None):
     return result
 
 
-def _set_entries(root, env, artifacts):
+def _set_entries(root: Path, env: Mapping[str, str], artifacts: Mapping[str, Mapping[str, str] | None]) -> None:
     records = []
     width = len(_text(root, "rev-parse", "HEAD", env=env))
     for name, identity in sorted(artifacts.items()):
@@ -81,7 +88,9 @@ def _set_entries(root, env, artifacts):
     _git(root, "update-index", "-z", "--index-info", env=env, data=b"".join(records))
 
 
-def commit_reviewed_project(prepared, *, authority_url, project_id, native_context_id, message_file):
+def commit_reviewed_project(
+    prepared: dict[str, Any], *, authority_url: str, project_id: str, native_context_id: str, message_file: Path
+) -> str:
     root = Path(prepared["checkout"]["path"]).resolve()
     hooks = Path(prepared["hooks_path"]).resolve()
     parent = prepared["expected_parent"]
@@ -247,7 +256,7 @@ def check_reference_transaction(state: str) -> None:
     old, new = identities.pop()
     if old != values["PARENT"]:
         raise ProjectCommitError("checkout_base_changed: The prepared parent changed")
-    result = AuthorityClient(values["AUTHORITY"]).request(
+    result = AuthorityClient(values["AUTHORITY"], timeout=5).request(
         "POST",
         f"/v1/projects/{quote(values['PROJECT'], safe='')}/check-commit",
         body={
@@ -272,11 +281,14 @@ if __name__ == "__main__":
         KeyError,
         ValueError,
     ) as error:
-        sys.stderr.write(f"{error}\n")
+        details = getattr(error, "details", None)
+        sys.stderr.write(f"{error}\n" if not details else f"{error} {json.dumps(details, sort_keys=True)}\n")
         raise SystemExit(1) from error
 
 
-def reviewed_git_candidates(root, work_item_ids, artifacts):
+def reviewed_git_candidates(
+    root: Path, work_item_ids: Sequence[str], artifacts: Mapping[str, Mapping[str, str] | None]
+) -> list[str]:
     """Read possible completed effects from Git without visiting peer checkouts."""
     if not artifacts:
         raise ProjectCommitError("The attempt has no exact reviewed artifact identity")
@@ -288,7 +300,7 @@ def reviewed_git_candidates(root, work_item_ids, artifacts):
         message = _text(root, "show", "-s", "--format=%B", commit_id)
         if not required.issubset(set(re.findall(r"\(WI-[A-Za-z0-9_-]+\)", message))):
             continue
-        tree = {}
+        tree: dict[str, dict[str, str] | str] = {}
         for entry in _git(root, "ls-tree", "-rz", "--full-tree", commit_id).split(b"\0"):
             if entry:
                 metadata, raw_name = entry.split(b"\t", 1)

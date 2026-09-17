@@ -8,11 +8,24 @@ an input to these scenarios.
 from __future__ import annotations
 
 import json
+import os
+import re
+import socket
+import subprocess
+import sys
+from datetime import UTC, datetime
+from pathlib import Path
+from string import Template
 
 import pytest
+from groundtruth_kb.bridge.native import parse_authored_message
+from groundtruth_kb.bridge.taxonomy import BRIDGE_KIND_BY_STATUS, BridgeKind
+from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES
+from groundtruth_kb.postgres_kernel import PostgresKernelError
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
+from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
 from platform_tests.groundtruth_kb.test_native_authority_service import native as native
 from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
 from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
@@ -207,3 +220,193 @@ def test_stored_forbidden_scope_cannot_reuse_a_live_effect_claim(bridge, field):
     assert abandoned.status_code == 200, abandoned.text
     assert claim(client, "valid-successor", "pb3", 0, "READY").status_code == 422
     deliver(client, contexts, "valid-successor", "pb3", 1, "NEW")
+
+
+# An independent statement of the contract, not a list derived from the parser.
+EXPECTED_KINDS = {
+    "NEW": "implementation_proposal",
+    "REVISED": "implementation_proposal",
+    "GO": "lo_verdict",
+    "NO-GO": "lo_verdict",
+    "NOT-READY": "lo_verdict",
+    "VERIFIED": "lo_verdict",
+    "SUPERSEDED": "lo_verdict",
+    "READY": "implementation_report",
+    "ADVISORY": "governance_advisory",
+    "VERDICT-REJECTED": "governance_review",
+    "BLOCKED": "operational_state_change",
+    "WITHDRAWN": "operational_state_change",
+}
+
+
+def test_native_kind_contract_covers_exactly_the_current_vocabulary():
+    assert set(EXPECTED_KINDS) == set(CANONICAL_STATUSES)
+    assert {kind.value for kind in BridgeKind} == set(EXPECTED_KINDS.values())
+    assert {status: kind.value for status, kind in BRIDGE_KIND_BY_STATUS.items()} == EXPECTED_KINDS
+
+
+@pytest.mark.parametrize("status", list(EXPECTED_KINDS))
+@pytest.mark.parametrize(
+    "kind", sorted(set(EXPECTED_KINDS.values())) + ["index_reconciliation", "prime_proposal", "unknown"]
+)
+def test_native_parser_status_kind_matrix(status, kind):
+    content = authored({"session_context_id": "qualification-context"}, "kind-matrix", 1, status, bridge_kind=kind)
+    if kind == EXPECTED_KINDS[status]:
+        parsed = parse_authored_message(content)
+        assert parsed["status"] == status
+        assert parsed["metadata"]["bridge_kind"] == kind
+    else:
+        with pytest.raises(PostgresKernelError) as refused:
+            parse_authored_message(content)
+        assert refused.value.code == "invalid_bridge_header"
+        assert refused.value.details == {"status": status, "expected_bridge_kind": EXPECTED_KINDS[status]}
+
+
+@pytest.mark.parametrize("status", ["BLOCKED", "WITHDRAWN", "VERDICT-REJECTED"])
+def test_native_kind_mismatch_preserves_claim_and_exact_state(bridge, status):
+    service, client, contexts, _ = bridge
+    document = "kind-refusal"
+    context, head = "pb1", 0
+    extra, options = {}, {}
+    if status == "BLOCKED":
+        # The fixture owns a disposable PostgreSQL schema, never production state.
+        with service.kernel.transaction() as tx:
+            tx.cursor.execute(
+                sql.SQL("UPDATE {}.projects SET {}='not authorized' WHERE id='PROJECT-1'").format(
+                    sql.Identifier(tx.schema), sql.Identifier("authorization")
+                )
+            )
+        extra = {"observed_authorization": "not authorized", "authorization_read_at": datetime.now(UTC).isoformat()}
+        options = {"mode": "headless"}
+    else:
+        deliver(client, contexts, document, "pb1", 1, "NEW")
+        context, head = "pb2", 1
+        if status == "VERDICT-REJECTED":
+            deliver(client, contexts, document, "lo1", 2, "GO")
+            head = 2
+    reservation = claim(client, document, context, head, status)
+    assert reservation.status_code == 200, reservation.text
+    fence = {"native_context_id": context, "fence": reservation.json()["fence"]}
+    before = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    for kind in sorted(set(EXPECTED_KINDS.values()) - {EXPECTED_KINDS[status]}) + ["index_reconciliation"]:
+        response = client.post(
+            f"/v1/bridge/{document}/deliver",
+            json={
+                **fence,
+                **options,
+                "content": authored(contexts[context], document, head + 1, status, bridge_kind=kind, **extra),
+            },
+        )
+        assert response.status_code == 422, response.text
+        assert response.json()["error"]["code"] == "invalid_bridge_header"
+        assert response.json()["error"]["details"]["expected_bridge_kind"] == EXPECTED_KINDS[status]
+        assert client.get(f"/v1/bridge/{document}/show?include_content=true").json() == before
+        assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+    content = authored(contexts[context], document, head + 1, status, bridge_kind=EXPECTED_KINDS[status], **extra)
+    accepted = client.post(f"/v1/bridge/{document}/deliver", json={**fence, **options, "content": content})
+    assert accepted.status_code == 200, accepted.text
+    after = client.get(f"/v1/bridge/{document}/show?include_content=true").json()
+    if status == "WITHDRAWN":
+        assert "messages" not in after  # Terminal purge omits payload from readback.
+    else:
+        assert after["messages"][-1]["content"] == content
+    assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 422
+
+
+@pytest.mark.parametrize("status", ["NEW", "REVISED"])
+def test_documented_proposal_header_delivers_through_actual_cli(bridge, tmp_path, status):
+    _, client, contexts, _ = bridge
+    document = "documented-proposal"
+    head = 0
+    if status == "REVISED":
+        deliver(client, contexts, document, "pb1", 1, "NEW")
+        deliver(client, contexts, document, "lo1", 2, "NO-GO")
+        head = 2
+    root = Path(__file__).resolve().parents[2]
+    skill = (root / ".harness-baseline-configuration/skills/gtkb-propose/SKILL.md").read_text(encoding="utf-8")
+    example = re.search(r"## Authored header example\n.*?```text\n(.*?)```", skill, re.S)
+    assert example is not None
+    with socket.socket() as socket_probe:
+        socket_probe.bind(("127.0.0.1", 0))
+        port = socket_probe.getsockname()[1]
+    process, service_env = _serve_authority(tmp_path, port)
+    try:
+        config = tmp_path / "client.toml"
+        config.write_text(
+            '[groundtruth]\nproject_root="."\nauthority_url="http://127.0.0.1:'
+            + str(port)
+            + '"\ndb_path="unavailable-client.db"\n',
+            encoding="utf-8",
+        )
+        env = {key: value for key, value in service_env.items() if not key.startswith(("PG", "GT_POSTGRES_"))}
+        env.pop("GT_AUTHORITY_URL", None)
+
+        def cli(*arguments):
+            completed = subprocess.run(
+                [sys.executable, "-P", "-m", "groundtruth_kb", "--config", str(config), *arguments, "--json"],
+                cwd=tmp_path,
+                env=env,
+                capture_output=True,
+                encoding="utf-8",
+                timeout=30,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
+            )
+            assert completed.returncode == 0, completed.stderr
+            return json.loads(completed.stdout)
+
+        current = cli("context", "work-item", "WI-1")
+        binding = cli("session", "show", "--native-context-id", "pb1")
+        assert binding["session_context_id"] == contexts["pb1"]["session_context_id"]
+        reserved = cli(
+            "bridge",
+            "claim",
+            document,
+            "--work-item-id",
+            current["work_item"]["id"],
+            "--native-context-id",
+            "pb1",
+            "--expected-version",
+            str(head),
+            "--status",
+            status,
+            "--request-id",
+            "documented-" + status.lower(),
+        )
+        content = Template(example.group(1)).substitute(
+            status=status,
+            document=document,
+            next_version=head + 1,
+            date=datetime.now(UTC).date().isoformat(),
+            author_identity="qualified-agent",
+            harness_id="HARNESS-1",
+            bound_session_id=binding["session_context_id"],
+            model="qualification-model",
+            project_id=current["project"]["id"],
+            work_item_id=current["work_item"]["id"],
+            work_item_version=current["work_item"]["version"],
+            target_paths_json=json.dumps(["code.py"]),
+            test_targets_json=json.dumps(["tests/test_effect.py"]),
+            spec_versions_json=json.dumps({row["id"]: row["version"] for row in current["specifications"]}),
+            complete_body="Implement the specified effect in code.py and verify it with tests/test_effect.py.\nUnicode: cafÃ© æ¼¢å­—.\n",
+        )
+        draft = tmp_path / "scratchpad" / binding["session_context_id"] / "proposal.md"
+        draft.parent.mkdir(parents=True)
+        draft.write_text(content, encoding="utf-8", newline="")
+        cli(
+            "bridge",
+            "deliver",
+            document,
+            "--native-context-id",
+            "pb1",
+            "--fence",
+            str(reserved["fence"]),
+            "--content-file",
+            str(draft),
+        )
+        shown = cli("bridge", "show", document, "--content")
+        assert shown["messages"][-1]["content"] == content
+        assert not (tmp_path / "unavailable-client.db").exists()
+        assert not (tmp_path / "bridge").exists()
+    finally:
+        process.terminate()
+        process.wait(timeout=15)

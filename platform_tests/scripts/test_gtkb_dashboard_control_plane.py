@@ -14,8 +14,6 @@ bridge/gtkb-dashboard-control-plane-baseline-implementation-002.md (GO):
 from __future__ import annotations
 
 import importlib
-import importlib.util
-import sys
 from collections.abc import Mapping
 from http import HTTPStatus
 from pathlib import Path
@@ -24,22 +22,14 @@ from typing import Any
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-REGISTRY_PATH = REPO_ROOT / "scripts" / "gtkb_dashboard" / "control_plane_registry.py"
 
 
 def _load_registry():
-    spec = importlib.util.spec_from_file_location("control_plane_registry_under_test", REGISTRY_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules["control_plane_registry_under_test"] = module
-    spec.loader.exec_module(module)
-    return module
+    return importlib.import_module("groundtruth_kb.dashboard_control_plane")
 
 
 def _load_refresh_service():
-    if str(REPO_ROOT) not in sys.path:
-        sys.path.insert(0, str(REPO_ROOT))
-    return importlib.import_module("scripts.gtkb_dashboard.refresh_service")
+    return importlib.import_module("groundtruth_kb.dashboard_service")
 
 
 def _build_context(registry, tmp_path, *, apply_result=None, state_extras=None):
@@ -91,11 +81,11 @@ def test_registry_exposes_three_operations_with_required_metadata():
 def test_dashboard_refresh_is_the_only_apply_capable_operation():
     registry = _load_registry()
     assert registry.get_descriptor("dashboard.refresh").supports_dry_run is True
-    assert registry.get_descriptor("dashboard.refresh").required_role_slots == ("dashboard-refresh-token",)
+    assert registry.get_descriptor("dashboard.refresh").requires_token is True
     assert registry.get_descriptor("dashboard.read").supports_dry_run is False
-    assert registry.get_descriptor("dashboard.read").required_role_slots == ()
+    assert registry.get_descriptor("dashboard.read").requires_token is False
     assert registry.get_descriptor("control_plane.status").supports_dry_run is False
-    assert registry.get_descriptor("control_plane.status").required_role_slots == ()
+    assert registry.get_descriptor("control_plane.status").requires_token is False
 
 
 def test_dispatch_rejects_unknown_operation_ids(tmp_path):
@@ -204,7 +194,7 @@ def test_control_plane_status_lists_all_registered_operations(tmp_path):
     assert reported_ids == set(registry.list_operation_ids())
     refresh_entry = next(op for op in operations if op["operation_id"] == "dashboard.refresh")
     assert refresh_entry["supports_dry_run"] is True
-    assert refresh_entry["required_role_slots"] == ["dashboard-refresh-token"]
+    assert refresh_entry["requires_token"] is True
 
 
 # --- refresh_service.handle_control_plane_request -----------------------------
@@ -315,3 +305,23 @@ def test_refresh_service_context_paths_come_from_state_not_caller(tmp_path):
     assert context.project_root == tmp_path
     assert context.dashboard_db == tmp_path / "dashboard.sqlite"
     assert context.subject == "dashboard"
+
+
+@pytest.mark.parametrize("supplied, accepted", [("test-only-café", True), ("test-only-cafe", False), ("", False)])
+def test_refresh_token_comparison_preserves_non_ascii_and_refuses_before_effects(
+    tmp_path, monkeypatch, supplied, accepted
+):
+    service, state = _make_state(tmp_path, token="test-only-café")
+    applied = []
+
+    def refresh(trigger):
+        applied.append(trigger)
+        return {"status": "completed", "trigger": trigger}
+
+    monkeypatch.setattr(state, "refresh_now", refresh)
+    status, body = service.handle_control_plane_request(
+        {"operation_id": "dashboard.refresh"}, state, supplied_token=supplied
+    )
+    assert status == (HTTPStatus.OK if accepted else HTTPStatus.UNAUTHORIZED)
+    assert applied == (["dashboard.refresh"] if accepted else [])
+    assert "test-only-café" not in str(body)

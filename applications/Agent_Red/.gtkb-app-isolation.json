@@ -1,289 +1,257 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.0",
   "application": "Agent_Red",
-  "isolation_contract_adr": "ADR-APPLICATION-ISOLATION-CONTRACT-001 (proposed; pending sub-slice 6)",
-  "minimization_principle_dcl": "DCL-APP-ROOT-MINIMIZATION-001 (proposed; pending sub-slice 6)",
-  "last_updated": "2026-06-19",
-  "established_by": "bridge/application-isolation-contract-006.md (GO) sub-slice 1",
+  "isolation_contract_adr": "ADR-APPLICATION-ISOLATION-CONTRACT-001",
+  "minimization_principle_dcl": "DCL-APP-ROOT-MINIMIZATION-001",
   "top_level_artifacts": [
     {
       "name": ".claude",
       "type": "DIR",
-      "bucket": "B",
-      "tool": "Claude Code",
-      "justification": "CWD-rooted rule/agent/skill/command/hook discovery for Agent-Red-scoped Claude Code sessions; substantive Agent-Red-scoped Claude configuration comprising 15 files / 596 freshly measured lines, including code-reviewer and security-analyzer agents, check-db/check-security/preflight/quick-review/refresh-creds commands, settings.json, and deploy/run-tests/seed-tenant skills with references; no GT-KB platform content imported"
+      "classification": "authoritative_input",
+      "purpose": "Application-owned Claude Code configuration, instructions, agents and skills. No GT-KB platform projection is supplied by this entry.",
+      "tool": "Claude Code"
     },
     {
       "name": ".codex",
       "type": "DIR",
-      "bucket": "B",
-      "tool": "Codex CLI",
-      "justification": "CWD-rooted config discovery for Agent-Red-scoped Codex sessions; minimal placeholder per Codex GO sub-slice 1 condition 2 (no GT-KB platform content imported)"
+      "classification": "authoritative_input",
+      "purpose": "Application-owned Codex configuration. No GT-KB platform projection is supplied by this entry.",
+      "tool": "Codex CLI"
     },
     {
       "name": ".dockerignore",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "Docker",
-      "justification": "Application-owned Docker build-context ignore for Agent Red production and test-host containers; keeps secrets, caches, and generated local artifacts out of the application build context while retaining src, config, tests, pyproject.toml, and test_host inputs required by the application-local Dockerfiles"
+      "classification": "authoritative_input",
+      "purpose": "Application-owned Docker build-context ignore for Agent Red production and test-host containers; keeps secrets, caches, and generated local artifacts out of the application build context while retaining src, config, tests, pyproject.toml, and test_host inputs required by the application-local Dockerfiles",
+      "tool": "Docker"
+    },
+    {
+      "name": ".github",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application-local workflow discovery for Agent Red test-host container builds; workflow defaults set working-directory to applications/Agent_Red and do not make GT-KB platform workflows application-owned",
+      "tool": "GitHub Actions"
     },
     {
       "name": ".gtkb-app-isolation.json",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "GT-KB release-gate scan (DCL-APP-ROOT-MINIMIZATION-001 assertion)",
-      "justification": "Self-referential registry file required by the minimization principle; the registry must contain itself for the scanner to validate its own presence"
-    },
-    {
-      "name": ".vscode",
-      "type": "DIR",
-      "bucket": "B",
-      "tool": "VSCode",
-      "justification": "Workspace settings discovery from opened folder; per owner directive 2026-04-27 the VSCode workspace root for the Agent Red project is applications/Agent_Red/"
-    },
-    {
-      "name": "application.toml",
-      "type": "FILE",
-      "bucket": "A",
-      "purpose": "Agent Red application marker consumed by GT-KB application registration, slot diagnostics, and isolation doctor checks."
+      "classification": "authoritative_input",
+      "purpose": "The application-owned artifact registry used for classification and boundary checks.",
+      "tool": "GT-KB release-gate scan (DCL-APP-ROOT-MINIMIZATION-001 assertion)"
     },
     {
       "name": "CHANGELOG.md",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red application changelog and release history."
-    },
-    {
-      "name": "CLAUDE.md",
-      "type": "FILE",
-      "bucket": "B",
-      "tool": "Claude Code",
-      "justification": "CWD-rooted Agent Red session instructions for Claude Code when applications/Agent_Red/ is opened as the working directory."
     },
     {
       "name": "CLAUDE-ARCHITECTURE.md",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red architecture reference documentation retained with the application lifecycle."
     },
     {
       "name": "CLAUDE-REFERENCE.md",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red implementation reference documentation retained with the application lifecycle."
+    },
+    {
+      "name": "CLAUDE.md",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "CWD-rooted Agent Red session instructions for Claude Code when applications/Agent_Red/ is opened as the working directory.",
+      "tool": "Claude Code"
     },
     {
       "name": "CLAUDE_ARCHIVE.md",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red historical Claude guidance retained as application-local archive material."
     },
     {
       "name": "CONTRIBUTING.md",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red application contribution guidance."
-    },
-    {
-      "name": "harness-state",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Application-level harness state (created S315 by owner; pre-existing; in-scope of application-isolation-contract)"
-    },
-    {
-      "name": "incident-response",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red incident-response artifacts (created S310 by IR-0.1 boundary work; pre-existing; in-scope of application-isolation-contract)"
-    },
-    {
-      "name": "pdf-tooling",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red PDF generation tooling and identity-report artifacts (migrated from GT-KB root in S331 sub-slice 18.B; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause)"
-    },
-    {
-      "name": "legal",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red SaaS legal documents (DPA, Privacy, SLA, Terms); migrated from GT-KB root in S334 sub-slice 18.D Pattern G (re-run per S334 owner AUQ after rollback); covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "docs",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red documentation (admin guides, architecture, plans, proposals, marketing, etc.; migrated from GT-KB root in S334 sub-slice 18.C re-run per S334 owner AUQ; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause). Platform docs (gtkb-dashboard, specification-scaffold, assets/gtkb-dashboard) explicitly excluded per S331 owner directive and remain at GT-KB root."
-    },
-    {
-      "name": "docs-site",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red Docusaurus site (agentredcx.com source); migrated from GT-KB root in S334 sub-slice 18.C re-run as per-file moves into existing destination subtree; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "src",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red Python application code (multi_tenant, agents, integrations, chat, app, jobs, migrations, observability, presets, quality_metrics, white-label, ai-features); migrated from GT-KB root in S339 sub-slice 18.E.1 per Codex GO at bridge/gtkb-isolation-018-slice-e1-atomic-code-move-016.md; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "tests",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red test suite (638 files MIGRATES + 21 MIGRATES_WITH_SCRIPT_DEP per E.3 manifest-v3 at .tmp/e3-disposition/manifest-v3.json); 112 platform-test files STAY at GT-KB root per S334 owner directive DELIB-S334-OQ-E3-OPTION-A; migrated from GT-KB root in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "admin",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red admin app (Vite + React + TypeScript); migrated from GT-KB root in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "widget",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red chat widget (Vite + Preact + TypeScript); migrated from GT-KB root in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "branding",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red product branding assets; deferred from 18.D per parents[2] dependency and migrated in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": "config",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red configuration (initially: Stripe pricing at config/stripe_product_ids.json deferred from 18.D); other Agent Red config arrives in subsequent slices. GT-KB platform configs in config/agent-control/ and config/governance/ STAY at GT-KB root per umbrella -008. Migrated in S339 sub-slice 18.E.1; covered by DELIB-S330-AGENT-RED-MIGRATION-PENDING-WAIVER v1 SCOPE clause."
-    },
-    {
-      "name": ".github",
-      "type": "DIR",
-      "bucket": "B",
-      "tool": "GitHub Actions",
-      "justification": "Application-local workflow discovery for Agent Red test-host container builds; workflow defaults set working-directory to applications/Agent_Red and do not make GT-KB platform workflows application-owned"
     },
     {
       "name": "Dockerfile",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "Docker",
-      "justification": "Agent Red production API image contract owned by the application lifecycle and built from applications/Agent_Red as Docker context"
+      "classification": "authoritative_input",
+      "purpose": "Agent Red production API image contract owned by the application lifecycle and built from applications/Agent_Red as Docker context",
+      "tool": "Docker"
     },
     {
       "name": "Dockerfile.test",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "Docker",
-      "justification": "Agent Red test-host image contract for SPEC-1825 verification; copies application-local src, config, tests, project metadata, and test_host package from applications/Agent_Red"
+      "classification": "authoritative_input",
+      "purpose": "Agent Red test-host image contract for SPEC-1825 verification; copies application-local src, config, tests, project metadata, and test_host package from applications/Agent_Red",
+      "tool": "Docker"
     },
     {
       "name": "Dockerfile.ui",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "Docker",
-      "justification": "Agent Red static UI image contract for application-local admin and widget build outputs"
+      "classification": "authoritative_input",
+      "purpose": "Agent Red static UI image contract for application-local admin and widget build outputs",
+      "tool": "Docker"
+    },
+    {
+      "name": "SECURITY.md",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "Agent Red application security policy and disclosure guidance."
+    },
+    {
+      "name": "admin",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application administration frontend source and build configuration."
+    },
+    {
+      "name": "application.toml",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "Agent Red application marker consumed by GT-KB application registration, slot diagnostics, and isolation doctor checks."
+    },
+    {
+      "name": "assets",
+      "type": "DIR",
+      "classification": "generated_output",
+      "purpose": "Generated application documentation site JavaScript and CSS assets. This classification grants no cleanup or rebuild-completeness claim."
+    },
+    {
+      "name": "branding",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application brand source assets and design references."
+    },
+    {
+      "name": "config",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application configuration inputs."
     },
     {
       "name": "docker-compose.yml",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "Docker Compose",
-      "justification": "Application-local development stack for Agent Red API, test-host, NATS, and Redis using applications/Agent_Red as the compose root"
+      "classification": "authoritative_input",
+      "purpose": "Application-local development stack for Agent Red API, test-host, NATS, and Redis using applications/Agent_Red as the compose root",
+      "tool": "Docker Compose"
     },
     {
-      "name": "pyproject.toml",
-      "type": "FILE",
-      "bucket": "B",
-      "tool": "Python packaging and test tooling",
-      "justification": "Application-owned Python project, pytest, coverage, Ruff, and build metadata for src and test_host packages"
+      "name": "docs",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application documentation sources and supporting references."
     },
     {
-      "name": "requirements.txt",
-      "type": "FILE",
-      "bucket": "B",
-      "tool": "pip",
-      "justification": "Application-owned production Python dependency manifest consumed by the Agent Red production and test-host Dockerfiles"
+      "name": "docs-site",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application Docusaurus documentation site source and build configuration."
     },
     {
-      "name": "requirements-test.txt",
-      "type": "FILE",
-      "bucket": "B",
-      "tool": "pip",
-      "justification": "Application-owned test dependency manifest for the Agent Red test-host container and local focused verification"
+      "name": "incident-response",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application incident-response procedures and reference material."
     },
     {
-      "name": "requirements-local.txt",
-      "type": "FILE",
-      "bucket": "B",
-      "tool": "pip",
-      "justification": "Application-owned local development dependency overlay chaining test dependencies plus local GT-KB governance tooling"
+      "name": "legal",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application legal documents including data processing, privacy, service terms and agreements."
     },
     {
       "name": "package-lock.json",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red JavaScript workspace dependency lockfile for application-local frontend tooling."
     },
     {
       "name": "package.json",
       "type": "FILE",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red JavaScript workspace manifest for application-local frontend tooling."
+    },
+    {
+      "name": "pdf-tooling",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application PDF generation source, templates and identity-report reference material."
+    },
+    {
+      "name": "pyproject.toml",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "Application-owned Python project, pytest, coverage, Ruff, and build metadata for src and test_host packages",
+      "tool": "Python packaging and test tooling"
+    },
+    {
+      "name": "requirements-local.txt",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "Application-owned local development dependency overlay chaining test dependencies plus local GT-KB governance tooling",
+      "tool": "pip"
+    },
+    {
+      "name": "requirements-test.txt",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "Application-owned test dependency manifest for the Agent Red test-host container and local focused verification",
+      "tool": "pip"
+    },
+    {
+      "name": "requirements.txt",
+      "type": "FILE",
+      "classification": "authoritative_input",
+      "purpose": "Application-owned production Python dependency manifest consumed by the Agent Red production and test-host Dockerfiles",
+      "tool": "pip"
     },
     {
       "name": "scripts",
       "type": "DIR",
-      "bucket": "A",
+      "classification": "authoritative_input",
       "purpose": "Agent Red application-local operational and development scripts."
-    },
-    {
-      "name": "test_host",
-      "type": "DIR",
-      "bucket": "A",
-      "purpose": "Agent Red application-owned self-service verification host package required by SPEC-1825; exposes FastAPI endpoints, suite registry, runner orchestration, and Cosmos result writing without depending on GT-KB root paths."
-    },
-    {
-      "name": "SECURITY.md",
-      "type": "FILE",
-      "bucket": "A",
-      "purpose": "Agent Red application security policy and disclosure guidance."
     },
     {
       "name": "shopify.app.toml",
       "type": "FILE",
-      "bucket": "B",
-      "tool": "Shopify CLI",
-      "justification": "Shopify CLI app configuration discovery at the Agent Red application root."
-    }
-  ],
-  "validator_contract": {
-    "scan_path": "applications/Agent_Red/",
-    "depth": "top-level only",
-    "rules": [
-      "Every top-level entry must match a registry entry by name+type",
-      "Registry entries with bucket=A require non-empty purpose",
-      "Registry entries with bucket=B require non-empty tool and justification",
-      "Bucket=C and bucket=D are not allowed at app root",
-      "Unmatched entries fail the gate"
-    ],
-    "implementation_status": "implemented by WI-4655 / gtkb-ar-readiness-phase-1-2-app-root-minimization-validator"
-  },
-  "out_of_scope_for_sub_slice_1": [
-    ".env.local handling (sub-slice 2; owner-action-only)",
-    ".shopify and .shopifyignore moves (sub-slice 3)",
-    "PDF cluster move into pdf-tooling/ (sub-slice 4)",
-    "DCL runner and release-gate wiring (sub-slice 5)",
-    "Formal DELIB/ADR/DCL writes via approval packets (sub-slice 6)",
-    "Cluster moves beyond PDF (subsequent phases per Phase E audit §B.1 sequence)",
-    ".gitignore modifications (per proposal -005 §7.2; deferred to a follow-up hygiene sub-slice)"
-  ],
-  "known_limitations": [
+      "classification": "authoritative_input",
+      "purpose": "Shopify CLI app configuration discovery at the Agent Red application root.",
+      "tool": "Shopify CLI"
+    },
     {
-      "artifact": ".vscode/settings.json",
-      "issue": "File exists on disk but is not git-tracked. The existing .gitignore line 90 (.vscode/) ignores the entire .vscode/ directory at any depth; the negation at line 91 (!.vscode/settings.json) cannot take effect because git does not descend into ignored parent directories.",
-      "impact": "VSCode opening applications/Agent_Red/ in this checkout will read settings.json correctly. Fresh clones or git clean -fdx will not retain the file or directory. Cross-machine persistence requires either changing line 90 to .vscode/* or adding a more specific negation pattern.",
-      "deferred_to": "Follow-up gitignore-hygiene sub-slice. Per sub-slice 1 proposal -005 §7.2, .gitignore modifications were explicitly out of scope of this slice."
+      "name": "src",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application source code, integrations, services and migrations."
+    },
+    {
+      "name": "terraform",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application infrastructure source, configuration examples and operational runbooks."
+    },
+    {
+      "name": "test_host",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Agent Red application-owned self-service verification host package required by SPEC-1825; exposes FastAPI endpoints, suite registry, runner orchestration, and Cosmos result writing without depending on GT-KB root paths."
+    },
+    {
+      "name": "tests",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application test source and fixtures."
+    },
+    {
+      "name": "widget",
+      "type": "DIR",
+      "classification": "authoritative_input",
+      "purpose": "Application chat widget source and build configuration."
     }
   ]
 }

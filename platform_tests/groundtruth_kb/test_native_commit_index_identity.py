@@ -47,7 +47,7 @@ def test_raw_index_ambiguity_is_typed_and_refuses_without_index_or_head_changes(
     product = (checkout / "code.py").read_bytes()
     result = invoke(config, message)
     assert result.exit_code != 0, result.output
-    assert "index_ambiguous" in result.output, (result.output, result.exception)
+    assert "index_ambiguous" in result.output, f"{result.output}\nexception: {result.exception!r}"
     assert base(checkout) == base(integration(root)) == parent
     assert real_index(checkout).read_bytes() == before
     assert (checkout / "code.py").read_bytes() == product

@@ -33,8 +33,7 @@ install / bootstrap path are explicitly deferred to a follow-on install slice
 with its own authorization and project-root-boundary review.
 
 Governing specs: GOV-STANDING-BACKLOG-001 (WI-4530 backlog authority),
-GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 /
-DCL-PROJECT-AUTHORIZATION-ENVELOPE-001 (PAUTH scope),
+GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 (project work ordering),
 ADR-ISOLATION-APPLICATION-PLACEMENT-001 (in-root invariant),
 DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 (each behaviour has a test).
 

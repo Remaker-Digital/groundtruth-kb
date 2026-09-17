@@ -36,9 +36,12 @@ _GT_KB_ROOT = Path(__file__).resolve().parents[2]
 # floor. The fix is a version-adaptive dispatch (onexc on 3.12+, onerror on 3.11).
 _RMTREE_HELPER_FILES = [
     _GT_KB_ROOT / "groundtruth-kb" / "src" / "groundtruth_kb" / "project" / "checks" / "stale_test_slots.py",
-    _GT_KB_ROOT / "groundtruth-kb" / "tests" / "adopter" / "conftest.py",
     _GT_KB_ROOT / "groundtruth-kb" / "tests" / "test_cli.py",
-    _GT_KB_ROOT / "groundtruth-kb" / "tests" / "test_scaffold_isolation.py",
+]
+# Files that once carried an rmtree helper and now remove no trees at all: the native adopter fixtures rely on
+# pytest's temporary roots, and the SQLite-era isolation tests are retired with mapped duties.
+_RMTREE_FREE_FILES = [
+    _GT_KB_ROOT / "groundtruth-kb" / "tests" / "adopter" / "conftest.py",
 ]
 
 
@@ -157,3 +160,9 @@ def test_rmtree_helpers_are_runtime_floor_compatible(src: Path) -> None:
     assert "onexc=" in text, f"{src.name}: missing the py3.12+ onexc branch"
     assert "onerror=" in text, f"{src.name}: missing the py3.11 onerror fallback (would TypeError on 3.11)"
     assert "version_info" in text, f"{src.name}: rmtree dispatch is not guarded by a sys.version_info check"
+
+
+@pytest.mark.parametrize("src", _RMTREE_FREE_FILES, ids=lambda p: p.name)
+def test_native_fixture_files_remove_no_trees(src: Path) -> None:
+    """A file that never removes a tree needs no version-adaptive rmtree dispatch."""
+    assert "rmtree" not in src.read_text(encoding="utf-8"), f"{src.name}: an rmtree helper returned without dispatch"

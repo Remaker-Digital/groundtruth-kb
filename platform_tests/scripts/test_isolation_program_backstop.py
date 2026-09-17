@@ -217,3 +217,19 @@ def test_release_gate_invokes_backstop_before_pytest(monkeypatch: pytest.MonkeyP
     )
     assert backstop_index < pytest_index
     assert "platform_tests/scripts/test_isolation_program_backstop.py" in commands[pytest_index]
+
+
+def test_backstop_rejects_the_retired_capture_path_exception(tmp_path: Path) -> None:
+    mod = _load_backstop_module()
+    scripts = tmp_path / "scripts"
+    scripts.mkdir()
+    retired = scripts / "_capture_scaffold_golden.py"
+    retired.write_text('TARGET = "applications/Demo_App/fixture"\n', encoding="utf-8")
+    before = retired.read_bytes()
+
+    payload = mod.scan(tmp_path)
+
+    assert payload["status"] == "fail"
+    assert not payload["allowed_references"]
+    assert [row["path"] for row in payload["violations"]] == ["scripts/_capture_scaffold_golden.py"]
+    assert retired.read_bytes() == before

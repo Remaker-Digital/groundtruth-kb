@@ -1,16 +1,23 @@
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 import sqlite3
 import subprocess
 from pathlib import Path
 
-from scripts.gtkb_dashboard import refresh_dashboard_db
-from scripts.gtkb_dashboard.refresh_dashboard_db import refresh_database
+import pytest
+from groundtruth_kb import dashboard as refresh_dashboard_db
+from groundtruth_kb import get_templates_dir
+from groundtruth_kb.dashboard import refresh_database
+from groundtruth_kb.dashboard_grafana import build_dashboard
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+
+
+@pytest.fixture(autouse=True)
+def isolate_optional_benchmark_consumer(monkeypatch):
+    """This suite qualifies dashboard rendering, not the separately reviewed benchmark."""
 
 
 def _panel_titles(panels: list[dict]) -> list[str]:
@@ -108,6 +115,192 @@ def _sample_model() -> dict:
     }
 
 
+def test_native_dashboard_model_reads_complete_pages_without_retaining_record_payloads(monkeypatch, tmp_path):
+    from groundtruth_kb.authority_client import AuthorityClient
+
+    (tmp_path / "groundtruth.toml").write_text('[groundtruth]\nauthority_url = "http://127.0.0.1:8765"\n')
+    calls = []
+
+    def request(self, method, path, *, query=None):
+        calls.append((method, path, query))
+        assert method == "GET"
+        if path == "/v1/bridge/state-report":
+            return {
+                "queues": {
+                    role: {"role": role, "eligible": [{}] if role == "lo" else [], "blocked": []}
+                    for role in ("pb", "lo")
+                }
+            }
+        after = query["after"]
+        if path == "/v1/work-items":
+            if after is None:
+                return {
+                    "records": [{"id": "WI-1", "resolution_status": "open", "description": "PRIVATE-PAYLOAD"}],
+                    "next_after": "WI-1",
+                }
+            assert after == "WI-1"
+            return {"records": [{"id": "WI-2", "resolution_status": "resolved"}], "next_after": None}
+        if path == "/v1/specifications":
+            return {
+                "records": [{"id": "SPEC-1", "status": "active"}, {"id": "SPEC-2", "status": "retired"}],
+                "next_after": None,
+            }
+        assert path == "/v1/tests"
+        return {"records": [{"id": "TEST-1", "status": "passed", "description": "PRIVATE-PAYLOAD"}], "next_after": None}
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    model = refresh_dashboard_db._build_dashboard_model(tmp_path)
+    assert model["metrics"]["backlog"]["active_item_count"] == 1
+    assert model["metrics"]["membase"]["open_work_items"] == 1
+    assert model["metrics"]["specifications"]["current_total"] == 1
+    assert model["metrics"]["tests"]["test_records"] == 1
+    assert model["metrics"]["contention"]["actionable_count"] == 1
+    assert model["dashboard_intelligence"]["quality_rollup"] == {}
+    assert model.get("role") is None and model.get("current_work_subject") is None
+    assert "PRIVATE-PAYLOAD" not in json.dumps(model)
+    assert len(calls) == 5
+
+
+def test_default_refresh_preserves_unknowns_and_history_without_startup_state(monkeypatch, tmp_path):
+    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda *args: None)
+    # Missing configuration and a non-Git root are unavailable observations, not empty inventories.
+    before = dict(os.environ)
+    path = tmp_path / "dashboard.sqlite"
+    refresh_database(path, tmp_path)
+    refresh_database(path, tmp_path)
+    assert dict(os.environ) == before
+    with sqlite3.connect(path) as conn:
+        metrics = {
+            key: (value, status)
+            for key, value, status in conn.execute("SELECT metric_key, value, status FROM current_metrics")
+        }
+        for key in (
+            "project_health_issues",
+            "release_blockers",
+            "ci_testing_failing",
+            "security_scan_posture",
+            "governance_bridge_items",
+            "dirty_worktree_paths",
+        ):
+            assert metrics[key] == (None, "yellow"), key
+        assert conn.execute("SELECT COUNT(DISTINCT generated_at) FROM kpi_snapshots").fetchone()[0] == 2
+        assert conn.execute("SELECT COUNT(*) FROM kpi_snapshots WHERE value IS NOT NULL").fetchone()[0] == 0
+        assert conn.execute("SELECT COUNT(*) FROM quality_rollup").fetchone()[0] == 0
+        cards = dict(conn.execute("SELECT label, value FROM health_cards"))
+        assert cards["Project Health"] == "Unavailable"
+    assert sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file()) == [
+        ".groundtruth/dashboard/dashboard-data.json",
+        "dashboard.sqlite",
+    ]
+    landing = json.loads((tmp_path / ".groundtruth/dashboard/dashboard-data.json").read_text())
+    assert landing["status"] == "unavailable"
+    assert all(value is None for value in landing["metrics"].values())
+
+
+@pytest.mark.parametrize(
+    "page",
+    [
+        None,
+        [],
+        {"records": []},
+        {"records": [], "next_after": "x"},
+        {"records": [{"id": "a"}, {"id": "a"}], "next_after": None},
+        {"records": [{"id": "b"}, {"id": "a"}], "next_after": None},
+        {"records": [{"id": "a"}], "next_after": "b"},
+        {"records": [{"id": True}], "next_after": None},
+    ],
+)
+def test_native_dashboard_rejects_incomplete_or_invalid_inventory_pages(page):
+    class Client:
+        def request(self, *args, **kwargs):
+            return page
+
+    with pytest.raises(ValueError):
+        refresh_dashboard_db._native_dashboard_records(Client(), "tests")
+
+
+def test_native_dashboard_failure_discards_partial_counts_and_redacts_errors(monkeypatch, tmp_path):
+    from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+
+    (tmp_path / "groundtruth.toml").write_text('[groundtruth]\nauthority_url="http://127.0.0.1:8765"\n')
+
+    def request(self, method, path, *, query=None):
+        if path == "/v1/work-items" and query["after"] is None:
+            return {"records": [{"id": "WI-1", "resolution_status": "open"}], "next_after": "WI-1"}
+        if path == "/v1/specifications":
+            return {"records": [], "next_after": None}
+        raise AuthorityClientError("authority_unavailable", "PRIVATE-ENDPOINT-DETAIL")
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    model = refresh_dashboard_db._build_dashboard_model(tmp_path)
+    assert model["metrics"]["backlog"]["active_item_count"] is None
+    assert model["metrics"]["specifications"]["current_total"] == 0
+    assert model["metrics"]["tests"]["test_records"] is None
+    assert model["metrics"]["contention"]["actionable_count"] is None
+    assert "PRIVATE-ENDPOINT-DETAIL" not in json.dumps(model)
+
+
+def test_native_dashboard_counts_current_tracked_sources_and_baseline_only(tmp_path):
+    subprocess.run(["git", "init", str(tmp_path)], check=True, capture_output=True)
+    names = [
+        "platform_tests/test_kept.py",
+        "platform_tests/test_deleted.py",
+        ".harness-baseline-configuration/skills/example/SKILL.md",
+        ".harness-baseline-configuration/rules/example.md",
+        ".harness-baseline-configuration/hooks/example.py",
+        ".claude/rules/extra.md",
+    ]
+    for name in names:
+        path = tmp_path / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# fixture\n")
+    subprocess.run(["git", "add", "--", *names], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "platform_tests/test_deleted.py").unlink()
+    model = refresh_dashboard_db._build_dashboard_model(tmp_path)
+    assert model["metrics"]["tests"]["pytest_file_count"] == 1
+    assert model["metrics"]["templates"] == {f"{kind}_template_count": 1 for kind in ("skill", "rule", "hook")}
+    snapshot = refresh_dashboard_db._snapshot_from_model(model)
+    assert all(snapshot[f"{kind}_template_count"] == 1 for kind in ("skill", "rule", "hook"))
+    assert snapshot["tokens_consumed_before_user_input"] is None
+
+
+def test_missing_metric_queries_reach_stat_panels_as_explicit_unavailable(monkeypatch, tmp_path):
+    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda *args: None)
+    db = tmp_path / "dashboard.sqlite"
+    refresh_database(db, tmp_path)
+
+    def walk(panels):
+        for panel in panels:
+            yield panel
+            yield from walk(panel.get("panels", []))
+
+    checked = []
+    with sqlite3.connect(db) as connection:
+        for panel in walk(build_dashboard()["panels"]):
+            if panel["type"] != "stat":
+                continue
+            query = panel["targets"][0]["rawQueryText"]
+            if "current_metrics" not in query:
+                continue
+            assert connection.execute(query).fetchone()[0] is None
+            defaults = panel["fieldConfig"]["defaults"]
+            assert defaults.get("noValue") == "Unavailable"
+            nulls = [
+                m["options"]["result"]
+                for m in defaults.get("mappings", [])
+                if m["type"] == "special" and m["options"]["match"] == "null"
+            ]
+            assert any(m["text"] == "Unavailable" and m["color"] == "yellow" for m in nulls)
+            checked.append(panel["title"])
+    assert {
+        "Project Health Issues",
+        "Release Blockers",
+        "CI / Testing Failing",
+        "Native Authority Findings",
+        "MTTR",
+    } <= set(checked)
+
+
 def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
     db_path = tmp_path / "gtkb-dashboard.sqlite"
     history = [
@@ -124,14 +317,16 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
         }
     ]
 
-    result = refresh_database(db_path=db_path, project_root=REPO_ROOT, model=_sample_model(), history=history)
+    result = refresh_database(db_path=db_path, project_root=tmp_path, model=_sample_model(), history=history)
 
     assert result["status"] == "completed"
     with sqlite3.connect(db_path) as conn:
         assert conn.execute("SELECT COUNT(*) FROM refresh_runs WHERE status = 'completed'").fetchone()[0] == 1
         assert conn.execute("SELECT COUNT(*) FROM health_cards").fetchone()[0] >= 2
         assert conn.execute("SELECT COUNT(*) FROM action_center").fetchone()[0] == 1
-        assert conn.execute("SELECT COUNT(*) FROM kpi_snapshots").fetchone()[0] == 8
+        assert conn.execute("SELECT COUNT(*) FROM kpi_snapshots").fetchone()[0] == len(
+            refresh_dashboard_db.KPI_DEFINITIONS
+        )
         assert conn.execute("SELECT COUNT(*) FROM setup_steps").fetchone()[0] >= 6
         assert conn.execute("SELECT COUNT(*) FROM required_tools").fetchone()[0] >= 8
         assert conn.execute("SELECT COUNT(*) FROM third_party_services").fetchone()[0] >= 8
@@ -155,7 +350,7 @@ def test_refresh_database_populates_grafana_sqlite_tables(tmp_path) -> None:
 
 
 def test_metric_count_status_helpers() -> None:
-    from scripts.gtkb_dashboard.refresh_dashboard_db import _metric_count_status
+    from groundtruth_kb.dashboard import _metric_count_status
 
     assert _metric_count_status(0) == "green"
     assert _metric_count_status(2) == "red"
@@ -182,7 +377,7 @@ def test_current_metric_statuses_green_when_sources_clean(tmp_path) -> None:
         }
     ]
 
-    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=history)
+    refresh_database(db_path=db_path, project_root=tmp_path, model=model, history=history)
 
     with sqlite3.connect(db_path) as conn:
         statuses = {
@@ -219,12 +414,12 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
         {"label": "Release Readiness", "value": "0 blockers", "status": "green", "tooltip": "stale"},
     ]
     model["dashboard_intelligence"]["release_health_findings"] = [
-        {"source": "dispatcher", "message": "dispatch health WARN", "severity": "red"},
+        {"source": "native-authority", "message": "native authority not ready", "severity": "red"},
         {"source": "bridge", "message": "bridge has live in-flight work", "severity": "yellow"},
         {"source": "readme-wiki", "message": "wiki page differs from source", "severity": "red"},
     ]
 
-    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=[])
+    refresh_database(db_path=db_path, project_root=tmp_path, model=model, history=[])
 
     with sqlite3.connect(db_path) as conn:
         metrics = {
@@ -236,7 +431,7 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
                 WHERE metric_key IN (
                     'release_blockers',
                     'release_health_findings',
-                    'dispatcher_health_findings',
+                    'native_authority_findings',
                     'bridge_actionability_findings',
                     'readme_wiki_drift'
                 )
@@ -258,12 +453,12 @@ def test_release_health_findings_make_release_readiness_non_green(tmp_path) -> N
     assert metrics == {
         "release_blockers": (3, "red"),
         "release_health_findings": (3, "red"),
-        "dispatcher_health_findings": (1, "red"),
+        "native_authority_findings": (1, "red"),
         "bridge_actionability_findings": (1, "yellow"),
         "readme_wiki_drift": (1, "red"),
     }
     assert blockers == [
-        "[dispatcher] dispatch health WARN",
+        "[native-authority] native authority not ready",
         "[bridge] bridge has live in-flight work",
         "[readme-wiki] wiki page differs from source",
     ]
@@ -309,7 +504,7 @@ def test_deferred_records_without_expiry_surface_release_health_warn(tmp_path) -
         {"id": "INTAKE-BOUNDED", "status": "deferred", "resume_trigger": "after release branch cut"},
     ]
 
-    refresh_database(db_path=db_path, project_root=REPO_ROOT, model=model, history=[])
+    refresh_database(db_path=db_path, project_root=tmp_path, model=model, history=[])
 
     with sqlite3.connect(db_path) as conn:
         metrics = {
@@ -345,7 +540,7 @@ def test_azure_reconciliation_is_explicit_opt_in(monkeypatch, tmp_path) -> None:
 
     refresh_dashboard_db.refresh_database(
         db_path=tmp_path / "default.sqlite",
-        project_root=REPO_ROOT,
+        project_root=tmp_path,
         model=_sample_model(),
         history=[],
     )
@@ -354,7 +549,7 @@ def test_azure_reconciliation_is_explicit_opt_in(monkeypatch, tmp_path) -> None:
     monkeypatch.setenv("GTKB_DASHBOARD_AZURE_RECONCILE", "1")
     refresh_dashboard_db.refresh_database(
         db_path=tmp_path / "opt-in.sqlite",
-        project_root=REPO_ROOT,
+        project_root=tmp_path,
         model=_sample_model(),
         history=[],
     )
@@ -376,55 +571,34 @@ def test_azure_reconciliation_requires_application_supplied_container_app_map(mo
         "production": "demo-production",
         "staging": "demo-staging",
     }
-    source_text = (REPO_ROOT / "scripts" / "gtkb_dashboard" / "refresh_dashboard_db.py").read_text(encoding="utf-8")
+    source_text = Path(refresh_dashboard_db.__file__).read_text(encoding="utf-8")
     assert "agent-red-api-gateway" not in source_text
     assert "agent-red-staging" not in source_text
 
 
-def test_refresh_database_uses_fast_startup_model_by_default(monkeypatch, tmp_path) -> None:
-    fast_hook_values: list[bool] = []
-
-    class FakeSessionModule:
-        def build_startup_model(self, project_root: Path, *, fast_hook: bool = False) -> dict:
-            fast_hook_values.append(fast_hook)
-            return _sample_model()
-
-        def _snapshot_from_model(self, model: dict) -> dict:
-            return {"generated_at": model["generated_at"]}
-
-    monkeypatch.setattr(refresh_dashboard_db, "_load_session_module", lambda: FakeSessionModule())
-    monkeypatch.setattr(refresh_dashboard_db, "_write_model_to_db", lambda *args, **kwargs: None)
-    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda project_root: None)
-    monkeypatch.setattr(refresh_dashboard_db, "_refresh_tafe_projection_safe", lambda db_path, project_root: None)
-
-    refresh_dashboard_db.refresh_database(db_path=tmp_path / "default.sqlite", project_root=REPO_ROOT)
-    refresh_dashboard_db.refresh_database(
-        db_path=tmp_path / "full.sqlite",
-        project_root=REPO_ROOT,
-        fast_startup_model=False,
+def test_refresh_database_builds_native_model_and_supplied_models_need_no_native_read(monkeypatch, tmp_path):
+    calls = []
+    monkeypatch.setattr(
+        refresh_dashboard_db, "_build_dashboard_model", lambda root, config=None: calls.append(root) or _sample_model()
     )
+    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda *args: None)
+    refresh_database(tmp_path / "default.sqlite", tmp_path)
+    refresh_database(tmp_path / "supplied.sqlite", tmp_path, model=_sample_model())
+    assert calls == [tmp_path]
 
-    assert fast_hook_values == [True, False]
 
-
-def test_direct_script_swimlane_writer_uses_absolute_import_fallback(tmp_path) -> None:
-    module_path = REPO_ROOT / "scripts" / "gtkb_dashboard" / "refresh_dashboard_db.py"
-    spec = importlib.util.spec_from_file_location("refresh_dashboard_db_direct_script", module_path)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-
+def test_installed_swimlane_writer_preserves_legacy_bridge_files(tmp_path) -> None:
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
-    (bridge_dir / "sample-thread-001.md").write_text("VERIFIED\n\n# Sample\n", encoding="utf-8")
-
-    module._write_bridge_swimlane_safe(tmp_path)
-
-    swimlane = tmp_path / "docs" / "gtkb-dashboard" / "bridge-swimlane.json"
-    assert swimlane.is_file()
+    legacy = bridge_dir / "sample-thread-001.md"
+    legacy.write_text("VERIFIED\n\n# Sample\n", encoding="utf-8")
+    before = legacy.read_bytes()
+    refresh_dashboard_db._write_bridge_swimlane_safe(tmp_path)
+    swimlane = tmp_path / ".groundtruth/dashboard/bridge-swimlane.json"
     data = json.loads(swimlane.read_text(encoding="utf-8"))
-    assert data["summary"]["thread_count"] == 1
-    assert data["threads"][0]["document"] == "sample-thread"
+    assert data["status"] == "unavailable"
+    assert data["summary"] is None and data["threads"] == []
+    assert legacy.read_bytes() == before
 
 
 def test_github_workflow_live_status_classifies_success(monkeypatch) -> None:
@@ -470,19 +644,10 @@ def test_github_workflow_live_status_classifies_unavailable(monkeypatch) -> None
     assert "gh auth required" in status["latest_run_summary"]
 
 
-def test_probe_live_restores_github_cli_auth_env_after_startup_model(monkeypatch, tmp_path) -> None:
+def test_probe_live_uses_host_github_cli_auth_env_with_native_model(monkeypatch, tmp_path) -> None:
     db_path = tmp_path / "gtkb-dashboard.sqlite"
     original_gh_config = str(tmp_path / "host-gh-config")
     captured_env: dict[str, str | None] = {}
-
-    class FakeSessionModule:
-        def build_startup_model(self, project_root: Path, *, fast_hook: bool = False) -> dict:
-            os.environ["XDG_CONFIG_HOME"] = str(tmp_path / "startup-temp-config")
-            os.environ["GH_CONFIG_DIR"] = str(tmp_path / "startup-gh-config")
-            return _sample_model()
-
-        def _snapshot_from_model(self, model: dict) -> dict:
-            return {"generated_at": model["generated_at"]}
 
     def fake_github_status(project_root: Path) -> dict:
         captured_env["XDG_CONFIG_HOME"] = os.environ.get("XDG_CONFIG_HOME")
@@ -499,26 +664,25 @@ def test_probe_live_restores_github_cli_auth_env_after_startup_model(monkeypatch
 
     monkeypatch.delenv("XDG_CONFIG_HOME", raising=False)
     monkeypatch.setenv("GH_CONFIG_DIR", original_gh_config)
-    monkeypatch.setattr(refresh_dashboard_db, "_load_session_module", lambda: FakeSessionModule())
-    monkeypatch.setattr(refresh_dashboard_db, "_live_release_health_findings", lambda project_root: [])
+    monkeypatch.setattr(refresh_dashboard_db, "_build_dashboard_model", lambda root, config=None: _sample_model())
+    monkeypatch.setattr(refresh_dashboard_db, "_live_release_health_findings", lambda project_root, config=None: [])
     monkeypatch.setattr(refresh_dashboard_db, "_github_workflow_live_status", fake_github_status)
     monkeypatch.setattr(
         refresh_dashboard_db,
-        "_dispatcher_supervisor_live_status",
-        lambda project_root: {
+        "_native_authority_live_status",
+        lambda project_root, config=None: {
             "order": 2,
-            "display_name": "Dispatcher Daemon Supervisor",
+            "display_name": "Native Authority",
             "health": "green",
-            "status": "healthy_headless",
+            "status": "ready",
             "latest_run_summary": "healthy",
             "gate_role": "release infrastructure",
             "remediation": "No action required.",
         },
     )
-    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda project_root: None)
-    monkeypatch.setattr(refresh_dashboard_db, "_refresh_tafe_projection_safe", lambda db_path, project_root: None)
+    monkeypatch.setattr(refresh_dashboard_db, "_write_bridge_swimlane_safe", lambda *args: None)
 
-    refresh_dashboard_db.refresh_database(db_path=db_path, project_root=REPO_ROOT, probe_live=True)
+    refresh_dashboard_db.refresh_database(db_path=db_path, project_root=tmp_path, probe_live=True)
 
     with sqlite3.connect(db_path) as conn:
         github_status = conn.execute("SELECT status FROM integration_status WHERE key = 'github'").fetchone()[0]
@@ -527,39 +691,26 @@ def test_probe_live_restores_github_cli_auth_env_after_startup_model(monkeypatch
     assert github_status == "passing"
 
 
-def test_probe_live_adds_headless_dispatcher_supervisor_status(monkeypatch) -> None:
-    monkeypatch.setattr(
-        refresh_dashboard_db,
-        "_github_workflow_live_status",
-        lambda project_root: {
-            "order": 1,
-            "display_name": "GitHub Actions",
-            "health": "green",
-            "status": "passing",
-            "latest_run_summary": "passing",
-            "gate_role": "release gate",
-            "remediation": "No action required.",
-        },
-    )
-    monkeypatch.setattr(
-        refresh_dashboard_db,
-        "_run_release_json_probe",
-        lambda project_root, args, timeout=20: {
-            "healthy": True,
-            "registered": True,
-            "enabled": True,
-            "hidden": True,
-            "uses_pythonw": True,
-        },
-    )
+def test_probe_live_adds_native_authority_status_without_a_dispatcher(monkeypatch) -> None:
+    from groundtruth_kb.authority_client import AuthorityClient
+    from groundtruth_kb.config import GTConfig
 
-    rows = refresh_dashboard_db._integration_status_rows({}, REPO_ROOT, probe_live_workflows=True)
+    monkeypatch.setattr(refresh_dashboard_db, "_github_workflow_live_status", lambda root: {"status": "unavailable"})
+    calls = []
+
+    def read(self, method, route):
+        calls.append((self.url, method, route))
+        return {"ready": True, "reachable": True, "schema_catalog_matches": True}
+
+    monkeypatch.setattr(AuthorityClient, "request", read)
+    config = GTConfig(project_root=REPO_ROOT, authority_url="http://127.0.0.1:39899")
+    rows = refresh_dashboard_db._integration_status_rows(
+        {"dispatcher_supervisor": {"status": "stale"}}, REPO_ROOT, probe_live_workflows=True, config=config
+    )
     by_key = {row[1]: row for row in rows}
-    supervisor = by_key["dispatcher_supervisor"]
-
-    assert supervisor[3] == "green"
-    assert supervisor[4] == "healthy_headless"
-    assert "hidden=True" in supervisor[5]
+    assert "dispatcher_supervisor" not in by_key
+    assert by_key["native_authority"][3:5] == ("green", "ready")
+    assert calls == [(config.authority_url, "GET", "/v1/status")]
 
 
 def test_shortcuts_panel_uses_copy_path_link_title() -> None:
@@ -572,27 +723,24 @@ def test_shortcuts_panel_uses_copy_path_link_title() -> None:
     assert link_title == "Copy path"
 
 
-def test_grafana_provisioning_targets_sqlite_database() -> None:
-    datasource = (
-        REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "datasources" / "gtkb-dashboard-sqlite.yml"
-    )
-    dashboard_provider = (
-        REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "dashboards" / "gtkb-dashboard.yml"
-    )
-    dashboard = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
-    readme = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "README.md"
-    package_integration = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "PACKAGE-INTEGRATION.md"
+def test_grafana_provisioning_targets_sqlite_database(tmp_path) -> None:
+    import yaml
+    from groundtruth_kb.config import GTConfig
 
+    config = GTConfig(project_root=tmp_path)
+    paths = refresh_dashboard_db.resolve_dashboard_paths(config)
+    refresh_dashboard_db.write_grafana_assets(paths, config)
+    datasource = paths.provisioning_dir / "datasources/gtkb-dashboard-sqlite.yml"
+    dashboard_provider = paths.provisioning_dir / "dashboards/gtkb-dashboard.yml"
     datasource_text = datasource.read_text(encoding="utf-8")
     dashboard_provider_text = dashboard_provider.read_text(encoding="utf-8")
-    dashboard_json = json.loads(dashboard.read_text(encoding="utf-8"))
-    readme_text = readme.read_text(encoding="utf-8")
-    package_integration_text = package_integration.read_text(encoding="utf-8")
+    assert yaml.safe_load(datasource_text)["datasources"][0]["jsonData"]["path"] == paths.db_path.as_posix()
+    assert yaml.safe_load(dashboard_provider_text)["providers"][0]["options"]["path"] == paths.dashboards_dir.as_posix()
+    dashboard_json = build_dashboard()
+    readme_text = (REPO_ROOT / "groundtruth-kb/README.md").read_text(encoding="utf-8")
     panel_titles = set(_panel_titles(dashboard_json["panels"]))
 
     assert "frser-sqlite-datasource" in datasource_text
-    assert "$GTKB_DASHBOARD_SQLITE_PATH" in datasource_text
-    assert "$GTKB_DASHBOARD_DASHBOARDS_PATH" in dashboard_provider_text
     assert dashboard_json["uid"] == "groundtruth-kb-dashboard"
     assert dashboard_json["title"] == "GT-KB Operations Dashboard"
     assert dashboard_json["tags"] == ["gt-kb", "operations", "sqlite"]
@@ -644,7 +792,7 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
     assert "Application Deployment Signals" in panel_titles
     assert "Release Health Findings" in panel_titles
     assert "Dirty Worktree Paths" in panel_titles
-    assert "Dispatcher Health Findings" in panel_titles
+    assert "Native Authority Findings" in panel_titles
     assert "Bridge Actionability Findings" in panel_titles
     assert "README / Wiki Drift" in panel_titles
     # GTKB-DORA-002: four-keys panels pinned in the generated dashboard JSON.
@@ -671,22 +819,17 @@ def test_grafana_provisioning_targets_sqlite_database() -> None:
         assert _panel["type"] == "stat"
         assert _panel["datasource"] == {"type": "frser-sqlite-datasource", "uid": "gtkb-dashboard-sqlite"}
         assert f"metric_key = '{_metric_key}'" in _panel["targets"][0]["rawQueryText"]
-    assert "start_local_dashboard.ps1" in readme_text
-    assert "scripts/update_wiki_pages.py compare" in readme_text
-    assert "--check" not in readme_text
-    assert "docker compose" not in readme_text.lower()
-    assert "gtkb dashboard install" in package_integration_text
-    assert "gtkb dashboard start" in package_integration_text
-    assert "Docker Desktop" in package_integration_text
+    assert "gt dashboard install" in readme_text
+    assert "gt dashboard start" in readme_text
+    assert "gt dashboard stop" in readme_text
 
 
 def test_stat_panels_surface_per_panel_freshness_secondary_value() -> None:
-    """GTKB-DASHBOARD-001 §C: each value-bearing stat panel must emit a
+    """GTKB-DASHBOARD-001 Â§C: each value-bearing stat panel must emit a
     `last_refreshed_at` secondary value (target `F`) sourced from refresh_runs.
-    The Refresh Age panel itself is exempt — its primary value already is the
+    The Refresh Age panel itself is exempt â€” its primary value already is the
     freshness reading, so a second freshness target would be redundant."""
-    dashboard = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
-    dashboard_json = json.loads(dashboard.read_text(encoding="utf-8"))
+    dashboard_json = build_dashboard()
 
     def _all_panels(panels: list[dict]) -> list[dict]:
         out: list[dict] = []
@@ -726,45 +869,22 @@ def test_stat_panels_surface_per_panel_freshness_secondary_value() -> None:
 
 def test_dashboard_launch_path_does_not_require_docker_desktop() -> None:
     compose_text = (REPO_ROOT / "docker-compose.yml").read_text(encoding="utf-8")
-    index_text = (REPO_ROOT / "docs" / "gtkb-dashboard" / "index.html").read_text(encoding="utf-8")
-    refresh_text = (REPO_ROOT / "scripts" / "gtkb_dashboard" / "refresh_dashboard_db.py").read_text(encoding="utf-8")
+    index_text = (get_templates_dir() / "dashboard/index.html").read_text(encoding="utf-8")
+    refresh_text = Path(refresh_dashboard_db.__file__).read_text(encoding="utf-8")
 
     assert "gtkb-dashboard-refresh" not in compose_text
     assert "container_name: gtkb-grafana" not in compose_text
     assert "docker compose up grafana" not in index_text
     assert "Docker Desktop" not in refresh_text
-    assert "start_local_dashboard.ps1" in index_text
+    assert "gt dashboard start" in index_text
     assert "Grafana OSS" in refresh_text
 
 
-# =============================================================================
-# WI-4506: TAFE Observability panel assertions on the generated dashboard.
-# =============================================================================
-
-_TAFE_PANEL_TITLES: tuple[str, ...] = (
-    "Stage Attempt Outcomes (TAFE)",
-    "Failure Class Distribution (TAFE)",
-    "Active Flow Instances (TAFE)",
-    "Active Stage Leases (TAFE)",
-    "Capability Snapshot Readiness by Role (TAFE)",
-)
-
-_TAFE_PROJECTION_TABLES: tuple[str, ...] = (
-    "tafe_stage_attempt_telemetry",
-    "tafe_flow_instances",
-    "tafe_stage_instances",
-    "tafe_stage_leases",
-    "tafe_agent_capability_snapshots",
-)
-
-
 def _load_generated_dashboard() -> dict:
-    dashboard_path = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "dashboards" / "gtkb-dashboard.json"
-    return json.loads(dashboard_path.read_text(encoding="utf-8"))
+    return build_dashboard()
 
 
 def _walk_panels(panels: list[dict]) -> list[dict]:
-    """Flat list of all panels in the dashboard, recursively through rows."""
     out: list[dict] = []
     for panel in panels:
         out.append(panel)
@@ -772,89 +892,77 @@ def _walk_panels(panels: list[dict]) -> list[dict]:
     return out
 
 
-def test_tafe_observability_row_exists() -> None:
-    dashboard = _load_generated_dashboard()
+def test_retired_observability_panels_are_absent() -> None:
+    dashboard = build_dashboard()
+    assert "tafe" not in json.dumps(dashboard).lower()
     titles = _panel_titles(dashboard["panels"])
-    assert "TAFE Observability" in titles, "TAFE Observability row missing from generated dashboard"
+    assert "Native Authority Findings" in titles
+    assert "Dispatcher Health Findings" not in titles
+    assert "DORA Four Keys (Delivery Performance)" in titles
 
 
-def test_all_tafe_panel_titles_present() -> None:
-    dashboard = _load_generated_dashboard()
-    titles = set(_panel_titles(dashboard["panels"]))
-    for title in _TAFE_PANEL_TITLES:
-        assert title in titles, f"TAFE panel {title!r} missing from generated dashboard"
-
-
-def test_tafe_panels_use_sqlite_datasource() -> None:
-    dashboard = _load_generated_dashboard()
-    flat = _walk_panels(dashboard["panels"])
-    tafe_panels = [p for p in flat if p.get("title") in _TAFE_PANEL_TITLES]
-    assert len(tafe_panels) == len(_TAFE_PANEL_TITLES), "Expected all TAFE panels to be present"
-    for panel in tafe_panels:
-        for target in panel.get("targets", []):
-            ds = target.get("datasource", {})
-            assert ds.get("uid") == "gtkb-dashboard-sqlite", (
-                f"TAFE panel {panel['title']!r} uses non-SQLite datasource: {ds}"
-            )
-
-
-def test_tafe_panel_queries_are_read_only() -> None:
-    """No TAFE panel query may issue a write (INSERT/UPDATE/DELETE/DROP/CREATE)."""
-    dashboard = _load_generated_dashboard()
-    flat = _walk_panels(dashboard["panels"])
-    forbidden = ("INSERT ", "UPDATE ", "DELETE ", "DROP ", "CREATE ")
-    for panel in flat:
-        if panel.get("title") not in _TAFE_PANEL_TITLES:
-            continue
-        for target in panel.get("targets", []):
-            sql_upper = target.get("rawQueryText", "").upper()
-            for verb in forbidden:
-                assert verb not in sql_upper, (
-                    f"TAFE panel {panel['title']!r} contains forbidden SQL verb {verb!r}: {sql_upper!r}"
-                )
-
-
-def test_tafe_panel_queries_reference_projection_tables() -> None:
-    """Each TAFE panel's query must read from one of the projection tables, not
-    from any canonical `groundtruth.db` table name. The dashboard datasource
-    points at the dashboard SQLite, so a canonical-table reference would be a
-    silent miss."""
-    dashboard = _load_generated_dashboard()
-    flat = _walk_panels(dashboard["panels"])
-    for panel in flat:
-        if panel.get("title") not in _TAFE_PANEL_TITLES:
-            continue
-        for target in panel.get("targets", []):
-            sql = target.get("rawQueryText", "")
-            assert any(table in sql for table in _TAFE_PROJECTION_TABLES), (
-                f"TAFE panel {panel['title']!r} references no projection table; SQL: {sql!r}"
-            )
+def test_current_panel_queries_are_read_only_and_use_the_derived_datasource() -> None:
+    targets = [target for panel in _walk_panels(build_dashboard()["panels"]) for target in panel.get("targets", [])]
+    assert targets
+    for target in targets:
+        assert target["datasource"]["uid"] == "gtkb-dashboard-sqlite"
+        query = target["rawQueryText"].upper()
+        assert query.startswith(("SELECT", "WITH"))
+        assert all(verb not in query for verb in ("INSERT ", "UPDATE ", "DELETE ", "DROP ", "CREATE "))
 
 
 def test_panel_ids_are_monotonically_unique() -> None:
-    """Adding the TAFE row + 5 panels must not collide with existing panel IDs."""
-    dashboard = _load_generated_dashboard()
-    flat = _walk_panels(dashboard["panels"])
-    ids = [p.get("id") for p in flat if "id" in p]
-    assert len(ids) == len(set(ids)), f"duplicate panel IDs found: {sorted(ids)}"
+    ids = [panel["id"] for panel in _walk_panels(build_dashboard()["panels"]) if "id" in panel]
+    assert ids and len(ids) == len(set(ids))
 
 
-def test_no_alert_rule_references_a_tafe_panel() -> None:
-    """The WI-4506 PAUTH forbids alert-rule scope creep. No alert rule may
-    reference a TAFE panel by id or by title."""
-    alerting_dir = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "alerting"
-    if not alerting_dir.exists():
-        return
-    dashboard = _load_generated_dashboard()
-    flat = _walk_panels(dashboard["panels"])
-    tafe_panel_ids = {str(p.get("id")) for p in flat if p.get("title") in _TAFE_PANEL_TITLES}
-
+def test_alert_rules_do_not_reference_removed_observability() -> None:
+    alerting_dir = get_templates_dir() / "dashboard/alerting"
     for alert_file in alerting_dir.glob("*.yaml"):
-        text = alert_file.read_text(encoding="utf-8")
-        for title in _TAFE_PANEL_TITLES:
-            assert title not in text, f"alert file {alert_file.name} references TAFE panel title {title!r}"
-        for panel_id in tafe_panel_ids:
-            # Match panelId: NN exactly (alert-rule schema field).
-            assert f"panelId: {panel_id}" not in text, (
-                f"alert file {alert_file.name} references TAFE panel id {panel_id}"
-            )
+        assert "tafe" not in alert_file.read_text(encoding="utf-8").lower()
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "dora_deployment_frequency",
+        "dora_lead_time_hours",
+        "dora_change_failure_rate",
+        "dora_mttr_hours",
+        "project_health_issues",
+        "release_blockers",
+        "ci_testing_failing",
+        "governance_bridge_items",
+        "release_health_findings",
+        "dirty_worktree_paths",
+        "native_authority_findings",
+        "bridge_actionability_findings",
+        "readme_wiki_drift",
+    ],
+)
+def test_metric_query_selects_only_its_declared_metric(key):
+    from groundtruth_kb.dashboard_grafana import _metric_query
+
+    with sqlite3.connect(":memory:") as connection:
+        connection.execute("CREATE TABLE current_metrics(metric_key TEXT, value INTEGER)")
+        connection.executemany("INSERT INTO current_metrics VALUES (?, ?)", [(key, 7), ("unrelated", 19)])
+        assert connection.execute(_metric_query(key)).fetchall() == [(7,)]
+
+
+@pytest.mark.parametrize(
+    "key",
+    [
+        "",
+        "unknown_metric",
+        "release_blockers' OR 1=1 --",
+        "release_blockers'; DROP TABLE current_metrics;--",
+        None,
+        42,
+        [],
+    ],
+)
+def test_metric_query_rejects_undeclared_keys_before_constructing_sql(key):
+    from groundtruth_kb.dashboard_grafana import _metric_query
+
+    with pytest.raises(ValueError, match="unsupported_dashboard_metric_key"):
+        _metric_query(key)

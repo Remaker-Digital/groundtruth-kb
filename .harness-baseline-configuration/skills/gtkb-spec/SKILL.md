@@ -1,86 +1,112 @@
 ---
 name: gtkb-spec
-description: Create or update a specification in the Knowledge Database. Enforces GOV-01 (spec-first), validates ID format, checks for duplicates, and ensures all required fields are present.
-argument-hint: "[new|update] [SPEC-ID]"
-allowed-tools: Bash, Read, Grep, Glob
+description: Author or amend an assigned canonical specification through the native CLI, with current-source readback and bounded assertion evidence.
+argument-hint: "[new|update] <assigned identifier or topic>"
+allowed-tools: Bash, Read, Grep
 license: "Proprietary - (c) 2026 Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
-  category: knowledge-management
-  governance: GOV-01, GOV-02, GOV-18
+  category: specifications and governance
   references:
     - references/assertion-format.md
-  license: "Proprietary - (c) 2026 Remaker Digital"
-  activity-envelope: deliberation, specification
 ---
-# Activity Envelope Requirement
+# Specification authoring
 
-This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+Use this skill for assigned specification work in the current `spec` activity,
+with the existing immutable session binding and actual context attribution.
+GOV-ARTIFACT-AUTHORITY-HIERARCHY-001 governs current authority and owner direction.
+Read the current applicable formal sources. This derived guide is not a separate
+authority, permission step or proof that a service enforces every formal clause.
 
+Drafting text is distinct from canonical persistence. Prepare and compare text
+freely; persist it within owner-directed scope after resolving material choices.
+Direction already given applies without a second permission ledger. Do not
+mistake project authorization, an actor string, a test pass or a draft for the
+owner's approval of new formal substance. A conflict between current formal
+records and the directed work needs explicit reconciliation, not invented
+approval fields or a claim that an absent approval service ran.
 
-# Create or Update Specification
+## Read and select
 
-Guided specification management enforcing GOV-01 (spec-first workflow).
+Use the configured native authority through the ordinary CLI:
 
-**Arguments:** `$ARGUMENTS[0]` = action (`new` or `update`), `$ARGUMENTS[1]` = spec ID (required for update).
-
-## Action: New Specification
-
-### Step 1: Determine Next ID
-Query KB for next available SPEC ID via `db.list_specs()` and find max numeric ID + 1.
-
-### Step 2: Validate No Duplicate
-Search existing specs with similar titles via `db.list_specs(search="<KEYWORDS>")`. If duplicate found, STOP.
-
-### Step 3: Collect Required Fields
-
-| Field | Required | Notes |
-|-------|----------|-------|
-| `id` | Yes | Format: `SPEC-NNNN` (auto-incremented) |
-| `title` | Yes | Concise, descriptive, under 120 chars |
-| `status` | Yes | `specified`, `implemented`, `verified`, `retired` |
-| `changed_by` | Yes | `"Claude"` or `"Owner"` |
-| `change_reason` | Yes | Session reference, e.g., `"S189: Rate limit redesign"` |
-
-Optional: `description`, `priority`, `scope`, `section`, `handle`, `tags`, `assertions`, `type`.
-
-### Step 4: Write Assertions (GOV-18)
-Every spec SHOULD include at least one machine-verifiable assertion. See `references/assertion-format.md` for format, types, good/bad examples, and spec types reference.
-
-### Step 5: Insert
-```python
-spec = db.insert_spec(
-    id="SPEC-NNNN", title="...", status="specified",
-    description="...", priority="medium", scope="...",
-    assertions=[...],
-    changed_by="Claude", change_reason="SXXX: ...",
-)
+```text
+gt spec show <id> --json
+gt spec list --search <topic> --limit 200 --json
+gt spec list --search <topic> --limit 200 --after <last-returned-id> --json
 ```
 
-### Step 6: Post-Creation Checklist
-- [ ] **GOV-12:** Create work item for implementation gap
-- [ ] **GOV-12:** Create test linked to this spec
-- [ ] **GOV-13:** Assign test to PLAN-001 phase
-- [ ] Add work item to backlog
+Keep the same filters while paging; a full page may have successors. Read the
+exact selected record and its formal dependencies, including status and version.
+Distinguish a typed missing-record response from an unavailable authority.
+Search results identify candidates for comparison, not automatic duplicates or
+an exhaustive semantic search. Amend an existing subject when appropriate.
+Use the assigned or explicitly selected identifier. Never calculate a new ID
+from the largest numeric ID in a listing; creation is checked atomically with
+expected version zero. Do not open SQLite, call KnowledgeDB, or read another
+harness's state to recover current authority.
 
-> **Tip:** Use `/kb-work-item` to handle steps 1-3 automatically.
+## Prepare the fields
 
-## Action: Update Specification
+A UTF-8 JSON object contains only authored fields accepted by `gt spec record`.
+The identifier, expected version, actor and change reason are separate options.
+For example, after the subject and scope have been settled:
 
-### Step 1: Read Current State
-`db.get_spec("SPEC-XXXX")` -- review version and status.
-
-### Step 2: Validate Update Rules
-- **GOV-02:** Immutable without owner approval for title/description/status changes.
-- **GOV-05:** Fix spec first if tests are failing.
-- Status transitions: `specified -> implemented -> verified` (forward only). `-> retired` (owner approval required).
-
-### Step 3: Apply Update
-```python
-db.update_spec("SPEC-XXXX", changed_by="Claude", change_reason="SXXX: ...", status="implemented")
+```json
+{
+  "title": "Local service configuration requirement",
+  "type": "requirement",
+  "status": "active",
+  "description": "The service configuration declares port 8765. Structural configuration checks are separate from actual listener and request qualification."
+}
 ```
 
-### Step 4: Verify Assertions (if promoting)
-If promoting to `implemented` or `verified`, run assertions first. Only promote if all PASS.
+The native writer accepts only `active`, `superseded` and `retired` as status
+values. Legacy progress labels, unknown values and explicit null are refused.
+`active` identifies a current formal requirement; it does not claim completed
+implementation or independent verification. New native records default to
+`active` if status is omitted. An amendment that omits status retains the current
+value. Read and reconcile an existing inactive state explicitly; do not promote
+it merely because assertions pass. Retire or supersede a formal subject through
+an appropriate forward amendment, preserving historical versions. Work-item
+verification and Git activation use their own domain lifecycle.
+
+Use the appropriate formal class, such as `requirement`, `governance`,
+`design_constraint`, `architecture_decision` or `protected_behavior`, and the
+current canonical vocabulary. Keep substance self-contained and preserve
+unmodified semantic fields. Optional native fields include `assertions`,
+`constraints`, `tags`, `source_paths`, `parent` and `affected_by`. A parent is an
+explicit relationship; dependency references do not imply parenthood. Referenced
+identifiers must resolve. Do not copy returned version/history fields into the
+fields object or manufacture retirement timestamps. Null is an authored value,
+not an instruction to preserve a field.
+
+Assertions must state the limited observation they make. Use the supported
+formats in [the assertion reference](references/assertion-format.md). Structural
+checks complement executable behavioral tests and independent review; they do
+not prove that code is invoked, an operation succeeds or a requirement is fully
+satisfied.
+
+## Write and read back
+
+```text
+gt spec record --id <id> --fields-file <fields.json> --expected-version <version> --actor <current-context> --change-reason "<concrete correction>" --json
+gt spec show <id> --json
+gt assert --spec <id> --triggered-by <current-context> --json
+```
+
+Use zero only for creation; use the freshly read version for an amendment.
+After a CAS conflict, re-read and reconcile changed content before retrying.
+Do not overwrite the intervening version. Compare both returned and separately
+read canonical fields with the intended result, including unchanged fields and
+the new version. The writer appends native change history; assertion evaluation
+does not amend the specification or record an implementation verdict.
+
+Map each implementation gap to its existing project, work item and executable
+test, or use the current work-intake route where new work is required. Preserve
+single-project membership and current test-plan relationships. Specification
+authoring alone neither creates implementation work nor starts it. Do not
+invent a project, force every test into a hard-coded plan, or substitute a
+historical assertion result for current qualification.
+
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

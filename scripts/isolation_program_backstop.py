@@ -107,12 +107,10 @@ ALLOWED_REFERENCE_PATTERNS: tuple[tuple[str, str], ...] = (
     ("scripts/rollback_e1_write_set.py", "isolation migration rollback helper"),
     ("scripts/run_e1_step*.py", "isolation migration helper"),
     ("scripts/run_platform_tests_rename.py", "platform-test migration helper"),
-    ("scripts/_capture_scaffold_golden.py", "scaffold golden capture helper"),
     ("scripts/_verify_slice8_closeout.py", "isolation closeout smoke helper"),
     ("scripts/release_candidate_gate.py", "release-gate application check inventory"),
     ("scripts/fab11_assertion_corpus_remediation.py", "assertion corpus remediation helper"),
     ("scripts/membase_ci_seed.py", "membase CI seed helper"),
-    ("scripts/session_self_initialization.py", "session self-initialization helper"),
 )
 
 

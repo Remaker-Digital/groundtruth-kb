@@ -468,11 +468,6 @@ def write_outputs(manifest: dict[str, Any], output_dir: Path) -> dict[str, Path]
 
 
 def _build_live_reader(db_path: Path) -> SpecReader:
-    import sys
-
-    src = str(PROJECT_ROOT / "groundtruth-kb" / "src")
-    if src not in sys.path:
-        sys.path.insert(0, src)
     from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
 
     return KnowledgeDB(str(db_path))

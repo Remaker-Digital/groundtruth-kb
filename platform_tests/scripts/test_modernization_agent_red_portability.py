@@ -14,10 +14,12 @@ import json
 import os
 import re
 import shutil
-import sqlite3
+import socket
 import subprocess
 import sys
 import textwrap
+import threading
+import time
 import tomllib
 import venv
 import zipfile
@@ -26,18 +28,20 @@ from importlib import metadata
 from pathlib import Path, PureWindowsPath
 
 import pytest
+import uvicorn
+from fastapi.testclient import TestClient
+from groundtruth_kb.authority_api import create_authority_app
 from packaging.requirements import Requirement
 
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native  # noqa: F401
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
-PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
 AGENT_RED_ROOT = REPO_ROOT / "applications" / "Agent_Red"
 PLATFORM_PRODUCT_ROOT = REPO_ROOT / "groundtruth-kb"
 PRIOR_PACKAGE_FIXTURE = (
     REPO_ROOT / "platform_tests" / "fixtures" / "modernization" / "agent-red-prior-supported-package.json"
 )
 
-if str(PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_SRC))
 
 _TEXT_SUFFIXES = frozenset({".json", ".md", ".ps1", ".py", ".sh", ".toml", ".yaml", ".yml"})
 _OPERATIONAL_SUBTREES = (".claude", ".codex", "config", "scripts", "src")
@@ -54,7 +58,15 @@ _OPERATIONAL_ROOT_FILES = (
     "shopify.app.toml",
 )
 _DERIVED_DIRS = frozenset(
-    {".mypy_cache", ".pytest_cache", ".ruff_cache", "__pycache__", "build", "dist", "node_modules"}
+    {
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        "__pycache__",
+        "build",
+        "dist",
+        "node_modules",
+    }
 )
 _WINDOWS_ABSOLUTE_PATH = re.compile(r"(?<![A-Za-z])(?P<path>[A-Za-z]:[\\/][^\s\"'<>|?*`,;)\]}]+)")
 _POSIX_HOST_PATH = re.compile(r"(?<![A-Za-z0-9:/])(?P<path>/(?:home|mnt|opt|private|tmp|Users)/[^\s\"'<>`]+)")
@@ -148,6 +160,7 @@ _RUNTIME_PROBE = textwrap.dedent(
     expected_isolation_findings = {
         item for item in os.environ["GTKB_EXPECT_ISOLATION_FINDINGS"].split("|") if item
     }
+    exercise_agent_red_runtime = os.environ["GTKB_PROBE_AGENT_RED_RUNTIME"] == "1"
 
     sys.path.insert(0, str(app_root))
 
@@ -155,7 +168,6 @@ _RUNTIME_PROBE = textwrap.dedent(
     from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization
     from groundtruth_kb.isolation.validation import validate_self_completion_preflight
     from groundtruth_kb.project.doctor_isolation import run_isolation_checks
-    from src.app.factory import create_app
 
     package_origin = Path(groundtruth_kb.__file__).resolve()
     assert package_origin.is_relative_to(expected_install), (package_origin, expected_install)
@@ -165,7 +177,7 @@ _RUNTIME_PROBE = textwrap.dedent(
     assert candidate_module_present is expected_candidate_module
 
     validate_self_completion_preflight(host_root, "Agent_Red")
-    minimization = validate_app_root_minimization(app_root, project_root=host_root, tracked_only=False)
+    minimization = validate_app_root_minimization(app_root, project_root=host_root)
     assert minimization.ok, minimization.first_error_message(limit=10)
     checks = run_isolation_checks(app_root, "dual-agent", product_root=package_origin.parent)
     unacceptable = {
@@ -175,10 +187,14 @@ _RUNTIME_PROBE = textwrap.dedent(
     }
     assert set(unacceptable) == expected_isolation_findings, unacceptable
 
-    app = create_app()
-    app_origin = Path(sys.modules["src.app.factory"].__file__).resolve()
-    assert app_origin.is_relative_to(app_root)
-    assert app.title == "Agent Red Customer Experience"
+    app_origin = None
+    if exercise_agent_red_runtime:
+        from src.app.factory import create_app
+
+        app = create_app()
+        app_origin = Path(sys.modules["src.app.factory"].__file__).resolve()
+        assert app_origin.is_relative_to(app_root)
+        assert app.title == "Agent Red Customer Experience"
 
     evidence_path.write_text(
         json.dumps(
@@ -186,8 +202,8 @@ _RUNTIME_PROBE = textwrap.dedent(
                 "phase": phase,
                 "package_version": groundtruth_kb.__version__,
                 "package_origin": str(package_origin),
-                "agent_red_origin": str(app_origin),
-                "platform_consumption": "pass",
+                "agent_red_origin": str(app_origin) if app_origin else None,
+                "platform_consumption": "pass" if exercise_agent_red_runtime else "not_exercised",
                 "source_host_read_guard": "active",
                 "candidate_module_present": candidate_module_present,
                 "isolation_findings": sorted(unacceptable),
@@ -198,6 +214,9 @@ _RUNTIME_PROBE = textwrap.dedent(
         + "\n",
         encoding="utf-8",
     )
+
+    if not exercise_agent_red_runtime:
+        raise SystemExit(0)
 
     import pytest
 
@@ -220,9 +239,8 @@ _RUNTIME_PROBE = textwrap.dedent(
     """
 ).strip()
 
-_MIGRATION_DRIVER = textwrap.dedent(
+_NATIVE_LIFECYCLE_DRIVER = textwrap.dedent(
     r"""
-    import hashlib
     import json
     import os
     import subprocess
@@ -264,103 +282,69 @@ _MIGRATION_DRIVER = textwrap.dedent(
     sys.addaudithook(deny_source_host_reads)
 
     import groundtruth_kb
-    from groundtruth_kb.project.rollback import (
-        execute_rollback,
-        find_latest_receipt,
-        plan_rollback,
+    from groundtruth_kb.project.application_upgrade import (
+        UpgradeOptions,
+        apply_upgrade,
+        plan_upgrade,
+        recover,
+        recovery_plan,
     )
-    from groundtruth_kb.project.upgrade import execute_upgrade
 
-    app_root = Path(os.environ["GTKB_AGENT_RED_ROOT"]).resolve()
+    host_root = Path(os.environ["GTKB_RELOCATED_HOST"]).resolve()
+    app_root = host_root / "applications" / "Agent_Red"
     evidence_path = Path(os.environ["GTKB_EVIDENCE_PATH"])
-    operation = os.environ["GTKB_MIGRATION_OPERATION"]
+    operation = os.environ["GTKB_LIFECYCLE_OPERATION"]
     package_origin = Path(groundtruth_kb.__file__).resolve()
     assert package_origin.is_relative_to(Path(sys.prefix).resolve())
     assert not denied_source(package_origin)
-
-    if operation == "upgrade":
-        results = execute_upgrade(
-            app_root,
-            actions=[],
-            accept_migration=True,
-            product_root=package_origin.parent,
-        )
-        receipt = find_latest_receipt(app_root)
-        assert receipt is not None
-        receipt_path = (
-            app_root
-            / ".claude"
-            / "upgrade-receipts"
-            / "active"
-            / f"{receipt['receipt_id']}.json"
-        )
-        raw_receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
-        merge_commit = subprocess.run(
-            ["git", "rev-parse", f"{receipt['merge_commit']}^{{commit}}"],
-            cwd=app_root,
-            check=True,
-            capture_output=True,
-            text=True,
-        ).stdout.strip()
-        assert merge_commit == receipt["merge_commit"]
-        migration = raw_receipt.get("isolation_migration")
-        assert isinstance(migration, dict)
-        evidence = {
-            "operation": operation,
-            "package_origin": str(package_origin),
-            "package_version": groundtruth_kb.__version__,
-            "source_host_read_guard": "active",
-            "receipt_id": receipt["receipt_id"],
-            "receipt_mode": receipt["mode"],
-            "receipt_path": str(receipt_path),
-            "receipt_sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
-            "merge_commit": receipt["merge_commit"],
-            "auto_fixed": migration.get("auto_fixed", []),
-            "results": results,
-        }
-    elif operation == "rollback":
-        receipt = find_latest_receipt(app_root)
-        assert receipt is not None
-        plan = plan_rollback(app_root, receipt_id=receipt["receipt_id"])
-        result = execute_rollback(app_root, plan, commit=True)
-        durable_receipt = find_latest_receipt(app_root)
-        assert durable_receipt is not None
-        assert durable_receipt["receipt_id"] == receipt["receipt_id"]
-        receipt_path = (
-            app_root
-            / ".claude"
-            / "upgrade-receipts"
-            / "active"
-            / f"{receipt['receipt_id']}.json"
-        )
-        evidence = {
-            "operation": operation,
-            "package_origin": str(package_origin),
-            "package_version": groundtruth_kb.__version__,
-            "source_host_read_guard": "active",
-            "receipt_id": result.receipt_id,
-            "receipt_mode": durable_receipt["mode"],
-            "receipt_path": str(receipt_path),
-            "receipt_sha256": hashlib.sha256(receipt_path.read_bytes()).hexdigest(),
-            "merge_commit": result.merge_commit,
-            "rollback_commit": result.commit_sha,
-            "files_reverted": [entry.path for entry in result.files_reverted],
-        }
-    else:
-        raise AssertionError(f"unknown migration operation: {operation}")
-
-    evidence_path.write_text(
-        json.dumps(evidence, indent=2, sort_keys=True) + "\n",
-        encoding="utf-8",
+    options = UpgradeOptions(
+        application="Agent_Red",
+        project_id=os.environ["GTKB_PROJECT_ID"],
+        gt_kb_root=host_root,
+        authority_url=os.environ["GTKB_AUTHORITY_URL"],
     )
+
+    def head():
+        return subprocess.run(
+            ["git", "rev-parse", "HEAD"], cwd=app_root, check=True, capture_output=True, text=True
+        ).stdout.strip()
+
+    before = head()
+    if operation == "preview":
+        plan = plan_upgrade(options)
+        evidence = {"plan": plan.to_json_dict(), "writes": sorted(plan.writes), "removes": sorted(plan.removes)}
+    elif operation == "apply":
+        plan = plan_upgrade(options)
+        result = apply_upgrade(plan)
+        evidence = {"plan": plan.to_json_dict(), "result": result}
+    elif operation == "recover":
+        plan = recovery_plan(options)
+        result = recover(options)
+        evidence = {"recovery_plan": plan, "result": result}
+    else:
+        raise AssertionError(f"unknown lifecycle operation: {operation}")
+    evidence.update(
+        {
+            "operation": operation,
+            "package_origin": str(package_origin),
+            "package_version": groundtruth_kb.__version__,
+            "source_host_read_guard": "active",
+            "head_before": before,
+            "head_after": head(),
+            "receipts_dir_exists": (app_root / ".claude" / "upgrade-receipts").exists(),
+        }
+    )
+    evidence_path.write_text(json.dumps(evidence, indent=2, sort_keys=True, default=str) + "\n", encoding="utf-8")
     """
 ).strip()
 
 
 def _validate_app_root(app_root: Path, project_root: Path):
-    from groundtruth_kb.isolation.app_root_minimization import validate_app_root_minimization
+    from groundtruth_kb.isolation.app_root_minimization import (
+        validate_app_root_minimization,
+    )
 
-    return validate_app_root_minimization(app_root, project_root=project_root, tracked_only=False)
+    return validate_app_root_minimization(app_root, project_root=project_root)
 
 
 def _validate_slot(project_root: Path) -> None:
@@ -386,7 +370,7 @@ def _assert_isolation_clean(checks) -> None:
     assert not unacceptable, f"Agent Red isolation checks are not clean: {unacceptable}"
     assert by_name["isolation:adopter-root-placement"].status == "pass"
     assert by_name["isolation:no-writable-product-paths"].status == "pass"
-    assert by_name["isolation:hooks-point-to-wrappers"].status == "pass"
+    assert by_name["isolation:hook-settings-structure"].status == "pass"
     assert by_name["isolation:workstream-focus-hook-absent"].status == "pass"
     assert by_name["isolation:chroma-regeneratable"].status == "pass"
 
@@ -487,11 +471,22 @@ def _materialize_build_backend(output_dir: Path) -> Path:
     """Copy the declared backend closure into the only non-stdlib import path."""
     build_site = output_dir / "build-backend-site"
     build_site.mkdir(parents=True)
-    pending = [Requirement(_BUILD_BACKEND_REQUIREMENT)]
+    _materialize_distributions([_BUILD_BACKEND_REQUIREMENT], build_site)
+    return build_site
+
+
+def _materialize_distributions(requirements: list[str], site: Path) -> set[str]:
+    """Copy the closure of the named distributions from this interpreter into ``site`` (offline, versions checked)."""
+    pending = [Requirement(item) for item in requirements]
     copied: set[str] = set()
     while pending:
         requirement = pending.pop()
-        if requirement.marker is not None and not requirement.marker.evaluate():
+        # A dependency declared for an extra (``psycopg[binary]`` -> ``psycopg-binary; extra == "binary"``) is
+        # part of the closure only when that extra was requested by the depending distribution.
+        extras = getattr(requirement, "_requested_extras", set())
+        if requirement.marker is not None and not (
+            requirement.marker.evaluate() or any(requirement.marker.evaluate({"extra": extra}) for extra in extras)
+        ):
             continue
         key = requirement.name.lower().replace("_", "-")
         if key in copied:
@@ -507,12 +502,24 @@ def _materialize_build_backend(output_dir: Path) -> Path:
             source = Path(distribution.locate_file(entry))
             if not source.is_file():
                 continue
-            target = build_site / relative
+            target = site / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copy2(source, target)
         copied.add(key)
-        pending.extend(Requirement(item) for item in distribution.requires or ())
-    return build_site
+        for item in distribution.requires or ():
+            child = Requirement(item)
+            child._requested_extras = set(requirement.extras)  # type: ignore[attr-defined]
+            pending.append(child)
+    return copied
+
+
+def _materialize_runtime_dependencies(source_root: Path, environment_root: Path) -> set[str]:
+    """The clean environment receives the package's declared runtime dependency closure, never the host's path."""
+    config = tomllib.loads((source_root / "pyproject.toml").read_text(encoding="utf-8"))
+    site = environment_root / ("Lib/site-packages" if os.name == "nt" else "lib/site-packages")
+    if os.name != "nt":
+        site = next(environment_root.glob("lib/python*/site-packages"))
+    return _materialize_distributions(list(config["project"]["dependencies"]), site)
 
 
 def _venv_python(environment_root: Path) -> Path:
@@ -521,8 +528,10 @@ def _venv_python(environment_root: Path) -> Path:
 
 
 def _install_wheel(python: Path, wheel: Path, *, replace_existing: bool = False) -> None:
+    """Install the supplied wheel into this test environment, ignoring host metadata."""
     command = [
         str(python),
+        "-I",
         "-m",
         "pip",
         "install",
@@ -532,8 +541,15 @@ def _install_wheel(python: Path, wheel: Path, *, replace_existing: bool = False)
     ]
     if replace_existing:
         command.append("--force-reinstall")
+    else:
+        # An inherited/system distribution with the same version is not an
+        # installation in this newly created environment. Leave that copy alone.
+        command.append("--ignore-installed")
     command.append(str(wheel))
-    _run_checked(command, cwd=wheel.parent, timeout=180)
+    env = {key: value for key, value in os.environ.items() if not key.startswith("PIP_")}
+    env.pop("PYTHONPATH", None)
+    env["PIP_CONFIG_FILE"] = os.devnull
+    _run_checked(command, cwd=wheel.parent, env=env, timeout=180)
 
 
 def _run_relocated_operation(
@@ -545,6 +561,7 @@ def _run_relocated_operation(
     phase: str,
     expect_candidate_module: bool,
     expected_isolation_findings: tuple[str, ...] = (),
+    agent_red_runtime: bool = True,
 ) -> dict[str, object]:
     probe = relocated_host / "portability-runtime-probe.py"
     evidence_path = relocated_host / f"portability-{phase}.json"
@@ -561,58 +578,70 @@ def _run_relocated_operation(
             "GTKB_TEST_NODES": "|".join(_AGENT_RED_OPERATIONAL_TESTS),
             "GTKB_EXPECT_CANDIDATE_MODULE": "present" if expect_candidate_module else "absent",
             "GTKB_EXPECT_ISOLATION_FINDINGS": "|".join(expected_isolation_findings),
+            "GTKB_PROBE_AGENT_RED_RUNTIME": "1" if agent_red_runtime else "0",
             "PYTEST_DISABLE_PLUGIN_AUTOLOAD": "1",
             "PYTHONPATH": "",
         }
     )
-    _run_checked([str(python), str(probe)], cwd=relocated_host / "applications" / "Agent_Red", env=env)
+    _run_checked(
+        [str(python), str(probe)],
+        cwd=relocated_host / "applications" / "Agent_Red",
+        env=env,
+    )
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     assert evidence["phase"] == phase
     assert evidence["package_version"] == expected_version
     assert Path(evidence["package_origin"]).resolve().is_relative_to(environment_root.resolve())
-    assert (
-        Path(evidence["agent_red_origin"])
-        .resolve()
-        .is_relative_to((relocated_host / "applications" / "Agent_Red").resolve())
-    )
-    assert evidence["platform_consumption"] == "pass"
+    if agent_red_runtime:
+        assert (
+            Path(evidence["agent_red_origin"])
+            .resolve()
+            .is_relative_to((relocated_host / "applications" / "Agent_Red").resolve())
+        )
+        assert evidence["platform_consumption"] == "pass"
+    else:
+        assert evidence["agent_red_origin"] is None and evidence["platform_consumption"] == "not_exercised"
     assert evidence["source_host_read_guard"] == "active"
     assert evidence["candidate_module_present"] is expect_candidate_module
     assert evidence["isolation_findings"] == sorted(expected_isolation_findings)
     return evidence
 
 
-def _run_migration_operation(
+def _run_lifecycle_operation(
     python: Path,
     *,
     environment_root: Path,
     relocated_host: Path,
+    authority_url: str,
+    project_id: str,
     operation: str,
 ) -> dict[str, object]:
-    driver = relocated_host / "portability-migration-driver.py"
+    driver = relocated_host / "portability-lifecycle-driver.py"
     evidence_path = relocated_host / f"portability-{operation}-evidence.json"
-    driver.write_text(_MIGRATION_DRIVER + "\n", encoding="utf-8")
-    env = os.environ.copy()
+    driver.write_text(_NATIVE_LIFECYCLE_DRIVER + "\n", encoding="utf-8")
+    env = {
+        key: value
+        for key, value in os.environ.items()
+        if not key.upper().startswith(("PG", "GT_POSTGRES_", "GIT_"))
+        and key not in {"GT_AUTHORITY_URL", "GT_PROJECT_ROOT"}
+    }
     env.update(
         {
             "GTKB_SOURCE_ROOT": str(REPO_ROOT),
             "GTKB_RELOCATED_HOST": str(relocated_host),
-            "GTKB_AGENT_RED_ROOT": str(relocated_host / "applications" / "Agent_Red"),
+            "GTKB_AUTHORITY_URL": authority_url,
+            "GTKB_PROJECT_ID": project_id,
             "GTKB_EVIDENCE_PATH": str(evidence_path),
-            "GTKB_MIGRATION_OPERATION": operation,
+            "GTKB_LIFECYCLE_OPERATION": operation,
             "PYTHONPATH": "",
         }
     )
-    _run_checked(
-        [str(python), str(driver)],
-        cwd=relocated_host,
-        env=env,
-        timeout=180,
-    )
+    _run_checked([str(python), str(driver)], cwd=relocated_host, env=env, timeout=180)
     evidence = json.loads(evidence_path.read_text(encoding="utf-8"))
     assert evidence["operation"] == operation
     assert evidence["source_host_read_guard"] == "active"
     assert Path(str(evidence["package_origin"])).resolve().is_relative_to(environment_root.resolve())
+    assert evidence["receipts_dir_exists"] is False
     return evidence
 
 
@@ -628,7 +657,7 @@ def _register_relocated_root_files(app_root: Path, names: tuple[str, ...]) -> No
             {
                 "name": name,
                 "type": "DIR" if name == ".git" else "FILE",
-                "bucket": "A",
+                "classification": "runtime_data" if name == ".git" else "authoritative_input",
                 "purpose": "Portability fixture for the canonical GT-KB adopter migration and rollback lifecycle.",
             }
         )
@@ -636,89 +665,56 @@ def _register_relocated_root_files(app_root: Path, names: tuple[str, ...]) -> No
     registry_path.write_text(json.dumps(registry, indent=2, sort_keys=False) + "\n", encoding="utf-8")
 
 
-def _prepare_pre_isolation_state(app_root: Path) -> dict[str, object]:
-    """Create a realistic old-adopter state and return its exact rollback baseline."""
+def _stage_relocated_host(relocated_host: Path, authority_url: str) -> None:
+    """Give the relocated host what the native upgrade reads: baseline, projector, catalog and its authority."""
+    shutil.copytree(
+        REPO_ROOT / ".harness-baseline-configuration",
+        relocated_host / ".harness-baseline-configuration",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.lock"),
+    )
+    shutil.copytree(
+        REPO_ROOT / "scripts/harness_projection",
+        relocated_host / "scripts/harness_projection",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+    )
+    for script in sorted(REPO_ROOT.glob("scripts/*_hook_adapter.py")) + [
+        REPO_ROOT / "scripts/implementation_start_gate.py"
+    ]:
+        if script.is_file():
+            shutil.copyfile(script, relocated_host / "scripts" / script.name)
+    shutil.copyfile(REPO_ROOT / "pyproject.toml", relocated_host / "pyproject.toml")
+    (relocated_host / ".githooks").mkdir()
+    shutil.copyfile(REPO_ROOT / ".githooks/reference-transaction", relocated_host / ".githooks/reference-transaction")
+    (relocated_host / "applications" / "registry.toml").write_text(
+        '[applications]\nAgent_Red={slot="Agent_Red"}\n', encoding="utf-8"
+    )
+    (relocated_host / "groundtruth.toml").write_text(
+        f'[groundtruth]\nproject_root="{relocated_host.as_posix()}"\nauthority_url="{authority_url}"\n',
+        encoding="utf-8",
+    )
 
+
+def _initialize_relocated_application(app_root: Path, authority_url: str) -> dict[str, bytes]:
+    """The relocated application selects the relocated host's authority; its own files are the baseline to preserve."""
     _register_relocated_root_files(app_root, (".git", ".gitignore", "groundtruth.toml"))
-    (app_root / ".gitignore").write_text("# pre-migration application ignore policy\n", encoding="utf-8")
-
-    manifest = app_root / "groundtruth.toml"
-    manifest.write_text(
-        textwrap.dedent(
-            """
-            [groundtruth]
-            db_path = "config/portability-state.sqlite3"
-
-            [project]
-            project_name = "Agent Red"
-            owner = "Portability Test"
-            profile = "dual-agent"
-            copyright_notice = ""
-            cloud_provider = "none"
-            scaffold_version = "0.6.0"
-            created_at = "2026-01-01T00:00:00Z"
-
-            [service]
-            endpoint = "groundtruth.db"
-            """
-        ).lstrip(),
-        encoding="utf-8",
+    (app_root / ".gitignore").write_text("__pycache__/\n", encoding="utf-8")
+    (app_root / "groundtruth.toml").write_text(
+        f'[groundtruth]\nproject_root="{app_root.as_posix()}"\nauthority_url="{authority_url}"\n', encoding="utf-8"
     )
-
-    work_subject = app_root / ".claude" / "session" / "work-subject.json"
-    work_subject.parent.mkdir(parents=True, exist_ok=True)
-    work_subject.write_text(
-        json.dumps(
-            {
-                "current_subject": "platform",
-                "application_root": str(app_root.resolve()).replace("\\", "/"),
-                "set_by": "pre-modernization-adopter",
-            },
-            indent=2,
-        )
-        + "\n",
-        encoding="utf-8",
-    )
-
-    legacy_hook = app_root / ".claude" / "hooks" / "workstream-focus.py"
-    legacy_hook.parent.mkdir(parents=True, exist_ok=True)
-    legacy_hook.write_text("# retired pre-isolation application hook\n", encoding="utf-8")
-
     state_file = app_root / "config" / "portability-state.json"
     state_file.parent.mkdir(parents=True, exist_ok=True)
     state_file.write_text(
-        json.dumps({"tenant": "agent-red", "lifecycle": "pre-migration"}, indent=2) + "\n",
-        encoding="utf-8",
+        json.dumps({"tenant": "agent-red", "lifecycle": "relocated"}, indent=2) + "\n", encoding="utf-8"
     )
-    database = app_root / "config" / "portability-state.sqlite3"
-    with sqlite3.connect(database) as connection:
-        connection.execute("CREATE TABLE application_state (state_key TEXT PRIMARY KEY, state_value TEXT NOT NULL)")
-        connection.execute(
-            "INSERT INTO application_state (state_key, state_value) VALUES (?, ?)",
-            ("tenant-lifecycle", "pre-migration"),
-        )
-
     return _snapshot_application_state(app_root)
 
 
-def _snapshot_application_state(app_root: Path) -> dict[str, object]:
-    database = app_root / "config" / "portability-state.sqlite3"
-    with sqlite3.connect(database) as connection:
-        database_rows = connection.execute(
-            "SELECT state_key, state_value FROM application_state ORDER BY state_key"
-        ).fetchall()
+def _snapshot_application_state(app_root: Path) -> dict[str, bytes]:
     return {
-        "database_bytes": database.read_bytes(),
-        "database_rows": database_rows,
+        "marker": (app_root / "application.toml").read_bytes(),
         "state_file": (app_root / "config" / "portability-state.json").read_bytes(),
-        "manifest": (app_root / "groundtruth.toml").read_bytes(),
-        "work_subject": (app_root / ".claude" / "session" / "work-subject.json").read_bytes(),
-        "legacy_hook": (
-            (app_root / ".claude" / "hooks" / "workstream-focus.py").read_bytes()
-            if (app_root / ".claude" / "hooks" / "workstream-focus.py").exists()
-            else None
-        ),
-        "gitignore": (app_root / ".gitignore").read_bytes(),
+        "config": (app_root / "groundtruth.toml").read_bytes(),
+        "factory": (app_root / "src" / "app" / "factory.py").read_bytes(),
     }
 
 
@@ -824,132 +820,232 @@ def test_live_agent_red_is_a_clean_independent_application_slot() -> None:
     assert registered_names.isdisjoint({"bridge", "groundtruth-kb", "groundtruth.db"})
 
 
-@pytest.mark.timeout(300)
+@pytest.mark.timeout(600)
 def test_agent_red_survives_relocation_and_has_an_independent_lifecycle(
     relocated_agent_red: tuple[Path, Path],
+    native,
     tmp_path: Path,
 ) -> None:
-    """A relocated Agent Red runs through install, adopter migration, and rollback."""
+    """A relocated Agent Red runs through clean install, native upgrade preview/apply, commit and recovery."""
 
     relocated_host, relocated_app = relocated_agent_red
     original_marker = (AGENT_RED_ROOT / "application.toml").read_bytes()
     relocated_marker = relocated_app / "application.toml"
     relocated_marker.write_bytes(original_marker + b"\n# independent relocated lifecycle\n")
 
-    prior_fixture = _load_prior_package_fixture()
-    candidate_source = tmp_path / "candidate-package"
-    _copy_package_build_source(candidate_source)
+    service, _client, _schema, _service_name = native
+    project_id = "PROJECT-AGENT-RED"
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+        authority_url = f"http://127.0.0.1:{port}"
+        # The relocated host is the authority's project root: its catalog registers the relocated application.
+        _stage_relocated_host(relocated_host, authority_url)
+        baseline_state = _initialize_relocated_application(relocated_app, authority_url)
+        _initialize_relocated_application_repository(relocated_app)
+        app = create_authority_app(service, project_root=relocated_host)
+        client = TestClient(app)
+        server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="error"))
+        worker = threading.Thread(target=lambda: server.run(sockets=[listener]), daemon=True)
+        worker.start()
+        deadline = time.monotonic() + 10
+        while not server.started and worker.is_alive() and time.monotonic() < deadline:
+            time.sleep(0.01)
+        assert server.started
+        try:
+            response = client.put(
+                f"/v1/projects/{project_id}",
+                json={
+                    "expected_version": 0,
+                    "actor": "portability",
+                    "reason": "Relocated reference adopter",
+                    "kind": "project",
+                    "fields": {"name": "Agent Red (relocated)", "repository_ref": "application:Agent_Red"},
+                },
+            )
+            assert response.status_code == 200, response.text
+            committed_head = _run_checked(["git", "rev-parse", "HEAD"], cwd=relocated_app).stdout.strip()
 
-    candidate_init = candidate_source / "src" / "groundtruth_kb" / "__init__.py"
-    candidate_text = candidate_init.read_text(encoding="utf-8")
-    version_match = _PACKAGE_VERSION.search(candidate_text)
-    assert version_match is not None, "GT-KB package version declaration is missing"
-    candidate_version = version_match.group("version")
+            candidate_source = tmp_path / "candidate-package"
+            _copy_package_build_source(candidate_source)
+            candidate_init = candidate_source / "src" / "groundtruth_kb" / "__init__.py"
+            version_match = _PACKAGE_VERSION.search(candidate_init.read_text(encoding="utf-8"))
+            assert version_match is not None, "GT-KB package version declaration is missing"
+            candidate_version = version_match.group("version")
+            candidate_wheel = _build_wheel(candidate_source, tmp_path / "candidate-wheel")
+            environment_root = tmp_path / "clean-gtkb-install"
+            venv.EnvBuilder(with_pip=True, system_site_packages=False).create(environment_root)
+            python = _venv_python(environment_root)
+            _install_wheel(python, candidate_wheel)
+            _materialize_runtime_dependencies(candidate_source, environment_root)
 
-    baseline_version = str(prior_fixture["package_version"])
-    candidate_only_module = str(prior_fixture["candidate_only_module"])
+            install_evidence = _run_relocated_operation(
+                python,
+                environment_root=environment_root,
+                relocated_host=relocated_host,
+                expected_version=candidate_version,
+                phase="clean-install",
+                expect_candidate_module=True,
+                agent_red_runtime=False,
+            )
 
-    candidate_wheel = _build_wheel(candidate_source, tmp_path / "candidate-wheel")
-    baseline_wheel = Path(prior_fixture["wheel_path"])
-    assert _wheel_contains_module(candidate_wheel, candidate_only_module)
-    assert not _wheel_contains_module(baseline_wheel, candidate_only_module), (
-        "the frozen prior wheel contains candidate-only modernization code"
-    )
-    environment_root = tmp_path / "clean-gtkb-install"
-    venv.EnvBuilder(with_pip=True, system_site_packages=True).create(environment_root)
-    python = _venv_python(environment_root)
+            preview = _run_lifecycle_operation(
+                python,
+                environment_root=environment_root,
+                relocated_host=relocated_host,
+                authority_url=authority_url,
+                project_id=project_id,
+                operation="preview",
+            )
+            assert preview["plan"]["project_id"] == project_id
+            assert preview["plan"]["repository_ref"] == "application:Agent_Red"
+            assert preview["head_after"] == committed_head
+            assert _snapshot_application_state(relocated_app) == baseline_state, "a preview changes nothing"
 
-    _install_wheel(python, baseline_wheel)
-    baseline_evidence = _run_relocated_operation(
-        python,
-        environment_root=environment_root,
-        relocated_host=relocated_host,
-        expected_version=baseline_version,
-        phase="clean-install",
-        expect_candidate_module=False,
-    )
+            applied = _run_lifecycle_operation(
+                python,
+                environment_root=environment_root,
+                relocated_host=relocated_host,
+                authority_url=authority_url,
+                project_id=project_id,
+                operation="apply",
+            )
+            assert applied["head_after"] == committed_head, "the native upgrade never commits"
+            assert applied["result"]["commits"] == 0
+            assert _snapshot_application_state(relocated_app) == baseline_state, "application-owned files are preserved"
+            written = set(applied["result"]["written"])
+            assert written == set(preview["writes"]) and written, (written, preview["writes"])
+            assert all(not path.startswith(("src/", "tests/", "config/")) for path in written), written
+            _run_checked(["git", "add", "-A"], cwd=relocated_app)
+            _run_checked(
+                ["git", "commit", "-qm", "relocated Agent Red at the current host baseline"], cwd=relocated_app
+            )
+            upgraded_head = _run_checked(["git", "rev-parse", "HEAD"], cwd=relocated_app).stdout.strip()
+            assert upgraded_head != committed_head
 
-    _install_wheel(python, candidate_wheel, replace_existing=True)
-    pre_migration_state = _prepare_pre_isolation_state(relocated_app)
-    _initialize_relocated_application_repository(relocated_app)
+            current = _run_lifecycle_operation(
+                python,
+                environment_root=environment_root,
+                relocated_host=relocated_host,
+                authority_url=authority_url,
+                project_id=project_id,
+                operation="preview",
+            )
+            assert current["plan"]["changes"] == 0, current["plan"]
+            tracked = set(_run_checked(["git", "ls-files"], cwd=relocated_app).stdout.splitlines())
+            committed_managed = sorted(written & tracked)
+            assert committed_managed, (written, sorted(tracked)[:20])
+            drifted = committed_managed[0]
+            drifted_path = relocated_app / drifted
+            committed_bytes = drifted_path.read_bytes()
+            drifted_path.write_bytes(b"# local drift that recovery restores\n")
+            recovered = _run_lifecycle_operation(
+                python,
+                environment_root=environment_root,
+                relocated_host=relocated_host,
+                authority_url=authority_url,
+                project_id=project_id,
+                operation="recover",
+            )
+            assert drifted in set(recovered["result"]["restore"]), recovered["result"]
+            assert recovered["result"]["status"] == "restored"
+            assert drifted_path.read_bytes() == committed_bytes
+            assert recovered["head_after"] == upgraded_head
+            assert _run_checked(["git", "status", "--porcelain"], cwd=relocated_app).stdout.strip() == ""
 
-    migration_evidence = _run_migration_operation(
-        python,
-        environment_root=environment_root,
-        relocated_host=relocated_host,
-        operation="upgrade",
-    )
-    assert migration_evidence["receipt_mode"] == "tracked"
-    assert re.fullmatch(r"[0-9a-f]{40}", str(migration_evidence["merge_commit"]))
-    assert re.fullmatch(r"[0-9a-f]{64}", str(migration_evidence["receipt_sha256"]))
-    assert {(entry["check_name"], entry["file"], entry["outcome"]) for entry in migration_evidence["auto_fixed"]} == {
-        ("isolation:service-endpoint", "groundtruth.toml", "fixed"),
-        ("isolation:work-subject", ".claude/session/work-subject.json", "fixed"),
-        (
-            "isolation:workstream-focus-hook-absent",
-            ".claude/hooks/workstream-focus.py",
-            "fixed",
-        ),
-    }
-
-    migrated_state = _snapshot_application_state(relocated_app)
-    assert migrated_state["database_bytes"] == pre_migration_state["database_bytes"]
-    assert migrated_state["database_rows"] == pre_migration_state["database_rows"]
-    assert migrated_state["state_file"] == pre_migration_state["state_file"]
-    assert migrated_state["manifest"] != pre_migration_state["manifest"]
-    assert migrated_state["work_subject"] != pre_migration_state["work_subject"]
-    assert json.loads(bytes(migrated_state["work_subject"]))["current_subject"] == "application"
-    assert migrated_state["legacy_hook"] is None
-
-    upgraded_evidence = _run_relocated_operation(
-        python,
-        environment_root=environment_root,
-        relocated_host=relocated_host,
-        expected_version=candidate_version,
-        phase="adopter-migration",
-        expect_candidate_module=True,
-    )
-
-    rollback_operation = _run_migration_operation(
-        python,
-        environment_root=environment_root,
-        relocated_host=relocated_host,
-        operation="rollback",
-    )
-    assert rollback_operation["receipt_id"] == migration_evidence["receipt_id"]
-    assert rollback_operation["merge_commit"] == migration_evidence["merge_commit"]
-    assert rollback_operation["receipt_sha256"] == migration_evidence["receipt_sha256"]
-    assert re.fullmatch(r"[0-9a-f]{40}", str(rollback_operation["rollback_commit"]))
-    assert {
-        "groundtruth.toml",
-        ".claude/session/work-subject.json",
-        ".claude/hooks/workstream-focus.py",
-    }.issubset(set(rollback_operation["files_reverted"]))
-
-    rolled_back_state = _snapshot_application_state(relocated_app)
-    assert rolled_back_state == pre_migration_state
-    rollback_evidence = _run_relocated_operation(
-        python,
-        environment_root=environment_root,
-        relocated_host=relocated_host,
-        expected_version=candidate_version,
-        phase="adopter-rollback",
-        expect_candidate_module=True,
-        expected_isolation_findings=(
-            "isolation:service-endpoint",
-            "isolation:work-subject",
-            "isolation:workstream-focus-hook-absent",
-        ),
-    )
-
-    assert baseline_evidence["candidate_module_present"] is False
+            upgraded_evidence = _run_relocated_operation(
+                python,
+                environment_root=environment_root,
+                relocated_host=relocated_host,
+                expected_version=candidate_version,
+                phase="adopter-upgraded",
+                expect_candidate_module=True,
+                agent_red_runtime=False,
+            )
+        finally:
+            server.should_exit = True
+            worker.join(timeout=10)
+    assert install_evidence["candidate_module_present"] is True
     assert upgraded_evidence["candidate_module_present"] is True
-    assert rollback_evidence["candidate_module_present"] is True
-    assert rollback_evidence["package_version"] == candidate_version
-    assert _run_checked(["git", "status", "--porcelain"], cwd=relocated_app).stdout.strip() == ""
+    assert upgraded_evidence["package_version"] == candidate_version
     assert (AGENT_RED_ROOT / "application.toml").read_bytes() == original_marker
     assert relocated_marker.read_bytes() != original_marker
     assert relocated_app.resolve() != AGENT_RED_ROOT.resolve()
+
+
+def _agent_red_runtime_requirements() -> list[str]:
+    """Agent Red's declared runtime requirements and the test runner its operational tests need."""
+    requirements = []
+    for line in (AGENT_RED_ROOT / "requirements.txt").read_text(encoding="utf-8").splitlines():
+        line = line.split("#", 1)[0].strip()
+        if line and not line.startswith("-"):
+            requirements.append(line)
+    return requirements + ["pytest>=8.0", "pytest-asyncio>=0.24.0", "pytest-timeout>=2.3.0", "httpx>=0.27.0"]
+
+
+def _missing_distributions(requirements: list[str]) -> list[str]:
+    missing = []
+    for item in requirements:
+        requirement = Requirement(item)
+        if requirement.marker is not None and not requirement.marker.evaluate():
+            continue
+        try:
+            version = metadata.version(requirement.name)
+        except metadata.PackageNotFoundError:
+            missing.append(item)
+            continue
+        if not requirement.specifier.contains(version, prereleases=True):
+            missing.append(f"{item} (installed {version})")
+    return missing
+
+
+@pytest.mark.timeout(600)
+def test_relocated_agent_red_runtime_operates_on_the_installed_platform(
+    relocated_agent_red: tuple[Path, Path],
+    tmp_path: Path,
+) -> None:
+    """Agent Red's own application factory and operational tests run in the relocated, clean installation.
+
+    Agent Red's runtime closure is its own declaration (requirements.txt); this case materializes that closure
+    from the running interpreter into the clean environment and is skipped, visibly, where the interpreter does not
+    carry it. The GT-KB lifecycle case above does not depend on Agent Red's runtime.
+    """
+    requirements = _agent_red_runtime_requirements()
+    missing = _missing_distributions(requirements)
+    if missing:
+        pytest.skip("Agent Red's declared runtime closure is not installed in this interpreter: " + ", ".join(missing))
+    relocated_host, relocated_app = relocated_agent_red
+    _stage_relocated_host(relocated_host, "http://127.0.0.1:9")
+    _initialize_relocated_application(relocated_app, "http://127.0.0.1:9")
+    _initialize_relocated_application_repository(relocated_app)
+    candidate_source = tmp_path / "candidate-package"
+    _copy_package_build_source(candidate_source)
+    version_match = _PACKAGE_VERSION.search(
+        (candidate_source / "src/groundtruth_kb/__init__.py").read_text(encoding="utf-8")
+    )
+    assert version_match is not None
+    candidate_wheel = _build_wheel(candidate_source, tmp_path / "candidate-wheel")
+    environment_root = tmp_path / "clean-gtkb-install"
+    venv.EnvBuilder(with_pip=True, system_site_packages=False).create(environment_root)
+    python = _venv_python(environment_root)
+    _install_wheel(python, candidate_wheel)
+    _materialize_runtime_dependencies(candidate_source, environment_root)
+    site = (
+        environment_root / "Lib/site-packages"
+        if os.name == "nt"
+        else next(environment_root.glob("lib/python*/site-packages"))
+    )
+    _materialize_distributions(requirements, site)
+    evidence = _run_relocated_operation(
+        python,
+        environment_root=environment_root,
+        relocated_host=relocated_host,
+        expected_version=version_match.group("version"),
+        phase="agent-red-runtime",
+        expect_candidate_module=True,
+        agent_red_runtime=True,
+    )
+    assert evidence["platform_consumption"] == "pass"
 
 
 def test_agent_red_operational_surfaces_have_no_out_of_root_dependencies() -> None:
@@ -969,3 +1065,62 @@ def test_external_path_scan_is_not_vacuous(tmp_path: Path) -> None:
 
     assert len(findings) == 1
     assert "C:\\external-models\\agent-red.bin" in findings[0]
+
+
+@pytest.mark.parametrize("replace_existing", [False, True])
+def test_portability_wheel_install_ignores_inherited_same_version_distribution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, replace_existing: bool
+) -> None:
+    """A real same-version distribution on PYTHONPATH must not satisfy local installation."""
+    prior = _load_prior_package_fixture()
+    wheel = Path(prior["wheel_path"])
+    inherited = tmp_path / "inherited-package"
+    inherited.mkdir()
+    with zipfile.ZipFile(wheel) as archive:
+        for entry in archive.infolist():
+            target = inherited / entry.filename
+            assert target.resolve().is_relative_to(inherited.resolve())
+        archive.extractall(inherited)
+        expected_init = archive.read("groundtruth_kb/__init__.py")
+    before = {
+        p.relative_to(inherited).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in inherited.rglob("*")
+        if p.is_file()
+    }
+    environment = tmp_path / "isolated-install"
+    venv.EnvBuilder(with_pip=True, system_site_packages=False).create(environment)
+    python = _venv_python(environment)
+    monkeypatch.setenv("PYTHONPATH", str(inherited))
+    _install_wheel(python, wheel)
+    relative_site = (
+        Path("Lib/site-packages")
+        if os.name == "nt"
+        else Path(
+            "lib",
+            f"python{sys.version_info.major}.{sys.version_info.minor}",
+            "site-packages",
+        )
+    )
+    installed_init = environment / relative_site / "groundtruth_kb/__init__.py"
+    assert installed_init.read_bytes() == expected_init
+    if replace_existing:
+        installed_init.write_bytes(expected_init + b"\n# altered disposable installation\n")
+        _install_wheel(python, wheel, replace_existing=True)
+        assert installed_init.read_bytes() == expected_init
+    probe = _run_checked(
+        [
+            str(python),
+            "-I",
+            "-c",
+            "import json, groundtruth_kb; from importlib.metadata import version; print(json.dumps({'origin':groundtruth_kb.__file__,'version':version('groundtruth-kb')}))",
+        ],
+        cwd=tmp_path,
+    )
+    observed = json.loads(probe.stdout)
+    assert Path(observed["origin"]).resolve().is_relative_to(environment.resolve())
+    assert observed["version"] == prior["package_version"]
+    assert before == {
+        p.relative_to(inherited).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+        for p in inherited.rglob("*")
+        if p.is_file()
+    }

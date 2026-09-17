@@ -34,7 +34,6 @@ hook.session-health	gt-kb-managed
 hook.session-start-governance	gt-kb-managed
 hook.spec-before-code	gt-kb-managed
 hook.spec-classifier	gt-kb-managed
-hook.spec-event-surfacer	gt-kb-managed
 rule.bridge-essential	gt-kb-managed
 rule.bridge-poller-canonical	gt-kb-managed
 rule.canonical-terminology	gt-kb-managed
@@ -59,7 +58,6 @@ settings.hook.owner-decision-capture.posttooluse	gt-kb-managed
 settings.hook.scanner-safe-writer.pretooluse	gt-kb-managed
 settings.hook.session-start-governance.sessionstart	gt-kb-managed
 settings.hook.spec-before-code.pretooluse	gt-kb-managed
-settings.hook.spec-event-surfacer.posttooluse	gt-kb-managed
 skill.bridge-propose.helper	gt-kb-managed
 skill.bridge-propose.skill-md	gt-kb-managed
 skill.bridge.impl-report-helper	gt-kb-managed

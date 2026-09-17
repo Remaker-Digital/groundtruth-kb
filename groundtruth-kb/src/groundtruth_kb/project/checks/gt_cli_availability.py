@@ -26,8 +26,7 @@ identically to ``scripts/install_gt_path_shim.resolve_venv_python_exe`` and
 drift (tests assert that equivalence).
 
 Governing specs: GOV-STANDING-BACKLOG-001 (WI-4466 backlog authority),
-GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 /
-DCL-PROJECT-AUTHORIZATION-ENVELOPE-001 (PAUTH scope),
+GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001 (project work ordering),
 ADR-ISOLATION-APPLICATION-PLACEMENT-001 (in-root invariant),
 ADR-REGISTRY-DISCOVERY-001 (registry extension point),
 DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001 (each behaviour has a test).
@@ -163,9 +162,9 @@ def _inspect_generated_shim(on_path: Path, target: Path, text: str) -> ToolCheck
 
     legacy_targets = [path for path in _quoted_paths(text) if _looks_like_legacy_venv_gt(path)]
     if legacy_targets:
-        missing = [path for path in legacy_targets if not path.is_file()]
-        if missing:
-            rendered = ", ".join(str(path) for path in missing)
+        missing_targets = [path for path in legacy_targets if not path.is_file()]
+        if missing_targets:
+            rendered = ", ".join(str(path) for path in missing_targets)
             return ToolCheck(
                 name=_NAME,
                 required=False,

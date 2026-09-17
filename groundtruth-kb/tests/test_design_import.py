@@ -1,16 +1,8 @@
-"""Tests for groundtruth_kb.design_import (WI-3302).
+"""Tests for groundtruth_kb.design_import (O-7 R21: local inspection without the archive pipeline).
 
-Covers the package-level handoff pipeline that backs ``gt design import``:
-inspection, SPEC-CD-HANDOFF-FORMAT-001 validation, deterministic content
-formatting, dry-run semantics, content-hash idempotence, and the
-parameterized DA attribution. The end-to-end ``--apply`` path runs against a
-temporary KnowledgeDB so the tracked MemBase is never mutated.
-
-These tests exercise the package module directly; the script-level regression
-test (platform_tests/scripts/test_archive_claude_design_handoff.py) continues
-to exercise the same contract through the compatibility wrapper.
-
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Covers the package-level pipeline that backs ``gt design inspect``: inspection, SPEC-CD-HANDOFF-FORMAT-001
+validation, deterministic content formatting, catalog redaction and the complete local report. The report is
+computed and returned; the module stores nothing and opens no database.
 """
 
 from __future__ import annotations
@@ -20,11 +12,11 @@ from pathlib import Path
 
 import pytest
 
-from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.design_import import (
-    archive,
+    build_inspection_report,
     format_inspection_content,
     inspect_handoff,
+    redact_inspection_content,
     validate_handoff_format,
 )
 
@@ -58,31 +50,35 @@ class TestInspectHandoff:
         _build_minimal_handoff_zip(zip_path)
         inspection = inspect_handoff(zip_path)
         assert inspection.source_kind == "zip"
-        paths = {e.path for e in inspection.entries}
-        assert "ar-widget/README.md" in paths
-        assert "ar-widget/project/index.html" in paths
-        assert inspection.sha256 is not None
+        assert inspection.sha256 is not None and len(inspection.sha256) == 64
+        assert len(inspection.entries) == 4
+        assert inspection.total_bytes == sum(e.size_bytes for e in inspection.entries)
+        assert {e.path for e in inspection.entries} == {
+            "ar-widget/README.md",
+            "ar-widget/project/index.html",
+            "ar-widget/project/styles.css",
+            "ar-widget/project/widget.jsx",
+        }
 
     def test_inspect_directory_lists_entries(self, tmp_path: Path) -> None:
-        (tmp_path / "ar-widget" / "project").mkdir(parents=True)
-        (tmp_path / "ar-widget" / "README.md").write_text("hi\n", encoding="utf-8")
-        (tmp_path / "ar-widget" / "project" / "index.html").write_text("<!doctype html>", encoding="utf-8")
-        (tmp_path / "ar-widget" / "project" / "styles.css").write_text(":root {}", encoding="utf-8")
-        (tmp_path / "ar-widget" / "project" / "app.jsx").write_text("export {}", encoding="utf-8")
-        inspection = inspect_handoff(tmp_path / "ar-widget")
+        handoff = tmp_path / "handoff"
+        (handoff / "project").mkdir(parents=True)
+        (handoff / "README.md").write_text("readme\n", encoding="utf-8")
+        (handoff / "project" / "index.html").write_text("<html></html>", encoding="utf-8")
+        inspection = inspect_handoff(handoff)
         assert inspection.source_kind == "directory"
         assert inspection.sha256 is None
-        assert len(inspection.entries) == 4
+        assert [e.path for e in inspection.entries] == ["README.md", "project/index.html"]
 
     def test_inspect_missing_path_raises(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError):
-            inspect_handoff(tmp_path / "no-such-thing.zip")
+            inspect_handoff(tmp_path / "missing.zip")
 
     def test_inspect_unsupported_file_raises(self, tmp_path: Path) -> None:
-        p = tmp_path / "not-a-zip.txt"
-        p.write_text("nope", encoding="utf-8")
-        with pytest.raises(ValueError):
-            inspect_handoff(p)
+        bad = tmp_path / "handoff.txt"
+        bad.write_text("nope", encoding="utf-8")
+        with pytest.raises(ValueError, match="must be a .zip file or a directory"):
+            inspect_handoff(bad)
 
 
 # ---------------------------------------------------------------------------
@@ -100,12 +96,15 @@ class TestValidateHandoffFormat:
         zip_path = tmp_path / "handoff.zip"
         _build_malformed_handoff_zip(zip_path)
         warnings = validate_handoff_format(inspect_handoff(zip_path))
+        assert len(warnings) == 4
         assert any("README.md" in w for w in warnings)
         assert any("project/index.html" in w for w in warnings)
+        assert any(".css" in w for w in warnings)
+        assert any("jsx" in w for w in warnings)
 
 
 # ---------------------------------------------------------------------------
-# Content formatting (hash stability)
+# Content formatting
 # ---------------------------------------------------------------------------
 
 
@@ -114,29 +113,46 @@ class TestFormatInspectionContent:
         zip_path = tmp_path / "handoff.zip"
         _build_minimal_handoff_zip(zip_path)
         inspection = inspect_handoff(zip_path)
+        warnings = validate_handoff_format(inspection)
         kwargs = dict(
             inspection=inspection,
             date="2026-04-18",
             session_id="S302",
-            owner_decision="token-only + net-new",
+            owner_decision="token-only-candidate",
             notes=None,
-            warnings=(),
+            warnings=warnings,
         )
         assert format_inspection_content(**kwargs) == format_inspection_content(**kwargs)
 
     def test_content_mentions_date_and_session(self, tmp_path: Path) -> None:
         zip_path = tmp_path / "handoff.zip"
         _build_minimal_handoff_zip(zip_path)
+        inspection = inspect_handoff(zip_path)
         content = format_inspection_content(
-            inspection=inspect_handoff(zip_path),
+            inspection=inspection,
             date="2026-04-18",
             session_id="S302",
             owner_decision=None,
             notes=None,
-            warnings=(),
+            warnings=[],
         )
-        assert "2026-04-18" in content
-        assert "S302" in content
+        assert "Handoff date: 2026-04-18" in content
+        assert "Session: S302" in content
+        assert "OK — all D1 mandatory files present." in content
+
+    def test_content_omits_session_when_none_is_supplied(self, tmp_path: Path) -> None:
+        zip_path = tmp_path / "handoff.zip"
+        _build_minimal_handoff_zip(zip_path)
+        content = format_inspection_content(
+            inspection=inspect_handoff(zip_path),
+            date="2026-04-18",
+            session_id=None,
+            owner_decision=None,
+            notes="looked at the tokens",
+            warnings=[],
+        )
+        assert "Session:" not in content
+        assert "## Inspection notes\nlooked at the tokens" in content
 
     def test_content_mentions_warnings_when_present(self, tmp_path: Path) -> None:
         zip_path = tmp_path / "handoff.zip"
@@ -156,85 +172,45 @@ class TestFormatInspectionContent:
 
 
 # ---------------------------------------------------------------------------
-# Archive pipeline
+# The complete local report
 # ---------------------------------------------------------------------------
 
 
-class TestArchiveDryRun:
-    def test_dry_run_returns_would_create(self, tmp_path: Path) -> None:
+class TestInspectionReport:
+    def test_report_hash_is_deterministic(self, tmp_path: Path) -> None:
         zip_path = tmp_path / "handoff.zip"
         _build_minimal_handoff_zip(zip_path)
-        result = archive(
-            handoff_path=zip_path,
-            date="2026-04-18",
-            session_id="S302",
-            owner_decision="dry run test",
-            apply=False,
-        )
-        assert result.action == "would_create"
-        assert result.delib_id is None
-        assert result.source_ref.startswith("claude-design-handoff:2026-04-18:")
-        assert len(result.content_hash) == 64
+        first = build_inspection_report(zip_path, date="2026-04-18", session_id="S302", owner_decision="first run")
+        second = build_inspection_report(zip_path, date="2026-04-18", session_id="S302", owner_decision="first run")
+        assert first == second
+        assert len(first.content_hash) == 64
+        assert first.warnings == () and first.redaction_notes is None
+        assert first.to_json_dict()["file_count"] == 4
 
-    def test_dry_run_does_not_require_db(self, tmp_path: Path) -> None:
-        # A dry run must never construct or touch a database; passing no db and
-        # apply=False must succeed even though _load_kb would fail in a bare env.
+    def test_report_redacts_credentials_from_the_catalog(self, tmp_path: Path) -> None:
         zip_path = tmp_path / "handoff.zip"
         _build_minimal_handoff_zip(zip_path)
-        result = archive(handoff_path=zip_path, date="2026-04-18", session_id="S302", apply=False)
-        assert result.action == "would_create"
+        report = build_inspection_report(zip_path, date="2026-04-18", notes="uses key AKIAABCDEFGHIJKLMNOP")
+        assert "AKIAABCDEFGHIJKLMNOP" not in report.content
+        assert "[REDACTED:aws_key]" in report.content
+        assert report.redaction_notes == "aws_key: 1 occurrence(s)"
+        assert redact_inspection_content("nothing sensitive") == ("nothing sensitive", None)
 
-
-class TestArchiveApply:
-    def test_second_apply_is_skipped(self, tmp_path: Path) -> None:
-        db = KnowledgeDB(db_path=str(tmp_path / "ephemeral.db"))
+    def test_report_reads_no_database(self, tmp_path: Path) -> None:
         zip_path = tmp_path / "handoff.zip"
         _build_minimal_handoff_zip(zip_path)
-
-        first = archive(
-            handoff_path=zip_path,
-            date="2026-04-18",
-            session_id="S302",
-            owner_decision="first run",
-            apply=True,
-            db=db,
-        )
-        assert first.action == "created"
-        assert first.delib_id is not None
-
-        second = archive(
-            handoff_path=zip_path,
-            date="2026-04-18",
-            session_id="S302",
-            owner_decision="first run",  # identical inputs → identical content_hash
-            apply=True,
-            db=db,
-        )
-        assert second.action == "skipped"
-        assert second.content_hash == first.content_hash
-        assert second.delib_id == first.delib_id
-
-    def test_changed_by_attribution_is_recorded(self, tmp_path: Path) -> None:
-        db = KnowledgeDB(db_path=str(tmp_path / "ephemeral.db"))
-        zip_path = tmp_path / "handoff.zip"
-        _build_minimal_handoff_zip(zip_path)
-
-        result = archive(
-            handoff_path=zip_path,
-            date="2026-04-18",
-            session_id="S302",
-            apply=True,
-            db=db,
-            changed_by="gt design import",
-        )
-        assert result.action == "created"
-        row = (
-            db._get_conn()
-            .execute(
-                "SELECT changed_by FROM current_deliberations WHERE source_ref = ?",
-                (result.source_ref,),
-            )
-            .fetchone()
-        )
-        assert row is not None
-        assert row[0] == "gt design import"
+        before = set(tmp_path.iterdir())
+        report = build_inspection_report(zip_path, date="2026-04-18")
+        assert set(tmp_path.iterdir()) == before
+        assert set(report.to_json_dict()) == {
+            "source_path",
+            "source_kind",
+            "sha256",
+            "total_bytes",
+            "file_count",
+            "entries",
+            "warnings",
+            "content",
+            "content_hash",
+            "redaction_notes",
+        }

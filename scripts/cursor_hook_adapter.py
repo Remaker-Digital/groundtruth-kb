@@ -92,7 +92,10 @@ def _read_payload() -> dict[str, Any]:
 
 def _to_claude_pretooluse(payload: dict[str, Any]) -> dict[str, Any]:
     try:
-        return _to_claude_pretooluse_inner(payload)
+        adapted = _to_claude_pretooluse_inner(payload)
+        if "cwd" in payload:
+            adapted["cwd"] = payload["cwd"]
+        return adapted
     except Exception:
         return payload
 

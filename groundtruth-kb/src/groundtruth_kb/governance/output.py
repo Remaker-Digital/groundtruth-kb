@@ -8,6 +8,7 @@ No hook constructs raw JSON dicts directly.
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from typing import Literal
 
 EventName = Literal["SessionStart", "UserPromptSubmit", "PreToolUse", "PostToolUse", "Stop"]
@@ -68,3 +69,37 @@ def emit_deny(event: EventName, reason: str) -> None:
 def emit_pass() -> None:
     """Silent pass — no output to Claude's context."""
     print("{}")
+
+
+def emit_effect_gate_result(result: Mapping[str, object], *, diagnostic: bool = False) -> None:
+    """Emit the effect checker's existing diagnostic, deny or allow JSON protocol."""
+    if diagnostic:
+        print(
+            json.dumps(
+                {
+                    "decision": result.get("decision", "allow"),
+                    "diagnostic": True,
+                    "reason": result.get("reason", ""),
+                    "would_block": result.get("decision") == "block",
+                },
+                sort_keys=True,
+            )
+        )
+        return
+    if result.get("decision") == "block":
+        reason = result.get("reason") or "BLOCKED (GTKB-IMPLEMENTATION-START-GATE)"
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": reason,
+                        "additionalContext": reason,
+                    }
+                },
+                sort_keys=True,
+            )
+        )
+    else:
+        print(json.dumps(result, sort_keys=True))

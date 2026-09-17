@@ -1,15 +1,14 @@
 """Read-only deterministic specification-coherence checks.
 
 Layer A intentionally emits candidates, not final governance decisions. The
-checker reads ``current_specifications`` and a TOML rule registry, then writes
-only caller-requested output artifacts.
+checker reads one native active-specification snapshot and a TOML rule registry,
+then writes only caller-requested output artifacts. No finding changes authority.
 """
 
 from __future__ import annotations
 
 import json
 import re
-import sqlite3
 import tomllib
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -17,8 +16,10 @@ from itertools import combinations
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.authority_client import AuthorityClient
+
 _MAX_EVIDENCE_LEN = 180
-_ACTIVE_CHILD_STATUSES = frozenset({"implemented", "verified"})
+_ACTIVE_CHILD_STATUSES = frozenset({"active"})
 _DEFAULT_POLARITY_PAIRS = (
     (
         r"\bmust\s+(?!not\b)(?:use|read|load|write|allow|permit|require)\b"
@@ -77,12 +78,13 @@ class CoherenceResult:
 
     run_id: str
     generated_at: str
-    db_path: str
+    authority_url: str
     rule_set_path: str
     rules_loaded: int
     specs_scanned: int
     findings: tuple[Finding, ...]
     rule_classes: dict[str, str]
+    spec_versions: dict[str, int]
 
     @property
     def finding_count(self) -> int:
@@ -103,18 +105,24 @@ def load_rules(toml_path: Path, name: str | None = None) -> list[Rule]:
     except tomllib.TOMLDecodeError as exc:
         raise CoherenceRuleError(f"Malformed TOML in {toml_path}: {exc}") from exc
 
-    raw_rules = data.get("rules") or []
-    if not isinstance(raw_rules, list):
-        raise CoherenceRuleError(f"'rules' must be an array in {toml_path}")
+    raw_rules = data.get("rules")
+    if not isinstance(raw_rules, list) or not raw_rules:
+        raise CoherenceRuleError(f"'rules' must be a nonempty array in {toml_path}")
 
     rules: list[Rule] = []
+    identifiers: set[str] = set()
     for index, entry in enumerate(raw_rules):
         if not isinstance(entry, dict):
             raise CoherenceRuleError(f"Rule entry #{index} must be a table in {toml_path}")
         rule_id = _required_str(entry, "id", index, toml_path)
+        if rule_id in identifiers:
+            raise CoherenceRuleError(f"Duplicate coherence rule id: {rule_id}")
+        identifiers.add(rule_id)
         if name is not None and rule_id != name:
             continue
         rule_class = _required_str(entry, "class", index, toml_path)
+        if rule_class not in {"surface_overlap", "hierarchy_violation", "status_drift"}:
+            raise CoherenceRuleError(f"Unknown coherence rule class: {rule_class}")
         rules.append(
             Rule(
                 id=rule_id,
@@ -133,20 +141,27 @@ def load_rules(toml_path: Path, name: str | None = None) -> list[Rule]:
     return rules
 
 
-def load_specs_from_db(db_path: Path) -> list[dict[str, Any]]:
-    """Read ``current_specifications`` from ``db_path`` using SQLite read-only mode."""
-    if not db_path.is_file():
-        raise CoherenceRuleError(f"GroundTruth DB not found: {db_path}")
-    uri = f"file:{db_path.resolve().as_posix()}?mode=ro"
-    conn = sqlite3.connect(uri, uri=True)
-    conn.row_factory = sqlite3.Row
-    try:
-        rows = conn.execute("SELECT * FROM current_specifications").fetchall()
-    except sqlite3.OperationalError as exc:
-        raise CoherenceRuleError("GroundTruth DB is missing current_specifications") from exc
-    finally:
-        conn.close()
-    return [dict(row) for row in rows]
+def load_specs_from_authority(client: AuthorityClient) -> list[dict[str, Any]]:
+    """Read one complete native snapshot; unavailable or malformed data is an error."""
+    response = client.request("GET", "/v1/specifications/snapshot")
+    if not isinstance(response, dict) or response.get("consistency") != "single_read_transaction":
+        raise CoherenceRuleError("Authority did not return a specification snapshot")
+    rows = response.get("records")
+    if not isinstance(rows, list):
+        raise CoherenceRuleError("Authority specification snapshot has invalid records")
+    previous = ""
+    for row in rows:
+        if (
+            not isinstance(row, dict)
+            or not isinstance(row.get("id"), str)
+            or row["id"] <= previous
+            or type(row.get("version")) is not int
+            or row["version"] < 1
+            or row.get("status") != "active"
+        ):
+            raise CoherenceRuleError("Authority specification snapshot has invalid identity, order or lifecycle")
+        previous = row["id"]
+    return rows
 
 
 def check_surface_overlap(specs: list[dict[str, Any]], rules: list[Rule]) -> list[Finding]:
@@ -228,7 +243,7 @@ def run_all(specs: list[dict[str, Any]], rules: list[Rule]) -> list[Finding]:
 
 def make_result(
     *,
-    db_path: Path,
+    authority_url: str,
     rule_set_path: Path,
     specs: list[dict[str, Any]],
     rules: list[Rule],
@@ -239,12 +254,13 @@ def make_result(
     return CoherenceResult(
         run_id=now.strftime("%Y%m%dT%H%M%SZ"),
         generated_at=now.strftime("%Y-%m-%dT%H:%M:%S.%fZ"),
-        db_path=str(db_path),
+        authority_url=authority_url,
         rule_set_path=str(rule_set_path),
         rules_loaded=len(rules),
         specs_scanned=len(specs),
         findings=tuple(findings),
         rule_classes={rule.id: rule.rule_class for rule in rules},
+        spec_versions={spec["id"]: spec["version"] for spec in specs},
     )
 
 
@@ -252,10 +268,13 @@ def emit_json(result: CoherenceResult, out_path: Path) -> None:
     """Write structured JSON output."""
     out_path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "schema_version": 1,
+        "schema_version": 2,
         "run_id": result.run_id,
         "generated_at": result.generated_at,
-        "db_path": result.db_path,
+        "authority_url": result.authority_url,
+        "source_consistency": "single_read_transaction",
+        "assessment": "review_candidates_only",
+        "spec_versions": result.spec_versions,
         "rule_set_path": result.rule_set_path,
         "rules_loaded": result.rules_loaded,
         "specs_scanned": result.specs_scanned,
@@ -273,7 +292,9 @@ def emit_markdown(result: CoherenceResult, out_path: Path) -> None:
         "",
         f"- Generated: {result.generated_at}",
         f"- Run id: {result.run_id}",
-        f"- DB: {result.db_path}",
+        f"- Authority: {result.authority_url}",
+        "- Source: active specifications from one native read-only transaction",
+        "- Assessment: review candidates only; no verification or completeness claim",
         f"- Rule set: {result.rule_set_path}",
         f"- Rules loaded: {result.rules_loaded}",
         f"- Specs scanned: {result.specs_scanned}",
@@ -313,9 +334,9 @@ def _required_str(entry: dict[str, Any], key: str, index: int, toml_path: Path) 
 def _str_tuple(value: object) -> tuple[str, ...]:
     if value is None:
         return ()
-    if not isinstance(value, list):
-        return ()
-    return tuple(str(item).strip() for item in value if str(item).strip())
+    if not isinstance(value, list) or any(not isinstance(item, str) or not item.strip() for item in value):
+        raise CoherenceRuleError("Coherence rule lists must contain nonempty strings")
+    return tuple(item.strip() for item in value)
 
 
 def _polarity_pairs(value: object, rule_id: str) -> tuple[PolarityPair, ...]:
@@ -400,22 +421,14 @@ def _tags(spec: dict[str, Any]) -> set[str]:
     return {_norm_surface(raw)}
 
 
-def _surface_for(spec: dict[str, Any], rule: Rule) -> str | None:
-    tag_values = _tags(spec)
-    text = _norm_surface(_spec_text(spec))
+def _shared_surface(spec_a: dict[str, Any], spec_b: dict[str, Any], rule: Rule) -> str | None:
+    a_tags, b_tags = _tags(spec_a), _tags(spec_b)
+    a_text, b_text = _norm_surface(_spec_text(spec_a)), _norm_surface(_spec_text(spec_b))
     for raw_surface in rule.surface_tags:
         surface = _norm_surface(raw_surface)
-        if not surface:
-            continue
-        if surface in tag_values or surface in text:
+        if surface and (surface in a_tags or surface in a_text) and (surface in b_tags or surface in b_text):
             return raw_surface
     return None
-
-
-def _shared_surface(spec_a: dict[str, Any], spec_b: dict[str, Any], rule: Rule) -> str | None:
-    surface_a = _surface_for(spec_a, rule)
-    surface_b = _surface_for(spec_b, rule)
-    return surface_a if surface_a is not None and surface_b is not None else None
 
 
 def _opposing_polarity_evidence(
@@ -473,16 +486,6 @@ def _parent_id(spec: dict[str, Any]) -> str | None:
     parent = spec.get("parent")
     if isinstance(parent, str) and parent.strip():
         return parent.strip()
-    affected_by = spec.get("affected_by")
-    if isinstance(affected_by, str):
-        try:
-            parsed = json.loads(affected_by)
-        except json.JSONDecodeError:
-            parsed = None
-        if isinstance(parsed, list):
-            for item in parsed:
-                if isinstance(item, str) and item.strip():
-                    return item.strip()
     return None
 
 

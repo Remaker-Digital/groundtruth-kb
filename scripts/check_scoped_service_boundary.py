@@ -9,10 +9,10 @@ the dimensions owned by this slice:
    operations (deferred to later sub-slices).
 2. The ``allowed_read_operations`` allowlist drifts away from what this
    slice supports (``dashboard.summary.read`` only).
-3. The live startup/dashboard summary path in
-   ``scripts/session_self_initialization.py`` still opens a direct
-   ``sqlite3.connect(...groundtruth.db...)`` connection instead of going
-   through the scoped client.
+
+The summary-path guard that scanned the SQLite-era startup generator for a raw
+``groundtruth.db`` connection left with that generator (legacy startup
+retirement, 2026-09); the scoped client itself is unchanged.
 
 The checker never mutates anything. Exit code 0 = boundary intact,
 exit code 1 = regression found, exit code 2 = unexpected failure.
@@ -24,7 +24,6 @@ reserved.
 from __future__ import annotations
 
 import argparse
-import ast
 import json
 import sys
 from pathlib import Path
@@ -41,10 +40,6 @@ from gtkb_scoped_client import (  # noqa: E402  (path bootstrap above is require
     ScopedServiceConfigError,
     load_scoped_service_config,
 )
-
-SUMMARY_PATH_FILE = _SCRIPTS_DIR / "session_self_initialization.py"
-SUMMARY_PATH_FUNCTIONS: tuple[str, ...] = ("_database_metrics",)
-GROUNDTRUTH_DB_MARKER = "groundtruth.db"
 
 
 class BoundaryCheckError(RuntimeError):
@@ -86,70 +81,6 @@ def _check_config(project_root: Path) -> dict[str, Any]:
     }
 
 
-def _collect_function_sqlite_connects(module_source: str, function_names: tuple[str, ...]) -> list[dict[str, Any]]:
-    """Return ``sqlite3.connect`` call sites inside any of the named functions.
-
-    The check is AST-driven: it walks function bodies (including nested
-    defs) and flags any call expressed as ``sqlite3.connect(...)``. It then
-    string-checks call-site source for the ``groundtruth.db`` marker so the
-    guard is scoped to the GT-KB DB specifically rather than any SQLite
-    usage.
-    """
-
-    tree = ast.parse(module_source)
-    source_lines = module_source.splitlines()
-    findings: list[dict[str, Any]] = []
-
-    def walk_function_body(func: ast.FunctionDef | ast.AsyncFunctionDef) -> None:
-        for node in ast.walk(func):
-            if isinstance(node, ast.Call):
-                callee = node.func
-                if (
-                    isinstance(callee, ast.Attribute)
-                    and isinstance(callee.value, ast.Name)
-                    and callee.value.id == "sqlite3"
-                    and callee.attr == "connect"
-                ):
-                    start = (node.lineno - 1) if node.lineno else 0
-                    end = (node.end_lineno or node.lineno) if node.lineno else start + 1
-                    snippet = "\n".join(source_lines[start:end])
-                    if GROUNDTRUTH_DB_MARKER in snippet:
-                        findings.append(
-                            {
-                                "function": func.name,
-                                "lineno": node.lineno,
-                                "snippet": snippet.strip(),
-                            }
-                        )
-
-    for node in ast.walk(tree):
-        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name in function_names:
-            walk_function_body(node)
-
-    return findings
-
-
-def _check_no_raw_read_on_summary_path() -> dict[str, Any]:
-    if not SUMMARY_PATH_FILE.is_file():
-        raise BoundaryCheckError(f"expected summary-path file missing: {SUMMARY_PATH_FILE}")
-
-    source = SUMMARY_PATH_FILE.read_text(encoding="utf-8")
-    findings = _collect_function_sqlite_connects(source, SUMMARY_PATH_FUNCTIONS)
-    if findings:
-        formatted = "; ".join(
-            f"{finding['function']}:{finding['lineno']} -> {finding['snippet']}" for finding in findings
-        )
-        raise BoundaryCheckError(
-            f"raw groundtruth.db sqlite3.connect() remains on the migrated summary path: {formatted}"
-        )
-
-    return {
-        "summary_path_file": str(SUMMARY_PATH_FILE),
-        "checked_functions": list(SUMMARY_PATH_FUNCTIONS),
-        "sqlite_connect_findings": [],
-    }
-
-
 def run_checks(project_root: Path | None = None) -> dict[str, Any]:
     root = (project_root or PROJECT_ROOT).resolve()
     report: dict[str, Any] = {
@@ -165,12 +96,6 @@ def run_checks(project_root: Path | None = None) -> dict[str, Any]:
     except BoundaryCheckError as exc:
         errors.append(str(exc))
         report["checks"]["config"] = {"error": str(exc)}
-
-    try:
-        report["checks"]["no_raw_read_on_summary_path"] = _check_no_raw_read_on_summary_path()
-    except BoundaryCheckError as exc:
-        errors.append(str(exc))
-        report["checks"]["no_raw_read_on_summary_path"] = {"error": str(exc)}
 
     if errors:
         report["status"] = "fail"
@@ -209,7 +134,6 @@ def main(argv: list[str] | None = None) -> int:
             config = report["checks"].get("config", {})
             print(f"  config: {config.get('source_path')}")
             print(f"  allowed_read_operations: {config.get('allowed_read_operations')}")
-            print(f"  summary_path_file: {report['checks']['no_raw_read_on_summary_path']['summary_path_file']}")
         else:
             print("scoped-service boundary: FAIL", file=sys.stderr)
             for error in report.get("errors", []):

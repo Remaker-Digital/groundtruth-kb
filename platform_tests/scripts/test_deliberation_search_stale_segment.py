@@ -2,18 +2,10 @@
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import Any
 
-from click.testing import CliRunner
-
-_SRC = Path(__file__).resolve().parents[2] / "groundtruth-kb" / "src"
-if _SRC.is_dir() and str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
-
 from groundtruth_kb import db as dbmod  # noqa: E402
-from groundtruth_kb.cli import main  # noqa: E402
 
 
 def _make_db(tmp_path: Path, monkeypatch, delib_id: str = "DELIB-STALE-0001") -> dbmod.KnowledgeDB:
@@ -114,59 +106,3 @@ def test_successful_empty_semantic_pass_is_not_degraded(tmp_path: Path, monkeypa
     assert results == []
     assert status["semantic_succeeded"] is True
     assert status["semantic_degraded"] is False
-
-
-def test_semantic_only_fails_closed_when_semantic_pass_degrades(tmp_path: Path, monkeypatch) -> None:
-    config = tmp_path / "groundtruth.toml"
-    config.write_text('[groundtruth]\napp_title = "test"\ndb_path = "./groundtruth.db"\n', encoding="utf-8")
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(dbmod, "HAS_CHROMADB", True)
-
-    semantic_requirements: list[bool] = []
-
-    def _fake_search(
-        self: dbmod.KnowledgeDB,
-        _query: str,
-        *,
-        limit: int = 5,
-        require_semantic: bool = False,
-    ) -> list[dict[str, Any]]:  # noqa: ARG001
-        semantic_requirements.append(require_semantic)
-        status = {
-            "semantic_expected": True,
-            "semantic_attempted": True,
-            "semantic_succeeded": False,
-            "semantic_degraded": True,
-            "degradation_reason": "stale_segment",
-            "semantic_required": require_semantic,
-        }
-        self._last_deliberation_search_status = status
-        if require_semantic:
-            raise dbmod.DeliberationSearchDegradedError(
-                "Semantic deliberation search degraded (stale_segment).",
-                status=status,
-            )
-        return [
-            {
-                "id": "DELIB-TEXT-ONLY",
-                "version": 1,
-                "title": "text-only fallback",
-                "summary": "fallback row",
-                "content": "fallback row",
-                "search_method": "text_match",
-                "score": None,
-            }
-        ]
-
-    monkeypatch.setattr(dbmod.KnowledgeDB, "search_deliberations", _fake_search)
-    result = CliRunner().invoke(
-        main,
-        ["--config", str(config), "deliberations", "search", "staleprobe", "--semantic-only"],
-        catch_exceptions=False,
-    )
-
-    assert result.exit_code == 1
-    assert semantic_requirements == [True]
-    assert "semantic search" in result.output
-    assert "stale_segment" in result.output
-    assert "DELIB-TEXT-ONLY" not in result.output

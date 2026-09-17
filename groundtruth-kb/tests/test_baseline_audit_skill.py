@@ -41,7 +41,7 @@ def test_managed_registry_includes_new_orientation_rows() -> None:
 
 
 def test_baseline_audit_skill_template_exists() -> None:
-    skill_path = get_templates_dir() / "skills/baseline-audit/SKILL.md"
+    skill_path = get_templates_dir() / "skills/gtkb-baseline-audit/SKILL.md"
     assert skill_path.is_file()
     text = skill_path.read_text(encoding="utf-8")
     assert "baseline status" in text

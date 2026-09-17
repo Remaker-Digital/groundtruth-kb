@@ -1,11 +1,184 @@
-# Typed operational-control catalog (WI-5806 foundation).
-#
-# This checked-in file owns only non-secret definitions, relaxed defaults,
-# units, bounds, and invariant policy. The root .env.local remains the sole
-# production authority for live platform override values. No consumer is
-# migrated and no runtime control is active in this foundation slice.
+# Canonical live operational values. New operations read one validated snapshot.
+# Environment overrides and source fallbacks are not value authorities.
+# This migration covers registry writer controls. Other consumers and calibration remain open.
+schema_version = 2
 
-schema_version = 1
-live_value_authority = "root_env_local"
-controls = []
-invariants = []
+[[controls]]
+id = "registry.lock.acquire_seconds"
+description = "Maximum acquisition wait after locating the checkout mutex."
+numeric_kind = "decimal"
+unit = "seconds"
+value = "300"
+minimum = "0.001"
+maximum = "3600"
+category = "timeout"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "registry.lock.initial_backoff_seconds"
+description = "Initial basis for acquisition retry backoff."
+numeric_kind = "decimal"
+unit = "seconds"
+value = "0.05"
+minimum = "0.001"
+maximum = "3600"
+category = "retry_schedule"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "registry.lock.max_backoff_seconds"
+description = "Maximum acquisition retry backoff before jitter and remaining-budget clipping."
+numeric_kind = "decimal"
+unit = "seconds"
+value = "1"
+minimum = "0.001"
+maximum = "3600"
+category = "retry_schedule"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "registry.lock.backoff_factor"
+description = "Multiplier applied to the previous backoff."
+numeric_kind = "decimal"
+unit = "ratio"
+value = "2"
+minimum = "1"
+maximum = "16"
+category = "retry_schedule"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "registry.lock.jitter_min_ratio"
+description = "Lower fractional multiplier for jitter."
+numeric_kind = "decimal"
+unit = "ratio"
+value = "0.5"
+minimum = "0.001"
+maximum = "1"
+category = "retry_schedule"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "registry.lock.jitter_max_ratio"
+description = "Upper fractional multiplier for jitter."
+numeric_kind = "decimal"
+unit = "ratio"
+value = "1"
+minimum = "0.001"
+maximum = "1"
+category = "retry_schedule"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "registry.git_probe_seconds"
+description = "Socket-independent subprocess timeout for Git checkout identity lookup."
+numeric_kind = "decimal"
+unit = "seconds"
+value = "10"
+minimum = "0.001"
+maximum = "3600"
+category = "timeout"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Preserve the existing registry operating value during source consolidation. Current migration is not proof of optimal calibration."
+tolerance_rationale = "Positive bounded waits/backoff avoid unbounded waits and busy retry loops. Coupled backoff and jitter relations are validated together; the wait does not bound the complete registry operation."
+migration_state = "active"
+consumers = ["groundtruth_kb.project.registry_control_plane"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "GOV-PLATFORM-SOT-REGISTRY-001", "WI-5869"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["control_catalog_sha256", "RegistryFileLockAcquisitionTimeout"]
+
+[[controls]]
+id = "inventory.git_probe_seconds"
+description = "Maximum duration of the optional local Git revision probe performed by one inventory operation."
+numeric_kind = "decimal"
+unit = "seconds"
+value = "30"
+minimum = "0.001"
+maximum = "3600"
+category = "timeout"
+scope = "per_operation"
+zero_semantics = "forbidden"
+rationale = "Restore the inventory extractor historical 30-second probe bound through the canonical live control service. This preserves the former operating value; it is not calibration evidence."
+tolerance_rationale = "A stalled metadata subprocess must not make inventory generation wait indefinitely. Missing metadata remains explicit and does not invent a revision."
+migration_state = "active"
+consumers = ["scripts.timer_inventory"]
+evidence_refs = ["DCL-CENTRAL-DYNAMIC-OPERATIONAL-CONTROLS-001", "WI-5804"]
+reload_behavior = "next_operation"
+failure_disposition = "refuse_new_operation"
+observability = ["catalog_sha256", "generating_commit", "git_metadata_unavailable"]
+[[invariants]]
+id = "registry_backoff_order"
+left = "registry.lock.initial_backoff_seconds"
+operator = "lte"
+right = "registry.lock.max_backoff_seconds"
+margin = "0"
+
+[[invariants]]
+id = "registry_backoff_wait"
+left = "registry.lock.max_backoff_seconds"
+operator = "lt"
+right = "registry.lock.acquire_seconds"
+margin = "0"
+
+[[invariants]]
+id = "registry_jitter_order"
+left = "registry.lock.jitter_min_ratio"
+operator = "lte"
+right = "registry.lock.jitter_max_ratio"
+margin = "0"

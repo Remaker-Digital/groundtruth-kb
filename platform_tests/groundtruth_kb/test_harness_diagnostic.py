@@ -1,110 +1,273 @@
+"""Native diagnostic reads, exact context provenance and truthful coverage.
+
+These tests qualify the shared report/CLI on disposable PostgreSQL. They do not
+qualify real harness hosts, supply run telemetry or grant parity exemptions.
+"""
+
 from __future__ import annotations
 
 import json
+import socket
+import subprocess
 import sys
-from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
+import pytest
+from groundtruth_kb.authority_client import AuthorityClientError
+from groundtruth_kb.harness_diagnostic import SCHEMA_ID, collect_harness_diagnostic, diagnose_harness
 
-from groundtruth_kb.harness_diagnostic import SCHEMA_ID, diagnose_harness  # noqa: E402
+from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
+from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
 
-def _project(root: Path) -> None:
-    state = root / "harness-state"
-    state.mkdir(parents=True)
-    (state / "harness-identities.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": {"codex": {"id": "A"}}}),
-        encoding="utf-8",
+class ReadClient:
+    def __init__(self, client):
+        self.client = client
+        self.calls = []
+
+    def request(self, method, path, *, query=None):
+        assert method == "GET", "A diagnostic must not write"
+        assert path.startswith("/v1/harnesses/") or path == "/v1/sessions/binding", "No provider or state discovery"
+        self.calls.append((method, path, query))
+        result = self.client.get(path, params=query)
+        if result.status_code != 200:
+            error = result.json()["error"]
+            raise AuthorityClientError(error["code"], error["message"])
+        return result.json()
+
+
+def register(client, identifier="A", *, active=True):
+    row = put(
+        client,
+        "harnesses",
+        identifier,
+        {
+            "harness_name": "harness-" + identifier,
+            "harness_type": "test",
+            "capabilities_ref": "public-declared-capabilities",
+            "invocation_surfaces": {
+                "headless": {
+                    "argv": ["runner", "--model", "private-model", "private-prompt"],
+                    "env": {"TOKEN": "private-credential"},
+                },
+                "private-surface-content": {"role": "loyal-opposition", "output": "private-generated-text"},
+            },
+        },
     )
-    (state / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": [
-                    {
-                        "id": "A",
-                        "harness_name": "codex",
-                        "harness_type": "codex",
-                        "status": "active",
-                        "role": ["prime-builder"],
-                        "can_receive_dispatch": True,
-                        "can_fire_events": False,
-                        "invocation_surfaces": {
-                            "headless": {"argv": ["codex", "exec", "--model", "gpt-test", "{{PROMPT}}"]},
-                            "interactive": {"argv": ["codex"]},
-                        },
-                    }
-                ],
-            }
-        ),
-        encoding="utf-8",
-    )
+    assert row.status_code == 200, row.text
+    if active:
+        assert put(client, "harnesses", identifier, {"status": "active"}, expected_version=1).status_code == 200
 
 
-def _telemetry(root: Path, index: int, *, partial: bool = False) -> None:
-    directory = root / ".gtkb-state" / "bridge-poller" / "dispatch-runs"
-    directory.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_id": "gtkb.shim_dispatch_telemetry.v1",
-        "correlation": {
-            "dispatch_id": f"dispatch-{index}",
-            "run_id": f"dispatch-{index}",
-            "bridge_document_id": "diagnostic-thread",
-            "related_work_item_ids": ["WI-5179"],
-            "session_context_id": "diagnostic-session",
-        },
-        "worker": {
-            "harness_id": "A",
-            "harness_name": "codex",
-            "provider": "openai",
-            "model_id": "test-model",
-            "model_version": "v1",
-            "role": "prime-builder",
-        },
-        "timing": {"started_at": "2026-07-11T00:00:00Z", "completed_at": None, "elapsed_ms": None},
-        "budget": {"turn_budget": 8, "turns_used": None if partial else 2},
-        "turns": [{"index": 1, "tool_names": ["Read"]}],
-        "tool_calls": {"total": None if partial else 1, "by_name": {"Read": 1}},
-        "outcome": {"stop_reason": "external_termination", "exit_status": "partial", "exit_code": None},
-        "usage": {
-            "coverage": "unavailable" if partial else "complete",
-            "input_tokens": None if partial else 0,
-            "output_tokens": None if partial else 4,
-            "total_tokens": None if partial else 4,
-            "cache_read_tokens": None,
-            "cache_write_tokens": None,
-        },
-        "cost": {"amount": None, "currency": None, "source": None},
-        "prompt": "must not persist",
-        "tool_arguments": {"credential": "must not persist"},
-        "provider_body": {"secret": "must not persist"},
-    }
-    (directory / f"dispatch-{index}.telemetry.json").write_text(json.dumps(payload), encoding="utf-8")
+def bind(client, name, role):
+    response = client.post("/v1/sessions/bind", json={"native_context_id": name, "init_command": "::init gtkb " + role})
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "init_requested"
+    return response.json()["binding"]
 
 
-def test_unknown_harness_returns_structured_error(tmp_path: Path) -> None:
-    root = tmp_path / "project"
-    root.mkdir()
-    _project(root)
+def test_unknown_harness_returns_structured_error_without_mutation(native):
+    service, client, *_ = native
+    register(client)
+    before = history_count(service)
+    reader = ReadClient(client)
+    result = collect_harness_diagnostic(reader, "Z")
+    assert result["status"] == "error" and result["errors"] == ["harness_not_registered"]
+    assert reader.calls == [("GET", "/v1/harnesses/Z", None)]
+    assert history_count(service) == before
 
-    result = diagnose_harness(root, "Z")
 
-    assert result["status"] == "error"
-    assert result["errors"] == ["harness_not_registered"]
-
-
-def test_live_active_registry_is_the_diagnostic_coverage_inventory() -> None:
-    registry = json.loads((REPO_ROOT / "harness-state" / "harness-registry.json").read_text(encoding="utf-8"))
-    active_ids = [row["id"] for row in registry["harnesses"] if row["status"] == "active"]
-
-    assert active_ids
-    for harness_id in active_ids:
-        result = diagnose_harness(REPO_ROOT, harness_id)
+def test_registry_inventory_has_the_same_contract_without_claiming_host_parity(native):
+    service, client, *_ = native
+    for identifier in "ABCDEFGHI":
+        register(client, identifier, active=identifier != "I")
+    assert put(client, "harnesses", "D", {"status": "suspended"}, expected_version=2).status_code == 200
+    inventory = client.get("/v1/harnesses").json()["records"]
+    before = history_count(service)
+    for row in inventory:
+        reader = ReadClient(client)
+        result = collect_harness_diagnostic(reader, row["id"])
         assert result["schema_id"] == SCHEMA_ID
-        assert result["parity"] == {
-            "status": "implemented",
-            "contract": SCHEMA_ID,
-            "coverage_inventory": "active_harness_registry",
-            "waiver": None,
-        }
+        assert result["status"] == "partial" and result["parity"]["status"] == "unqualified"
+        assert result["harness"]["record_version"] == row["version"]
+        assert result["harness"]["lifecycle_status"] == row["status"]
+        assert result["role"]["role"] is None and len(reader.calls) == 1
+        assert result["checks"]["hooks"]["status"] == "unavailable"
+        assert result["checks"]["adapter_readiness"]["status"] == "unavailable"
+        assert result["harness"]["capabilities"]["observed"] is None
+        assert all(value is None for value in result["measurements"].values())
+        assert result["recent_runs"] == []
+        assert result["recent_runs_bounds"] == {"record_limit": 50, "records_returned": 0}
+        assert result["field_status"]["telemetry"]["status"] == "unavailable"
+    assert client.get("/v1/harnesses").json()["records"] == inventory
+    assert history_count(service) == before
+
+
+def test_role_comes_only_from_the_exact_selected_binding(native, monkeypatch):
+    service, client, *_ = native
+    register(client)
+    first = bind(client, "first-context", "pb")
+    successor = bind(client, "successor-context", "lo")
+    monkeypatch.setenv("GTKB_NATIVE_CONTEXT_ID", "successor-context")
+    before = history_count(service)
+    reader = ReadClient(client)
+    first_report = collect_harness_diagnostic(reader, "A", native_context_id="first-context")
+    assert first_report["role"]["role"] == "prime-builder"
+    assert first_report["role"]["session_context_id"] == first["session_context_id"]
+    assert first_report["role"]["source"] == "native_session_binding"
+    assert "no_harness_association_asserted" in first_report["role"]["scope"]
+    second_report = collect_harness_diagnostic(reader, "A", native_context_id="successor-context")
+    assert second_report["role"]["role"] == "loyal-opposition"
+    assert second_report["role"]["session_context_id"] == successor["session_context_id"]
+    unselected = collect_harness_diagnostic(reader, "A")
+    assert unselected["role"]["role"] is None
+    assert unselected["role"]["unavailable_reason"] == "native_context_not_selected"
+    missing = collect_harness_diagnostic(reader, "A", native_context_id="unbound")
+    assert missing["role"]["role"] is None and missing["role"]["unavailable_reason"] == "no_session_binding"
+    assert missing["correlation"]["session_id"] is None
+    assert client.get("/v1/sessions/binding", params={"native_context_id": "first-context"}).json() == first
+    assert client.get("/v1/sessions/binding", params={"native_context_id": "successor-context"}).json() == successor
+    assert history_count(service) == before
+
+
+def test_privacy_excludes_invocation_values_and_fingerprint_is_metadata_only(native):
+    _, client, *_ = native
+    register(client)
+    first = collect_harness_diagnostic(ReadClient(client), "A")
+    assert "private-" not in json.dumps(first)
+    assert first["harness"]["provider_identity"] is None and first["harness"]["model_identity"] is None
+    assert first["provider_health"]["mode"] == "local" and first["provider_health"]["status"] == "unavailable"
+    assert (
+        put(
+            client, "harnesses", "A", {"invocation_surfaces": {"private-new-key": "private-secret"}}, expected_version=2
+        ).status_code
+        == 200
+    )
+    second = collect_harness_diagnostic(ReadClient(client), "A")
+    assert "private-" not in json.dumps(second)
+    assert first["harness"]["configuration_fingerprint"] == second["harness"]["configuration_fingerprint"]
+    assert second["harness"]["configuration_fingerprint_scope"] == "canonical_installation_metadata_only"
+
+
+@pytest.mark.parametrize("response", [None, {}, {"id": "other"}])
+def test_malformed_harness_response_is_not_an_empty_successful_inventory(response):
+    class Client:
+        def request(self, *args, **kwargs):
+            return response
+
+    result = collect_harness_diagnostic(Client(), "A")
+    assert result["errors"] == ["invalid_harness_response"] and result["status"] == "error"
+
+
+@pytest.mark.parametrize(
+    "binding",
+    [
+        None,
+        {},
+        {"native_context_id": "other", "role": "prime-builder"},
+        {"native_context_id": "selected", "role": "loyal-opposition"},
+    ],
+)
+def test_malformed_binding_never_supplies_role_or_correlation(binding):
+    class Client:
+        def request(self, method, path, **kwargs):
+            return {"id": "A", "status": "active"} if path.startswith("/v1/harnesses/") else binding
+
+    result = collect_harness_diagnostic(Client(), "A", native_context_id="selected")
+    assert result["role"]["role"] is None and result["role"]["unavailable_reason"] == "invalid_session_response"
+    assert result["correlation"]["session_id"] is None
+
+
+def test_service_failure_has_no_private_body_and_does_not_fall_back():
+    class Client:
+        def request(self, *args, **kwargs):
+            raise AuthorityClientError("authority_unavailable", "private-body", details={"secret": "private-value"})
+
+    result = collect_harness_diagnostic(Client(), "A")
+    assert result["status"] == "error" and result["errors"] == ["harness_authority_unavailable"]
+    assert "private-" not in json.dumps(result)
+
+
+def test_invalid_selected_configuration_returns_a_private_structured_error(tmp_path, monkeypatch):
+    monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\nauthority_url="http://private-credential@127.0.0.1:1"\n', encoding="utf-8"
+    )
+    result = diagnose_harness(tmp_path, "A")
+    assert result["errors"] == ["native_authority_configuration_invalid"]
+    assert "private-" not in json.dumps(result)
+
+
+def test_explicit_root_does_not_discover_configuration_from_the_callers_directory(tmp_path, monkeypatch):
+    monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
+    other = tmp_path / "other"
+    other.mkdir()
+    (other / "groundtruth.toml").write_text('[groundtruth]\nauthority_url="http://127.0.0.1:1"\n', encoding="utf-8")
+    selected = tmp_path / "selected"
+    selected.mkdir()
+    monkeypatch.chdir(other)
+    result = diagnose_harness(selected, "A")
+    assert result["errors"] == ["native_authority_not_configured"]
+    assert list(selected.iterdir()) == []
+
+
+def test_ordinary_cli_and_direct_adapter_read_the_same_native_authority(native, tmp_path, monkeypatch):
+    service, client, *_ = native
+    register(client)
+    selected = bind(client, "cli-context", "pb")
+    before = history_count(service)
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    process, env = _serve_authority(tmp_path, port)
+    try:
+        config = tmp_path / "groundtruth.toml"
+        config.write_text(f'[groundtruth]\nauthority_url="http://127.0.0.1:{port}"\n', encoding="utf-8")
+        env = dict(env, PYTHONIOENCODING="utf-8")
+        env.pop("GT_AUTHORITY_URL", None)
+
+        def gt(identifier):
+            return subprocess.run(
+                [
+                    sys.executable,
+                    "-m",
+                    "groundtruth_kb",
+                    "--config",
+                    str(config),
+                    "harness",
+                    "diagnostic",
+                    "--harness-id",
+                    identifier,
+                    "--native-context-id",
+                    "cli-context",
+                    "--json",
+                ],
+                cwd=tmp_path,
+                env=env,
+                capture_output=True,
+                encoding="utf-8",
+                timeout=30,
+            )
+
+        completed = gt("A")
+        assert completed.returncode == 0, completed.stderr
+        report = json.loads(completed.stdout)
+        assert report["role"]["session_context_id"] == selected["session_context_id"]
+        monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
+        direct = diagnose_harness(tmp_path, "A", native_context_id="cli-context")
+        for output in (report, direct):
+            output.pop("generated_at")
+        assert report == direct
+        unknown = gt("missing")
+        assert unknown.returncode == 1 and json.loads(unknown.stdout)["errors"] == ["harness_not_registered"]
+        assert history_count(service) == before
+        process.terminate()
+        process.wait(timeout=15)
+        offline = gt("A")
+        assert offline.returncode == 1 and json.loads(offline.stdout)["errors"] == ["harness_authority_unavailable"]
+    finally:
+        if process.poll() is None:
+            process.terminate()
+            process.wait(timeout=15)

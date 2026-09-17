@@ -1,5 +1,5 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Project scaffold, profiles, doctor, and upgrade — Layers 2 & 3."""
+"""Project scaffold, profiles and doctor — Layers 2 & 3 (application upgrade lives in application_upgrade)."""
 
 from groundtruth_kb.project.lifecycle import (
     PROJECT_TERMINAL_STATUS,
@@ -13,7 +13,6 @@ from groundtruth_kb.project.managed_registry import (
     OwnershipMeta,
     UpgradePolicyEnum,
 )
-from groundtruth_kb.project.manifest import ProjectManifest, read_manifest, write_manifest
 from groundtruth_kb.project.ownership import (
     ClassificationRow,
     OwnershipRecord,
@@ -33,15 +32,12 @@ __all__ = [
     "OwnershipResolver",
     "PROJECTS_CHANGED_BY",
     "PROJECT_TERMINAL_STATUS",
-    "ProjectManifest",
     "ProjectLifecycleError",
     "ProjectLifecycleService",
     "ProjectProfile",
     "UpgradePolicyEnum",
     "get_profile",
     "list_profiles",
-    "read_manifest",
     "render_classification_report_json",
     "render_classification_report_markdown",
-    "write_manifest",
 ]

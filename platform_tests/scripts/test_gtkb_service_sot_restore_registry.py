@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import textwrap
 import tomllib
 from pathlib import Path
@@ -10,8 +9,6 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(_REPO_ROOT / "groundtruth-kb" / "src") not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.project.registry_control_plane import load_registry_snapshot  # noqa: E402
 from groundtruth_kb.project.sot_registry import (  # noqa: E402

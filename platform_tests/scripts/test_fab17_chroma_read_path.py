@@ -10,16 +10,9 @@ Spec-derived tests for gtkb-fab-17-da-chroma-read-path:
 
 from __future__ import annotations
 
-import sys
 import time
-from pathlib import Path
 
 import pytest
-
-_SRC = Path(__file__).resolve().parents[2] / "groundtruth-kb" / "src"
-if _SRC.is_dir() and str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
-
 from groundtruth_kb import db as dbmod  # noqa: E402
 
 

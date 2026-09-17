@@ -11,9 +11,6 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_artifact_evaluability.py"
-PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
-if str(PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_SRC))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 

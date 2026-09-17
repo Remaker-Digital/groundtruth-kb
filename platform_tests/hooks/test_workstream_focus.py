@@ -12,10 +12,6 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 MODULE_PATH = REPO_ROOT / "scripts" / "workstream_focus.py"
 
-_PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
-if str(_PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(_PACKAGE_SRC))
-
 # WI-3342 IP-6 — registry-backed role reader/writer fixtures.
 #
 # scripts/workstream_focus.py resolves the harness role map through

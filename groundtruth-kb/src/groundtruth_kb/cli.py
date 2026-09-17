@@ -82,24 +82,31 @@ class _NoWindowsExpandGroup(click.Group):
     @staticmethod
     def _commands() -> dict[str, click.Command]:
         """Knowledge commands always use native authority; local tools need no database."""
-        from groundtruth_kb.cli_authority import NATIVE_COMMANDS
+        from groundtruth_kb.cli_authority import NATIVE_COMMANDS, harness_group, scaffold_specs_cmd
 
         return {
             **NATIVE_COMMANDS,
             "authority": authority_group,
             "service": service_group,
             "secrets": secrets,
+            "push": push_group,
             "env": env_cmd,
             "config": config,
+            "controls": controls_group,
             "commit": click.Group(
                 "commit",
                 help="Inspect local staged changes without database access.",
                 commands={"preflight": commit_preflight_cmd},
             ),
+            "application": click.Group(
+                "application",
+                help="Register hosted applications and inspect their boundaries.",
+                commands={"inspect": application_inspect_cmd, "register": application_register_cmd},
+            ),
             "scaffold": click.Group(
                 "scaffold",
-                help="Generate adopter-owned infrastructure files without database access.",
-                commands={"iac": scaffold_iac_cmd, "cicd": scaffold_cicd_cmd},
+                help="Generate adopter-owned infrastructure files and starter specifications.",
+                commands={"iac": scaffold_iac_cmd, "cicd": scaffold_cicd_cmd, "specs": scaffold_specs_cmd},
             ),
             "db": click.Group(
                 "db", help="Explicit PostgreSQL administration and migration.", commands={"postgres": db_postgres_cmd}
@@ -112,13 +119,24 @@ class _NoWindowsExpandGroup(click.Group):
                 help="Read and update the canonical declaration using current authority facts.",
                 commands={
                     name: registry_cmd.commands[name]
-                    for name in ("list", "show", "inspect", "validate", "reconcile", "register", "amend", "transition")
+                    for name in (
+                        "list",
+                        "show",
+                        "inspect",
+                        "inventory",
+                        "scan-strings",
+                        "validate",
+                        "reconcile",
+                        "register",
+                        "amend",
+                        "transition",
+                    )
                 },
             ),
             "harness": click.Group(
                 "harness",
                 help="Read installation metadata or derive configuration from the canonical baseline.",
-                commands={**NATIVE_COMMANDS["harness"].commands, "project": harness_project_cmd},
+                commands={**harness_group.commands, "project": harness_project_cmd},
             ),
         }
 
@@ -238,6 +256,73 @@ def env_migrate_cmd(ctx: click.Context, app: str, dry_run: bool, apply_: bool, j
         click.echo(env_sot.render_migration_result(result))
 
 
+@click.command("inspect")
+@click.option(
+    "--host-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Explicit host whose applications/ catalog and slots are inspected.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit structured application diagnostics.")
+@click.pass_context
+def application_inspect_cmd(ctx: click.Context, host_root: Path, json_output: bool) -> None:
+    """Read local application catalog, marker and artifact-boundary facts.
+
+    The explicit host selects this local inspection independently of database
+    configuration. Native application lifecycle qualification remains separate.
+    """
+    from groundtruth_kb.isolation.doctor_verdicts import evaluate_isolation_state
+
+    try:
+        root = host_root.resolve(strict=True)
+        result = evaluate_isolation_state(root)
+    except (OSError, RuntimeError) as exc:
+        raise click.ClickException(f"Cannot inspect the selected application host: {exc}") from exc
+    findings = result["verdicts"]
+    if json_output:
+        click.echo(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    elif findings:
+        for finding in findings:
+            click.echo(f"{finding['severity']} {finding['verdict']}: {finding['details']}")
+            click.echo(f"  {finding['remediation']}")
+    elif result["slots_status"]:
+        click.echo(f"Application registry checks passed for {len(result['slots_status'])} applications.")
+        click.echo("Native lifecycle qualification is separate.")
+    else:
+        click.echo("No application slots configured; no application qualification performed.")
+    if findings:
+        ctx.exit(1)
+
+
+@click.command("register")
+@click.argument("name")
+@click.option(
+    "--host-root",
+    type=click.Path(exists=True, file_okay=False, path_type=Path),
+    required=True,
+    help="Explicit platform Git checkout whose application catalog is updated.",
+)
+@click.option("--json", "json_output", is_flag=True, help="Emit registration result and changed paths.")
+@click.pass_context
+def application_register_cmd(ctx: click.Context, name: str, host_root: Path, json_output: bool) -> None:
+    """Register a catalog entry and matching marker while preserving existing files."""
+    from groundtruth_kb.isolation.registry_check import register_application
+
+    try:
+        result = register_application(host_root, name)
+    except (OSError, RuntimeError, ValueError) as exc:
+        if json_output:
+            click.echo(json.dumps({"status": "refused", "error": str(exc)}, ensure_ascii=False, sort_keys=True))
+            ctx.exit(1)
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(result, ensure_ascii=False, sort_keys=True))
+    elif result["status"] == "already_registered":
+        click.echo(f"Application {name} is already registered.")
+    else:
+        click.echo(f"Successfully registered application {name}.")
+
+
 @main.group("commit")
 def commit_group() -> None:
     """Commit governance preflight commands."""
@@ -279,6 +364,84 @@ def commit_preflight_cmd(
     ctx.exit(preflight_exit_code(evidence))
 
 
+@main.group("push")
+def push_group() -> None:
+    """Push governance preflight and readiness commands."""
+
+
+@push_group.command("preflight")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--python-bin", default=None, help="Python executable used for secret range scans.")
+@click.pass_context
+def push_preflight_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    python_bin: str | None,
+) -> None:
+    """Run pre-push redacted secret range scans from Git pre-push stdin."""
+    from groundtruth_kb.governance.push_preflight import preflight_exit_code, run_push_preflight
+
+    config = _resolve_config(ctx)
+    evidence = run_push_preflight(
+        Path(config.project_root),
+        sys.stdin.read(),
+        python_bin=python_bin,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(preflight_exit_code(evidence))
+
+
+@push_group.command("readiness")
+@click.option("--json", "json_output", is_flag=True, default=False, help="Emit machine-readable JSON.")
+@click.option(
+    "--evidence-out",
+    "--evidence-file",
+    type=click.Path(dir_okay=False, path_type=Path),
+    default=None,
+    help="Write the evidence packet JSON to this path.",
+)
+@click.option("--remote", default="origin", show_default=True, help="Git remote name to check.")
+@click.option("--hostname", default="github.com", show_default=True, help="GitHub hostname for gh auth status.")
+@click.option("--timeout-seconds", default=15, show_default=True, type=int, help="Per-command timeout.")
+@click.pass_context
+def push_readiness_cmd(
+    ctx: click.Context,
+    json_output: bool,
+    evidence_out: Path | None,
+    remote: str,
+    hostname: str,
+    timeout_seconds: int,
+) -> None:
+    """Run a read-only non-interactive push readiness diagnostic."""
+    from groundtruth_kb.governance.push_readiness import readiness_exit_code, run_push_readiness
+
+    config = _resolve_config(ctx)
+    evidence = run_push_readiness(
+        Path(config.project_root),
+        remote=remote,
+        hostname=hostname,
+        timeout_seconds=timeout_seconds,
+        evidence_path=evidence_out,
+    )
+    if evidence_out is not None:
+        evidence_out.parent.mkdir(parents=True, exist_ok=True)
+        evidence_out.write_text(evidence.to_json() + "\n", encoding="utf-8")
+    click.echo(evidence.to_json() if json_output else evidence.to_text_summary())
+    ctx.exit(readiness_exit_code(evidence))
+
+
 @main.group("authority")
 def authority_group() -> None:
     """Resolve current canonical terminology through the authority service."""
@@ -317,7 +480,7 @@ def authority_status_cmd(ctx: click.Context, scope: str | None, json_output: boo
 
 @main.group("hygiene")
 def hygiene_group() -> None:
-    """Repository hygiene services (drift discovery, sweeps)."""
+    """Read-only repository observations."""
 
 
 @hygiene_group.command("worktrees")
@@ -326,35 +489,32 @@ def hygiene_group() -> None:
 @click.option("--json", "json_output", is_flag=True, default=False)
 @click.pass_context
 def hygiene_worktrees_cmd(ctx: click.Context, root: str, integration_ref: str, json_output: bool) -> None:
-    """Classify every git checkout. Read-only; writes nothing, removes nothing.
+    """Report checkout observations without inferring liveness or disposal eligibility."""
+    from groundtruth_kb.session.worktree import SessionWorktreeError, classify_worktrees
 
-    Disposition is never automatic. A checkout holding work is reported as
-    preserve_then_close and is never a removal candidate, because folding one
-    session's bytes into another session's commit is the failure this whole
-    lifecycle exists to prevent.
-    """
-    from groundtruth_kb.session.worktree import classify_worktrees
-
-    config = _resolve_config(ctx)
-    project_root = Path(root).resolve() if root != "." else Path(config.project_root)
-    states = classify_worktrees(project_root, Path(config.db_path), integration_ref=integration_ref)
+    project_root = Path(root).absolute() if root != "." else Path(_resolve_config(ctx).project_root)
+    try:
+        states = classify_worktrees(project_root, integration_ref=integration_ref)
+    except SessionWorktreeError as exc:
+        raise click.ClickException(f"{exc.code}: {exc}") from exc
 
     if json_output:
         click.echo(json.dumps([state.as_dict() for state in states], indent=2, sort_keys=True))
         return
 
     if not states:
-        click.echo("No checkouts beside the main tree.")
+        click.echo("No other checkouts reported.")
         return
     counts: dict[str, int] = {}
     for state in states:
         counts[state.classification] = counts.get(state.classification, 0) + 1
-    for state in states:
+        tracked = "unknown" if state.tracked_dirty is None else str(state.tracked_dirty)
+        untracked = "unknown" if state.untracked is None else str(state.untracked)
         click.echo(
             f"{state.classification:20} {state.candidate_action:22} "
-            f"dirty={state.tracked_dirty:<4} untracked={state.untracked:<4} {state.path}"
+            f"dirty={tracked:<7} untracked={untracked:<7} {state.path}"
         )
-    click.echo("")
+    click.echo("Git observations do not establish context liveness or disposal eligibility.")
     click.echo("  ".join(f"{name}={count}" for name, count in sorted(counts.items())))
 
 
@@ -429,6 +589,78 @@ def registry_show(ctx: click.Context, entry_id: str, json_output: bool) -> None:
                     click.echo(f"{key}: {val}")
             return
     raise click.ClickException(f"No registry entry with id={entry_id!r}")
+
+
+@registry_cmd.command("inventory")
+@click.option("--json", "json_output", is_flag=True, help="Emit the complete inventory report.")
+@click.pass_context
+def registry_inventory(ctx: click.Context, json_output: bool) -> None:
+    """Inspect declared artifact coverage without changing files or domain state."""
+    from groundtruth_kb.inventory import InventoryScanError, build_refresh_report
+
+    root = Path(_resolve_config(ctx).project_root)
+    try:
+        report = build_refresh_report(root)
+    except (InventoryScanError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    if json_output:
+        click.echo(json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True))
+        return
+    summary = report["summary"]
+    click.echo(f"Registry inventory: {summary['artifact_count']} artifacts, {summary['scanned_file_count']} files")
+    click.echo(f"blocking findings: {summary['blocking_finding_count']}")
+    click.echo("path classes: " + ", ".join(f"{key}={value}" for key, value in summary["path_class_counts"].items()))
+    for finding in report["registry_findings"]:
+        click.echo(f"{finding['artifact_id']}: {finding['code']} ({finding['storage_path']})")
+
+
+@registry_cmd.command("scan-strings")
+@click.option("--match", "matches", multiple=True, help="Literal to find in declared files; repeat for more literals.")
+@click.option(
+    "--match-file", "match_files", multiple=True, type=click.Path(exists=True, dir_okay=False, path_type=Path)
+)
+@click.option("--critical-class", "critical_classes", multiple=True, help="Add an artifact ID, domain or lifecycle.")
+@click.option("--critical-path", "critical_paths", multiple=True, help="Add a project-relative path pattern.")
+@click.option("--json", "json_output", is_flag=True, help="Emit the complete scan report.")
+@click.option("--report-only", is_flag=True, help="Report findings without a finding-driven nonzero exit.")
+@click.pass_context
+def registry_scan_strings(
+    ctx: click.Context,
+    matches: tuple[str, ...],
+    match_files: tuple[Path, ...],
+    critical_classes: tuple[str, ...],
+    critical_paths: tuple[str, ...],
+    json_output: bool,
+    report_only: bool,
+) -> None:
+    """Scan declared file contents; no database, membership or work-state mutation."""
+    from groundtruth_kb.inventory import (
+        InventoryScanError,
+        emit_markdown_ledger,
+        load_match_file,
+        scan_inventory_strings,
+    )
+
+    root = Path(_resolve_config(ctx).project_root)
+    try:
+        literals = list(matches)
+        for path in match_files:
+            literals.extend(load_match_file(path))
+        report = scan_inventory_strings(
+            root,
+            literals,
+            critical_classes=set(critical_classes),
+            critical_paths=critical_paths,
+        )
+    except (InventoryScanError, OSError, ValueError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(
+        json.dumps(report, ensure_ascii=False, indent=2, sort_keys=True)
+        if json_output
+        else emit_markdown_ledger(report)
+    )
+    if not report_only and (report["summary"]["critical"] or report["missing_artifacts"]):
+        raise click.exceptions.Exit(1)
 
 
 @registry_cmd.command("validate")
@@ -798,10 +1030,16 @@ def _run_postgres_operation(ctx: click.Context, operation: Any) -> None:
 
 
 @db_postgres_cmd.command("init")
+@click.option("--upgrade-from", metavar="SCHEMA_SHA256", help="Explicitly transition the supported existing schema.")
 @click.pass_context
-def db_postgres_init_cmd(ctx: click.Context) -> None:
-    """Initialize an empty, service-selected PostgreSQL schema."""
-    _run_postgres_operation(ctx, lambda kernel, _cfg: kernel.initialize())
+def db_postgres_init_cmd(ctx: click.Context, upgrade_from: str | None) -> None:
+    """Initialize an empty schema or explicitly transition a known predecessor."""
+    _run_postgres_operation(
+        ctx,
+        lambda kernel, _cfg: (
+            kernel.initialize() if upgrade_from is None else kernel.upgrade_schema(expected_schema_sha256=upgrade_from)
+        ),
+    )
 
 
 @db_postgres_cmd.command("status")
@@ -885,7 +1123,9 @@ def db_postgres_import_current_cmd(ctx: click.Context, input_path: Path, actor: 
     """Import one complete canonical current-state manifest."""
     _run_postgres_operation(
         ctx,
-        lambda kernel, _cfg: kernel.import_current(input_path=input_path, actor=actor, reason=reason),
+        lambda kernel, cfg: kernel.import_current(
+            input_path=input_path, actor=actor, reason=reason, project_root=cfg.project_root
+        ),
     )
 
 
@@ -898,13 +1138,132 @@ def db_postgres_readback_current_cmd(ctx: click.Context, output: Path) -> None:
 
 
 @main.command()
+@click.option("--json", "json_output", is_flag=True, help="Emit resolved settings as JSON.")
 @click.pass_context
-def config(ctx: click.Context) -> None:
-    """Show resolved configuration."""
-    cfg = _resolve_config(ctx)
-    click.echo(f"Project root: {cfg.project_root}")
+def config(ctx: click.Context, json_output: bool) -> None:
+    """Show resolved settings without probing services or optional dependencies."""
+    try:
+        cfg = _resolve_config(ctx)
+        project_root = str(cfg.project_root.resolve())
+        db_path = str(cfg.db_path.resolve())
+        chroma_path = str(cfg.chroma_path.resolve()) if cfg.chroma_path is not None else None
+    except (GTConfigError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    postgresql = {
+        "service": cfg.postgresql.service,
+        "connect_timeout_seconds": cfg.postgresql.connect_timeout_seconds,
+        "lock_timeout_ms": cfg.postgresql.lock_timeout_ms,
+        "statement_timeout_ms": cfg.postgresql.statement_timeout_ms,
+    }
+    if json_output:
+        click.echo(
+            json.dumps(
+                {
+                    "app_title": cfg.app_title,
+                    "project_root": project_root,
+                    "authority_url": cfg.authority_url,
+                    "postgresql": postgresql,
+                    "legacy_paths": {"db_path": db_path, "chroma_path": chroma_path},
+                },
+                indent=2,
+                sort_keys=True,
+                ensure_ascii=False,
+            )
+        )
+        return
+    click.echo(f"Application title: {cfg.app_title}")
+    click.echo(f"Project root: {project_root}")
     click.echo(f"Authority URL: {cfg.authority_url or '(missing; configure before knowledge operations)'}")
-    click.echo(f"PostgreSQL service: {cfg.postgresql.service or '(not configured)'}")
+    click.echo(f"PostgreSQL service: {cfg.postgresql.service}")
+    click.echo(f"PostgreSQL connect timeout (seconds): {cfg.postgresql.connect_timeout_seconds}")
+    click.echo(f"PostgreSQL lock timeout (ms): {cfg.postgresql.lock_timeout_ms}")
+    click.echo(f"PostgreSQL statement timeout (ms): {cfg.postgresql.statement_timeout_ms}")
+    click.echo(f"Legacy helper db_path: {db_path}")
+    click.echo(f"Legacy helper chroma_path: {chroma_path if chroma_path is not None else 'unset'}")
+
+
+@main.group("controls")
+def controls_group() -> None:
+    """Inspect and atomically update the selected live operational-control artifact."""
+
+
+def _control_proposal(path: Path) -> bytes:
+    from groundtruth_kb.project.operational_control_config import MAX_CATALOG_BYTES, OperationalControlConfigError
+
+    with path.open("rb") as stream:
+        payload = stream.read(MAX_CATALOG_BYTES + 1)
+    if len(payload) > MAX_CATALOG_BYTES:
+        raise OperationalControlConfigError("resource_bound", "proposed artifact exceeds the format byte bound")
+    return payload
+
+
+def _controls_call(
+    ctx: click.Context, operation: str, input_path: Path | None, expected_sha256: str | None
+) -> dict[str, Any]:
+    from groundtruth_kb.project.operational_control_config import (
+        OperationalControlConfigError,
+        catalog_dict,
+        diff_operational_controls,
+        load_operational_control_catalog,
+        set_operational_controls,
+        validate_operational_control_bytes,
+    )
+
+    try:
+        root = _resolve_config(ctx).project_root
+        if operation == "show":
+            return catalog_dict(load_operational_control_catalog(root))
+        if operation == "validate":
+            catalog = (
+                load_operational_control_catalog(root)
+                if input_path is None
+                else validate_operational_control_bytes(_control_proposal(input_path))
+            )
+            return {"valid": True, "catalog_sha256": catalog.catalog_sha256, "control_count": len(catalog.definitions)}
+        if input_path is None:
+            raise click.ClickException("A proposed control artifact is required")
+        proposed = _control_proposal(input_path)
+        if operation == "diff":
+            return diff_operational_controls(root, proposed)
+        if expected_sha256 is None:
+            raise click.ClickException("The currently observed artifact SHA-256 is required")
+        return set_operational_controls(root, proposed, expected_sha256=expected_sha256)
+    except (GTConfigError, OperationalControlConfigError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+
+
+@controls_group.command("show")
+@click.pass_context
+def controls_show(ctx: click.Context) -> None:
+    """Show exact live values, units, metadata, invariants and source identity as JSON."""
+    click.echo(json.dumps(_controls_call(ctx, "show", None, None), indent=2, sort_keys=True))
+
+
+@controls_group.command("validate")
+@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False, path_type=Path))
+@click.pass_context
+def controls_validate(ctx: click.Context, input_path: Path | None) -> None:
+    """Validate the canonical artifact or an explicit proposed TOML file without writing."""
+    click.echo(json.dumps(_controls_call(ctx, "validate", input_path, None), indent=2, sort_keys=True))
+
+
+@controls_group.command("diff")
+@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.pass_context
+def controls_diff(ctx: click.Context, input_path: Path) -> None:
+    """Compare current and proposed control definitions and invariants without writing."""
+    click.echo(json.dumps(_controls_call(ctx, "diff", input_path, None), indent=2, sort_keys=True))
+
+
+@controls_group.command("set")
+@click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
+@click.option(
+    "--expected-sha256", required=True, help="Current catalog_sha256 from controls show; refuses stale input."
+)
+@click.pass_context
+def controls_set(ctx: click.Context, input_path: Path, expected_sha256: str) -> None:
+    """Validate and atomically replace the selected artifact for subsequent operations."""
+    click.echo(json.dumps(_controls_call(ctx, "set", input_path, expected_sha256), indent=2, sort_keys=True))
 
 
 @main.group()

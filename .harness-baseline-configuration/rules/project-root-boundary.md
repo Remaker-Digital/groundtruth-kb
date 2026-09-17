@@ -94,29 +94,17 @@ Owner approval is per-manifest, not per-run; adding new sandbox paths requires:
 3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by platform_tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).
 
 
-## DB-Snapshot Output Exception
+## SQLite Snapshot Output (retired exception)
 
-GT-KB database snapshot operations (`gt db snapshot` / `create_snapshot()`) write
-snapshot files to a platform-default directory outside `E:\GT-KB` when ALL of the
-following hold:
-
-1. The output directory resolves to `%LOCALAPPDATA%\gtkb-snapshots\<project-name>`
-   (the platform default computed by `groundtruth_kb.db_snapshot.default_output_dir`)
-   or to a path explicitly configured in `groundtruth.toml` under
-   `[backup] snapshot_output_dir`.
-2. The snapshot output is a regenerable integrity-checked copy of `groundtruth.db`,
-   not canonical project state. The canonical MemBase remains at
-   `E:\GT-KB\groundtruth.db`; snapshots are disaster-recovery artifacts.
-3. The doctor check `_check_db_snapshot_output_allowlist` enforces the bound: it
-   confirms the resolved output directory matches the allowlist constant
-   `_DB_SNAPSHOT_OUTPUT_ALLOWLIST` in `doctor.py` and reports FAIL if the output
-   would land in an unrecognized location.
-
-Authority: `DCL-PROJECT-ROOT-BOUNDARY-DB-SNAPSHOT-OUTPUT-EXCEPTION-001`.
-
-Snapshots covered by this exception remain outside the scope of GT-KB canonical
-state, audit history, release evidence, and dependency closure. The canonical
-MemBase is always `E:\GT-KB\groundtruth.db`.
+The `gt db snapshot` command, its scheduled task and the doctor's snapshot
+freshness and output-allowlist checks are retired (O-7 R22), and with them the
+former DB-Snapshot Output Exception (`DCL-PROJECT-ROOT-BOUNDARY-DB-SNAPSHOT-OUTPUT-EXCEPTION-001`,
+retired). A SQLite snapshot is neither a health criterion nor a production
+fallback. The only remaining snapshot use is the explicit offline migration
+input read by `gt db postgres export-current --sqlite-snapshot`; that file is
+supplied by the operator and is not a project-root output. The PostgreSQL
+authority is recovered from physical backups and WAL archives, which live
+outside the project root under their own installation contract.
 
 ## External Harness Executable Resolution Exception
 

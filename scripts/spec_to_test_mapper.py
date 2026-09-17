@@ -85,15 +85,6 @@ def _bridge_kind(content: str) -> str | None:
     return None
 
 
-def _ensure_bridge_helpers_importable(bridge_dir: Path) -> None:
-    project_root = bridge_dir.resolve().parent
-    gt_src = project_root / "groundtruth-kb" / "src"
-    if gt_src.exists():
-        src_text = str(gt_src)
-        if src_text not in sys.path:
-            sys.path.insert(0, src_text)
-
-
 def _matching_bridge_files(bridge_id: str, bridge_dir: Path) -> list[Path]:
     matches: list[tuple[int, Path]] = []
     for path in bridge_dir.glob("*.md"):
@@ -110,7 +101,6 @@ def extract_spec_ids_from_bridge(bridge_id: str, bridge_dir: Path) -> tuple[list
     Returns ``(spec_ids, source_file_path)``. Raises ``FileNotFoundError`` when
     no matching thread has a status-filtered proposal or report file.
     """
-    _ensure_bridge_helpers_importable(bridge_dir)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
     saw_thread = False

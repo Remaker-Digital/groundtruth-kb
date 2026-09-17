@@ -19,15 +19,15 @@ from groundtruth_kb.project.doctor import _check_harness_local_scratchpad_bounda
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BOUNDARY_DOCS = (
-    PROJECT_ROOT / "AGENTS.md",
+    PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md",
     PROJECT_ROOT / ".claude" / "rules" / "project-root-boundary.md",
 )
 REQUIRED_BOUNDARY_TERMS = (
     "Harness-local scratchpads",
     "non-authoritative",
-    "Antigravity planning/brain files",
-    "Codex automation memory",
-    "Claude Code auto-memory",
+    "per-harness planning/brain files",
+    "automation memory",
+    "harness auto-memory",
     "`MEMORY.md` hierarchy",
     "formal GT-KB artifacts",
     "implementation reports",
@@ -43,8 +43,8 @@ REQUIRED_BOUNDARY_TERMS = (
 
 GOOD_BOUNDARY_TEXT = """# Boundary
 
-Harness-local scratchpads are non-authoritative. This includes Antigravity planning/brain files,
-Codex automation memory, Claude Code auto-memory, and the
+Harness-local scratchpads are non-authoritative. This includes per-harness planning/brain files,
+automation memory, harness auto-memory, and the
 `MEMORY.md` hierarchy.
 
 Formal GT-KB artifacts, implementation reports, verification verdicts, tests,
@@ -91,7 +91,7 @@ def test_external_harness_exception_remains_executable_only() -> None:
 
 
 def test_doctor_check_passes_for_synthetic_declared_boundary(tmp_path: Path) -> None:
-    """Synthetic project: both required surfaces declare the boundary, so the check passes."""
+    """Synthetic project: the projected rule declares the boundary, so the check passes."""
     project = _write_boundary_project(tmp_path, agents_text=GOOD_BOUNDARY_TEXT, rule_text=GOOD_BOUNDARY_TEXT)
 
     result = _check_harness_local_scratchpad_boundary(project)

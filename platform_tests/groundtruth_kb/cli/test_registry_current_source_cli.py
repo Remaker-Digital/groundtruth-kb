@@ -16,6 +16,10 @@ from groundtruth_kb.project.artifact_membership_reconciliation import observe_go
 from groundtruth_kb.project.registry_control_plane import load_registry_snapshot, validate_registry
 from groundtruth_kb.project.sot_registry import load_toml
 
+from platform_tests.groundtruth_kb.cli.test_registry_current_mutation_cli import _control_fixture
+from platform_tests.groundtruth_kb.cli.test_registry_current_mutation_cli import project as project
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+
 
 def test_registry_read_requires_an_explicit_project_or_declaration(tmp_path, monkeypatch):
     from groundtruth_kb.project.registry_control_plane import RegistryControlPlaneError, inspect_registry
@@ -275,7 +279,9 @@ def test_inventory_honors_environment_authority_without_loading_callers_project(
 
 def test_registry_cli_starts_without_repository_script_imports(tmp_path: Path) -> None:
     config, _ = _seed(tmp_path)
-    source = Path(__file__).resolve().parents[3] / "groundtruth-kb/src"
+    import groundtruth_kb
+
+    package_root = Path(groundtruth_kb.__file__).resolve().parent.parent
     before = _files(tmp_path)
     program = """
 import importlib.abc
@@ -286,11 +292,14 @@ class NoRepositoryScripts(importlib.abc.MetaPathFinder):
             raise ModuleNotFoundError("Repository-only scripts are unavailable")
 sys.meta_path.insert(0, NoRepositoryScripts())
 sys.path.insert(0, sys.argv[1])
+from pathlib import Path
+import groundtruth_kb
+assert Path(groundtruth_kb.__file__).resolve().parent.parent == Path(sys.argv[1]).resolve()
 from groundtruth_kb.cli import main
 main(["--config", sys.argv[2], "registry", "list"], standalone_mode=False)
 """
     result = subprocess.run(
-        [sys.executable, "-I", "-c", program, str(source), str(config)],
+        [sys.executable, "-I", "-c", program, str(package_root), str(config)],
         cwd=tmp_path,
         capture_output=True,
         text=True,
@@ -395,3 +404,77 @@ def test_baseline_observer_does_not_follow_linked_tree(tmp_path: Path) -> None:
     assert not result.succeeded
     assert not result.observations
     assert any("Cannot follow" in item for item in result.diagnostics)
+
+
+@pytest.mark.parametrize("local_database", ["absent", "stale"])
+@pytest.mark.parametrize("selected_config", [False, True])
+def test_registry_requires_selected_native_authority_without_caller_or_sqlite_fallback(
+    tmp_path, monkeypatch, local_database, selected_config
+):
+    from dataclasses import replace
+
+    from groundtruth_kb.authority_client import AuthorityClient
+    from groundtruth_kb.db import KnowledgeDB
+    from groundtruth_kb.project import registry_control_plane as registry
+
+    for key in ("GT_AUTHORITY_URL", "GT_PROJECT_ROOT", "GT_DB_PATH", "GT_POSTGRES_SERVICE"):
+        monkeypatch.delenv(key, raising=False)
+    root = tmp_path / "selected"
+    root.mkdir()
+    config, declaration = _seed(root)
+    _control_fixture(root)
+    if not selected_config:
+        config.unlink()
+    existing = registry.load_registry_snapshot(project_root=root).records[0]
+    self_record = replace(existing, id="registry", storage_path="config/registry/sot-artifacts.toml")
+    declaration.write_bytes(registry.serialize_registry([self_record, existing]))
+    (root / "member.py").write_text("pass\n", encoding="utf-8")
+    new_record = replace(existing, id="member", storage_path="member.py")
+    if local_database == "stale":
+        database = KnowledgeDB(root / "groundtruth.db")
+        try:
+            database.insert_spec(
+                "GOV-PLATFORM-SOT-REGISTRY-001", "Stale local formal", "active", "fixture", "Inert fixture"
+            )
+        finally:
+            database.close()
+    caller = tmp_path / "unselected caller"
+    caller.mkdir()
+    (caller / "groundtruth.toml").write_text('[groundtruth]\nauthority_url="http://127.0.0.1:1"\n', encoding="utf-8")
+    monkeypatch.chdir(caller)
+    before = _files(tmp_path)
+    attempted = []
+
+    def forbidden(source):
+        def call(*args, **kwargs):
+            attempted.append(source)
+            raise AssertionError(f"Unselected source was accessed: {source}")
+
+        return call
+
+    monkeypatch.setattr(sqlite3, "connect", forbidden("SQLite"))
+    monkeypatch.setattr(AuthorityClient, "request", forbidden("caller authority"))
+    observed = observe_governed_knowledge(
+        root, registry.load_registry_snapshot(project_root=root), root / "groundtruth.db"
+    )
+    assert not observed.succeeded
+    assert any("No authority_url is configured for the selected project" in item for item in observed.diagnostics)
+    with pytest.raises(
+        registry.RegistryControlPlaneError, match="No authority_url is configured for the selected project"
+    ):
+        registry.register_artifacts([new_record], project_root=root, dry_run=True)
+    assert attempted == []
+    assert _files(tmp_path) == before
+
+
+@pytest.mark.integration
+@pytest.mark.timeout(120)
+def test_native_knowledge_inventory_reads_current_fields_and_preserves_local_database(project):
+    root, _config, _declaration = project
+    before = _files(root)
+    result = observe_governed_knowledge(root, load_registry_snapshot(project_root=root), root / "groundtruth.db")
+    assert result.succeeded, result.diagnostics
+    assert [(row.relative_path, row.evidence_source) for row in result.observations] == [
+        ("keep.txt", "specification:GOV-REGISTRY:source_paths")
+    ]
+    assert _files(root) == before

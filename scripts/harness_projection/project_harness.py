@@ -27,6 +27,7 @@ The engine renders these surface classes from the baseline:
     hooks/    hook scripts token-substituted + the harness-native hook
               registration rendered from hooks/manifest.toml
     routing   the selected provider's models and routes from routing.toml
+    config    native config.toml declared by the selected adaptation profile
     ownership .projection-manifest.json listing every produced path, so
               cleanup and --check can distinguish managed from unmanaged files
 
@@ -55,6 +56,16 @@ import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROFILES_PATH = Path(__file__).resolve().parent / "profiles.toml"
+APPLICATION_NAME: str | None = None
+
+
+def output_root() -> Path:
+    return PROJECT_ROOT / "applications" / APPLICATION_NAME if APPLICATION_NAME else PROJECT_ROOT
+
+
+def runtime_relative(path: str) -> str:
+    return "../../" + path if APPLICATION_NAME else path
+
 
 TOKEN_RE = re.compile(r"\{\{([A-Z_]+)\}\}")
 
@@ -118,7 +129,7 @@ def token_map(profile: dict, baseline_cfg: dict) -> dict[str, str]:
         "HARNESS_PROJECT_DIR_VAR": profile["project_dir_var"],
         "HARNESS_SESSION_ID_VAR": profile["session_id_var"],
         "HARNESS_NAME": profile["name"],
-        "SHARED_HELPERS_DIR": baseline_cfg["shared_helpers_dir"],
+        "SHARED_HELPERS_DIR": runtime_relative(baseline_cfg["shared_helpers_dir"]),
     }
 
 
@@ -164,7 +175,7 @@ def projected_interpreter(*, windowless: bool, project_dir_var: str | None = Non
     Source: advisory ``gtkb-advisory-hook-interpreter-fail-open-20260823``.
     """
     name = "pythonw.exe" if windowless else "python.exe"
-    relative = f"{VENV_INTERPRETER_DIR}/{name}"
+    relative = runtime_relative(f"{VENV_INTERPRETER_DIR}/{name}")
     if project_dir_var:
         return f"${project_dir_var}/{relative}"
     return relative
@@ -270,10 +281,10 @@ def _hook_command(profile: dict, hook: dict, tokens: dict[str, str], gaps: list[
     windowless = bool(profile.get("windowless_hooks"))
     interpreter = projected_interpreter(windowless=windowless)
     if hook.get("script_root") == "project_scripts":
-        target = f"scripts/{hook['script']}"
+        target = runtime_relative(f"scripts/{hook['script']}")
     else:
         target = f"{profile['hooks_dir']}/{hook['script']}"
-    adapter = str(profile.get("stdin_adapter") or "").strip()
+    adapter = runtime_relative(str(profile["stdin_adapter"])) if profile.get("stdin_adapter") else ""
     if adapter:
         command = f'"{interpreter}" -B {adapter} {target}'
     else:
@@ -302,6 +313,12 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
         normalized = normalize_planned_rel(str(rel))
         if not normalized or normalized in seen or normalized in owned:
             continue
+        # Exact-file declarations cannot silently become recursive deletion
+        # when an unlisted local directory appears at the former file path.
+        target = output_root() / normalized
+        if rel in (profile.get("leftover_paths") or []) and target.is_dir():
+            plan.gaps.append(f"Exact retired output is a directory: {normalized}")
+            continue
         seen.add(normalized)
         plan.removes.append(normalized)
 
@@ -319,13 +336,13 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
     # leaves the property holding only most of the time.
     config_dir = str(profile.get("config_dir") or "").strip()
     if config_dir:
-        projection_root = PROJECT_ROOT / config_dir
+        projection_root = output_root() / config_dir
         manifest_path = projection_root / ".projection-manifest.json"
         if manifest_path.exists():
             try:
                 if projection_root.is_symlink() or getattr(projection_root, "is_junction", lambda: False)():
                     raise ValueError("projection directory is linked; cleanup requires a local output directory")
-                if manifest_path.is_symlink() or not manifest_path.resolve().is_relative_to(PROJECT_ROOT.resolve()):
+                if manifest_path.is_symlink() or not manifest_path.resolve().is_relative_to(output_root().resolve()):
                     raise ValueError("projection manifest is linked or outside the project root")
                 previous = json.loads(manifest_path.read_text(encoding="utf-8"))
                 if (
@@ -348,7 +365,7 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
                         raise ValueError("projection manifest contains a path outside this harness's output directory")
                     if rel in owned or rel in seen:
                         continue
-                    target = PROJECT_ROOT / rel
+                    target = output_root() / rel
                     if target.is_symlink() or not target.resolve().is_relative_to(projection_root.resolve()):
                         raise ValueError("retired output is linked or escapes this harness's output directory")
                     if target.exists() and not target.is_file():
@@ -363,7 +380,7 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
             for path in sorted(stale):
                 if not path.exists():
                     continue
-                normalized = normalize_planned_rel(path.relative_to(PROJECT_ROOT).as_posix())
+                normalized = normalize_planned_rel(path.relative_to(output_root()).as_posix())
                 if not normalized or normalized in seen or normalized in owned:
                     continue
                 seen.add(normalized)
@@ -499,7 +516,7 @@ _NATIVE_CWD_BOOTSTRAP = "& { param([string]$adapterRel, [string]$hook, [string]$
 
 def _native_cwd_hook_command(profile: dict, hook: dict, event: str, timeout: int, tokens: dict, gaps: list[str]) -> str:
     target = (
-        f"scripts/{hook['script']}"
+        runtime_relative(f"scripts/{hook['script']}")
         if hook.get("script_root") == "project_scripts"
         else f"{profile['hooks_dir']}/{hook['script']}"
     )
@@ -512,7 +529,21 @@ def _native_cwd_hook_command(profile: dict, hook: dict, event: str, timeout: int
         gaps.append("unsupported_native_hook_argument: embedded quote or trailing backslash")
         return ""
     quoted = ['"' + "'" + arg.replace("'", "''") + "'" + '"' for arg in arguments]
-    return 'powershell.exe -NoProfile -NonInteractive -Command "' + _NATIVE_CWD_BOOTSTRAP + '" ' + " ".join(quoted)
+    bootstrap = _NATIVE_CWD_BOOTSTRAP
+    if APPLICATION_NAME:
+        # Git's common directory resolves an application worktree back to its
+        # registered slot. The hosting layout then selects the same installation
+        # after relocation, without an embedded drive or checkout path.
+        resolve = (
+            "$root = Split-Path -Parent $common; $applicationRoot = $root; "
+            f"if ((Split-Path -Leaf $root) -ne '{APPLICATION_NAME}' -or "
+            "(Split-Path -Leaf (Split-Path -Parent $root)) -ne 'applications') "
+            "{ throw 'Native context is outside the selected application repository' }; "
+            "$root = Split-Path -Parent (Split-Path -Parent $root); "
+            "$hook = Join-Path $applicationRoot $hook;"
+        )
+        bootstrap = bootstrap.replace("$root = Split-Path -Parent $common;", resolve)
+    return 'powershell.exe -NoProfile -NonInteractive -Command "' + bootstrap + '" ' + " ".join(quoted)
 
 
 def render_hooks_registration(
@@ -533,12 +564,13 @@ def render_hooks_registration(
                 gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
                 continue
             target = (
-                f"scripts/{hook['script']}"
+                runtime_relative(f"scripts/{hook['script']}")
                 if hook.get("script_root") == "project_scripts"
                 else f"{profile['hooks_dir']}/{hook['script']}"
             )
             timeout = _projected_timeout(profile, hook) or 30
             interpreter = projected_interpreter(windowless=True)
+            adapter = runtime_relative(str(profile["stdin_adapter"]))
             command = f'"{interpreter}" -B {adapter} --event {native_event} --timeout {max(1, timeout - 2)} {target}'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
@@ -557,7 +589,7 @@ def render_hooks_registration(
                 continue
             interpreter = projected_interpreter(windowless=False)
             if hook.get("script_root") == "project_scripts":
-                command = f'"{interpreter}" -B scripts/{hook["script"]}'
+                command = f'"{interpreter}" -B {runtime_relative("scripts/" + hook["script"])}'
             else:
                 command = f'"{interpreter}" -B {profile["hooks_dir"]}/{hook["script"]}'
             for arg in hook.get("args", []):
@@ -590,7 +622,7 @@ def render_hooks_registration(
             intents = hook.get("intents", ["all"])
             matcher = "|".join(m for m in (matchers.get(i, "") for i in intents) if m)
             if hook.get("script_root") == "project_scripts":
-                script_path = f"${profile['project_dir_var']}/scripts/{hook['script']}"
+                script_path = f"${profile['project_dir_var']}/{runtime_relative('scripts/' + hook['script'])}"
             else:
                 script_path = f"${profile['project_dir_var']}/{profile['hooks_dir']}/{hook['script']}"
             interpreter = projected_interpreter(windowless=True, project_dir_var=profile["project_dir_var"])
@@ -825,6 +857,20 @@ def build_plan(harness: str) -> Plan:
         if rendered is not None:
             plan.writes[rendered[0]] = rendered[1]
 
+    if "config_toml" in profile:
+        rel_out = f"{profile['config_dir']}/config.toml"
+        source_text = profile["config_toml"]
+        if not isinstance(source_text, str):
+            plan.gaps.append(f"invalid_native_config: {rel_out}: config_toml must be TOML text")
+        else:
+            text = substitute(source_text, tokens, rel_out, plan.gaps)
+            try:
+                tomllib.loads(text)
+            except tomllib.TOMLDecodeError as exc:
+                plan.gaps.append(f"invalid_native_config: {rel_out}: {exc}")
+            else:
+                plan.writes[rel_out] = apply_stamp(rel_out, text, stamp_text)
+
     ownership = sorted(plan.writes) + [f"{profile['config_dir']}/.projection-manifest.json"]
     plan.writes[f"{profile['config_dir']}/.projection-manifest.json"] = (
         json.dumps(
@@ -844,8 +890,41 @@ def build_plan(harness: str) -> Plan:
     return plan
 
 
+def projection_inputs() -> dict[str, str]:
+    """Freeze authored inputs for a scaffold/upgrade preview, never authority."""
+    paths = {Path(__file__).resolve(), PROFILES_PATH.resolve(), PROJECT_ROOT / "pyproject.toml"}
+    baseline = PROJECT_ROOT / BASELINE_ROOT_NAME
+    paths.update(path for path in baseline.rglob("*") if path.is_file() and not is_projection_junk(path, baseline))
+    # The baseline manifest can name host scripts, and profiles can name stdin
+    # adapters. Their bytes are part of the consumer's preview, not a live cache.
+    profiles = load_profiles()
+    manifest = tomllib.loads((baseline / profiles["baseline"]["hook_manifest"]).read_text(encoding="utf-8"))
+    for hook in manifest.get("hook", []):
+        if hook.get("script_root") == "project_scripts" and isinstance(hook.get("script"), str):
+            paths.add(PROJECT_ROOT / "scripts" / hook["script"])
+    for profile in profiles["harnesses"].values():
+        if profile.get("stdin_adapter"):
+            paths.add(PROJECT_ROOT / profile["stdin_adapter"])
+    return {
+        path.relative_to(PROJECT_ROOT).as_posix(): hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in sorted(paths)
+        if path.is_file()
+    }
+
+
 def run(harness: str, mode: str) -> int:
+    inputs = projection_inputs() if mode == "render-json" else {}
     plan = build_plan(harness)
+    if mode == "render-json" and projection_inputs() != inputs:
+        raise ProjectionError("Projection inputs changed while rendering")
+    if mode == "render-json":
+        print(
+            json.dumps(
+                {"writes": plan.writes, "removes": plan.removes, "gaps": plan.gaps, "inputs": inputs},
+                ensure_ascii=False,
+            )
+        )
+        return 2 if plan.gaps else 0
     reject_baseline_destinations(plan)
     if plan.gaps:
         print("PROJECTOR GAPS (obligation 6 - file or extend a work item):")
@@ -869,14 +948,14 @@ def run(harness: str, mode: str) -> int:
         if relative.is_absolute() or ".." in relative.parts or ":" in rel:
             print(f"FAIL: projection output is outside the selected project: {rel}")
             return 2
-        target = PROJECT_ROOT.resolve() / rel
+        target = output_root().resolve() / rel
         if target.resolve() != target:
             print(f"FAIL: projection output is redirected: {rel}")
             return 2
     if mode == "check":
         drift: list[str] = []
         for rel, content in plan.writes.items():
-            target = PROJECT_ROOT / rel
+            target = output_root() / rel
             if not target.is_file():
                 drift.append(f"missing: {rel}")
             elif (
@@ -886,7 +965,7 @@ def run(harness: str, mode: str) -> int:
                 drift.append(f"differs: {rel}")
         bytecode: list[str] = []
         for rel in plan.removes:
-            if (PROJECT_ROOT / rel).exists():
+            if (output_root() / rel).exists():
                 (bytecode if _is_bytecode_leftover(rel) else drift).append(f"leftover: {rel}")
         print(f"CHECK {harness}: {len(drift)} drifted of {len(plan.writes)} managed")
         for d in drift:
@@ -895,7 +974,7 @@ def run(harness: str, mode: str) -> int:
             print("  - (bytecode; removed on the next write)", b)
         return 1 if drift else 0
     for rel, content in plan.writes.items():
-        target = PROJECT_ROOT / rel
+        target = output_root() / rel
         target.parent.mkdir(parents=True, exist_ok=True)
         encoded = content.encode("utf-8", errors="surrogateescape")
         descriptor, temporary = tempfile.mkstemp(prefix=f".{target.name}.", suffix=".tmp", dir=target.parent)
@@ -908,24 +987,52 @@ def run(harness: str, mode: str) -> int:
             tmp_target.unlink(missing_ok=True)
     removed = 0
     for rel in plan.removes:
-        if remove_planned_path(PROJECT_ROOT / rel):
+        if remove_planned_path(output_root() / rel):
             removed += 1
     print(f"PROJECTED {harness}: {len(plan.writes)} files, {removed} leftovers removed")
     return 0
 
 
 def main() -> int:
+    global APPLICATION_NAME
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--harness", required=True)
+    parser.add_argument("--application", help="Derive into an explicitly registered hosted application")
     modes = parser.add_mutually_exclusive_group()
     modes.add_argument("--dry-run", action="store_true")
     modes.add_argument("--check", action="store_true")
     modes.add_argument(
+        "--render-json", action="store_true", help="Render a complete read-only scaffold/upgrade preview"
+    )
+    modes.add_argument(
         "--validate", action="store_true", help="Validate derivation without reading or writing installed output."
     )
     args = parser.parse_args()
-    mode = "validate" if args.validate else "dry-run" if args.dry_run else "check" if args.check else "write"
+    mode = (
+        "render-json"
+        if args.render_json
+        else "validate"
+        if args.validate
+        else "dry-run"
+        if args.dry_run
+        else "check"
+        if args.check
+        else "write"
+    )
     try:
+        if args.application:
+            from groundtruth_kb.isolation.registry_check import application_slot_path, load_application_catalog
+            from groundtruth_kb.isolation.validation import check_slot_markers
+
+            application_slot_path(PROJECT_ROOT, args.application)
+            marker = check_slot_markers(PROJECT_ROOT, args.application)
+            if (
+                args.application not in load_application_catalog(PROJECT_ROOT)
+                or not marker["consistent"]
+                or not marker["app_toml_present"]
+            ):
+                raise ProjectionError("Select a registered application with a matching marker")
+            APPLICATION_NAME = args.application
         return run(args.harness, mode)
     except ProjectionError as exc:
         print(f"PROJECTION ERROR: {exc}", file=sys.stderr)

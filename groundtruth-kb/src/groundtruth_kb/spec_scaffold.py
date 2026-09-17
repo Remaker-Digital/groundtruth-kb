@@ -252,6 +252,11 @@ def _generate_spec_data(config: SpecScaffoldConfig) -> list[dict[str, Any]]:
     return specs
 
 
+def starter_templates(config: SpecScaffoldConfig) -> list[dict[str, Any]]:
+    """Public template catalog for the selected profile; no store is read or written."""
+    return _generate_spec_data(config)
+
+
 def _generate_document_data(config: SpecScaffoldConfig) -> list[dict[str, Any]]:
     """Materialize the list of document data dicts to generate, per config.
 

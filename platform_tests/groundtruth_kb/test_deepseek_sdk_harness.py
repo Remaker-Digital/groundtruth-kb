@@ -134,6 +134,58 @@ def test_binding_and_delivery_failures_are_typed_and_never_reported_as_success()
     assert delivered["status"] == "delivered"
 
 
+@pytest.mark.parametrize("status", ["init_requested", "already_initialized_idempotent"])
+def test_sdk_binding_consumer_accepts_both_native_success_outcomes(status):
+    launcher = _launcher()
+    binding = {
+        "native_context_id": "deepseek-sdk-result",
+        "session_context_id": "SENV-result",
+        "subject": "gtkb",
+        "role": "loyal-opposition",
+        "created_at": "2026-09-12T00:00:00+00:00",
+        "minimum_idempotency_identity": "immutable-idempotency",
+    }
+    calls = []
+
+    def cli(arguments):
+        calls.append(arguments)
+        return {"status": status, "binding": binding}
+
+    assert launcher.bind_context(cli, "deepseek-sdk-result", "::init gtkb lo") == binding
+    assert calls == [
+        ["session", "bind", "--native-context-id", "deepseek-sdk-result", "--init-keyword", "::init gtkb lo"]
+    ]
+    assert "status" not in binding
+
+
+@pytest.mark.parametrize(
+    "result",
+    [
+        None,
+        [],
+        {"session_context_id": "SENV-flat", "role": "loyal-opposition", "native_context_id": "deepseek-sdk-result"},
+        {"status": "no_init_marker", "binding": {}},
+        {"status": "invented-success", "binding": {}},
+        {"status": "init_requested", "binding": None},
+        {"status": "init_requested", "binding": []},
+        {"status": "init_requested", "binding": {"session_context_id": "SENV-x", "role": "loyal-opposition"}},
+        {
+            "status": "already_initialized_idempotent",
+            "binding": {
+                "native_context_id": "another-context",
+                "session_context_id": "SENV-x",
+                "role": "loyal-opposition",
+            },
+        },
+    ],
+)
+def test_sdk_binding_consumer_refuses_unusable_results_and_other_contexts(result):
+    launcher = _launcher()
+    with pytest.raises(launcher.LauncherError) as refusal:
+        launcher.bind_context(lambda arguments: result, "deepseek-sdk-result", "::init gtkb lo")
+    assert refusal.value.code == launcher.EXIT_BIND_FAILED
+
+
 def test_prompt_carries_the_neutral_baseline_binding_facts_and_task(tmp_path):
     launcher = _launcher()
     baseline = tmp_path / ".harness-baseline-configuration"
@@ -251,7 +303,7 @@ def test_installed_runtime_tools_follow_the_live_cli_claim_and_refuse_foreign_ef
     _service, client, contexts, _work_root = bridge
     scripts = tmp_path / "scripts"
     scripts.mkdir()
-    for name in ("implementation_start_gate.py", "controlled_artifact_paths.py"):
+    for name in ("implementation_start_gate.py",):
         (scripts / name).write_bytes((ROOT / "scripts" / name).read_bytes())
     document = "deepseek-sdk-effects"
     deliver(client, contexts, document, "pb1", 1, "NEW")
@@ -383,7 +435,14 @@ def test_default_invocation_places_the_runtime_home_in_the_bound_contexts_scratc
     def fake_cli(arguments):
         if arguments[:2] == ["session", "bind"]:
             native = arguments[arguments.index("--native-context-id") + 1]
-            return {"session_context_id": "SC-default-home", "role": "loyal-opposition", "native_context_id": native}
+            return {
+                "status": "init_requested",
+                "binding": {
+                    "session_context_id": "SC-default-home",
+                    "role": "loyal-opposition",
+                    "native_context_id": native,
+                },
+            }
         raise AssertionError(arguments)
 
     def fake_run_session(installation, **kwargs):

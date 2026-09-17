@@ -15,12 +15,6 @@ schema_version = 1
 [[hook]]
 event = "pre_tool_use"
 intents = ["file_write", "shell_exec"]
-script = "spec-before-code.py"
-blocking = true
-
-[[hook]]
-event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
 script = "kb-not-markdown.py"
 blocking = true
 
@@ -80,26 +74,3 @@ intents = ["read_access", "shell_exec"]
 script = "sot-read-discipline.py"
 blocking = true
 timeout_seconds = 5
-
-[[hook]]
-event = "post_tool_use"
-intents = ["all"]
-script = "spec-event-surfacer.py"
-blocking = false
-timeout_seconds = 5
-
-[[hook]]
-event = "turn_end"
-intents = ["all"]
-script = "advisory-router-scan.py"
-blocking = true
-timeout_seconds = 10
-
-[[hook]]
-event = "turn_end"
-intents = ["all"]
-script = "advisory_grilling_gate_lint.py"
-script_root = "project_scripts"
-args = ["--stop-hook"]
-blocking = true
-timeout_seconds = 10

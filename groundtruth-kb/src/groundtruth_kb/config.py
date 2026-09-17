@@ -169,13 +169,12 @@ class GTConfig:
 
 
 def _load_toml(config_path: Path | None) -> dict[str, Any]:
-    """Load values from groundtruth.toml.
+    """Read the selected file; GTConfig.load alone owns configuration discovery.
 
     Raises:
         FileNotFoundError: When ``config_path`` is explicitly supplied but
-            the file does not exist. Auto-discovery (``config_path is None``)
-            still returns ``{}`` when no config is found, per the historical
-            "exploration mode" contract.
+            the file does not exist. No selected file (``config_path is None``)
+            returns ``{}`` without searching the caller's directories.
         GTConfigError: When the file exists but contains invalid TOML. The
             original :class:`tomllib.TOMLDecodeError` is chained via
             ``__cause__``.
@@ -185,10 +184,7 @@ def _load_toml(config_path: Path | None) -> dict[str, Any]:
     # callers get a FileNotFoundError with a recovery hint instead of
     # silently falling back to defaults.
     if config_path is None:
-        discovered = _find_config()
-        if discovered is None:
-            return {}
-        config_path = discovered
+        return {}
     elif not config_path.exists():
         raise FileNotFoundError(
             f"GroundTruth config file not found: {config_path}. Check the --config path or create the file."

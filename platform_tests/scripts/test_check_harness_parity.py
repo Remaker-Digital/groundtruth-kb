@@ -147,6 +147,62 @@ def test_unmanaged_output_is_reported_and_preserved(tree):
     assert foreign.read_text() == "unrelated bytes"
 
 
+@pytest.mark.parametrize("existing", [False, True])
+def test_native_toml_configuration_is_derived_and_checked(tree, existing):
+    settings = 'approval_policy = "on-request"\n[features]\nhooks = true\n'
+    profile_path = tree / "scripts/harness_projection/profiles.toml"
+    profile_path.write_text(
+        PROFILE.replace(
+            'hooks_json_path = ".example/settings.json"',
+            'hooks_json_path = ".example/settings.json"\nconfig_toml = """\n' + settings + '"""',
+        ),
+        encoding="utf-8",
+    )
+    config = tree / ".example/config.toml"
+    if existing:
+        write(tree, ".example/config.toml", "# Earlier local representation\n" + settings)
+    neighbor = write(tree, "unrelated.txt", "Preserve this work")
+    engine = parity._load_projector(tree)
+    before = {p: p.read_bytes() for p in tree.rglob("*") if p.is_file()}
+    assert engine.run("example", "validate") == 0
+    assert engine.run("example", "dry-run") == 0
+    assert {p: p.read_bytes() for p in tree.rglob("*") if p.is_file()} == before
+    assert engine.run("example", "write") == 0
+    import tomllib
+
+    assert config.is_file()
+    assert tomllib.loads(config.read_text(encoding="utf-8")) == tomllib.loads(settings)
+    assert "Derived from" in config.read_text(encoding="utf-8")
+    assert ".example/config.toml" in json.loads((tree / ".example/.projection-manifest.json").read_text())["paths"]
+    assert report(tree)["status"] == "pass"
+    first = {p: p.read_bytes() for p in tree.rglob("*") if p.is_file()}
+    assert engine.run("example", "write") == 0
+    assert {p: p.read_bytes() for p in tree.rglob("*") if p.is_file()} == first
+    assert neighbor.read_text() == "Preserve this work"
+    config.write_text(settings.replace("true", "false"), encoding="utf-8")
+    assert "changed_output" in codes(report(tree))
+    assert engine.run("example", "check") == 1
+
+
+@pytest.mark.parametrize("value", ["false", "{}", '"""broken = ["""', "'mode = \"{{UNKNOWN}}\"'"])
+def test_invalid_native_configuration_refuses_without_effects(tree, value):
+    profile_path = tree / "scripts/harness_projection/profiles.toml"
+    profile_path.write_text(
+        PROFILE.replace(
+            'hooks_json_path = ".example/settings.json"',
+            'hooks_json_path = ".example/settings.json"\nconfig_toml = ' + value,
+        ),
+        encoding="utf-8",
+    )
+    write(tree, ".example/config.toml", 'existing = "preserve"\n')
+    engine = parity._load_projector(tree)
+    before = {p: p.read_bytes() for p in tree.rglob("*") if p.is_file()}
+    assert engine.build_plan("example").gaps
+    assert engine.run("example", "write") == 2
+    assert {p: p.read_bytes() for p in tree.rglob("*") if p.is_file()} == before
+    assert report(tree)["status"] == "fail"
+
+
 def test_removed_baseline_output_is_detected_without_deleting_it(tree):
     install(tree)
     (tree / parity.BASELINE / "rules/work.md").unlink()
@@ -310,3 +366,37 @@ def test_cli_requires_explicit_target():
         timeout=10,
     )
     assert result.returncode == 2
+
+
+def test_declared_former_file_is_drift_until_projector_removes_it(tree, monkeypatch):
+    install(tree)
+    old = write(tree, ".former/hooks/retired.py", "obsolete output")
+    neighbor = write(tree, ".former/hooks/local.py", "preserve local work")
+    engine = parity._load_projector(tree)
+    profiles = engine.load_profiles()
+    profiles["harnesses"]["example"]["leftover_paths"] = [".former/hooks/retired.py"]
+    monkeypatch.setattr(engine, "load_profiles", lambda: profiles)
+    monkeypatch.setattr(parity, "_load_projector", lambda _: engine)
+    assert report(tree, installed=False)["status"] == "pass"
+    assert codes(report(tree)) == {"retired_output"}
+    assert old.read_text() == "obsolete output"
+    assert engine.run("example", "write") == 0
+    assert report(tree)["status"] == "pass"
+    assert not old.exists()
+    assert neighbor.read_text() == "preserve local work"
+
+
+@pytest.mark.parametrize("path,declared", [(".peer/private.md", True), (".peer", True), (".former/local.md", False)])
+def test_retired_removal_cannot_escape_into_peer_or_unlisted_material(tree, monkeypatch, path, declared):
+    engine = parity._load_projector(tree)
+    profiles = engine.load_profiles()
+    profiles["harnesses"]["peer"] = {"config_dir": ".peer"}
+    if declared:
+        profiles["harnesses"]["example"]["leftover_paths"] = [path]
+    monkeypatch.setattr(engine, "load_profiles", lambda: profiles)
+    plan = engine.build_plan("example")
+    plan.removes = [path]
+    monkeypatch.setattr(engine, "build_plan", lambda _: plan)
+    monkeypatch.setattr(parity, "_load_projector", lambda _: engine)
+    assert "invalid_projection" in codes(report(tree, installed=False))
+    assert not (tree / ".peer").exists()

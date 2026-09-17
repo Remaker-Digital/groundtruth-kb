@@ -4,18 +4,30 @@ from __future__ import annotations
 
 import json
 import os
+import socket
+import sqlite3
 import subprocess
 import sys
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import asdict
 from pathlib import Path
 
 import pytest
+import tomlkit
+import uvicorn
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
-from groundtruth_kb.db import KnowledgeDB
 from groundtruth_kb.project import registry_control_plane as registry
+from groundtruth_kb.project.operational_control_config import CATALOG_RELATIVE_PATH
 from groundtruth_kb.project.sot_registry import SoTArtifact
+from psycopg import sql
+
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.test_native_authority_service import put
+
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
 
 def record(ident: str, path: str, **changes) -> SoTArtifact:
@@ -38,27 +50,78 @@ def record(ident: str, path: str, **changes) -> SoTArtifact:
     )
 
 
+def _control_fixture(root: Path, timeout: float | None = None):
+    source = Path(__file__).resolve().parents[3] / CATALOG_RELATIVE_PATH
+    target = root / CATALOG_RELATIVE_PATH
+    document = tomlkit.parse(source.read_text(encoding="utf-8"))
+    if timeout is not None:
+        for row in document["controls"]:
+            if row["id"] == "registry.lock.acquire_seconds":
+                row["value"] = str(timeout)
+            elif row["id"] == "registry.lock.max_backoff_seconds":
+                row["value"] = "0.01"
+            elif row["id"] == "registry.lock.initial_backoff_seconds":
+                row["value"] = "0.001"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(tomlkit.dumps(document), encoding="utf-8")
+    return registry._registry_controls(root)
+
+
 @pytest.fixture
-def project(tmp_path: Path):
+def project(tmp_path: Path, native):
+    service, client, _, _ = native
+    _control_fixture(tmp_path)
+    response = put(
+        client,
+        "specifications",
+        "GOV-REGISTRY",
+        {"title": "Current native registry contract", "status": "active", "source_paths": ["keep.txt"]},
+    )
+    assert response.status_code == 200, response.text
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
     config = tmp_path / "groundtruth.toml"
-    config.write_text('[groundtruth]\nproject_root="."\ndb_path="groundtruth.db"\n', encoding="utf-8")
     declaration = tmp_path / "config/registry/sot-artifacts.toml"
     declaration.parent.mkdir(parents=True)
     declaration.write_bytes(registry.serialize_registry([record("registry", "config/registry/sot-artifacts.toml")]))
-    db = KnowledgeDB(tmp_path / "groundtruth.db")
-    try:
-        db.insert_spec(
-            id="GOV-REGISTRY",
-            title="Current registry contract",
-            status="active",
-            changed_by="test",
-            change_reason="Fixture",
-        )
-    finally:
-        db.close()
+    with sqlite3.connect(tmp_path / "groundtruth.db") as connection:
+        connection.execute("CREATE TABLE historical_marker (value TEXT)")
+        connection.execute("INSERT INTO historical_marker VALUES ('inert local database must remain unchanged')")
     (tmp_path / "keep.txt").write_text("unrelated work", encoding="utf-8")
-    return tmp_path, config, declaration
+
+    def canonical_snapshot():
+        with service.kernel.transaction(read_only=True) as tx:
+            tx.cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname=%s ORDER BY tablename", (tx.schema,))
+            tables = [r["tablename"] for r in tx.cursor.fetchall()]
+            rows = {}
+            for table in tables:
+                tx.cursor.execute(
+                    sql.SQL("SELECT * FROM {}.{}").format(sql.Identifier(tx.schema), sql.Identifier(table))
+                )
+                rows[table] = sorted(json.dumps(dict(row), default=str, sort_keys=True) for row in tx.cursor.fetchall())
+            return rows
+
+    before = canonical_snapshot()
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+        config.write_text(
+            f'[groundtruth]\nproject_root="."\ndb_path="groundtruth.db"\nauthority_url="http://127.0.0.1:{port}"\n',
+            encoding="utf-8",
+        )
+        server = uvicorn.Server(uvicorn.Config(client.app, host="127.0.0.1", port=port, log_level="error"))
+        worker = threading.Thread(target=lambda: server.run(sockets=[listener]), daemon=True)
+        worker.start()
+        deadline = time.monotonic() + 10
+        try:
+            while not server.started and worker.is_alive() and time.monotonic() < deadline:
+                time.sleep(0.01)
+            assert server.started
+            yield tmp_path, config, declaration
+        finally:
+            server.should_exit = True
+            worker.join(10)
+            assert not worker.is_alive()
+            assert canonical_snapshot() == before
 
 
 def invoke(project, *args):
@@ -547,14 +610,14 @@ with Path(sys.argv[1]).open('a+b') as handle:
         assert lock.stat().st_size == 0
         with (
             pytest.raises(registry.RegistryFileLockAcquisitionTimeout),
-            registry._RegistryFileLock(lock, timeout=0.1),
+            registry._RegistryFileLock(lock, controls=_control_fixture(root, 0.1)),
         ):
             pytest.fail("A second context acquired an already held byte-range lock")
         assert lock.stat().st_size == 0
     finally:
         stdout, stderr = holder.communicate("release\n", timeout=5)
         assert holder.returncode == 0, (stdout, stderr)
-    with registry._RegistryFileLock(lock, timeout=1):
+    with registry._RegistryFileLock(lock, controls=_control_fixture(root, 1)):
         assert lock.stat().st_size == 0
 
 
@@ -575,3 +638,36 @@ def test_unrelated_archived_metadata_does_not_block_a_current_declaration_change
     invalid = invoke(project, "amend", "registry", "--changes-json", '{"mutation_api":""}')
     assert invalid.exit_code != 0 and "mutation_api must not be empty" in invalid.output
     assert declaration.read_bytes() == before
+
+
+@pytest.mark.parametrize("dry_run", [False, True])
+@pytest.mark.parametrize("bad", ["missing", "malformed", "unit", "value"])
+def test_registry_write_refuses_invalid_live_control_artifact_without_changes(project, bad, monkeypatch, dry_run):
+    root, config, declaration = project
+    controls_path = root / CATALOG_RELATIVE_PATH
+    if bad == "missing":
+        controls_path.unlink()
+    elif bad == "malformed":
+        controls_path.write_text("invalid TOML", encoding="utf-8")
+    else:
+        document = tomlkit.parse(controls_path.read_text(encoding="utf-8"))
+        row = next(row for row in document["controls"] if row["id"] == "registry.git_probe_seconds")
+        row["unit" if bad == "unit" else "value"] = "count" if bad == "unit" else "-1"
+        controls_path.write_text(tomlkit.dumps(document), encoding="utf-8")
+    before = declaration.read_bytes()
+    monkeypatch.setenv("GTKB_REGISTRY_LOCK_TIMEOUT_SECONDS", "300")
+    monkeypatch.setattr(
+        registry, "_declaration_lock_path", lambda *args: pytest.fail("Invalid controls reached the Git probe")
+    )
+    with pytest.raises(registry.RegistryControlPlaneError, match="operational_controls"):
+        registry.register_artifacts([record("added", "keep.txt")], project_root=root, dry_run=dry_run)
+    assert declaration.read_bytes() == before
+
+
+def test_registry_write_reports_the_consumed_control_snapshot(project):
+    root, _config, declaration = project
+    controls = registry._registry_controls(root)
+    result = registry.register_artifacts([record("added", "keep.txt")], project_root=root)
+    assert result["changed"]
+    assert result["control_catalog_sha256"] == next(iter(controls.values())).catalog_sha256
+    assert "added" in {row.id for row in registry.load_registry_snapshot(project_root=root).records}

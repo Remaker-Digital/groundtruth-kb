@@ -1,7 +1,7 @@
 # Templates Reference
 
-GroundTruth KB ships 30 template files used by `gt project init` and
-`gt bootstrap-desktop` to scaffold new projects. Templates are organized
+GroundTruth KB ships 30 template files used by `gt project init` to
+scaffold new applications. Templates are organized
 by category and copied selectively based on the chosen profile and options.
 
 ## Template Inventory

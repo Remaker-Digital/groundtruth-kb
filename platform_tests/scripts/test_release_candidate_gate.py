@@ -139,23 +139,26 @@ def _valid_dev_inventory_payload(gate, generated_at: str | None = None) -> dict:
         "host": {},
         "shell": {},
         "toolchain": {},
-        "harnesses": {},
+        "harnesses": {"installations": []},
         "repo_configured_surfaces": {},
         "runtime_provided_capabilities": {},
         "role_by_harness_compatibility": [
             {
                 "harness": harness,
                 "role": role,
-                "assignment": {"status": "configured", "evidence": "test"},
+                "harness_id": None,
+                "role_scope": "qualification_scenario_only",
+                "qualification": "unqualified",
                 "capabilities": {
-                    dimension: {"status": "unknown", "evidence": "test"}
+                    dimension: {"status": "unavailable", "evidence": "test"}
                     for dimension in collector.CAPABILITY_DIMENSIONS
                 },
             }
-            for harness, role in collector.MATRIX_ROWS
+            for harness in collector.PRIMARY_HARNESSES
+            for role in collector.CONTEXT_ROLES
         ],
         "redaction": {"status": "pass"},
-        "verification": {},
+        "verification": {"behavioral_qualification": "unqualified"},
     }
 
 
@@ -488,44 +491,36 @@ def test_dev_environment_inventory_drift_gate_passes_clean_result(monkeypatch):
     gate._check_dev_environment_inventory_drift()
 
 
-def test_agent_red_app_root_minimization_gate_passes(tmp_path, monkeypatch, capsys):
+def test_registered_application_roots_gate_passes(tmp_path, monkeypatch, capsys):
     gate = _load_gate_module()
     monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
 
-    class Result:
-        ok = True
-        actual_entries = [object(), object()]
-
-        def first_error_message(self):
-            return "no errors"
-
-    def fake_validate(app_root, *, project_root, tracked_only):
-        assert app_root == tmp_path / "applications" / "Agent_Red"
+    def fake_evaluate(project_root):
         assert project_root == tmp_path
-        assert tracked_only is True
-        return Result()
+        return {"verdicts": [], "slots_status": {"First": {}, "Second": {}}}
 
-    monkeypatch.setattr(gate, "_agent_red_app_root_minimization_helpers", lambda: fake_validate)
+    monkeypatch.setattr(gate, "_application_isolation_helpers", lambda: fake_evaluate)
+    gate._check_registered_application_roots()
+    assert (
+        "PASS application registry checks (2 applications); native lifecycle qualification is separate"
+        in capsys.readouterr().out
+    )
 
-    gate._check_agent_red_app_root_minimization()
 
-    assert "PASS Agent Red app-root minimization (2 top-level artifacts)" in capsys.readouterr().out
-
-
-def test_agent_red_app_root_minimization_gate_fails(monkeypatch):
+def test_registered_application_roots_gate_fails(monkeypatch):
     gate = _load_gate_module()
-
-    class Result:
-        ok = False
-        actual_entries = []
-
-        def first_error_message(self):
-            return "unregistered_top_level_artifact: EXTRA.md has no registry entry"
-
-    monkeypatch.setattr(gate, "_agent_red_app_root_minimization_helpers", lambda: lambda *a, **kw: Result())
-
-    with pytest.raises(gate.GateFailure, match="EXTRA.md"):
-        gate._check_agent_red_app_root_minimization()
+    monkeypatch.setattr(
+        gate,
+        "_application_isolation_helpers",
+        lambda: (
+            lambda _root: {
+                "verdicts": [{"details": "Second: unregistered_top_level_artifact: EXTRA.md has no registry entry"}],
+                "slots_status": {"First": {}, "Second": {}},
+            }
+        ),
+    )
+    with pytest.raises(gate.GateFailure, match="Second.*EXTRA.md"):
+        gate._check_registered_application_roots()
 
 
 def test_python_version_gate_requires_exact_minor():
@@ -601,8 +596,6 @@ def test_python_gate_runs_canonical_harness_conformance_before_pytest(monkeypatc
     )
     assert harness_parity_index < pytest_index
     assert "platform_tests/scripts/test_codex_hook_parity.py" in commands[pytest_index]
-    assert "platform_tests/scripts/test_standing_backlog_harvest.py" in commands[pytest_index]
-    assert "platform_tests/scripts/test_session_self_initialization.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_collect_dev_environment_inventory.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_check_dev_environment_inventory_drift.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_gtkb_dashboard_control_plane.py" in commands[pytest_index]
@@ -657,11 +650,11 @@ def test_python_gate_runs_session_overlay_policy_before_pytest(monkeypatch):
 def test_python_gate_runs_scoped_service_boundary_before_pytest(monkeypatch):
     """The Phase 4 scoped-service boundary checker must run before pytest.
 
-    The no-raw-read guard in ``check_scoped_service_boundary.py`` is the
-    enforcement mechanism that keeps ``_database_metrics`` on the scoped
-    client. If it only ran after pytest, a regression that put a raw
-    ``sqlite3.connect`` back on the summary path could still pass the
-    release gate as long as tests were structured around the drift.
+    The checker validates the ``[scoped_service]`` contract in
+    ``groundtruth.toml``. If it only ran after pytest, configuration drift
+    could still pass the release gate as long as tests were structured
+    around the drift. (Its summary-path guard left with the SQLite-era
+    startup generator; the scoped-client tests remain gate-run.)
     """
 
     gate = _load_gate_module()

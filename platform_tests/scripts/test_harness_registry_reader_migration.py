@@ -44,9 +44,6 @@ from pathlib import Path
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
-if str(_PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(_PACKAGE_SRC))
 if str(_REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(_REPO_ROOT))
 
@@ -426,14 +423,11 @@ _SCAN_ROOTS = (
 _LEGACY_JSON_FILENAMES = ("role-assignments.json", "harness-identities.json")
 
 # Exclusion allowlist (paths relative to the repo root, POSIX form):
-#   * scripts/seed_harness_registry.py — the seed source legitimately reads the
-#     legacy JSON until the gated physical-deletion follow-on.
 #   * scripts/rehearse/_dashboard_regen.py
 #     reference the legacy filenames only as static, non-executing string
 #     constants; they are allowlisted per the IP-6 named-allowlist contract.
 _SCAN_ALLOWLIST = frozenset(
     {
-        "scripts/seed_harness_registry.py",
         "scripts/rehearse/_dashboard_regen.py",
     }
 )

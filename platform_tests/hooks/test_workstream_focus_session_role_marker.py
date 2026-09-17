@@ -41,10 +41,6 @@ MODULE_PATH = REPO_ROOT / "scripts" / "workstream_focus.py"
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-_PACKAGE_SRC = REPO_ROOT / "groundtruth-kb" / "src"
-if str(_PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(_PACKAGE_SRC))
-
 
 # Env vars the implementation reads in the resolver fallback chain. Each
 # test's fixture sanitises these so the resolver cannot pick up stray values

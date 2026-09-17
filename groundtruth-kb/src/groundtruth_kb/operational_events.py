@@ -155,9 +155,10 @@ def _validate_enums(*, event_type: str, lifecycle_state: str, authorization_valu
 
 def _current(connection: sqlite3.Connection, event_id: str) -> sqlite3.Row | None:
     connection.row_factory = sqlite3.Row
-    return connection.execute(
+    row: sqlite3.Row | None = connection.execute(
         f'SELECT * FROM "{TABLE}" WHERE id = ? ORDER BY version DESC LIMIT 1', (event_id,)
     ).fetchone()
+    return row
 
 
 def create(

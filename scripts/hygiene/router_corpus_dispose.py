@@ -20,7 +20,6 @@ import hashlib
 import json
 import re
 import sqlite3
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -336,7 +335,6 @@ def apply_batch(
         confirm_manifest=confirm_manifest,
     )
 
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "groundtruth-kb" / "src"))
     from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
 
     db = KnowledgeDB(db_path)

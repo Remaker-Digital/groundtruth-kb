@@ -73,5 +73,5 @@ def test_codex_interactive_config_uses_split_posture() -> None:
 
     assert data["approval_policy"] == "on-request"
     assert data["sandbox_workspace_write"]["network_access"] is False
-    assert "DELIB-FAB15-REMEDIATION-20260610" in text
-    assert "Headless bridge-dispatch" in text
+    # The config is projected from the profile; deliberation-archive provenance comments are retired.
+    assert "PROJECTION, NOT CANONICAL" in text

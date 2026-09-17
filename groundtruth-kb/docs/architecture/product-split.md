@@ -22,7 +22,7 @@ assertion engine.
 | Assertions | `gt assert` - run machine-checkable spec assertions |
 | Web dashboard | `gt serve` - optional FastAPI UI (`[web]` extra) |
 | Summary | `gt summary` - quick project overview |
-| Desktop bootstrap | `gt bootstrap-desktop` - same-day prototype scaffold |
+| Application initialization | `gt project init` - the single native initializer for a registered application |
 
 Layer 1 is what ADR-0001: Three-Tier Memory Architecture calls MemBase — the canonical knowledge and specifications tier.
 

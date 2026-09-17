@@ -182,22 +182,27 @@ def read_harness_surface(project_root: Path) -> dict[str, Any]:
 
 
 def read_routing_surface(project_root: Path) -> dict[str, Any]:
-    """Surface (c): API-harness routing config (.api-harness/routing.toml)."""
-    data = _load_toml(project_root / ".api-harness" / "routing.toml")
-    if not isinstance(data, dict):
-        return {"status": "unknown", "per_provider": {}, "default_model": None}
-    models = data.get("models", {})
+    """Read each monitored provider's own derived catalog; there is no shared default."""
     per_provider: dict[str, list[str]] = {}
-    if isinstance(models, dict):
-        for name, model in models.items():
-            provider = str(model.get("provider", "")) if isinstance(model, dict) else ""
-            per_provider.setdefault(provider, []).append(name)
-    routing = data.get("routing", {})
-    default_model = routing.get("default_model") if isinstance(routing, dict) else None
+    defaults: dict[str, str | None] = {}
+    for provider in MONITORED_HARNESSES.values():
+        data = _load_toml(project_root / ".api-harness" / provider / "routing.toml")
+        models = data.get("models", {}) if isinstance(data, dict) else {}
+        routing = data.get("routing", {}) if isinstance(data, dict) else {}
+        own = routing.get(provider, {}) if isinstance(routing, dict) else {}
+        if not isinstance(models, dict) or not models or not isinstance(own, dict):
+            continue
+        if any(not isinstance(row, dict) or row.get("provider") != provider for row in models.values()):
+            continue
+        default = own.get("default_model")
+        if not isinstance(default, str) or default not in models:
+            continue
+        per_provider[provider] = sorted(models)
+        defaults[provider] = default
     return {
-        "status": "ok" if models else "unknown",
+        "status": "ok" if len(per_provider) == len(MONITORED_HARNESSES) else "partial" if per_provider else "unknown",
         "per_provider": per_provider,
-        "default_model": default_model,
+        "default_models": defaults,
     }
 
 

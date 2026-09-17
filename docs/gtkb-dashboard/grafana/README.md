@@ -1,80 +1,40 @@
-# GT-KB Grafana Dashboard
+# GT-KB Grafana dashboard
 
-This directory contains the committed Grafana provisioning assets for the GT-KB dashboard.
-
-Dashboard design rule: default views should prioritize graphical summaries such as status cards, gauges,
-charts, timelines, and diagrams. Long textual tables are drill-down detail and should be collapsed or placed
-below the visual overview unless a user explicitly needs them first.
-
-Runtime data is not committed. Each environment creates its own SQLite database at:
-
-```text
-memory/gtkb-dashboard.sqlite
-```
-
-Install Grafana locally:
+The installed package owns dashboard collection, templates and process control.
+Run the ordinary CLI with the configuration for the intended project:
 
 ```powershell
-.\scripts\gtkb_dashboard\install_local_grafana.ps1
+gt --config E:\GT-KB\groundtruth.toml dashboard install
+gt --config E:\GT-KB\groundtruth.toml dashboard start
+gt --config E:\GT-KB\groundtruth.toml dashboard refresh --json
+gt --config E:\GT-KB\groundtruth.toml dashboard stop
 ```
 
-Start the local dashboard:
+`start` returns the actual local URLs after checking readiness. Default ports are
+3000 for Grafana and 8766 for the refresh service. Both listeners bind to loopback;
+children run without visible windows. The refresh service collects on startup
+and every 60 minutes by default. Manual refresh requires
+`GTKB_DASHBOARD_REFRESH_TOKEN` in the service's environment.
 
-```powershell
-.\scripts\gtkb_dashboard\start_local_dashboard.ps1
-```
+Generated data and display assets default to `<project_root>/.groundtruth/dashboard`;
+Grafana defaults to `<project_root>/.groundtruth/tools/grafana`. These runtime
+files are uncommitted. Source templates live in the installed package's
+`templates/dashboard` directory. `--runtime-root`, `--db-path`, port and interval
+options select a particular runtime; use the same runtime when stopping it.
 
-The dashboard is available at `http://127.0.0.1:3000/d/gtkb/groundtruth-kb-dashboard`.
+`dashboard init` collects current native observations and materializes the display
+without starting processes. `dashboard init --schema-only` creates or migrates
+only the derived reporting schema. `dashboard refresh --probe-live` additionally
+reads native service/bridge and GitHub workflow observations using the selected
+configuration. Probes are read-only; unavailable measurements remain unavailable.
+A completed refresh is not release signoff or full telemetry qualification.
 
-The companion refresh service is available at `http://127.0.0.1:8766/` and requires
-`GTKB_DASHBOARD_REFRESH_TOKEN` from `.env.local` for manual refreshes. The service also refreshes
-the database on startup and every 60 minutes by default.
+Display record counts and queue eligibility do not establish execution success,
+readiness or context ownership. Prefer graphical summaries and provide detailed
+tables below the overview. Live application connectors and external alert delivery
+remain explicit application/operator choices; dashboard setup does not activate
+them. The default notifier retains local alert-list behavior.
 
-For release preparation, the refresh database must not report a false green. The
-release readiness row surfaces:
-
-- `release_blockers`
-- `release_health_findings`
-- `dirty_worktree_paths`
-- `dispatcher_health_findings`
-- `bridge_actionability_findings`
-- `readme_wiki_drift`
-
-Application deployment, security, throughput/latency, defect, and
-infrastructure summaries are provider-neutral dashboard contracts. GT-KB ships
-mock rows for those panels; the active application owns any live connector to
-Azure, Kubernetes, containers, VMs, or another deployment environment.
-
-Run a bounded one-off release-health refresh from the repository root with:
-
-```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB
-```
-
-For release signoff, add `--probe-live` after confirming local dispatcher and
-GitHub CLI probes are healthy; live probes are opt-in because they depend on
-host-local process and authentication state.
-
-Compare governed wiki source pages with a local wiki clone with:
-
-```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/update_wiki_pages.py compare --wiki-dir .tmp/groundtruth-kb.wiki
-```
-
-Azure Container Apps reconciliation is an optional adopter diagnostic, not a
-default GT-KB release-health dependency. Enable it only for an Azure-hosted
-adopter check:
-
-```powershell
-$env:GTKB_DASHBOARD_AZURE_RECONCILE = "1"
-$env:GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP = '{"staging":"<app-staging>","production":"<app-production>"}'
-$env:GTKB_DASHBOARD_AZURE_RESOURCE_GROUP = "<application-resource-group>"
-```
-
-Stop the local dashboard:
-
-```powershell
-.\scripts\gtkb_dashboard\stop_local_dashboard.ps1
-```
-
-Package-level GT-KB integration requirements are captured in `PACKAGE-INTEGRATION.md`.
+The source-tree Python and PowerShell entry points have been consolidated into
+these installed commands. No Docker Desktop or pip post-install operation is
+required. See [package integration](PACKAGE-INTEGRATION.md) for replacement details.

@@ -5,18 +5,9 @@ import subprocess
 from pathlib import Path
 
 import pytest
-
-from scripts import cursor_harness
-from scripts.verify_cursor_dispatch import evaluate_readiness
-
-
-def _write_registry(root: Path, record: dict) -> None:
-    state = root / "harness-state"
-    state.mkdir()
-    (state / "harness-registry.json").write_text(
-        json.dumps({"harnesses": [record], "schema_version": 1}),
-        encoding="utf-8",
-    )
+from groundtruth_kb import cursor_harness
+from groundtruth_kb import cursor_readiness as verify_cursor_dispatch
+from groundtruth_kb.cursor_readiness import evaluate_readiness
 
 
 def _cursor_record(**overrides):
@@ -75,8 +66,8 @@ def clear_registry_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(cursor_harness, "load_env_local", lambda **_kwargs: {})
 
 
-def test_readiness_fails_closed_when_agent_cli_missing(tmp_path: Path) -> None:
-    _write_registry(tmp_path, _cursor_record())
+def test_readiness_fails_closed_when_agent_cli_missing(tmp_path: Path, native_harness_record) -> None:
+    native_harness_record(tmp_path, _cursor_record())
     _write_cursor_shim(tmp_path)
 
     def missing_agent() -> list[str]:
@@ -84,13 +75,12 @@ def test_readiness_fails_closed_when_agent_cli_missing(tmp_path: Path) -> None:
 
     result = evaluate_readiness(project_root=tmp_path, agent_resolver=missing_agent)
 
-    assert result["ready"] is False
-    assert result["dispatchable_now"] is False
+    assert result["probe_passed"] is False
     assert result["first_failed_check"].startswith("headless Cursor Agent CLI")
 
 
-def test_readiness_can_be_ready_without_current_dispatch_enablement(tmp_path: Path) -> None:
-    _write_registry(tmp_path, _cursor_record())
+def test_prerequisite_checks_do_not_qualify_harness_or_dispatchability(tmp_path: Path, native_harness_record) -> None:
+    native_harness_record(tmp_path, _cursor_record())
     _write_cursor_shim(tmp_path)
 
     result = evaluate_readiness(
@@ -99,9 +89,9 @@ def test_readiness_can_be_ready_without_current_dispatch_enablement(tmp_path: Pa
         auth_runner=_auth_runner(),
     )
 
-    assert result["ready"] is True
-    assert result["dispatchable_now"] is False
-    assert result["can_receive_dispatch"] is False
+    assert result["probe_passed"] is True
+    assert result["harness_qualification"] == "unqualified"
+    assert not ({"ready", "dispatchable", "dispatchable_now", "can_receive_dispatch", "role"} & result.keys())
     assert "role" not in result
     assert result["cursor_adaptation"]["harness_id"] == "E"
     assert result["cursor_adaptation"]["raw_prompt_included"] is False
@@ -109,8 +99,10 @@ def test_readiness_can_be_ready_without_current_dispatch_enablement(tmp_path: Pa
 
 
 @pytest.mark.parametrize("missing", [True, False])
-def test_readiness_refuses_missing_or_empty_own_instructions(tmp_path: Path, missing: bool) -> None:
-    _write_registry(tmp_path, _cursor_record())
+def test_readiness_refuses_missing_or_empty_own_instructions(
+    tmp_path: Path, missing: bool, native_harness_record
+) -> None:
+    native_harness_record(tmp_path, _cursor_record())
     _write_cursor_shim(tmp_path)
     own = tmp_path / ".cursor" / "skills" / "verify" / "SKILL.md"
     if missing:
@@ -122,13 +114,15 @@ def test_readiness_refuses_missing_or_empty_own_instructions(tmp_path: Path, mis
         agent_resolver=lambda: ["C:/Tools/cursor-agent.exe"],
         auth_runner=_auth_runner(),
     )
-    assert result["ready"] is False
+    assert result["probe_passed"] is False
     assert result["first_failed_check"].startswith("local review instructions")
 
 
 @pytest.mark.parametrize("legacy_role", [None, [], ["prime-builder"], ["loyal-opposition"]])
-def test_dispatch_enablement_does_not_assign_a_context_role(tmp_path: Path, legacy_role) -> None:
-    _write_registry(
+def test_legacy_fields_supply_no_context_role_or_dispatchability(
+    tmp_path: Path, legacy_role, native_harness_record
+) -> None:
+    native_harness_record(
         tmp_path,
         _cursor_record(
             can_receive_dispatch=True,
@@ -143,12 +137,13 @@ def test_dispatch_enablement_does_not_assign_a_context_role(tmp_path: Path, lega
         auth_runner=_auth_runner(),
     )
 
-    assert result["ready"] is True
-    assert result["dispatchable_now"] is True
+    assert result["probe_passed"] is True
+    assert result["harness_qualification"] == "unqualified"
+    assert not ({"ready", "dispatchable", "dispatchable_now", "can_receive_dispatch", "role"} & result.keys())
 
 
-def test_readiness_fails_closed_when_agent_is_unauthenticated(tmp_path: Path) -> None:
-    _write_registry(tmp_path, _cursor_record(can_receive_dispatch=True, role=["prime-builder"]))
+def test_readiness_fails_closed_when_agent_is_unauthenticated(tmp_path: Path, native_harness_record) -> None:
+    native_harness_record(tmp_path, _cursor_record(can_receive_dispatch=True, role=["prime-builder"]))
     _write_cursor_shim(tmp_path)
 
     result = evaluate_readiness(
@@ -157,14 +152,15 @@ def test_readiness_fails_closed_when_agent_is_unauthenticated(tmp_path: Path) ->
         auth_runner=_auth_runner(authenticated=False),
     )
 
-    assert result["ready"] is False
-    assert result["dispatchable_now"] is False
+    assert result["probe_passed"] is False
     assert result["auth_probe"]["authenticated"] is False
     assert result["first_failed_check"].startswith("headless Cursor Agent authentication")
 
 
-def test_auth_probe_injects_cursor_api_key_from_env_local(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _write_registry(tmp_path, _cursor_record(can_receive_dispatch=True, role=["prime-builder"]))
+def test_auth_probe_injects_cursor_api_key_from_env_local(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, native_harness_record
+) -> None:
+    native_harness_record(tmp_path, _cursor_record(can_receive_dispatch=True, role=["prime-builder"]))
     _write_cursor_shim(tmp_path)
     monkeypatch.delenv("CURSOR_API_KEY", raising=False)
     monkeypatch.setattr(cursor_harness, "load_env_local", lambda **_kwargs: {"CURSOR_API_KEY": "fixture-key"})
@@ -181,12 +177,14 @@ def test_auth_probe_injects_cursor_api_key_from_env_local(tmp_path: Path, monkey
         auth_runner=runner,
     )
 
-    assert result["ready"] is True
+    assert result["probe_passed"] is True
+    assert result["harness_qualification"] == "unqualified"
+    assert not ({"ready", "dispatchable", "dispatchable_now", "can_receive_dispatch", "role"} & result.keys())
     assert result["auth_probe"]["cursor_api_key_available"] is True
 
 
-def test_live_probe_requires_non_empty_output(tmp_path: Path) -> None:
-    _write_registry(tmp_path, _cursor_record(can_receive_dispatch=True, role=["loyal-opposition"]))
+def test_live_probe_requires_non_empty_output(tmp_path: Path, native_harness_record) -> None:
+    native_harness_record(tmp_path, _cursor_record(can_receive_dispatch=True, role=["loyal-opposition"]))
     _write_cursor_shim(tmp_path)
 
     def blank_runner(command, **kwargs):
@@ -202,7 +200,86 @@ def test_live_probe_requires_non_empty_output(tmp_path: Path) -> None:
         live_runner=blank_runner,
     )
 
-    assert result["ready"] is False
-    assert result["dispatchable_now"] is False
+    assert result["probe_passed"] is False
     assert result["live_probe"]["stdout_bytes"] == 2
     assert result["first_failed_check"].startswith("live bridge-review probe")
+
+
+@pytest.mark.parametrize("value,exit_code", [("false", 0), ("true", 0), (1, 0), (True, 1), (None, 0)])
+def test_authentication_requires_true_boolean_and_successful_exit(tmp_path, native_harness_record, value, exit_code):
+    native_harness_record(tmp_path, _cursor_record())
+    _write_cursor_shim(tmp_path)
+
+    def runner(command, **kwargs):
+        return subprocess.CompletedProcess(command, exit_code, stdout=json.dumps({"isAuthenticated": value}), stderr="")
+
+    result = evaluate_readiness(project_root=tmp_path, agent_resolver=lambda: ["fixture-agent"], auth_runner=runner)
+    assert result["probe_passed"] is False
+    assert result["auth_probe"]["authenticated"] is False
+    assert result["first_failed_check"].startswith("headless Cursor Agent authentication")
+
+
+def test_auth_uses_selected_root_without_mutating_environment_or_retaining_private_output(tmp_path, monkeypatch):
+    import os
+
+    private = "private-fixture-value"
+    monkeypatch.delenv("CURSOR_API_KEY", raising=False)
+    before = dict(os.environ)
+
+    def load(**kwargs):
+        assert kwargs == {"check_only": True, "env_file": tmp_path / ".env.local"}
+        return {"CURSOR_API_KEY": private}
+
+    def runner(command, **kwargs):
+        assert kwargs["env"]["CURSOR_API_KEY"] == private
+        return subprocess.CompletedProcess(
+            command,
+            0,
+            stdout=json.dumps({"isAuthenticated": True, "message": private, "status": private}),
+            stderr=private,
+        )
+
+    monkeypatch.setattr(cursor_harness, "load_env_local", load)
+    result = verify_cursor_dispatch._run_auth_probe(["fixture-agent"], project_root=tmp_path, runner=runner)
+    assert result["authenticated"] is True
+    assert private not in json.dumps(result)
+    assert "command" not in result and "message" not in result
+    assert dict(os.environ) == before
+
+
+@pytest.mark.parametrize(
+    "record",
+    [
+        _cursor_record(harness_type="claude"),
+        _cursor_record(invocation_surfaces={"headless": {"argv": ["fixture-agent", None]}}),
+    ],
+)
+def test_invalid_native_launch_record_prevents_auth_and_prompt_subprocesses(tmp_path, native_harness_record, record):
+    native_harness_record(tmp_path, record)
+    _write_cursor_shim(tmp_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Invalid launch prerequisites must fail before any subprocess")
+
+    report = evaluate_readiness(
+        project_root=tmp_path,
+        agent_resolver=lambda: ["fixture-agent"],
+        auth_runner=forbidden,
+        live_runner=forbidden,
+        require_live=True,
+    )
+    assert report["probe_passed"] is False
+    assert report["auth_probe"] is None and report["live_probe"] is None
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        ["--skill", "wrong", "bridge-review"],
+        ["bridge-review", "--skill"],
+        ["--skill", "bridge-review", "--skill", "wrong"],
+        ["--skill", "wrong", "--skill", "bridge-review"],
+    ],
+)
+def test_skill_selection_requires_one_exact_option_value(argv):
+    assert not verify_cursor_dispatch._argv_selects_skill(argv, "bridge-review")

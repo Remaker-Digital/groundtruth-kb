@@ -16,7 +16,6 @@ from groundtruth_kb import get_templates_dir
 HOOKS_DIR = get_templates_dir() / "hooks"
 
 ALL_HOOKS = [
-    "spec-before-code.py",
     "bridge-compliance-gate.py",
     "kb-not-markdown.py",
     "destructive-gate.py",
@@ -24,7 +23,6 @@ ALL_HOOKS = [
 ]
 
 PRETOOLUSE_HOOKS = [
-    "spec-before-code.py",
     "bridge-compliance-gate.py",
     "kb-not-markdown.py",
     "destructive-gate.py",
@@ -277,8 +275,23 @@ def test_credential_scan_both_modes_deny_same_sample(tmp_path, mode):
 # ---------------------------------------------------------------------------
 
 
-def test_spec_before_code_no_source_paths(tmp_path):
-    """No specs with source_paths → info advisory (no source_paths defined)."""
+def _native_spec_effect_probe(tmp_path: Path, payload: str) -> subprocess.CompletedProcess:
+    """Preserve decoy data while checking the one native effect adapter."""
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "spec-test"},
+    )
+    assert result.returncode == 0 and not result.stderr
+    output = json.loads(result.stdout)
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert {p: p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
+    return result
+
+
+def test_native_spec_effect_no_source_paths(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
@@ -300,15 +313,15 @@ def test_spec_before_code_no_source_paths(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
-    # Emits info advisory or pass — either is acceptable
+    # The native checker returns an explicit denial; fixture metadata grants no claim.
     output = json.loads(result.stdout)
     assert isinstance(output, dict)
 
 
-def test_spec_before_code_match(tmp_path):
-    """Spec with matching source_paths → pass (empty JSON)."""
+def test_native_spec_effect_match(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
@@ -331,14 +344,14 @@ def test_spec_before_code_match(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    assert output == {}
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_spec_before_code_no_match(tmp_path):
-    """source_paths defined but not matching → warning advisory."""
+def test_native_spec_effect_no_match(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
@@ -361,15 +374,15 @@ def test_spec_before_code_no_match(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
     assert "hookSpecificOutput" in output
     assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
 
 
-def test_spec_before_code_non_source_file(tmp_path):
-    """Target is docs/guide.md → pass (not a source file by extension)."""
+def test_native_spec_effect_non_source_file(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -379,14 +392,14 @@ def test_spec_before_code_non_source_file(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    assert output == {}
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_spec_before_code_match_via_migrated_db(tmp_path):
-    """Spec inserted via KnowledgeDB (real migration) — proves schema, not mock."""
+def test_native_spec_effect_match_via_migrated_db(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(tmp_path / "test.db")
@@ -414,14 +427,14 @@ def test_spec_before_code_match_via_migrated_db(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    assert output == {}
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_spec_before_code_platform_tests_match_via_bridge_evidence(tmp_path):
-    """platform_tests path with explicit bridge evidence passes without matching source_paths."""
+def test_native_spec_effect_platform_tests_match_via_bridge_evidence(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
@@ -459,14 +472,14 @@ def test_spec_before_code_platform_tests_match_via_bridge_evidence(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
-    assert output == {}
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_spec_before_code_platform_tests_unmapped_bridge_evidence_warns(tmp_path):
-    """Unrelated platform_tests path still warns when bridge evidence maps another file."""
+def test_native_spec_effect_platform_tests_unmapped_bridge_evidence_denies(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(tmp_path / "groundtruth.db")
@@ -502,11 +515,11 @@ def test_spec_before_code_platform_tests_unmapped_bridge_evidence_warns(tmp_path
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("spec-before-code.py", stdin_data=payload)
+    result = _native_spec_effect_probe(tmp_path, payload)
     assert result.returncode == 0
     output = json.loads(result.stdout)
     assert "hookSpecificOutput" in output
-    assert "No specification found covering" in output["hookSpecificOutput"]["additionalContext"]
+    assert output["hookSpecificOutput"]["permissionDecisionReason"]
 
 
 def _seed_platform_spec_db(tmp_path: Path) -> None:
@@ -539,14 +552,14 @@ def _platform_test_payload(tmp_path: Path, file_path: str = "platform_tests/grou
     )
 
 
-def _run_platform_spec_before_code(tmp_path: Path) -> dict:
-    result = _run_hook("spec-before-code.py", stdin_data=_platform_test_payload(tmp_path))
+def _run_platform_native_effect(tmp_path: Path) -> dict:
+    result = _native_spec_effect_probe(tmp_path, _platform_test_payload(tmp_path))
     assert result.returncode == 0
     return json.loads(result.stdout)
 
 
-def test_spec_before_code_platform_tests_target_paths_only_suppresses(tmp_path):
-    """Current structured target_paths bridge evidence suppresses the advisory."""
+def test_native_spec_effect_platform_tests_target_paths_only_does_not_grant_claim(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     _seed_platform_spec_db(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
@@ -555,11 +568,11 @@ def test_spec_before_code_platform_tests_target_paths_only_suppresses(tmp_path):
         encoding="utf-8",
     )
 
-    assert _run_platform_spec_before_code(tmp_path) == {}
+    assert _run_platform_native_effect(tmp_path)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_spec_before_code_platform_tests_mapping_only_suppresses(tmp_path):
-    """Current structured Spec-to-Test Mapping bridge evidence suppresses the advisory."""
+def test_native_spec_effect_platform_tests_mapping_only_does_not_grant_claim(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     _seed_platform_spec_db(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
@@ -572,11 +585,11 @@ def test_spec_before_code_platform_tests_mapping_only_suppresses(tmp_path):
         encoding="utf-8",
     )
 
-    assert _run_platform_spec_before_code(tmp_path) == {}
+    assert _run_platform_native_effect(tmp_path)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
-def test_spec_before_code_platform_tests_prose_only_bridge_mention_warns(tmp_path):
-    """A prose-only bridge mention is not structured coverage."""
+def test_native_spec_effect_platform_tests_prose_only_bridge_mention_denies(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     _seed_platform_spec_db(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
@@ -585,14 +598,14 @@ def test_spec_before_code_platform_tests_prose_only_bridge_mention_warns(tmp_pat
         encoding="utf-8",
     )
 
-    output = _run_platform_spec_before_code(tmp_path)
+    output = _run_platform_native_effect(tmp_path)
     assert "hookSpecificOutput" in output
-    assert "No specification found covering" in output["hookSpecificOutput"]["additionalContext"]
+    assert output["hookSpecificOutput"]["permissionDecisionReason"]
 
 
 @pytest.mark.parametrize("latest_status", ["NO-GO", "WITHDRAWN", "DEFERRED", "ADVISORY"])
-def test_spec_before_code_platform_tests_latest_non_coverage_status_warns(tmp_path, latest_status):
-    """Earlier mapped versions do not count when latest bridge state is non-covering."""
+def test_native_spec_effect_platform_tests_latest_non_coverage_status_denies(tmp_path, latest_status):
+    """SQLite and loose files never establish a current native effect claim."""
     _seed_platform_spec_db(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
@@ -607,13 +620,13 @@ def test_spec_before_code_platform_tests_latest_non_coverage_status_warns(tmp_pa
         encoding="utf-8",
     )
 
-    output = _run_platform_spec_before_code(tmp_path)
+    output = _run_platform_native_effect(tmp_path)
     assert "hookSpecificOutput" in output
-    assert "No specification found covering" in output["hookSpecificOutput"]["additionalContext"]
+    assert output["hookSpecificOutput"]["permissionDecisionReason"]
 
 
-def test_spec_before_code_platform_tests_latest_go_over_older_nogo_suppresses(tmp_path):
-    """Latest acceptable bridge evidence wins over older rejected history."""
+def test_native_spec_effect_platform_tests_latest_go_over_older_nogo_does_not_grant_claim(tmp_path):
+    """SQLite and loose files never establish a current native effect claim."""
     _seed_platform_spec_db(tmp_path)
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
@@ -630,7 +643,7 @@ def test_spec_before_code_platform_tests_latest_go_over_older_nogo_suppresses(tm
         encoding="utf-8",
     )
 
-    assert _run_platform_spec_before_code(tmp_path) == {}
+    assert _run_platform_native_effect(tmp_path)["hookSpecificOutput"]["permissionDecision"] == "deny"
 
 
 # ---------------------------------------------------------------------------
@@ -650,16 +663,8 @@ def _make_bridge_thread(tmp_path: Path, entries: list[tuple[str, str, str]]) -> 
     return bridge_dir
 
 
-def _write_bridge_version(tmp_path: Path, slug: str, version: int, status: str) -> Path:
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir(parents=True, exist_ok=True)
-    path = bridge_dir / f"{slug}-{version:03d}.md"
-    path.write_text(f"{status}\n\n", encoding="utf-8")
-    return path
-
-
 def test_bridge_compliance_go_entry(tmp_path):
-    """Latest GO → pass (no target_paths in proposal → also pass)."""
+    """Loose bridge files never grant a native effect claim."""
     _make_bridge_thread(tmp_path, [("my-feature", "GO", "bridge/my-feature-002.md")])
     payload = json.dumps(
         {
@@ -670,13 +675,20 @@ def test_bridge_compliance_go_entry(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     assert result.returncode == 0
-    assert json.loads(result.stdout) == {}
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_no_frontmatter(tmp_path):
-    """Latest NEW, no target_paths in proposal → pass."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "my-feature-001.md").write_text("NEW\n\n# Proposal\n\nNo target_paths here.\n", encoding="utf-8")
@@ -689,13 +701,20 @@ def test_bridge_compliance_no_frontmatter(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     assert result.returncode == 0
-    assert json.loads(result.stdout) == {}
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_new_entry_match(tmp_path):
-    """Latest NEW with frontmatter matching → ask with hookEventName."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text(
@@ -711,16 +730,23 @@ def test_bridge_compliance_new_entry_match(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     assert result.returncode == 0
     output = json.loads(result.stdout)
     assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
-    assert output["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_ask_has_additionalContext(tmp_path):
-    """emit_ask for pending → both permissionDecisionReason and additionalContext."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
@@ -733,14 +759,21 @@ def test_bridge_compliance_ask_has_additionalContext(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     output = json.loads(result.stdout)
     assert output["hookSpecificOutput"]["permissionDecisionReason"]
     assert output["hookSpecificOutput"]["additionalContext"]
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_nogo_entry(tmp_path):
-    """Latest NO-GO with matching frontmatter → ask."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
@@ -754,14 +787,21 @@ def test_bridge_compliance_nogo_entry(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     output = json.loads(result.stdout)
-    assert output["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_nogo_ask_has_additionalContext(tmp_path):
-    """emit_ask for NO-GO → additionalContext == permissionDecisionReason."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
@@ -775,13 +815,20 @@ def test_bridge_compliance_nogo_ask_has_additionalContext(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     output = json.loads(result.stdout)
     assert output["hookSpecificOutput"]["additionalContext"] == output["hookSpecificOutput"]["permissionDecisionReason"]
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_revised_over_nogo(tmp_path):
-    """Latest REVISED, historical NO-GO below → ask (pending flavor, not NO-GO)."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
@@ -798,16 +845,23 @@ def test_bridge_compliance_revised_over_nogo(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     output = json.loads(result.stdout)
-    assert output["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
     reason = output["hookSpecificOutput"]["permissionDecisionReason"]
-    # Should be pending message (REVISED/pending), not NO-GO message
-    assert "NO-GO" not in reason or "pending" in reason.lower() or "REVISED" in reason
+    assert reason
+    assert "pending Codex review" not in reason
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_go_over_nogo(tmp_path):
-    """Latest GO, historical NO-GO below → pass."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
@@ -822,12 +876,19 @@ def test_bridge_compliance_go_over_nogo(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
-    assert json.loads(result.stdout) == {}
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
+    assert json.loads(result.stdout)["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 def test_bridge_compliance_multi_doc_partial_match(tmp_path):
-    """Two docs, one matching one not → only matching doc fires."""
+    """Loose bridge files never grant a native effect claim."""
     bridge_dir = tmp_path / "bridge"
     bridge_dir.mkdir()
     (bridge_dir / "auth-refactor-001.md").write_text('NEW\n\ntarget_paths: ["src/auth.py"]\n', encoding="utf-8")
@@ -841,9 +902,16 @@ def test_bridge_compliance_multi_doc_partial_match(tmp_path):
             "cwd": str(tmp_path),
         }
     )
-    result = _run_hook("bridge-compliance-gate.py", stdin_data=payload)
+    result = _run_hook(
+        "bridge-compliance-gate.py",
+        stdin_data=payload,
+        env={"GT_AUTHORITY_URL": "http://127.0.0.1:1", "GTKB_NATIVE_CONTEXT_ID": "test"},
+    )
     output = json.loads(result.stdout)
-    assert output["hookSpecificOutput"]["permissionDecision"] == "ask"
+    assert output["hookSpecificOutput"]["permissionDecision"] == "deny"
+    assert not (tmp_path / ".gtkb-state").exists()
+    assert not (tmp_path / "src/feature.py").exists()
+    assert not (tmp_path / "src/auth.py").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -928,3 +996,74 @@ def test_kb_not_markdown_configured_allowlist(tmp_path):
 # ---------------------------------------------------------------------------
 # tool_response runtime-payload tests (documented PostToolUse contract)
 # ---------------------------------------------------------------------------
+
+
+def _bridge_content_checkpoint(tmp_path: Path, content: str) -> dict:
+    """Validate current metadata without treating narrative wording as authority."""
+    decoy = tmp_path / "groundtruth.db"
+    decoy.write_bytes(b"unrelated application data")
+    status = content.splitlines()[0]
+    header = (
+        f"::init gtkb lo\n::open build\n{status}\n"
+        "bridge_kind: implementation_proposal\nDocument: probe\nVersion: 1\nDate: 2026-09-13\n"
+        "author_identity: test\nauthor_harness_id: test\nauthor_session_context_id: SENV-test\n"
+        "author_model: test-model\nrecipient_role: loyal-opposition\n"
+        "Project: PROJECT-1\nWork Item: WI-1\nwork_item_version: 1\n"
+        'target_paths: ["src/feature.py"]\ntest_artifact_targets: ["tests/test_feature.py"]\n'
+        'spec_versions: {"SPEC-1": 1}\n\n'
+    )
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-P",
+            "-c",
+            "import json,sys; from groundtruth_kb.bridge.native import parse_authored_message; "
+            "print(json.dumps(parse_authored_message(sys.stdin.read())))",
+        ],
+        input=header + content,
+        cwd=tmp_path,
+        env=_canonical_env(),
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=20,
+    )
+    assert decoy.read_bytes() == b"unrelated application data"
+    assert sorted(p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file()) == ["groundtruth.db"]
+    return json.loads(result.stdout)
+
+
+@pytest.mark.parametrize("status", ["NEW", "REVISED"])
+@pytest.mark.parametrize(
+    "body",
+    [
+        "This implementation inserts a new GOV version record into MemBase.",
+        "This implementation writes formal artifact approval evidence for a new GOV version.",
+        "This implementation writes a narrative-artifact approval-packet for AGENTS.md.",
+        "This proposal explains prior MemBase defects but performs no MemBase mutation.",
+        "This proposal explains prior approval packet defects but performs no approval packet work.",
+    ],
+)
+def test_bridge_content_does_not_demand_retired_authority_carriers(tmp_path, status, body):
+    # Legacy wording is inert text here, never permission or a request to create a packet.
+    content = (
+        f"{status}\nbridge_kind: implementation_proposal\n"
+        'target_paths: ["src/feature.py"]\n'
+        f"{body}\n\n## Specification Links\n"
+        "- DCL-ARTIFACT-APPROVAL-HOOK-001\n"
+    )
+    assert _bridge_content_checkpoint(tmp_path, content)["status"] == status
+
+
+@pytest.mark.parametrize("status", ["NEW", "REVISED"])
+def test_bridge_content_heading_does_not_override_canonical_metadata(tmp_path, status):
+    content = (
+        f"{status}\nbridge_kind: implementation_proposal\n"
+        'target_paths: ["src/feature.py"]\n'
+        "## Specification Links (current sources)\n"
+        "- DCL-ARTIFACT-APPROVAL-HOOK-001\n"
+    )
+    parsed = _bridge_content_checkpoint(tmp_path, content)
+    assert parsed["status"] == status
+    assert parsed["metadata"]["project"] == "PROJECT-1"
+    assert parsed["spec_versions"] == {"SPEC-1": 1}

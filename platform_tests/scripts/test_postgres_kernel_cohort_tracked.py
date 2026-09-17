@@ -15,6 +15,13 @@ what was reviewed, survives cohort removal, and reproduces from a clone.
 
 Each digest was published in ``bridge/gtkb-wi7707-postgres-kernel-cohort-tracking-001.md`` and
 independently confirmed by the reviewer at ``-002``.
+
+Re-pinned 2026-09-17 under owner ruling D8 after the independent reviewer confirmed the cohort
+changes of the realignment (the explicit repository/scope transition and its integration cases;
+``test_postgres_kernel.py`` unchanged). The digest case now measures the LF-normalized working-tree
+content - the git-blob identity of the file under this repository's text normalization - so it
+proves the reviewed final bytes on any checkout and before as well as after the commit that lands
+them; the pinned values are the LF-normalized size and sha256 of those bytes.
 """
 
 from __future__ import annotations
@@ -27,26 +34,26 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-#: path -> (exact byte size, exact sha256) as reviewed. Do not recompute these from disk.
+#: path -> (LF-normalized byte size, sha256 of the LF-normalized content) as reviewed. Do not recompute these from disk.
 COHORT: dict[str, tuple[int, str]] = {
     "groundtruth-kb/src/groundtruth_kb/postgres_kernel.py": (
-        106854,
-        "3d8dfbf2dd8ccb065f44a777b4c00255e3524edfc40f6f8fb212193b1aee5bd8",
+        140341,
+        "f6dca15ab51b5f44a7b690ee5790e463f0394172924dba980758f3c1cf36437d",
     ),
     "groundtruth-kb/src/groundtruth_kb/postgresql_v1.sql": (
-        12774,
-        "1036416620e2eec0f80335e267eb05a173a9abe2d09987ed2be1d7a59f4a2879",
+        17823,
+        "4b5f8275cec878ade811adf5692436835ef06c147d79a24686a29dad327980fb",
     ),
     "groundtruth-kb/tests/test_postgres_kernel.py": (
-        49791,
-        "83ab586407ace1382568573a7b6c1f993c45af72fdb5096b1b8c3211f88a02ba",
+        78379,
+        "ced464f571211f32f87e15187dc82c96b58c2e5da665d92cd33a7092bb9d5f4c",
     ),
     # Re-pinned under WI-7669: the two side defects in this file were repaired,
     # which changes its blob. A reviewed-preimage pin is re-pinned under review
     # when the file legitimately changes; that is what the pin is for.
     "platform_tests/groundtruth_kb/test_postgres_kernel_integration.py": (
-        36109,
-        "7927cf067df0b6728ba4e126c71743b2c9895a3b09b69899f6debaa1e7635a06",
+        73588,
+        "7d44de9c101b58d639f23a981f59b582ed2a228d302ef4868fa11be1e1c0714e",
     ),
 }
 
@@ -92,6 +99,17 @@ def _blob(rel_path: str) -> bytes:
     return result.stdout
 
 
+def _normalized_content(rel_path: str) -> bytes:
+    """The working-tree file with CRLF normalized to LF: the blob git stores for it under ``.gitattributes``.
+
+    Reading the tracked content this way, rather than the staged blob, lets the digest case measure the
+    bytes actually present in the tree under test - a qualification clone carries the candidate's changes
+    in its working tree while its index is the production HEAD - and yields the same digest on a CRLF or an
+    LF checkout and after the change is committed.
+    """
+    return (REPO_ROOT / rel_path).read_bytes().replace(b"\r\n", b"\n")
+
+
 @pytest.mark.parametrize("rel_path", sorted(COHORT))
 def test_kernel_cohort_files_are_tracked_at_canonical_paths(rel_path: str) -> None:
     """Terminality requires the target to be in the index, per canon section 7."""
@@ -101,11 +119,11 @@ def test_kernel_cohort_files_are_tracked_at_canonical_paths(rel_path: str) -> No
 
 @pytest.mark.parametrize("rel_path", sorted(COHORT))
 def test_kernel_cohort_files_match_the_reviewed_digests(rel_path: str) -> None:
-    """Byte-identity to the reviewed preimage, measured on the blob so it holds on any clone."""
+    """Byte-identity to the reviewed content, measured on the LF-normalized tree file so it holds on any clone (D8)."""
     expected_size, expected_sha = COHORT[rel_path]
-    data = _blob(rel_path)
-    assert len(data) == expected_size, f"{rel_path} blob is {len(data)} bytes, reviewed at {expected_size}"
-    assert hashlib.sha256(data).hexdigest() == expected_sha, f"{rel_path} blob differs from the reviewed preimage"
+    data = _normalized_content(rel_path)
+    assert len(data) == expected_size, f"{rel_path} normalized size {len(data)}, reviewed at {expected_size}"
+    assert hashlib.sha256(data).hexdigest() == expected_sha, f"{rel_path} normalized content differs from reviewed"
 
 
 @pytest.mark.parametrize("rel_path", sorted(COHORT))

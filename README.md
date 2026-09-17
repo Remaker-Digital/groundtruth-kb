@@ -102,7 +102,7 @@ Deferred release-scope work must have an expiry, time limit, or resume trigger. 
 Local dashboard refresh:
 
 ```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB
+gt --config E:\GT-KB\groundtruth.toml dashboard refresh --runtime-root E:\GT-KB\.groundtruth\dashboard-health --json
 ```
 
 Wiki source comparison:

@@ -173,7 +173,7 @@ _VALID_OWNER_ROLES: frozenset[str] = frozenset(
 
 _VALID_COVERAGE_MODES: frozenset[str] = frozenset({"exact", "recursive", "glob", "opaque_container", "virtual"})
 
-_DEFAULT_RESTORE_ACTION = "manual"
+_DEFAULT_RESTORE_ACTION: RestoreAction = "manual"
 
 _REQUIRED_FIELDS: frozenset[str] = frozenset(
     {

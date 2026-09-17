@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import stat
@@ -11,9 +12,10 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
+from platform_tests.groundtruth_kb.test_assertion_cli import assertion_source as assertion_source
+from platform_tests.groundtruth_kb.test_assertion_cli import native as native
 
 from groundtruth_kb.cli import main
-from groundtruth_kb.db import KnowledgeDB
 
 
 def test_cli_module_invocation_dispatches_help() -> None:
@@ -95,22 +97,59 @@ def _force_rmtree(path: Path) -> None:
 
 
 class TestAssert:
-    def test_assert_no_specs(self, runner: CliRunner, project_dir: Path) -> None:
-        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "assert"])
-        assert result.exit_code == 0
+    pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
-    def test_assert_with_passing_spec(self, runner: CliRunner, project_dir: Path) -> None:
-        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
-        runner.invoke(main, [*config_flag, "seed"])
-        result = runner.invoke(main, [*config_flag, "assert"])
-        assert result.exit_code == 0
-        assert "PASSED" in result.output
+    def test_assert_no_specs(self, runner: CliRunner, assertion_source) -> None:
+        config, _, snapshot, calls = assertion_source
+        before = snapshot()
+        result = runner.invoke(main, ["--config", str(config), "assert", "--json"])
+        assert result.exit_code == 1, result.output
+        report = json.loads(result.output)
+        assert report["total_specs"] == report["passed"] == 0
+        assert report["aggregate_result"] == "UNASSESSED"
+        assert snapshot() == before and all(method == "GET" for method, _ in calls)
 
-    def test_assert_single_spec(self, runner: CliRunner, project_dir: Path) -> None:
-        config_flag = ["--config", str(project_dir / "groundtruth.toml")]
-        runner.invoke(main, [*config_flag, "seed"])
-        result = runner.invoke(main, [*config_flag, "assert", "--spec", "GOV-01"])
-        assert result.exit_code == 0
+    def test_assert_with_passing_spec(self, runner: CliRunner, assertion_source) -> None:
+        config, record, snapshot, calls = assertion_source
+        record(
+            "GOV-01",
+            {
+                "title": "Required effect",
+                "status": "active",
+                "assertions": [{"type": "grep", "file": "effect.py", "pattern": "value = 1"}],
+            },
+        )
+        before = snapshot()
+        result = runner.invoke(main, ["--config", str(config), "assert"])
+        assert result.exit_code == 0, result.output
+        assert "PASSED" in result.output and "GOV-01" in result.output
+        assert snapshot() == before and all(method == "GET" for method, _ in calls)
+
+    def test_assert_single_spec(self, runner: CliRunner, assertion_source) -> None:
+        config, record, snapshot, calls = assertion_source
+        record(
+            "GOV-01",
+            {
+                "title": "Selected effect",
+                "status": "active",
+                "assertions": [{"type": "grep", "file": "effect.py", "pattern": "value = 1"}],
+            },
+        )
+        record(
+            "GOV-02",
+            {
+                "title": "Unselected effect",
+                "status": "active",
+                "assertions": [{"type": "file_exists", "file": "missing.py"}],
+            },
+        )
+        before = snapshot()
+        result = runner.invoke(main, ["--config", str(config), "assert", "--spec", "GOV-01", "--json"])
+        assert result.exit_code == 0, result.output
+        report = json.loads(result.output)
+        assert report["aggregate_result"] == "PASS" and report["total_specs"] == 1
+        assert report["details"][0]["spec_id"] == "GOV-01" and report["details"][0]["spec_version"] == 1
+        assert snapshot() == before and all(method == "GET" for method, _ in calls)
 
 
 # ---------------------------------------------------------------------------
@@ -141,39 +180,41 @@ class TestConfig:
         assert "my-chroma" in result.output
         assert "unset" not in result.output
 
-    def test_config_chroma_path_unset_chromadb_installed(self, runner: CliRunner, project_dir: Path) -> None:
-        """When chroma_path is unset and chromadb is importable, show runtime fallback.
-
-        Requires the `search` extra (chromadb). Skipped in the base no-search
-        install state — the base state's behavior is covered by
-        `test_config_chroma_path_unset_no_chromadb` below.
-        """
-        pytest.importorskip("chromadb")
-        result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "config"])
-        assert result.exit_code == 0
-        assert "unset" in result.output
-        assert "runtime fallback" in result.output
-
-    def test_config_chroma_path_unset_no_chromadb(
-        self,
-        runner: CliRunner,
-        project_dir: Path,
-        monkeypatch: pytest.MonkeyPatch,
+    @pytest.mark.parametrize("present", [False, True], ids=["missing-module", "present-module"])
+    def test_config_chroma_path_unset_does_not_probe_dependency(
+        self, runner: CliRunner, project_dir: Path, monkeypatch: pytest.MonkeyPatch, present: bool
     ) -> None:
-        """When chroma_path is unset and chromadb is absent, show not-installed."""
+        """An unset legacy path is reported independently of a controlled module state."""
         import builtins
+        import types
 
+        attempts = []
+        if present:
+            module = types.ModuleType("chromadb")
+
+            def deny_client(*args, **kwargs):
+                pytest.fail("Configuration reporting started a Chroma client")
+
+            monkeypatch.setattr(module, "PersistentClient", deny_client, raising=False)
+            monkeypatch.setitem(sys.modules, "chromadb", module)
+        else:
+            monkeypatch.delitem(sys.modules, "chromadb", raising=False)
         real_import = builtins.__import__
 
-        def mock_import(name, *args, **kwargs):
-            if name == "chromadb":
-                raise ImportError("mocked")
+        def observe_import(name, *args, **kwargs):
+            if name == "chromadb" or name.startswith("chromadb."):
+                attempts.append(name)
+                if not present:
+                    raise ImportError("controlled missing dependency")
             return real_import(name, *args, **kwargs)
 
-        monkeypatch.setattr(builtins, "__import__", mock_import)
+        monkeypatch.setattr(builtins, "__import__", observe_import)
         result = runner.invoke(main, ["--config", str(project_dir / "groundtruth.toml"), "config"])
-        assert result.exit_code == 0
-        assert "chromadb not installed" in result.output
+        assert result.exit_code == 0, result.output
+        assert "Legacy helper chroma_path: unset" in result.output
+        assert "runtime fallback" not in result.output
+        assert "chromadb not installed" not in result.output
+        assert not attempts
 
 
 # ---------------------------------------------------------------------------
@@ -221,178 +262,34 @@ class TestVersion:
 
 
 # ---------------------------------------------------------------------------
-# gt bootstrap-desktop
-# ---------------------------------------------------------------------------
-
-
-class TestBootstrapDesktop:
-    def test_bootstrap_desktop_creates_scaffold(self, runner: CliRunner, tmp_path: Path) -> None:
-        target = tmp_path / "client-prototype"
-        result = runner.invoke(
-            main,
-            [
-                "bootstrap-desktop",
-                "client-prototype",
-                "--dir",
-                str(target),
-                "--owner",
-                "Acme Labs",
-            ],
-        )
-        assert result.exit_code == 0
-        assert (target / "groundtruth.toml").exists()
-        assert (target / "groundtruth.db").exists()
-        assert (target / "CLAUDE.md").exists()
-        assert (target / "MEMORY.md").exists()
-        assert (target / "BRIDGE-INVENTORY.md").exists()
-        assert (target / "bridge-os-poller-setup-prompt.md").exists()
-        assert (target / ".claude" / "hooks" / "assertion-check.py").exists()
-        assert (target / ".claude" / "rules" / "prime-builder.md").exists()
-        assert (target / ".github" / "workflows" / "test.yml").exists()
-
-        claude_text = (target / "CLAUDE.md").read_text(encoding="utf-8")
-        bridge_text = (target / "BRIDGE-INVENTORY.md").read_text(encoding="utf-8")
-        bridge_prompt = (target / "bridge-os-poller-setup-prompt.md").read_text(encoding="utf-8")
-        gitignore_text = (target / ".gitignore").read_text(encoding="utf-8")
-        assert "{{PROJECT_NAME}}" not in claude_text
-        assert "client-prototype" in claude_text
-        assert "Acme Labs" in claude_text
-        assert "{{AGENT_OR_PROCESS_1}}" not in bridge_text
-        assert "bridge/INDEX.md" not in bridge_prompt
-        assert "PRIME_BRIDGE_DB" not in gitignore_text
-
-        db = KnowledgeDB(db_path=target / "groundtruth.db")
-        try:
-            summary = db.get_summary()
-            assert summary["spec_total"] == 8
-            assert summary["test_artifact_count"] >= 3
-        finally:
-            db.close()
-
-    def test_bootstrap_desktop_rejects_non_empty_target(self, runner: CliRunner, tmp_path: Path) -> None:
-        target = tmp_path / "occupied"
-        target.mkdir()
-        (target / "notes.txt").write_text("already here", encoding="utf-8")
-
-        result = runner.invoke(main, ["bootstrap-desktop", "occupied", "--dir", str(target)])
-        assert result.exit_code != 0
-        assert "not empty" in result.output
-
-
-# ---------------------------------------------------------------------------
 # Regression: --config from outside project directory (Codex P1)
 # ---------------------------------------------------------------------------
 
 
 class TestConfigRelativePaths:
-    """Verify that relative paths in groundtruth.toml resolve against the
-    config file's directory, NOT the caller's cwd."""
+    """Assertion paths resolve against the selected configuration, not caller cwd."""
 
-    def _init_and_seed(self, runner: CliRunner, project_path: Path) -> None:
-        """Create and seed a project at the given path."""
-        result = runner.invoke(main, ["init", "proj", "--dir", str(project_path)])
-        assert result.exit_code == 0
-        toml = str(project_path / "groundtruth.toml")
-        result = runner.invoke(main, ["--config", toml, "seed", "--example"])
-        assert result.exit_code == 0
+    pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
     def test_assert_spec_from_outside_project_dir(
-        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+        self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, assertion_source
     ) -> None:
-        """gt --config <project>/groundtruth.toml assert --spec GOV-01 must resolve correctly."""
-        project = tmp_path / "my-project"
-        self._init_and_seed(runner, project)
-
+        config, record, snapshot, calls = assertion_source
+        record(
+            "GOV-01",
+            {
+                "title": "Selected-root effect",
+                "status": "active",
+                "assertions": [{"type": "grep", "file": "effect.py", "pattern": "value = 1"}],
+            },
+        )
         other_dir = tmp_path / "elsewhere"
         other_dir.mkdir()
+        (other_dir / "effect.py").write_text("value = 2\n", encoding="utf-8")
         monkeypatch.chdir(other_dir)
-
-        result = runner.invoke(main, ["--config", str(project / "groundtruth.toml"), "assert", "--spec", "GOV-01"])
-        assert result.exit_code == 0
-
-
-# ---------------------------------------------------------------------------
-# Regression: import validation (Codex P2)
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# Regression: CLI gate_config wiring (Codex P1)
-# ---------------------------------------------------------------------------
-
-
-class TestCLIGateConfigWiring:
-    """Verify that _open_db() passes gate_config so TOML-configured gates are active."""
-
-    def test_cli_path_wires_transport_gate(self, tmp_path: Path) -> None:
-        """A TOML-configured TransportEvidenceGate must block pass on the CLI path."""
-        from groundtruth_kb.cli import _open_db
-        from groundtruth_kb.config import GTConfig
-        from groundtruth_kb.gates_transport import TransportEvidenceGateError
-
-        toml = tmp_path / "groundtruth.toml"
-        toml.write_text(
-            f"""[groundtruth]
-db_path = "{(tmp_path / "test.db").as_posix()}"
-project_root = "{tmp_path.as_posix()}"
-
-[gates]
-plugins = ["groundtruth_kb.gates_transport:TransportEvidenceGate"]
-
-[gates.config.TransportEvidenceGate]
-spec_ids = ["SPEC-1524"]
-""",
-            encoding="utf-8",
-        )
-        config = GTConfig.load(config_path=toml)
-        db = _open_db(config)
-
-        # Verify gate is wired with config
-        gate_names = [g.name() for g in db._gate_registry._gates]
-        assert "Transport Evidence Gate" in gate_names
-
-        # Verify spec_ids are populated (not empty frozenset)
-        transport_gates = [g for g in db._gate_registry._gates if g.name() == "Transport Evidence Gate"]
-        assert len(transport_gates) == 1
-        assert "SPEC-1524" in transport_gates[0]._spec_ids
-
-        # Verify enforcement
-        db.insert_spec("SPEC-1524", "Transport test", "implemented", "test", "test")
-        with pytest.raises(TransportEvidenceGateError, match="test_file is required"):
-            db.insert_test(
-                "TEST-CLI-001",
-                "CLI path test",
-                "SPEC-1524",
-                "e2e",
-                "pass expected",
-                "test",
-                "regression",
-                last_result="pass",
-            )
-        db.close()
-
-    def test_cli_path_inherits_project_root(self, tmp_path: Path) -> None:
-        """Gate must inherit project_root from GTConfig when not set in gate config."""
-        from groundtruth_kb.cli import _open_db
-        from groundtruth_kb.config import GTConfig
-
-        toml = tmp_path / "groundtruth.toml"
-        toml.write_text(
-            f"""[groundtruth]
-db_path = "{(tmp_path / "test.db").as_posix()}"
-project_root = "{tmp_path.as_posix()}"
-
-[gates]
-plugins = ["groundtruth_kb.gates_transport:TransportEvidenceGate"]
-
-[gates.config.TransportEvidenceGate]
-spec_ids = ["SPEC-1524"]
-""",
-            encoding="utf-8",
-        )
-        config = GTConfig.load(config_path=toml)
-        db = _open_db(config)
-
-        transport_gates = [g for g in db._gate_registry._gates if g.name() == "Transport Evidence Gate"]
-        assert transport_gates[0]._project_root == tmp_path
-        db.close()
+        before = snapshot()
+        result = runner.invoke(main, ["--config", str(config), "assert", "--spec", "GOV-01", "--json"])
+        assert result.exit_code == 0, result.output
+        assert json.loads(result.output)["aggregate_result"] == "PASS"
+        assert (other_dir / "effect.py").read_text(encoding="utf-8") == "value = 2\n"
+        assert snapshot() == before and all(method == "GET" for method, _ in calls)

@@ -29,7 +29,7 @@ Respond with a markdown table of **exactly 29 rows** numbered 1–29. Each row m
 | Evidence class | Meaning |
 |----------------|---------|
 | `command_output` | Answer from a command executed this session |
-| `bridge_status` | Answer from TAFE/dispatcher or versioned bridge scan |
+| `bridge_status` | Answer from dispatcher bridge state or versioned bridge scan |
 | `DA_row` | Answer from Deliberation Archive search/read |
 | `CI_result` | Answer from CI / `gh run list` / workflow evidence |
 | `release_tag` | Answer from release tag, package version, or gate artifact |
@@ -45,7 +45,7 @@ Outputs missing a valid tag or using fewer/more than 29 rows are **invalid** and
 
 | # | Item | Live source hint | Required tag |
 |---|------|------------------|--------------|
-| 1 | Bridge queue summary | TAFE/dispatcher + bridge scan | bridge_status |
+| 1 | Bridge queue summary | bridge state + bridge scan | bridge_status |
 | 2 | Latest GO awaiting implementation | bridge scan for this harness | bridge_status |
 | 3 | Latest NO-GO needing response | bridge scan | bridge_status |
 | 4 | Git branch + HEAD short sha | `git rev-parse` / `git status -sb` | command_output |

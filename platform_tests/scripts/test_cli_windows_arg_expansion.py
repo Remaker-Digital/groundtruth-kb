@@ -46,10 +46,13 @@ def test_glob_arg_arrives_literally_on_windows(tmp_path: Path) -> None:
 
     group = _NoWindowsExpandGroup("test_grp")
 
-    @group.command("record")
+    @click.command("record")
     @click.option("--pattern", "pattern", required=True)
     def record_cmd(pattern: str) -> None:
         captured_args.append(pattern)
+
+    # The group resolves names through its native command table; give the probe command a seat there.
+    group._commands = lambda: {"record": record_cmd}  # type: ignore[method-assign]
 
     test_argv = ["gt", "record", "--pattern", str(tmp_path / "*.txt")]
 

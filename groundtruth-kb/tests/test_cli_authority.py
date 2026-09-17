@@ -53,6 +53,22 @@ def invoke(config, *args):
     return CliRunner().invoke(main, ["--config", str(config), *args])
 
 
+@pytest.mark.parametrize("command,domain", [("spec", "specifications"), ("tests", "tests")])
+def test_native_scope_filter_uses_exact_catalog_reference(configured, monkeypatch, command, domain):
+    config, calls, _record = configured
+
+    def request(self, method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        return {"records": [], "next_after": None}
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    result = invoke(config, command, "list", "--application-scope", "application:Beta", "--json")
+    assert result.exit_code == 0, result.output
+    assert calls[-1][0:2] == ("GET", f"/v1/{domain}")
+    assert calls[-1][2]["query"]["application_scope"] == "application:Beta"
+    assert json.loads(result.output) == []
+
+
 def test_authority_resolves_current_record_through_native_service(configured):
     config, calls, record = configured
     result = invoke(config, "authority", "resolve", "work group", "--scope", "platform", "--json")
@@ -240,8 +256,8 @@ def test_file_scaffolds_work_offline_and_preserve_adopter_changes(configured, mo
     assert not calls
 
 
-@pytest.mark.parametrize("command", ["specs", "adrs"])
-def test_file_scaffold_route_does_not_expose_legacy_database_writers(configured, monkeypatch, command):
+def test_file_scaffold_route_does_not_expose_legacy_database_writers(configured, monkeypatch):
+    """The retired ADR scaffold has no route; starter specifications go through the native authority only."""
     config, calls, _ = configured
 
     def reject_database(*args, **kwargs):
@@ -250,10 +266,13 @@ def test_file_scaffold_route_does_not_expose_legacy_database_writers(configured,
     monkeypatch.setattr("sqlite3.connect", reject_database)
     help_result = invoke(config, "scaffold", "--help")
     assert help_result.exit_code == 0 and "iac" in help_result.output and "cicd" in help_result.output
-    assert command not in help_result.output
-    rejected = invoke(config, "scaffold", command, "--apply")
+    assert "adrs" not in help_result.output and "specs" in help_result.output
+    rejected = invoke(config, "scaffold", "adrs", "--apply")
     assert rejected.exit_code != 0 and "No such command" in rejected.output
     assert not calls
+    specs_help = invoke(config, "scaffold", "specs", "--help")
+    assert specs_help.exit_code == 0 and "--project-id" in specs_help.output and "--apply" in specs_help.output
+    assert "sqlite" not in specs_help.output.lower() and "database" not in specs_help.output.lower()
 
 
 def test_harness_metadata_cli_uses_native_reads_and_has_no_role_mutator(configured, monkeypatch):
@@ -275,3 +294,128 @@ def test_harness_metadata_cli_uses_native_reads_and_has_no_role_mutator(configur
         assert invoke(config, "harness", command).exit_code != 0
     assert len(calls) == 2
     assert invoke(config, "harness", "project", "--help").exit_code == 0
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        None,
+        [],
+        "private-text",
+        {"error": None},
+        {"error": []},
+        {"error": False},
+        {"error": "private-nested-text"},
+        {"error": {"code": []}},
+        {"error": {"message": {"private": "body"}}},
+        {"code": 42},
+        {"message": False},
+    ],
+)
+def test_native_client_malformed_http_error_is_typed_and_not_retried(tmp_path, payload):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    requests = []
+    sentinel = tmp_path / "groundtruth.db"
+    sentinel.write_bytes(b"never fall back or write locally")
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_PUT(self):
+            requests.append((self.path, self.rfile.read(int(self.headers["Content-Length"]))))
+            body = json.dumps(payload).encode("utf-8")
+            self.send_response(422)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = AuthorityClient(f"http://127.0.0.1:{server.server_port}", timeout=2)
+        with pytest.raises(AuthorityClientError) as caught:
+            client.request("PUT", "/v1/projects/PROJECT-1", body={"intent": "preserve"})
+        assert caught.value.code == "authority_error"
+        assert str(caught.value) == "Authority returned HTTP 422"
+        assert caught.value.details is None
+        assert len(requests) == 1
+        assert requests[0][0] == "/v1/projects/PROJECT-1"
+        assert json.loads(requests[0][1]) == {"intent": "preserve"}
+        assert sentinel.read_bytes() == b"never fall back or write locally"
+        assert list(tmp_path.iterdir()) == [sentinel]
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+    assert not thread.is_alive()
+
+
+@pytest.mark.parametrize("nested", [False, True])
+def test_native_client_preserves_valid_error_fields_and_context(monkeypatch, nested):
+    from io import BytesIO
+    from urllib.error import HTTPError
+
+    result = {"code": "cas_conflict", "message": "Read current state", "details": {"actual": 7}}
+    payload = {"error": result} if nested else result
+    client = AuthorityClient("http://127.0.0.1:12345")
+    calls = []
+
+    def refused(request, *, timeout):
+        calls.append(request)
+        raise HTTPError(request.full_url, 409, "Conflict", {}, BytesIO(json.dumps(payload).encode()))
+
+    monkeypatch.setattr(client._opener, "open", refused)
+    with pytest.raises(AuthorityClientError) as caught:
+        client.request("PUT", "/v1/projects/PROJECT-1", body={"expected_version": 6})
+    assert caught.value.code == result["code"]
+    assert str(caught.value) == result["message"]
+    assert caught.value.details == result["details"]
+    assert len(calls) == 1
+
+
+@pytest.mark.parametrize("status", [301, 302, 303, 307, 308])
+def test_native_client_does_not_follow_redirects_or_replay_write_body(status):
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from threading import Thread
+
+    calls = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_PUT(self):
+            self.rfile.read(int(self.headers.get("Content-Length", "0")))
+            calls.append((self.command, self.path))
+            self.send_response(status)
+            self.send_header("Location", f"http://127.0.0.1:{self.server.server_port}/destination")
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+
+        def do_GET(self):
+            calls.append((self.command, self.path))
+            self.send_response(200)
+            self.send_header("Content-Length", "2")
+            self.end_headers()
+            self.wfile.write(b"{}")
+
+        def log_message(self, *args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        client = AuthorityClient(f"http://127.0.0.1:{server.server_port}", timeout=2)
+        with pytest.raises(AuthorityClientError) as caught:
+            client.request("PUT", "/v1/projects/PROJECT-1", body={"private": "write intent"})
+        assert caught.value.code == "authority_error"
+        assert str(caught.value) == f"Authority returned HTTP {status}"
+        assert calls == [("PUT", "/v1/projects/PROJECT-1")]
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+    assert not thread.is_alive()

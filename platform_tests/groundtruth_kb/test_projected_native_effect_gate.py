@@ -68,9 +68,9 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
     assert not [path for path in plan.writes if "lo-file-safety-gate" in path]
     for retired in RETIRED_LO_GATE_PATHS:
         assert not (ROOT / retired).exists(), retired
-    assert "lo-file-safety-gate" not in (ROOT / ".codex" / "plugins" / "gtkb" / "hooks" / "hooks.json").read_text(
-        encoding="utf-8"
-    )
+    codex_hooks_path = engine.load_profiles()["harnesses"]["codex"]["hooks_json_path"]
+    assert "lo-file-safety-gate" not in (ROOT / codex_hooks_path).read_text(encoding="utf-8")
+    assert not (ROOT / ".codex" / "plugins" / "gtkb" / "hooks" / "hooks.json").exists()
     if harness == "claude":
         for tool in ("Write", "Edit"):
             selected = [
@@ -87,7 +87,6 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
     scripts.mkdir()
     for name in (
         "implementation_start_gate.py",
-        "controlled_artifact_paths.py",
         "cursor_hook_adapter.py",
         "antigravity_hook_adapter.py",
         "codex_hook_adapter.py",

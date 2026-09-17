@@ -1,36 +1,7 @@
-"""Regression tests for WI-7289 shell_exec gate coverage.
+"""Declared shell registrations, explicit read-policy fixtures and unchanged write extraction.
 
-Proposal ``bridge/gtkb-wi7289-shell-exec-gate-coverage-001.md``, GO at ``-004``.
-
-Six write gates and the SoT read-discipline gate declared no ``shell_exec``
-intent, so the projector never rendered the shell tool names into their matchers
-and none of them was registered against shell-command events on any harness. A
-shell-mediated write or read therefore reached a governed path with no gate ever
-firing.
-
-These tests are the derived verification for the proposal's specification links.
-The mapping from specification to test is:
-
-* ``DCL-SOT-READ-HOOK-CONTRACT-001`` -> :func:`test_sot_gate_declares_shell_exec`,
-  :func:`test_shell_read_of_forbidden_substitute_is_denied`,
-  :func:`test_owner_bypass_still_permits_forbidden_substitute_read`.
-* ``GOV-SOURCE-OF-TRUTH-FRESHNESS-001`` ->
-  :func:`test_every_registered_forbidden_substitute_is_denied_on_shell_surface`.
-* ``GOV-FILE-BRIDGE-AUTHORITY-001`` ->
-  :func:`test_shell_and_native_bridge_denial_reasons_are_byte_identical`.
-* ``DCL-CROSS-HARNESS-PARITY-ENFORCEMENT-001`` and
-  ``ADR-CROSS-HARNESS-PARITY-001`` ->
-  :func:`test_projected_matchers_include_shell_tool_names`.
-* ``DCL-CROSS-HARNESS-ENFORCEMENT-001`` ->
-  :func:`test_shell_and_native_bridge_denial_reasons_are_byte_identical`,
-  :func:`test_powershell_surface_is_covered`.
-* ``DCL-HARNESS-BASELINE-PROJECTION-CONFORMANCE-001`` and
-  ``ADR-RULE-PROJECTION-FLOW-INVERSION-001`` ->
-  :func:`test_projection_is_clean_against_baseline`.
-
-The over-blocking tests matter as much as the denial tests. GO binding condition
-2 requires that unrecognized and no-target command forms stay allowed: widening
-registration must not deny commands the native surface never saw.
+These controlled cases do not establish actual native host invocation or complete
+TEST-12284, whose remaining write-gate equivalence obligations remain open.
 """
 
 from __future__ import annotations
@@ -42,6 +13,9 @@ import tomllib
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
+
+from platform_tests.scripts.test_sot_read_discipline_hook import registry, run_hook
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_HOOKS = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks"
@@ -100,12 +74,22 @@ def _decision(response: dict) -> tuple[str | None, str]:
     return None, ""
 
 
-def _forbidden_substitutes() -> list[str]:
-    data = tomllib.loads(SOT_REGISTRY.read_text(encoding="utf-8"))
-    found: list[str] = []
-    for artifact in data.get("artifacts", []):
-        found.extend(artifact.get("forbidden_substitutes") or [])
-    return found
+@pytest.fixture
+def read_policy(tmp_path):
+    import shutil
+
+    root = tmp_path / "read-policy"
+    hook = root / ".harness-baseline-configuration/hooks/sot-read-discipline.py"
+    hook.parent.mkdir(parents=True)
+    shutil.copyfile(SOT_GATE, hook)
+    registry(root)
+    return root
+
+
+def _forbidden_substitutes(root: Path) -> list[str]:
+    paths = [path for row in load_registry_snapshot(project_root=root).records for path in row.forbidden_substitutes]
+    assert paths, "The behavioral fixture must exercise an actual declared restriction"
+    return [path.replace("**", "nested/current.txt") for path in paths]
 
 
 # --------------------------------------------------------------------------
@@ -144,54 +128,44 @@ def test_sot_gate_declares_shell_exec() -> None:
 # --------------------------------------------------------------------------
 
 
-def test_shell_read_of_forbidden_substitute_is_denied() -> None:
-    substitutes = _forbidden_substitutes()
-    if not substitutes:
-        pytest.skip("no forbidden_substitutes registered; read-side gap is latent")
+def test_shell_read_of_forbidden_substitute_is_denied(read_policy: Path) -> None:
+    substitutes = _forbidden_substitutes(read_policy)
     decision, reason = _decision(
-        _run_hook(SOT_GATE, {"tool_name": "Bash", "cwd": ".", "tool_input": {"command": f"cat {substitutes[0]}"}})
+        run_hook(read_policy, {"tool_name": "Bash", "tool_input": {"command": f"cat {substitutes[0]}"}})
     )
     assert decision == "block", f"shell read of {substitutes[0]!r} was not blocked (reason={reason!r})"
 
 
-def test_every_registered_forbidden_substitute_is_denied_on_shell_surface() -> None:
+def test_every_registered_forbidden_substitute_is_denied_on_shell_surface(read_policy: Path) -> None:
     """GOV-SOURCE-OF-TRUTH-FRESHNESS-001 clause (a) must be mechanical, not advisory."""
-    substitutes = _forbidden_substitutes()
-    if not substitutes:
-        pytest.skip("no forbidden_substitutes registered")
+    substitutes = _forbidden_substitutes(read_policy)
     allowed = []
     for path in substitutes:
-        decision, _ = _decision(
-            _run_hook(SOT_GATE, {"tool_name": "Bash", "cwd": ".", "tool_input": {"command": f"cat {path}"}})
-        )
+        decision, _ = _decision(run_hook(read_policy, {"tool_name": "Bash", "tool_input": {"command": f"cat {path}"}}))
         if decision != "block":
             allowed.append(path)
     assert allowed == [], f"forbidden substitutes readable via shell: {allowed}"
 
 
-def test_powershell_surface_is_covered() -> None:
+def test_powershell_surface_is_covered(read_policy: Path) -> None:
     """Claude renders shell_exec to Bash|PowerShell; matching only "Bash" leaves half the surface open."""
-    substitutes = _forbidden_substitutes()
-    if not substitutes:
-        pytest.skip("no forbidden_substitutes registered")
+    substitutes = _forbidden_substitutes(read_policy)
     decision, _ = _decision(
-        _run_hook(
-            SOT_GATE,
-            {"tool_name": "PowerShell", "cwd": ".", "tool_input": {"command": f"Get-Content {substitutes[0]}"}},
+        run_hook(
+            read_policy,
+            {"tool_name": "PowerShell", "tool_input": {"command": f"Get-Content {substitutes[0]}"}},
         )
     )
     assert decision == "block"
 
 
-def test_owner_bypass_still_permits_forbidden_substitute_read() -> None:
+def test_owner_bypass_still_permits_forbidden_substitute_read(read_policy: Path) -> None:
     """GO binding condition 3: the owner-authorized bypass must survive registration."""
-    substitutes = _forbidden_substitutes()
-    if not substitutes:
-        pytest.skip("no forbidden_substitutes registered")
-    response = _run_hook(
-        SOT_GATE,
-        {"tool_name": "Bash", "cwd": ".", "tool_input": {"command": f"cat {substitutes[0]}"}},
-        env_extra={"GTKB_SOT_READ_DISCIPLINE_BYPASS": "1"},
+    substitutes = _forbidden_substitutes(read_policy)
+    response = run_hook(
+        read_policy,
+        {"tool_name": "Bash", "tool_input": {"command": f"cat {substitutes[0]}"}},
+        bypass=True,
     )
     decision, _ = _decision(response)
     assert decision != "block"
@@ -288,10 +262,11 @@ def test_native_payload_expands_to_itself() -> None:
         ("cursor", ".cursor/hooks.json", ("Shell", "Bash")),
     ],
 )
-def test_projected_matchers_include_shell_tool_names(harness: str, path: str, shell_names: tuple[str, ...]) -> None:
-    projection = PROJECT_ROOT / path
-    if not projection.exists():
-        pytest.skip(f"{harness} projection not present")
+@pytest.mark.timeout(300)
+def test_projected_matchers_include_shell_tool_names(
+    harness: str, path: str, shell_names: tuple[str, ...], generated_harness_root: Path
+) -> None:
+    projection = generated_harness_root / path
     data = json.loads(projection.read_text(encoding="utf-8"))
     events = data.get("hooks", {})
     entries = events.get("PreToolUse") or events.get("preToolUse") or []
@@ -311,7 +286,8 @@ def test_projected_matchers_include_shell_tool_names(harness: str, path: str, sh
     assert checked, f"{harness}: no covered gate found in the projection"
 
 
-def test_goose_registers_gates_without_a_matcher() -> None:
+@pytest.mark.timeout(300)
+def test_goose_registers_gates_without_a_matcher(generated_harness_root: Path) -> None:
     """Goose's registration mode carries no matcher, so coverage there is behavioral.
 
     Recording this explicitly stops a future reader from concluding the Goose
@@ -319,22 +295,21 @@ def test_goose_registers_gates_without_a_matcher() -> None:
     string: it never had one, and every PreToolUse hook already receives every
     tool event.
     """
-    projection = PROJECT_ROOT / ".goose" / "plugins" / "gtkb" / "hooks" / "hooks.json"
-    if not projection.exists():
-        pytest.skip("goose projection not present")
+    projection = generated_harness_root / ".goose" / "plugins" / "gtkb" / "hooks" / "hooks.json"
     entries = json.loads(projection.read_text(encoding="utf-8"))["hooks"].get("PreToolUse", [])
     assert entries, "goose PreToolUse registration is empty"
     assert not any("matcher" in entry for entry in entries)
 
 
 @pytest.mark.parametrize("harness", ["claude", "cursor", "goose"])
-def test_projection_is_clean_against_baseline(harness: str) -> None:
+@pytest.mark.timeout(300)
+def test_projection_is_clean_against_baseline(harness: str, generated_harness_root: Path) -> None:
     """DCL-HARNESS-BASELINE-PROJECTION-CONFORMANCE-001: no hand-edited projection drift."""
     result = subprocess.run(
         [sys.executable, "scripts/harness_projection/project_harness.py", "--harness", harness, "--check"],
         capture_output=True,
         text=True,
-        cwd=str(PROJECT_ROOT),
+        cwd=str(generated_harness_root),
         timeout=300,
     )
     assert result.returncode == 0, f"{harness} projection drift:\n{result.stdout}\n{result.stderr}"

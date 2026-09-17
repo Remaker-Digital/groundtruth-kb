@@ -37,7 +37,7 @@ Tier labels in the diagram map to ADR-0001: Three-Tier Memory Architecture — M
 
 See also: [Application/Platform Isolation](architecture/isolation.md) — the
 two-root model adopters consume GT-KB through, plus the doctor / upgrade /
-rollback / migration walkthroughs.
+migration walkthroughs.
 
 **New here?** Read [The User Journey](user-journey.md) to see what building
 a product with GroundTruth looks like — from first install to production.

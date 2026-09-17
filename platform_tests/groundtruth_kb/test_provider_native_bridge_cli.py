@@ -22,9 +22,11 @@ from pathlib import Path
 import pytest
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
+from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
 from platform_tests.groundtruth_kb.test_native_authority_service import native as native
 from platform_tests.groundtruth_kb.test_native_bridge import authored, deliver
 from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.test_native_session_context import seed_startup_sources
 from platform_tests.scripts.test_provider_native_cli_delivery import (
     PROVIDERS,
     _response,
@@ -34,6 +36,187 @@ from platform_tests.scripts.test_provider_native_cli_delivery import (
 )
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_provider_initializes_each_subject_and_role_without_a_bridge_assignment(provider, bridge, tmp_path):
+    _service, client, _, _ = bridge
+    runtime = create_provider_guard_fixtures(provider, tmp_path)
+    seed_startup_sources(client, tmp_path)
+    before = client.get("/v1/bridge/state-report").json()
+    before.pop("observed_at")
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    process, _ = _serve_authority(tmp_path, port)
+    url = f"http://127.0.0.1:{port}"
+    config = tmp_path / "client.toml"
+    config.write_text(
+        f'[groundtruth]\nproject_root="."\nauthority_url="{url}"\ndb_path="must-not-open.db"\n', encoding="utf-8"
+    )
+    sentinel = tmp_path / "must-not-open.db"
+    sentinel.write_bytes(b"No SQLite initialization or fallback.")
+    prefix = [sys.executable, "-m", "groundtruth_kb", "--config", str(config)]
+    identifiers = set()
+    try:
+        for subject, role in (("gtkb", "pb"), ("gtkb", "lo"), ("application", "pb"), ("application", "lo")):
+            marker = f"::init {subject} {role}"
+            prompt = f"First input: café.\r\n{marker}\r\n::open deliberation\r\nRead the immutable binding."
+            observed = {"turns": 0, "native_id": None, "argv": None, "results": [], "codes": []}
+
+            def chat(*args, prompt=prompt, observed=observed, subject=subject, role=role):
+                payload = args[-2]
+                assert [m["content"] for m in payload["messages"] if m["role"] == "user"][0] == prompt
+                context_id = native_id_from_payload(payload)
+                if observed["native_id"] is None:
+                    observed["native_id"] = context_id
+                assert context_id == observed["native_id"]
+                turn = observed["turns"]
+                observed["turns"] += 1
+                if turn == 6:
+                    assert "session_init_conflict" in json.dumps(payload)
+                    assert "host_observations" in json.dumps(payload)
+                    return _response(provider, content="Current binding read; conflicting rebind refused.")
+                if turn == 5:
+                    args = ["context", "session", "--native-context-id", context_id, "--json"]
+                elif turn in (2, 4):
+                    args = ["session", "show", "--native-context-id", context_id, "--json"]
+                else:
+                    supplied = prompt if turn < 2 else f"::init {subject} {'lo' if role == 'pb' else 'pb'}"
+                    args = ["session", "bind", "--native-context-id", context_id, "--init-keyword", supplied, "--json"]
+                observed["argv"] = [*prefix, *args]
+                return _response(
+                    provider, tool="Bash", arguments={"command": subprocess.list2cmdline(observed["argv"])}
+                )
+
+            def runner(command, cwd, env, timeout, observed=observed):
+                assert command == subprocess.list2cmdline(observed["argv"])
+                assert env["GTKB_NATIVE_CONTEXT_ID"] == observed["native_id"]
+                assert "GTKB_AUTHOR_SESSION_CONTEXT_ID" not in env
+                client_env = {k: v for k, v in env.items() if not k.startswith(("PG", "GT_POSTGRES_"))}
+                client_env.pop("GT_AUTHORITY_URL", None)
+                client_env["PYTHONIOENCODING"] = "utf-8"
+                completed = subprocess.run(
+                    observed["argv"],
+                    cwd=cwd,
+                    env=client_env,
+                    capture_output=True,
+                    encoding="utf-8",
+                    timeout=min(timeout, 20),
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                observed["codes"].append(completed.returncode)
+                if completed.returncode == 0:
+                    observed["results"].append(json.loads(completed.stdout))
+                else:
+                    assert "session_init_conflict" in completed.stderr, (completed.stdout, completed.stderr)
+                    assert '"observed_markers"' in completed.stderr and "gt session show" in completed.stderr
+                    observed["results"].append(None)
+                return completed
+
+            args = [
+                prompt,
+                provider.ModelRoute("fixture", "fixture-model", "v1", True, ("Bash",)),
+                "https://fixture.invalid",
+            ]
+            if provider is not ollama:
+                args.append("fixture-key")
+            args.extend([7, tmp_path])
+            result = provider.run_tool_loop(
+                *args,
+                chat_func=chat,
+                command_runner=runner,
+                guard_runner=lambda *_: runtime.GuardExecutionResult(0, "{}"),
+            )
+            assert result == "Current binding read; conflicting rebind refused."
+            assert observed["codes"][:3] == [0, 0, 0] and observed["codes"][3] != 0
+            assert observed["codes"][4] == 0
+            assert observed["codes"][5] == 0
+            assert observed["results"][0]["status"] == "init_requested"
+            assert observed["results"][1]["status"] == "already_initialized_idempotent"
+            binding = observed["results"][0]["binding"]
+            assert binding == observed["results"][1]["binding"] == observed["results"][2] == observed["results"][4]
+            assert binding["subject"] == subject
+            assert binding["role"] == {"pb": "prime-builder", "lo": "loyal-opposition"}[role]
+            assert binding["native_context_id"] == observed["native_id"]
+            assert observed["results"][5]["binding"] == binding
+            assert all(v["status"] == "unavailable" for v in observed["results"][5]["host_observations"].values())
+            assert observed["native_id"] not in identifiers
+            identifiers.add(observed["native_id"])
+            after = client.get("/v1/bridge/state-report").json()
+            after.pop("observed_at")
+            assert after == before
+            assert sentinel.read_bytes() == b"No SQLite initialization or fallback."
+        assert len(identifiers) == 4
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
+
+
+def test_explicit_init_cli_reports_missing_invalid_and_conflicting_markers(bridge, tmp_path):
+    _service, client, contexts, _ = bridge
+    before = client.get("/v1/bridge/state-report").json()
+    before.pop("observed_at")
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    process, server_env = _serve_authority(tmp_path, port)
+    config = tmp_path / "init-client.toml"
+    config.write_text(
+        f'[groundtruth]\nproject_root="."\nauthority_url="http://127.0.0.1:{port}"\ndb_path="init-sentinel.db"\n',
+        encoding="utf-8",
+    )
+    sentinel = tmp_path / "init-sentinel.db"
+    sentinel.write_bytes(b"Binding diagnostics must not open SQLite.")
+    client_env = {k: v for k, v in server_env.items() if not k.startswith(("PG", "GT_POSTGRES_"))}
+
+    def cli(*arguments):
+        return subprocess.run(
+            [sys.executable, "-m", "groundtruth_kb", "--config", str(config), *arguments],
+            cwd=tmp_path,
+            env=client_env,
+            capture_output=True,
+            encoding="utf-8",
+            timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+
+    try:
+        for prompt, code in (
+            ("An ordinary owner request.", "no_init_marker"),
+            ("::init gtkb pb # private-owner-content", "invalid_init_marker"),
+            ("::init gtkb pb\r\n::init gtkb lo", "session_init_conflict"),
+            ("::init application pb\n::init gtkb pb", "session_init_conflict"),
+        ):
+            result = cli(
+                "session", "bind", "--native-context-id", "fresh-cli-refusal", "--init-keyword", prompt, "--json"
+            )
+            assert result.returncode != 0 and not result.stdout
+            assert code in result.stderr and '"observed_markers"' in result.stderr
+            assert '"invalid_marker_line_numbers"' in result.stderr and "gt session show" in result.stderr
+            assert "private-owner-content" not in result.stderr
+            read = cli("session", "show", "--native-context-id", "fresh-cli-refusal", "--json")
+            assert read.returncode != 0 and "no_session_binding" in read.stderr
+        conflict = cli("session", "bind", "--native-context-id", "pb1", "--init-keyword", "::init gtkb lo", "--json")
+        assert conflict.returncode != 0 and "session_init_conflict" in conflict.stderr
+        assert '"::init gtkb lo"' in conflict.stderr and "gt session show" in conflict.stderr
+        read = cli("session", "show", "--native-context-id", "pb1", "--json")
+        assert read.returncode == 0 and json.loads(read.stdout) == contexts["pb1"]
+        after = client.get("/v1/bridge/state-report").json()
+        after.pop("observed_at")
+        assert after == before
+        assert sentinel.read_bytes() == b"Binding diagnostics must not open SQLite."
+    finally:
+        process.terminate()
+        try:
+            process.wait(timeout=10)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait(timeout=10)
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
@@ -178,7 +361,8 @@ def test_provider_binds_claims_authors_and_delivers_through_separate_cli(provide
                 "session", "bind", "--native-context-id", native_id, "--init-keyword", "::init gtkb lo", "--json"
             )
         if step == 2:
-            state["binding"] = state["results"][-1]
+            assert state["results"][-1]["status"] == "init_requested"
+            state["binding"] = state["results"][-1]["binding"]
             assert state["binding"]["session_context_id"] != native_id
             message_path = "scratchpad/" + state["binding"]["session_context_id"] + "/reply.md"
             return command_response(
@@ -298,7 +482,8 @@ def test_provider_binds_claims_authors_and_delivers_through_separate_cli(provide
                     )
                 assert native_id_from_payload(payload) == native_id
                 if step == 2:
-                    state["binding"] = state["results"][-1]
+                    assert state["results"][-1]["status"] == "init_requested"
+                    state["binding"] = state["results"][-1]["binding"]
                     return command_response("bridge", "show", document, "--content", "--json")
                 if step == 3:
                     observed = state["results"][-1]
@@ -381,7 +566,8 @@ def test_provider_binds_claims_authors_and_delivers_through_separate_cli(provide
                     f"::init gtkb {role}",
                     "--json",
                 )
-                state["binding"] = state["results"][-1]
+                assert state["results"][-1]["status"] == "init_requested"
+                state["binding"] = state["results"][-1]["binding"]
                 scratch = "scratchpad/" + state["binding"]["session_context_id"]
                 yield command_response("bridge", "show", document, "--content", "--json")
                 observed = state["results"][-1]

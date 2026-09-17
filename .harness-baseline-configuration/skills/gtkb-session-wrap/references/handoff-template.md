@@ -1,63 +1,34 @@
-# Session Handoff Prompt Template
+# Ephemeral continuation text
 
-Use this template for Phase 5 of `kb-session-wrap`. The prompt must be complete enough for a fresh agent to continue without hidden chat memory.
+Use this optional template in the owner-visible response. It is never a saved
+prompt, session object, canonical record or condition for recovery. Facts needed
+for continued work must already exist in the applicable canonical domain.
 
-Preferred first line:
+Include role/activity marker lines only when the owner or dispatch has supplied
+those exact lines for the next assignment. Do not default a role, manufacture an
+activity or imply that suggested work has been selected. The receiving context
+uses its own native identity and immutable binding, not the previous context's.
 
 ```text
-::init gtkb pb
+Continuation observations as of <time>
+Assigned target: <exact owner/dispatcher-selected target, or selection pending>
+Project root and registered checkout: <current canonical retrieval route>
+Observed branch/HEAD and remaining changes: <timestamped Git facts>
+
+Canonical state to re-query:
+- Work item, parent project, current formal requirements and executable tests.
+- Exact dispatched bridge action and current attempt/delivery state.
+- Dependencies and material unresolved choices.
+
+Observed work and verification:
+- <Canonical changes and successful readbacks.>
+- <Commands, tested inputs, results and coverage limits.>
+- <Pending review, failed or unexecuted checks, and recovery route.>
+
+Suggested next actions, subject to selection:
+- <Concrete next action and the condition it resolves.>
+
+Re-query all current facts before acting. Obtain a fresh next-artifact claim.
+No previous author, retained handoff, session memory or peer-harness contact is
+required for continuation. This text grants no claim, ownership or authority.
 ```
-
-Template body:
-
-```text
-::init gtkb pb
-
-Continue GroundTruth-KB work in E:/GT-KB.
-
-Session carried forward: <SESSION_ID>
-Branch/HEAD: <branch> @ <sha>
-Dirty state at wrap: <clean|summary of remaining uncommitted paths>
-
-## Previous Session Summary
-<1-4 concise paragraphs covering what changed and why. Include bridge IDs, work item IDs, spec IDs, and report paths when relevant.>
-
-## Knowledge Collection
-- MemBase: <work items/specs/projects/session_prompts updated, skipped, or blocked>
-- Deliberation Archive: <captures/harvest counts or blocker>
-- memory/MEMORY.md: <updated/no-op reason>
-- Bridge state: <latest statuses from TAFE-backed bridge state / dispatcher
-  status that matter next; mention only current dispatcher/TAFE evidence unless
-  a historical audit record is directly relevant>
-- Reports/procedures: <paths to implementation reports, reviews, or procedure updates>
-- Ignored local evidence: <.groundtruth/.gtkb-state/report paths to inspect, or none>
-
-## Verification
-- Tests/assertions run: <commands and results>
-- Wrap scanner outputs: <snapshot paths and severity summary>
-- Known failures or skipped verification: <tracked reason or none>
-
-## Blockers / Risks
-- <owner/governance/tooling blocker, with exact next action>
-
-## Suggested Next Actions
-1. <next action>
-2. <next action>
-3. <next action>
-```
-
-Insertion example, when MemBase API support is available:
-
-```python
-from groundtruth_kb.db import KnowledgeDB
-
-db = KnowledgeDB("groundtruth.db")
-db.insert_session_prompt(
-    session_id="<NEXT_SESSION_ID>",
-    prompt_text=prompt_text,
-    changed_by="codex",
-    change_reason="<SESSION_ID>: session wrap handoff",
-)
-```
-
-If `session_prompts` insertion is blocked, write the prompt text into the wrap summary/report and record the blocker explicitly.

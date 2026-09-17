@@ -39,8 +39,9 @@ def overlay_module():
 @pytest.fixture()
 def fake_project(tmp_path: Path) -> Path:
     (tmp_path / "docs" / "gtkb-dashboard").mkdir(parents=True)
+    (tmp_path / ".groundtruth" / "dashboard").mkdir(parents=True)
     (tmp_path / "memory").mkdir(parents=True)
-    (tmp_path / "docs" / "gtkb-dashboard" / "dashboard-data.json").write_text(
+    (tmp_path / ".groundtruth" / "dashboard" / "dashboard-data.json").write_text(
         json.dumps({"generated_at": "2026-04-23T00:00:00Z"}) + "\n",
         encoding="utf-8",
     )
@@ -85,7 +86,7 @@ def test_build_overlay_is_copy_only_and_non_authoritative(overlay_module, fake_p
         assert len(entry.source_hash) == 64
 
     # Source files are unchanged; mtime/content identical. Sanity-check content.
-    dashboard_source = (fake_project / "docs" / "gtkb-dashboard" / "dashboard-data.json").read_text(encoding="utf-8")
+    dashboard_source = (fake_project / ".groundtruth" / "dashboard" / "dashboard-data.json").read_text(encoding="utf-8")
     dashboard_overlay = (files_dir / "dashboard-data.json").read_text(encoding="utf-8")
     assert dashboard_source == dashboard_overlay
 
@@ -142,7 +143,7 @@ def test_evaluate_staleness_detects_hash_drift(overlay_module, fake_project):
     assert fresh.expired is False
 
     # Mutate one source: overlay must now report stale.
-    (fake_project / "docs" / "gtkb-dashboard" / "dashboard-data.json").write_text(
+    (fake_project / ".groundtruth" / "dashboard" / "dashboard-data.json").write_text(
         json.dumps({"generated_at": "2026-04-23T99:00:00Z", "mutated": True}) + "\n",
         encoding="utf-8",
     )

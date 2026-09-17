@@ -1,266 +1,229 @@
 #!/usr/bin/env python3
-"""SoT Read-Discipline canonical hook.
+"""Guard declared substitute paths using the selected project's current registry.
 
-Authority: DCL-SOT-READ-HOOK-CONTRACT-001 v1; GOV-SOURCE-OF-TRUTH-FRESHNESS-001 v2
-(clauses a-d of the Read-Discipline Extension); DCL-SOT-REGISTRY-RECORD-SCHEMA-001 v2
-(forbidden_substitutes column).
-
-Two-surface harness-specific contract:
-
-- Native-tool branch: tool_name in {Read, Grep, Glob}; extract target from tool_input;
-  consult registry; block on match.
-- Shell-command branch: tool_name == Bash; parse tool_input.command for known read/search
-  verbs (Get-Content, Select-String, Get-ChildItem incl. -Recurse, aliases gc/gci/cat,
-  rg, grep); extract path; consult registry; block on match.
-
-Bypass: set GTKB_SOT_READ_DISCIPLINE_BYPASS=1 for owner-authorized single-command
-exceptions per {{HARNESS_RULES_DIR}}/sot-read-discipline.md.
-
-Fail-closed: registry authority failures emit an explicit block. A missing,
-mixed-generation, or unreadable registry cannot silently disable read discipline.
+This authored baseline is projected independently into each harness. The guard
+handles normalized native read/search events and explicit simple shell read
+arguments. An empty result neither proves currentness nor qualifies host hook
+invocation. Current facts still require their canonical CLI/domain readers.
 """
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
-import re
 import shlex
 import sys
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-PACKAGE_ROOT = PROJECT_ROOT / "groundtruth-kb" / "src"
-if str(PACKAGE_ROOT) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_ROOT))
-
-from groundtruth_kb.project.registry_control_plane import load_registry_snapshot  # noqa: E402
-
+HOOKS_DIR = "{{HARNESS_HOOKS_DIR}}"
+if "{{" in HOOKS_DIR:
+    HOOKS_DIR = ".harness-baseline-configuration/hooks"
+# Derive the root from this exact authored/projected location, not cwd, a
+# neighbouring harness, an environment fallback or a fixed directory depth.
+PROJECT_ROOT = Path(__file__).absolute().parents[len(PurePosixPath(HOOKS_DIR).parts)]
 BYPASS_ENV_VAR = "GTKB_SOT_READ_DISCIPLINE_BYPASS"
-
-NATIVE_READ_TOOLS = {"Read", "Grep", "Glob"}
-
-# WI-7289: the shell surface is not one tool name. The projector renders
-# shell_exec to "Bash|PowerShell" for Claude and "Shell|Bash" for Cursor, and
-# Goose registers every PreToolUse hook without a matcher at all, so a payload
-# can arrive under any of these names. Matching only "Bash" left the specified
-# shell surface of DCL-SOT-READ-HOOK-CONTRACT-001 unenforced on the harnesses
-# that do not use that name, even once the intent is declared.
 SHELL_COMMAND_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "bash", "powershell"})
-# Retained for callers and tests that referenced the single-name constant.
-SHELL_COMMAND_TOOL = "Bash"
-
-# Per-verb extractor table for the shell-command branch.
-# Returns the path argument(s) extracted from a token list, or [] if no match.
-
-_PATH_FLAGS = {"-Path", "-LiteralPath", "--path"}
-
-
-def _extract_path_after_flag(tokens: list[str], flags: set[str]) -> list[str]:
-    out: list[str] = []
-    for i, tok in enumerate(tokens):
-        if tok in flags and i + 1 < len(tokens):
-            out.append(tokens[i + 1])
-    return out
-
-
-def _first_positional(tokens: list[str], skip: int = 1) -> list[str]:
-    """Return the first positional argument after `skip` tokens, skipping flags."""
-    seen = 0
-    i = skip
-    while i < len(tokens):
-        tok = tokens[i]
-        if tok.startswith("-"):
-            # skip flag + value if value follows
-            if i + 1 < len(tokens) and not tokens[i + 1].startswith("-"):
-                i += 2
-            else:
-                i += 1
-            continue
-        return [tok]
-        seen += 1
-    return []
+_PATH_FLAGS = frozenset({"-path", "-literalpath", "--path"})
+_VALUE_FLAGS = frozenset(
+    {
+        "-encoding",
+        "-filter",
+        "-include",
+        "-exclude",
+        "-pattern",
+        "-totalcount",
+        "-tail",
+        "-readcount",
+        "-context",
+        "--glob",
+        "-g",
+        "--iglob",
+        "-t",
+        "--type",
+        "-T",
+        "--type-not",
+        "--max-count",
+        "-m",
+        "--max-depth",
+        "--encoding",
+        "-f",
+        "--file",
+    }
+)
 
 
-def _last_positional(tokens: list[str], skip: int = 1) -> list[str]:
-    """Return the last positional argument (rg/grep convention: PATTERN PATH)."""
-    positionals = []
-    i = skip
-    while i < len(tokens):
-        tok = tokens[i]
-        if tok.startswith("-"):
-            i += 1
-            # heuristic: don't consume value for boolean flags
-            continue
-        positionals.append(tok)
-        i += 1
-    return [positionals[-1]] if len(positionals) >= 2 else []
+def _shell_read(command: str) -> tuple[list[str], bool]:
+    """Extract explicit paths from one simple read command without executing it.
 
-
-def _extract_paths_from_bash(command: str) -> list[str]:
-    """Parse a Bash/PowerShell command for known read/search verbs.
-
-    Returns a list of extracted path arguments. Empty list when no recognized
-    verb is present.
+    This is not a shell interpreter: assignments, command substitution, pipelines,
+    compound commands and unknown verbs do not establish evaluated coverage.
     """
-    if not command:
-        return []
     try:
-        tokens = shlex.split(command, posix=False)
+        tokens = [value.strip("'\"") for value in shlex.split(command, posix=False)]
     except ValueError:
-        return []
+        return [], False
     if not tokens:
-        return []
-    verb = tokens[0].lstrip(".\\/")
-    verb_lower = verb.lower()
+        return [], False
+    verb = tokens[0].lower()
+    if verb not in {"get-content", "gc", "cat", "select-string", "sls", "get-childitem", "gci", "rg", "grep"}:
+        return [], False
+    paths, positionals = [], []
+    expression = False
+    files = False
+    index = 1
+    literal = False
+    while index < len(tokens):
+        token = tokens[index]
+        lower = token.lower()
+        if not literal and token == "--":
+            literal = True
+        elif not literal and lower in _PATH_FLAGS:
+            index += 1
+            if index < len(tokens):
+                paths.append(tokens[index])
+        elif not literal and token in {"-e", "--regexp"}:
+            expression = True
+            index += 1
+        elif not literal and lower == "--files":
+            files = True
+        elif not literal and (lower in _VALUE_FLAGS or token in _VALUE_FLAGS):
+            if lower == "-pattern":
+                expression = True
+            index += 1
+        elif not literal and token.startswith("-"):
+            # Boolean flags do not consume the following positional path.
+            pass
+        else:
+            positionals.append(token)
+        index += 1
+    search = (
+        verb == "rg"
+        or (
+            verb == "grep"
+            and any(value == "--recursive" or value.startswith("-r") or value.startswith("-R") for value in tokens[1:])
+        )
+        or (verb in {"get-childitem", "gci"} and any(value.lower() == "-recurse" for value in tokens[1:]))
+    )
+    if verb in {"rg", "grep", "select-string", "sls"}:
+        if not expression and not files and positionals:
+            positionals = positionals[1:]
+        paths.extend(positionals)
+    else:
+        paths.extend(positionals)
+    if verb in {"get-childitem", "gci"} and not search:
+        paths.extend(value.rstrip("/") + "/*" for value in list(paths))
+    return paths, search
 
-    # First-positional verbs (path is first non-flag arg)
-    if verb_lower in {"get-content", "gc", "cat"}:
-        return _first_positional(tokens)
-    # -Path-flag verbs
-    if verb_lower in {"select-string", "sls"}:
-        paths = _extract_path_after_flag(tokens, _PATH_FLAGS)
-        return paths or _first_positional(tokens)
-    if verb_lower in {"get-childitem", "gci"}:
-        paths = _extract_path_after_flag(tokens, _PATH_FLAGS)
-        return paths or _first_positional(tokens)
-    # Last-positional verbs (rg/grep convention)
-    if verb_lower in {"rg", "grep"}:
-        return _last_positional(tokens)
-    return []
 
-
-def _normalize_relative(raw_path: str, root: Path) -> str | None:
+def _normalize_relative(raw_path: str, root: Path, cwd: Path | None = None) -> str | None:
     if not raw_path:
         return None
-    cleaned = raw_path.strip().strip("'\"`").replace("\\", "/")
+    path = Path(raw_path.strip().strip("'\"`").replace("\\", "/"))
+    if not path.is_absolute():
+        path = (cwd or Path.cwd()) / path
     try:
-        absolute = Path(cleaned).resolve()
+        return path.resolve().relative_to(root.resolve()).as_posix()
     except (OSError, ValueError):
-        # Treat unresolvable paths as project-relative literal
-        return cleaned.lstrip("./")
-    try:
-        rel = absolute.relative_to(root)
-    except ValueError:
-        # Outside project root: keep the literal for substring matching
-        return cleaned.lstrip("./")
-    return rel.as_posix()
+        return None
 
 
 def _load_registry_projection(root: Path) -> list[dict[str, Any]]:
-    """Load one coherent registry generation as hook-friendly dictionaries."""
-    snapshot = load_registry_snapshot(project_root=root)
-    out: list[dict[str, Any]] = []
-    for record in snapshot.records:
-        if record.forbidden_substitutes:
-            out.append(
-                {
-                    "id": record.id,
-                    "storage_path": record.storage_path,
-                    "forbidden_substitutes": list(record.forbidden_substitutes),
-                }
-            )
-    return out
+    from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
+
+    rows = []
+    for record in load_registry_snapshot(project_root=root).records:
+        if record.lifecycle == "archive" or not record.forbidden_substitutes:
+            continue
+        patterns = []
+        for value in record.forbidden_substitutes:
+            value = value.replace("\\", "/")
+            relative = PurePosixPath(value)
+            if relative.is_absolute() or ".." in relative.parts or ":" in value or str(relative) == ".":
+                raise ValueError(f"Invalid substitute locator in registry declaration {record.id}")
+            patterns.append(relative.as_posix())
+        rows.append({"id": record.id, "storage_path": record.storage_path, "forbidden_substitutes": patterns})
+    return rows
 
 
-def _normalize_substitute(sub: str) -> str:
-    """Normalize a forbidden_substitute string to compare against normalized targets.
+def _matches(pattern: str, target: str) -> bool:
+    """Match path segments; '*' never crosses '/', while '**' may do so."""
+    pattern_parts = os.path.normcase(pattern).replace("\\", "/").split("/")
+    target_parts = os.path.normcase(target).replace("\\", "/").split("/")
 
-    Uses the same convention as _normalize_relative: replace backslashes with
-    forward slashes, strip surrounding whitespace, and remove a leading "./"
-    prefix (but NOT a leading "." that begins a dotfile name like ".groundtruth").
-    """
-    cleaned = sub.strip().replace("\\", "/")
-    if cleaned.startswith("./"):
-        cleaned = cleaned[2:]
-    return cleaned
+    def match(patterns, parts):
+        if not patterns:
+            return not parts
+        if patterns[0] == "**":
+            return any(match(patterns[1:], parts[index:]) for index in range(len(parts) + 1))
+        return bool(parts) and fnmatch.fnmatchcase(parts[0], patterns[0]) and match(patterns[1:], parts[1:])
+
+    return match(pattern_parts, target_parts)
 
 
-def _check_against_registry(target: str, projection: list[dict[str, Any]]) -> dict[str, Any] | None:
-    if not target or not projection:
-        return None
-    for record in projection:
-        for sub in record["forbidden_substitutes"]:
-            sub_norm = _normalize_substitute(sub)
-            # Match via prefix OR glob-style wildcard
-            if sub_norm.endswith("/**"):
-                if target == sub_norm[:-3] or target.startswith(sub_norm[:-2]):
-                    return record
-            elif sub_norm.endswith("/*"):
-                target_parent = target.rsplit("/", 1)[0] + "/" if "/" in target else ""
-                if target_parent == sub_norm[:-1]:
-                    return record
-            elif target == sub_norm or target.endswith("/" + sub_norm):
-                return record
+def _check_against_registry(target: str, rows: list[dict[str, Any]], recursive=False) -> dict[str, Any] | None:
+    for row in rows:
+        for pattern in row["forbidden_substitutes"]:
+            if _matches(pattern, target) or _matches(target, pattern):
+                return row
+            if recursive and (
+                target == "." or os.path.normcase(pattern).startswith(os.path.normcase(target.rstrip("/") + "/"))
+            ):
+                return row
     return None
 
 
-def _emit(decision: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(decision))
-
-
-def _block_reason(target: str, record: dict[str, Any]) -> str:
-    return (
-        f"BLOCKED (DCL-SOT-READ-HOOK-CONTRACT-001): reading {target!r} as a "
-        f"current-state substitute for canonical SoT {record['storage_path']!r} "
-        f"(registry id {record['id']!r}) is forbidden. "
-        f"Read the canonical path or use the registry's canonical reader. "
-        f"To bypass for exceptional cases (audit/debug only), set "
-        f"GTKB_SOT_READ_DISCIPLINE_BYPASS=1 for the single command and document "
-        f"the rationale per {{HARNESS_RULES_DIR}}/sot-read-discipline.md."
-    )
-
-
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
-    # Bypass check
     if os.environ.get(BYPASS_ENV_VAR, "").strip() == "1":
         return {}
     tool_input = payload.get("tool_input") or {}
     if not isinstance(tool_input, dict):
         return {}
-    tool_name = payload.get("tool_name") or payload.get("tool") or ""
-
-    targets: list[str] = []
-    if tool_name in NATIVE_READ_TOOLS:
-        if tool_name == "Read":
-            raw = tool_input.get("file_path") or ""
-            if isinstance(raw, str) and raw:
-                targets.append(raw)
-        elif tool_name == "Grep":
-            raw = tool_input.get("path") or ""
-            if isinstance(raw, str) and raw:
-                targets.append(raw)
-        elif tool_name == "Glob":
-            raw = tool_input.get("pattern") or ""
-            if isinstance(raw, str) and raw:
-                # For glob, treat the base directory of the pattern as the target
-                base = re.split(r"[*?\[]", raw, maxsplit=1)[0]
-                if base:
-                    targets.append(base)
-    elif tool_name in SHELL_COMMAND_TOOLS:
-        command = tool_input.get("command") or ""
-        if isinstance(command, str) and command:
-            targets.extend(_extract_paths_from_bash(command))
+    tool = payload.get("tool_name") or payload.get("tool") or ""
+    targets = []
+    recursive = False
+    if tool == "Read":
+        targets = [tool_input.get("file_path") or tool_input.get("path")]
+    elif tool == "Grep":
+        targets = [tool_input.get("path") or "."]
+        recursive = True
+    elif tool == "Glob":
+        base = tool_input.get("path") or "."
+        pattern = tool_input.get("pattern") or "*"
+        if isinstance(base, str) and isinstance(pattern, str):
+            targets = [str(Path(base) / pattern)]
+    elif tool in SHELL_COMMAND_TOOLS:
+        command = tool_input.get("command")
+        if isinstance(command, str):
+            targets, recursive = _shell_read(command)
     else:
         return {}
-
+    targets = [value for value in targets if isinstance(value, str) and value]
     if not targets:
         return {}
-
-    projection = _load_registry_projection(PROJECT_ROOT)
-    if not projection:
-        return {}
-
-    for raw_target in targets:
-        normalized = _normalize_relative(raw_target, PROJECT_ROOT)
-        if normalized is None:
+    installed = PROJECT_ROOT / HOOKS_DIR / "sot-read-discipline.py"
+    if installed != Path(__file__).absolute() or installed.resolve() != installed:
+        raise ValueError("Read hook installation is missing or redirected")
+    cwd = payload.get("cwd") or str(Path.cwd())
+    if not isinstance(cwd, str):
+        raise ValueError("Read event cwd must be a path")
+    cwd_path = Path(cwd).absolute()
+    rows = _load_registry_projection(PROJECT_ROOT)
+    for value in targets:
+        target = _normalize_relative(value, PROJECT_ROOT, cwd_path)
+        if target is None:
             continue
-        record = _check_against_registry(normalized, projection)
-        if record is not None:
+        row = _check_against_registry(target, rows, recursive)
+        if row is not None:
             return {
                 "decision": "block",
-                "reason": _block_reason(normalized, record),
+                "reason": (
+                    f"BLOCKED (DCL-SOT-READ-HOOK-CONTRACT-001): {target!r} is a registered substitute for "
+                    f"{row['storage_path']!r} (registry id {row['id']!r}). Use the current canonical CLI/domain reader. "
+                    "For an owner-directed historical inspection or hook diagnosis, apply the existing "
+                    "GTKB_SOT_READ_DISCIPLINE_BYPASS=1 exception to that command only."
+                ),
             }
     return {}
 
@@ -275,12 +238,16 @@ def main() -> int:
         payload = {}
     try:
         decision = gate_decision(payload)
-    except Exception as exc:  # noqa: BLE001 - every authority failure blocks
+    except Exception as error:  # noqa: BLE001 - unavailable current input cannot permit a covered read
         decision = {
             "decision": "block",
-            "reason": (f"BLOCKED (DCL-SOT-READ-HOOK-CONTRACT-001): coherent registry authority unavailable: {exc}"),
+            "reason": (
+                f"BLOCKED (DCL-SOT-READ-HOOK-CONTRACT-001): coherent registry/read input unavailable "
+                f"({type(error).__name__}). Inspect the selected project's registry through its CLI; "
+                "no current read-discipline result is available."
+            ),
         }
-    _emit(decision)
+    sys.stdout.write(json.dumps(decision))
     return 0
 
 

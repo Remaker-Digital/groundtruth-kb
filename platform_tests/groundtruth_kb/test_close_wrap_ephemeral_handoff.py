@@ -1,35 +1,22 @@
-"""TEST-12147 — close and wrap harvest without persisted handoff objects.
+"""Component checks for retired handoff storage and its former source consumers.
 
-Linked acceptance test for WI-6952 (PROJECT-GTKB-WI6952-EPHEMERAL-HANDOFF).
-
-Canon s5 holds that a handoff is ephemeral owner-copyable text and "never an on-disk
-or database authority object", that "no fact required for continuation may exist only
-in the handoff", and that the receiving context re-queries canonical state. Canon s17
-and s24 additionally forbid the ``harness-state`` root.
-
-WI-6952 requires retiring the persisted carriers and every consumer that treats them as
-recovery or authority. Measured, those carriers are TWO, not one:
-
-1. the MemBase ``session_prompts`` store; and
-2. the on-disk session-envelope archive at
-   ``harness-state/<harness>/session-envelope-archive/<closed_at>-session-envelope.json``,
-   which ``session/wrap.py`` writes through ``close_session`` and which
-   ``session/handoff.py`` reads to compose a handoff.
-
-SCOPE. ``session_snapshots`` and ``session_role_attestations`` are NOT asserted here.
-WI-6940 owns their removal, and WI-6952 declares a ``terminal_published`` dependency on
-it; asserting them here would duplicate predecessor-owned scope. The live purge of
-existing ``session_prompts`` rows is likewise out of scope: this module asserts that no
-code path creates, reads, or consumes the carriers, not that historical rows are gone.
-
-All tests are expected to FAIL at proposal time; that red preimage is the point.
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+The linked TEST-12147 / WI-6952 contract additionally requires complete scoped
+canonical harvest and fresh receiving contexts. These checks do not establish
+that full contract. The legacy SQLite class is not the current authority service;
+its removed prompt API is tested directly, and absence checks cover only the
+named former files. No production database or generated projection is changed.
 """
 
 from __future__ import annotations
 
+import json
+import sqlite3
+import subprocess
+import sys
 from pathlib import Path
+
+import pytest
+from groundtruth_kb.db import KnowledgeDB
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
@@ -47,7 +34,10 @@ SESSION_START_HOOKS = (
 )
 
 PROMPT_STORE_API = (
+    "_next_session_prompt_version",
     "insert_session_prompt",
+    "get_session_prompt",
+    "get_session_prompt_by_idempotency_key",
     "get_next_session_prompt",
     "consume_session_prompt",
     "list_session_prompts",
@@ -58,27 +48,69 @@ def _read(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
-def test_close_wrap_harvest_without_persisted_objects() -> None:
-    """No persisted prompt-record store or accessor survives in the canonical DB layer."""
-    source = _read(DB)
-    survivors = [name for name in PROMPT_STORE_API if f"def {name}(" in source]
-    assert survivors == [], (
-        f"session_prompts store accessors still defined in db.py: {survivors}; "
-        "canon s5 forbids a database authority object for a handoff"
-    )
-    assert "CREATE TABLE IF NOT EXISTS session_prompts" not in source, (
-        "the session_prompts table is still created by the canonical schema"
-    )
+def test_close_wrap_harvest_without_persisted_objects(tmp_path: Path) -> None:
+    """Retire the real legacy store/API without treating this as full harvest proof."""
+    path = tmp_path / "legacy.db"
+    db = KnowledgeDB(path)
+    try:
+        with sqlite3.connect(path) as connection:
+            tables = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            assert "session_prompts" not in tables
+            indexes = {row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='index'")}
+            assert "idx_session_prompts_session" not in indexes
+        for name in PROMPT_STORE_API:
+            with pytest.raises(AttributeError):
+                getattr(db, name)
+
+        # Emulate an old database solely in this disposable fixture. Removing
+        # the API does not silently purge existing bytes or make them recovery
+        # inputs; the ordinary native context workflow is qualified separately.
+        with sqlite3.connect(path) as connection:
+            connection.execute("CREATE TABLE session_prompts (rowid INTEGER PRIMARY KEY, prompt_text TEXT)")
+            connection.execute("INSERT INTO session_prompts VALUES (1, 'OLD_PROMPT_SENTINEL')")
+            connection.execute(
+                "INSERT INTO assertion_runs (spec_id,spec_version,run_at,overall_passed,results,triggered_by) "
+                "VALUES ('SPEC-FIXTURE',1,'2026-01-01T00:00:00Z',0,'{}','fixture')"
+            )
+        with sqlite3.connect(path) as connection:
+            before = list(connection.iterdump())
+        exported = tmp_path / "selected-legacy-tables.json"
+        assert Path(db.export_json(exported)) == exported
+        output = json.loads(exported.read_text(encoding="utf-8"))
+        assert "session_prompts" not in output["tables"]
+        assert "OLD_PROMPT_SENTINEL" not in exported.read_text(encoding="utf-8")
+        assert output["tables"]["assertion_runs"][0]["spec_id"] == "SPEC-FIXTURE"
+        with sqlite3.connect(path) as connection:
+            assert list(connection.iterdump()) == before
+    finally:
+        db.close()
 
 
-def test_wrap_produces_no_session_envelope_archive() -> None:
-    """``::wrap`` harvests without writing a persisted envelope archive."""
-    if not WRAP.exists():
-        return
-    source = _read(WRAP)
-    assert "archive_path" not in source, (
-        "session/wrap.py still produces an archive path; canon s5 forbids wrap persisting a session object"
-    )
+def test_wrap_produces_no_session_envelope_archive(tmp_path: Path) -> None:
+    """Removed archive commands cannot recreate stores; this is not full wrap."""
+    if WRAP.exists():
+        assert "archive_path" not in _read(WRAP)
+    marker = tmp_path / "unrelated.txt"
+    marker.write_text("Preserve unrelated context bytes.\n", encoding="utf-8")
+    before = {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()}
+    for name in (
+        "harvest_session_deliberations.py",
+        "deliberation_health.py",
+        "inventory_lo_bridge_history_backfill.py",
+    ):
+        path = REPO_ROOT / "scripts" / name
+        assert not path.exists(), f"Retired bridge-archive route remains: {path}"
+        result = subprocess.run(
+            [sys.executable, str(path)],
+            cwd=tmp_path,
+            capture_output=True,
+            encoding="utf-8",
+            timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        assert result.returncode != 0 and not result.stdout
+        assert {p.name: p.read_bytes() for p in tmp_path.iterdir() if p.is_file()} == before
+        assert not any(p.is_dir() for p in tmp_path.iterdir())
 
 
 def test_handoff_reads_no_archived_envelope() -> None:

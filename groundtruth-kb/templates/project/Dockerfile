@@ -1,8 +1,7 @@
 # {{PROJECT_NAME}} Container Image
 # Multi-stage build for production Python applications.
 #
-# Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
-# All rights reserved.
+# {{COPYRIGHT_NOTICE}}
 
 # --- Stage 1: Build dependencies ---
 FROM python:3.12-slim AS builder

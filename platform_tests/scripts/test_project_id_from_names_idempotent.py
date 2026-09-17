@@ -5,12 +5,10 @@ Display labels never create projects or parent relationships, including on resta
 
 from __future__ import annotations
 
-import sys
 from contextlib import closing
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.db import KnowledgeDB, _project_id_from_names  # noqa: E402
 

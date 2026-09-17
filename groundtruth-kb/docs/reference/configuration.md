@@ -107,7 +107,9 @@ The `chroma_path` setting has three levels:
 
 ### `[backup]` section
 
-Database snapshot settings for `gt db snapshot`.
+Settings for the explicit offline SQLite snapshot that feeds
+`gt db postgres export-current --sqlite-snapshot`. The live `gt db snapshot`
+command is retired (see [SQLite snapshots](../gt-db-snapshot.md)).
 
 ```toml
 [backup]

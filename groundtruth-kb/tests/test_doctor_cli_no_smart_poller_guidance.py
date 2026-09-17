@@ -3,7 +3,7 @@
 
 Per Slice 4 D6 step 38 (proposal
 ``bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-015.md``),
-this CliRunner-based test invokes ``gt project doctor`` and asserts that:
+this test invokes the native ``gt project doctor`` on an initialized application and asserts that:
 
 1. No occurrence of ``verified smart poller``, ``smart-poller liveness``,
    ``Configure the smart poller``, or any pattern from D6 step 32's
@@ -18,12 +18,6 @@ Maps to T-4-doctor-cli-no-smart-poller-guidance.
 """
 
 from __future__ import annotations
-
-from pathlib import Path
-
-from click.testing import CliRunner
-
-from groundtruth_kb.cli import main
 
 # Forbidden patterns (current-use smart-poller wording, post-retirement).
 # Aligned with D6 step 32 forbidden-pattern set.
@@ -41,29 +35,12 @@ _REQUIRED_DISPATCH_WORDING = (
 )
 
 
-def _scaffold_minimal_dual_agent(target: Path) -> None:
-    """Scaffold the minimum surface a doctor smoke test needs.
-
-    The full ``gt project init`` is heavy; for this CLI smoke test we only
-    need ``groundtruth.toml`` and the bridge dirs so doctor walks the
-    dispatcher-daemon and dispatch-liveness checks.
-    """
-    (target / "groundtruth.toml").write_text(
-        '[project]\nname = "_test_smoke_doctor"\nprofile = "dual-agent"\n',
-        encoding="utf-8",
-    )
-    (target / "bridge").mkdir(parents=True, exist_ok=True)
-    (target / "bridge" / "INDEX.md").write_text("# bridge index\n", encoding="utf-8")
-    (target / ".gtkb-state" / "bridge-poller").mkdir(parents=True, exist_ok=True)
-
-
-def test_doctor_cli_emits_no_current_use_smart_poller_guidance(tmp_path: Path) -> None:
+def test_doctor_cli_emits_no_current_use_smart_poller_guidance(native_application) -> None:
     """``gt project doctor`` stdout must not advertise the retired smart poller."""
-    _scaffold_minimal_dual_agent(tmp_path)
-    runner = CliRunner()
-    result = runner.invoke(
-        main,
-        ["project", "doctor", "--dir", str(tmp_path)],
+    native_application.stage_baseline()
+    native_application.init("Alpha", "--profile", "dual-agent", "--harness", "claude")
+    result = native_application.invoke(
+        "project", "doctor", "--project-id", "PROJECT-Alpha", "--host-root", str(native_application.host)
     )
 
     # Doctor exits with 0 on PASS or 1 on findings; either is acceptable for

@@ -42,25 +42,24 @@ gt --config my-project/groundtruth.toml seed --example
 
 ## Bootstrapping a desktop-ready prototype
 
-If you want the shortest path from installation to a usable project scaffold,
-use:
+If you want the shortest path from installation to a usable application
+scaffold, register the application with its GT-KB host and use the single
+native initializer:
 
 ```bash
-gt bootstrap-desktop my-project --owner "Your Organization" --init-git
+gt --config <host>/groundtruth.toml project init my-project --project-id <PROJECT> --host-root <host> --owner "Your Organization" --profile local-only --harness claude
 ```
 
-This command creates:
+This command creates, inside the registered application root:
 
-- `groundtruth.toml`
-- `groundtruth.db`
-- `CLAUDE.md`
-- `MEMORY.md`
-- `BRIDGE-INVENTORY.md`
-- `.claude/hooks/`
-- `.claude/rules/`
-- `.github/workflows/` using the bundled CI templates
+- `groundtruth.toml` pointing at the host authority
+- the selected harness configuration projected from the host baseline
+- `.github/workflows/` using the profile-tiered CI templates
+- the application's artifact-boundary registry
 
-It also seeds governance records and the example domain records by default.
+Specifications, tests and work items live in the host's PostgreSQL authority;
+`--spec-scaffold minimal|full` writes the inferred starter specifications there.
+No local database is created and nothing is committed.
 
 ## Configuration
 

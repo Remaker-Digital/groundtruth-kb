@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Recovery stub: see comment in spec-before-code.py.
+"""Recovery stub with no enforcement behavior.
 
 Behavior: emit nothing and exit 0. Replace or remove the registration when the
 right enforcement is re-implemented. Tracked as WI-4449 (parallel-session

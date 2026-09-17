@@ -50,6 +50,12 @@ def _iter_hook_commands(settings: dict) -> list[tuple[str, str, str]]:
     return rows
 
 
+def _launches_python(command: str) -> bool:
+    """A bare `python`/`pythonw` launch or the projector's quoted in-root interpreter path."""
+    head = command.lstrip().split()[0].strip('"') if command.strip() else ""
+    return head.rsplit("/", 1)[-1].lower() in {"python", "python.exe", "pythonw", "pythonw.exe"}
+
+
 def test_no_relative_python_hook_commands_in_claude_settings() -> None:
     settings = json.loads(SETTINGS_PATH.read_text(encoding="utf-8"))
     offenders = [
@@ -75,7 +81,7 @@ def test_every_claude_hook_path_resolves_through_project_root() -> None:
     hook_path_commands = [
         (event, matcher, command)
         for event, matcher, command in _iter_hook_commands(settings)
-        if ".claude/hooks/" in command and command.lstrip().startswith("python")
+        if ".claude/hooks/" in command and _launches_python(command)
     ]
     assert hook_path_commands, "No python .claude/hooks/ registrations found; test fixture stale."
     missing_project_dir = [

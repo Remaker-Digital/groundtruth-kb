@@ -33,12 +33,11 @@ from groundtruth_kb.project.managed_registry import (
     artifacts_for_scaffold,
     artifacts_for_upgrade,
     find_artifact_by_id,
-    load_managed_artifacts,
 )
 
 
 def _registry_records() -> list[ManagedArtifact]:
-    """Return only the original 40 managed-registry records (excludes ownership-glob).
+    """Return only current managed-registry records (excludes ownership-glob).
 
     ``_load_all_artifacts()`` merges records from ``managed-artifacts.toml``
     and ``templates/scaffold-ownership.toml`` (``ownership-glob`` class). These
@@ -54,40 +53,9 @@ def _registry_records() -> list[ManagedArtifact]:
 
 
 def test_registry_total_matches_current_manifest() -> None:
-    """Current manifest totals exclude retired owner capture.
-
-    Previously: 62 total = 18 hooks + 11 rules + 11 skills + 4 files + 14 settings + 4 gitignore.
-
-    Post-spec-event-surfacer (Slice A of GTKB-MEMBASE-EFFECTIVE-USE-RECOVERY,
-    bridge -006 GO): spec-event-surfacer.py is an active hook with a paired
-    PostToolUse settings registration.
-
-    Pre-spec-event-surfacer rationale (carried forward):
-    54 total = 19 hooks + 10 rules + 6 skills + 15 settings + 4 gitignore.
-
-    Post-C4 (gtkb-settings-merge): gitignore-pattern count rose from 1 to 4
-    with 3 new adopter-critical patterns (groundtruth.db, .groundtruth/,
-    .claude/settings.local.json) promoted to upgrade-managed.
-
-    Current governance-completeness contract: active governance hooks are
-    _delib_common, gov09-capture, and related policy
-    hooks. Retired dead-stub hooks are absent from hook and settings
-    registration records.
-
-    ``ownership-glob`` rows from ``templates/scaffold-ownership.toml`` are
-    excluded via ``_registry_records()`` helper — this test scope is
-    registry-only.
-    """
+    """Current registry excludes retired capture, stubs and event notification."""
     records = _registry_records()
-    # GTKB-ISOLATION-017 Slice 3: 2 new file-class records (README quickstart,
-    # release-readiness banner). Total: 56 + 2 = 58.
-    # GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL Slice 1 (S327): 1 new rule
-    # (canonical-terminology-policy). Total: 58 + 1 = 59.
-    # GTKB-ISOLATION-017 Slice 4 (S328): 1 new file-class record
-    # (upgrade-rehearsal-recipe). Total: 59 + 1 = 60.
-    # Follow-on policy hook: +1 hook. Tier A bridge skill: +5 skills.
-    # Retired dead-stub hook cleanup removed two hooks and two settings registrations.
-    assert len(records) == 44, f"expected 44 current registry records; got {len(records)}"
+    assert len(records) == 37
 
 
 def test_bridge_skill_records_are_managed_for_dual_agent_profiles() -> None:
@@ -222,63 +190,6 @@ def _file_target_paths(records: list[ManagedArtifact]) -> set[str]:
     return {r.target_path for r in records if isinstance(r, FileArtifact)}
 
 
-def test_scaffold_local_only_copies_all_hooks_and_initial_rules() -> None:
-    """local-only scaffold copies all 13 hooks plus the 5 initial local-only rules.
-
-    Post-canonical-terminology-surface: local-only initial rules grew from 1
-    (prime-builder) to 3 with the addition of ``canonical-terminology.md`` and
-    ``canonical-terminology.toml``. Post-Slice-1 of GTKB-GOV-TERM-DISAMBIGUATION-
-    MECHANICAL: 3 → 4 with the addition of ``canonical-terminology-policy.toml``.
-    Post gtkb-session-start-orientation-gate: 4 → 5 with
-    ``session-start-orientation.md``.
-    """
-    scaffolded = artifacts_for_scaffold("local-only")
-    # 12 retained hooks
-    hooks = [r for r in scaffolded if r.class_ == "hook"]
-    assert len(hooks) == 7
-    # 5 rules (prime-builder + canonical-terminology surface + session-start-orientation)
-    rules = [r for r in scaffolded if r.class_ == "rule"]
-    rule_paths = {r.target_path for r in rules if isinstance(r, FileArtifact)}
-    assert rule_paths == {
-        ".claude/rules/prime-builder.md",
-        ".claude/rules/canonical-terminology.md",
-        ".claude/rules/canonical-terminology.toml",
-        ".claude/rules/canonical-terminology-policy.toml",
-        ".claude/rules/session-start-orientation.md",
-    }
-    # 1 skill (baseline-audit), 0 settings, 0 gitignore-patterns
-    skills = [r for r in scaffolded if r.class_ == "skill"]
-    assert len(skills) == 1
-    assert skills[0].id == "skill.baseline-audit.skill-md"
-    assert [r for r in scaffolded if r.class_ == "settings-hook-registration"] == []
-    assert [r for r in scaffolded if r.class_ == "gitignore-pattern"] == []
-
-
-def test_scaffold_dual_agent_copies_everything() -> None:
-    """dual-agent scaffold copies the full dual-agent managed artifact set.
-
-    Post-C4 (gtkb-settings-merge): gitignore-pattern scaffold count 1→4
-    (3 adopter-critical patterns added: groundtruth.db, .groundtruth/,
-    .claude/settings.local.json).
-
-    Current governance-completeness contract keeps only active hook and
-    settings-registration records; retired dead-stub hooks and registrations
-    remain absent.
-    """
-    scaffolded = artifacts_for_scaffold("dual-agent")
-    by_class: dict[str, int] = {}
-    for r in scaffolded:
-        by_class[r.class_] = by_class.get(r.class_, 0) + 1
-    assert by_class == {
-        "hook": 10,
-        "rule": 12,  # +1: session-start-orientation (gtkb-session-start-orientation-gate)
-        "skill": 7,
-        "file": 3,  # Slice 3 (README + release-readiness) + Slice 4 (upgrade-rehearsal-recipe)
-        "settings-hook-registration": 7,
-        "gitignore-pattern": 4,
-    }
-
-
 def test_scaffold_dual_agent_webapp_matches_dual_agent() -> None:
     """dual-agent-webapp scaffold set matches dual-agent for C1 scope."""
     a = _file_target_paths(artifacts_for_scaffold("dual-agent"))
@@ -374,8 +285,6 @@ def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
         assert hook_names == {
             "destructive-gate.py",
             "credential-scan.py",
-            "_delib_common.py",
-            "spec-event-surfacer.py",
         }, f"doctor hook set mismatch for {profile!r}: {hook_names}"
 
 
@@ -405,39 +314,25 @@ def test_doctor_rules_local_only_is_empty() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_managed_registry_includes_spec_event_surfacer_hook_with_dual_agent_managed_profiles() -> None:
-    """Per Slice A REVISED-2 F1 fix: hook artifact must be upgrade-managed
-    for bridge profiles so existing adopters receive the hook file via
-    `gt project upgrade` rather than only on initial scaffold.
-    """
+def test_retired_spec_event_hook_and_registration_are_absent() -> None:
     records = _load_all_artifacts()
-    matches = [r for r in records if isinstance(r, FileArtifact) and r.id == "hook.spec-event-surfacer"]
-    assert len(matches) == 1, f"expected exactly one hook.spec-event-surfacer record; got {len(matches)}"
-    hook = matches[0]
-    assert "dual-agent" in hook.managed_profiles
-    assert "dual-agent-webapp" in hook.managed_profiles
-    assert "dual-agent" in hook.doctor_required_profiles
-    assert "dual-agent-webapp" in hook.doctor_required_profiles
+    assert not {"hook.spec-event-surfacer", "settings.hook.spec-event-surfacer.posttooluse"}.intersection(
+        record.id for record in records
+    )
 
 
 def test_managed_registry_settings_registration_managed_profiles_match_hook_artifact() -> None:
-    """Per Slice A REVISED-2 F1 fix: settings-hook-registration's lifecycle
-    axes MUST match the paired hook artifact. Mismatch creates the inert-hook
-    risk Codex F1 -004 identified (registration delivered without hook file).
-    """
+    """Every retained managed registration delivers the corresponding hook."""
     records = _load_all_artifacts()
-    hook = next(r for r in records if isinstance(r, FileArtifact) and r.id == "hook.spec-event-surfacer")
-    reg = next(
-        r
-        for r in records
-        if isinstance(r, SettingsHookRegistration) and r.id == "settings.hook.spec-event-surfacer.posttooluse"
-    )
-    # The registration must point to the hook the artifact installs.
-    assert reg.hook_filename == "spec-event-surfacer.py"
-    assert reg.event == "PostToolUse"
-    # Lifecycle axes must match the hook's so upgrade/doctor treat them as a pair.
-    assert sorted(reg.managed_profiles) == sorted(hook.managed_profiles)
-    assert sorted(reg.doctor_required_profiles) == sorted(hook.doctor_required_profiles)
+    for reg in (r for r in records if isinstance(r, SettingsHookRegistration)):
+        hook = next(
+            r
+            for r in records
+            if isinstance(r, FileArtifact) and r.class_ == "hook" and r.target_path.endswith("/" + reg.hook_filename)
+        )
+        assert set(reg.initial_profiles) <= set(hook.initial_profiles)
+        assert set(reg.managed_profiles) <= set(hook.managed_profiles)
+        assert set(reg.doctor_required_profiles) <= set(hook.doctor_required_profiles)
 
 
 # ---------------------------------------------------------------------------
@@ -508,22 +403,6 @@ def test_condition2_doctor_composite_uses_registry_ids(tmp_path, monkeypatch) ->
 # ---------------------------------------------------------------------------
 # load_managed_artifacts — profile query helper
 # ---------------------------------------------------------------------------
-
-
-def test_load_managed_artifacts_unions_three_axes() -> None:
-    """Loader returns records touching the profile in any lifecycle axis."""
-    dual_agent = load_managed_artifacts("dual-agent")
-    # dual-agent sees all 56 retained records:
-    # 16 hooks + 12 rules + 9 skills + 3 files + 12 settings + 4 gitignore.
-    assert len(dual_agent) == 43
-
-    local_only = load_managed_artifacts("local-only")
-    # local-only sees all 12 retained original hooks + rule.prime-builder + 3
-    # canonical-terminology rules + session-start-orientation + baseline-audit skill
-    # + 3 file-class records (Slice 3 + Slice 4 upgrade-rehearsal-recipe) = 21.
-    # The 5 new governance hooks are dual-agent-only, and the 3 new gitignore rows
-    # are dual-agent-only.
-    assert len(local_only) == 16
 
 
 def test_find_artifact_by_id_raises_on_unknown() -> None:

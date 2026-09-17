@@ -12,7 +12,6 @@ import argparse
 import json
 import re
 import sqlite3
-import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -20,9 +19,6 @@ from typing import Any
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_DB_PATH = PROJECT_ROOT / "groundtruth.db"
 DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
-SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
 
 TERMINAL_SPEC_STATUSES = {"implemented", "verified"}
 BRIDGE_TERMINAL_STATUSES = {"GO", "VERIFIED"}

@@ -29,16 +29,19 @@ def test_groundtruth_kb_tests_workflow_triggers_on_platform_paths() -> None:
         assert ".github/workflows/groundtruth-kb-tests.yml" in paths
 
 
-def test_groundtruth_kb_tests_workflow_runs_platform_pytest_lane() -> None:
+def test_groundtruth_kb_tests_workflow_runs_the_package_pytest_lane_after_harness_derivation() -> None:
     workflow = _workflow()
     job = workflow["jobs"]["platform-tests"]
     steps = job["steps"]
 
     install_step = next(step for step in steps if step.get("name") == "Install GroundTruth KB test dependencies")
+    derivation_step = next(step for step in steps if step.get("name") == "Canonical harness derivation")
     test_step = next(step for step in steps if step.get("name") == "Run GroundTruth KB platform tests")
 
     assert job["runs-on"] == "ubuntu-latest"
     assert test_step["working-directory"] == "groundtruth-kb"
-    assert "./groundtruth-kb[dev,search]" in install_step["run"]
-    assert "python -m pytest platform_tests/ -q --tb=short" in test_step["run"]
+    assert '"./groundtruth-kb[dev,search,web]"' in install_step["run"]
+    assert "python scripts/check_harness_parity.py --all --validate" in derivation_step["run"]
+    assert steps.index(derivation_step) < steps.index(test_step)
+    assert "python -m pytest tests/ -q --tb=short" in test_step["run"]
     assert "--junitxml=.pytest-results/groundtruth-kb-tests.xml" in test_step["run"]

@@ -279,7 +279,7 @@ def test_foreign_project_root_rejected(scoped_project: Path, tmp_path: Path, cli
 
 
 # ---------------------------------------------------------------------------
-# Boundary checker: config + summary-path no-raw-read guard
+# Boundary checker: scoped-service configuration
 # ---------------------------------------------------------------------------
 
 
@@ -289,7 +289,7 @@ def test_boundary_checker_live_repo_passes(checker_module) -> None:
     report = checker_module.run_checks(REPO_ROOT)
     assert report["status"] == "pass", report
     assert report["checks"]["config"]["allowed_read_operations"] == ["dashboard.summary.read"]
-    assert report["checks"]["no_raw_read_on_summary_path"]["sqlite_connect_findings"] == []
+    assert set(report["checks"]) == {"config"}
 
 
 def test_boundary_checker_detects_allowlist_drift(tmp_path: Path, checker_module) -> None:
@@ -307,45 +307,6 @@ def test_boundary_checker_detects_allowlist_drift(tmp_path: Path, checker_module
     report = checker_module.run_checks(tmp_path)
     assert report["status"] == "fail"
     assert any("allowed_read_operations" in err or "not supported" in err for err in report["errors"])
-
-
-def test_boundary_checker_detects_raw_sqlite_reader_on_summary_path(
-    tmp_path: Path, checker_module, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """If a raw groundtruth.db reader reappears on the summary path, the
-    checker must fail closed."""
-
-    (tmp_path / "groundtruth.toml").write_text(BASE_TOML, encoding="utf-8")
-    _populate_fixture_db(tmp_path / "groundtruth.db")
-    (tmp_path / "memory").mkdir()
-
-    poisoned = tmp_path / "poisoned_summary_module.py"
-    poisoned.write_text(
-        textwrap.dedent(
-            """
-            import sqlite3
-
-
-            def _database_metrics(project_root):
-                connection = sqlite3.connect(project_root / "groundtruth.db")
-                try:
-                    return connection.execute("SELECT 1").fetchone()
-                finally:
-                    connection.close()
-            """
-        ).strip()
-        + "\n",
-        encoding="utf-8",
-    )
-
-    monkeypatch.setattr(checker_module, "SUMMARY_PATH_FILE", poisoned)
-    report = checker_module.run_checks(tmp_path)
-    assert report["status"] == "fail"
-    assert any("raw groundtruth.db" in err for err in report["errors"])
-    findings = report["checks"]["no_raw_read_on_summary_path"]
-    # The error branch may replace the successful findings dict with an
-    # {"error": ...} entry; either way the error message names the guard.
-    assert "error" in findings or findings.get("sqlite_connect_findings")
 
 
 # ---------------------------------------------------------------------------

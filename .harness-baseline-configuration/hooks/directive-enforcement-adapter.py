@@ -1,60 +1,19 @@
 #!/usr/bin/env python3
-"""PreToolUse hook for directive enforcement (DIR-ROOT-BOUNDARY-001)."""
+"""PreToolUse adapter for checkout containment and command checks."""
 
-import datetime as _dt
-import hashlib
 import json
 import os
 import sys
 from pathlib import Path
 
-# Add GT-KB paths to sys.path so we can import groundtruth_kb
-for _parent in Path(__file__).resolve().parents:
-    if (_parent / "scripts" / "validate_directive_registry.py").is_file():
-        if str(_parent) not in sys.path:
-            sys.path.insert(0, str(_parent))
-        _gt_src = _parent / "groundtruth-kb" / "src"
-        if _gt_src.is_dir() and str(_gt_src) not in sys.path:
-            sys.path.insert(0, str(_gt_src))
-        break
-
-try:
-    from groundtruth_kb.enforcement import check_bash_command, check_path_boundary
-except ImportError:
-
-    def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
-        return True, ""
-
-    def check_bash_command(command: str, project_root: Path) -> tuple[bool, str]:
-        return True, ""
+from groundtruth_kb.enforcement import check_bash_command, check_path_boundary
 
 
 def _project_root_from_env() -> Path:
     return Path(os.environ.get("{{HARNESS_PROJECT_DIR_VAR}}") or os.getcwd()).resolve()
 
 
-def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
-    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
-    if not path.is_absolute():
-        path = _project_root_from_env() / path
-    record = {
-        "schema_version": 1,
-        "timestamp_utc": _dt.datetime.now(tz=_dt.UTC).isoformat().replace("+00:00", "Z"),
-        "gate": "directive-enforcement-adapter",
-        "pattern_id": pattern_id,
-        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
-        "reason": reason,
-    }
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
-
-
-def emit_deny(reason: str, *, pattern_id: str = "root-boundary", subject: str = "") -> None:
-    _record_gate_denial(pattern_id, subject or reason, reason)
+def emit_deny(reason: str) -> None:
     out = {
         "hookSpecificOutput": {
             "hookEventName": "PreToolUse",
@@ -83,7 +42,7 @@ def main() -> None:
 
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {})
-    cwd = payload.get("cwd", ".")
+    cwd = payload.get("cwd") or str(_project_root_from_env())
     project_root = Path(cwd).resolve()
 
     # Find the nearest groundtruth.toml to resolve canonical root
@@ -98,11 +57,7 @@ def main() -> None:
         if command:
             allowed, reason = check_bash_command(command, project_root)
             if not allowed:
-                emit_deny(
-                    f"Command blocked by directive: {reason}",
-                    pattern_id="root-boundary-command",
-                    subject=command,
-                )
+                emit_deny(f"Command blocked by directive: {reason}")
         emit_pass()
 
     # 2. Extract potential paths from tool_input
@@ -133,11 +88,7 @@ def main() -> None:
     for path_str in path_args:
         allowed, reason = check_path_boundary(path_str, project_root)
         if not allowed:
-            emit_deny(
-                f"Tool execution blocked: {reason}",
-                pattern_id="root-boundary-path",
-                subject=path_str,
-            )
+            emit_deny(f"Tool execution blocked: {reason}")
 
     emit_pass()
 

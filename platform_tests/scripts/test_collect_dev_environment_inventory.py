@@ -9,6 +9,9 @@ import types
 from datetime import UTC, datetime
 from pathlib import Path
 
+import pytest
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+
 SCRIPT_PATH = Path(__file__).resolve().parents[2] / "scripts" / "collect_dev_environment_inventory.py"
 
 
@@ -33,46 +36,18 @@ def _make_project(root: Path) -> None:
         '[project]\nproject_name = "Synthetic"\nprofile = "dual-agent"\nscaffold_version = "0.7.0rc1"\n',
         encoding="utf-8",
     )
-    (root / "harness-state").mkdir()
-    (root / "harness-state" / "harness-identities.json").write_text(
-        json.dumps({"harnesses": {"codex": {"id": "A"}, "claude": {"id": "B"}}}),
-        encoding="utf-8",
-    )
-    (root / "harness-state" / "role-assignments.json").write_text(
-        json.dumps(
-            {
-                "harnesses": {
-                    "A": {"harness_type": "codex", "role": "prime-builder"},
-                    "B": {"harness_type": "claude", "role": "loyal-opposition"},
-                }
-            }
-        ),
-        encoding="utf-8",
-    )
-    (root / ".codex" / "gtkb-hooks").mkdir(parents=True)
-    (root / ".codex" / "config.toml").write_text("[features]\nhooks = true\n", encoding="utf-8")
-    (root / ".codex" / "hooks.json").write_text(json.dumps({"hooks": {"SessionStart": []}}), encoding="utf-8")
-    (root / ".codex" / "gtkb-hooks" / "session_start_dispatch.py").write_text("# hook\n", encoding="utf-8")
-    (root / ".claude" / "rules").mkdir(parents=True)
-    (root / ".claude" / "rules" / "canonical-terminology.md").write_text("# terms\n", encoding="utf-8")
-    (root / ".claude" / "hooks").mkdir()
-    (root / ".claude" / "hooks" / "formal-artifact-approval-gate.py").write_text("# gate\n", encoding="utf-8")
-    (root / ".claude" / "hooks" / "credential-scan.py").write_text("# scan\n", encoding="utf-8")
-    (root / ".claude" / "settings.json").write_text(json.dumps({"hooks": {"SessionStart": []}}), encoding="utf-8")
     for skill in ["zeta", "alpha"]:
-        (root / ".claude" / "skills" / skill).mkdir(parents=True)
-        (root / ".claude" / "skills" / skill / "SKILL.md").write_text(f"# {skill}\n", encoding="utf-8")
-    (root / ".claude" / "commands").mkdir()
-    (root / ".claude" / "commands" / "registry.json").write_text(
-        json.dumps({"commands": {"check": {}}}),
-        encoding="utf-8",
-    )
+        folder = root / ".harness-baseline-configuration/skills" / skill
+        folder.mkdir(parents=True)
+        (folder / "SKILL.md").write_text(f"# {skill}\n", encoding="utf-8")
+    for path in ("rules/canonical-terminology.md", "hooks/credential-scan.py", "commands/check.md"):
+        target = root / ".harness-baseline-configuration" / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("# authored source\n", encoding="utf-8")
     (root / ".githooks").mkdir()
     (root / ".githooks" / "pre-commit").write_text("python -m groundtruth_kb secrets scan --staged\n", encoding="utf-8")
     (root / ".github" / "workflows").mkdir(parents=True)
     (root / ".github" / "workflows" / "python-tests.yml").write_text("name: tests\n", encoding="utf-8")
-    (root / "bridge").mkdir()
-    (root / "bridge" / "INDEX.md").write_text("# Bridge Index\n", encoding="utf-8")
 
 
 def _stub_toolchain(monkeypatch, module) -> None:
@@ -87,6 +62,15 @@ def _stub_toolchain(monkeypatch, module) -> None:
     }
     private = {"python": {**public["python"], "resolved_executable": "python", "raw_output": "Python 3.12.0"}}
     monkeypatch.setattr(module, "_toolchain_inventory", lambda: (public, private))
+    monkeypatch.setattr(
+        module,
+        "_native_harness_records",
+        lambda _root: [
+            {"id": "A", "harness_name": "codex", "harness_type": "codex", "status": "active", "version": 1},
+            {"id": "B", "harness_name": "claude", "harness_type": "claude", "status": "active", "version": 1},
+            {"id": "G", "harness_name": "goose", "harness_type": "goose-desktop", "status": "suspended", "version": 1},
+        ],
+    )
 
 
 def test_collector_writes_public_and_local_inventory(tmp_path, monkeypatch) -> None:
@@ -96,21 +80,24 @@ def test_collector_writes_public_and_local_inventory(tmp_path, monkeypatch) -> N
 
     result = module.write_inventory(
         tmp_path,
-        public_json=tmp_path / "docs" / "release" / "dev-environment-inventory.json",
-        public_markdown=tmp_path / "docs" / "release" / "dev-environment-inventory.md",
-        local_json=tmp_path / ".gtkb-state" / "dev-environment-inventory" / "local.json",
+        public_json=tmp_path / module.PUBLIC_JSON_RELATIVE_PATH,
+        public_markdown=tmp_path / module.PUBLIC_MARKDOWN_RELATIVE_PATH,
+        local_json=tmp_path / "explicit-local" / "local.json",
         generated_at="2026-05-06T00:00:00Z",
     )
 
-    public_path = tmp_path / "docs" / "release" / "dev-environment-inventory.json"
-    markdown_path = tmp_path / "docs" / "release" / "dev-environment-inventory.md"
-    local_path = tmp_path / ".gtkb-state" / "dev-environment-inventory" / "local.json"
+    public_path = tmp_path / module.PUBLIC_JSON_RELATIVE_PATH
+    markdown_path = tmp_path / module.PUBLIC_MARKDOWN_RELATIVE_PATH
+    local_path = tmp_path / "explicit-local" / "local.json"
     public = json.loads(public_path.read_text(encoding="utf-8"))
     assert public == result["public"]
     assert markdown_path.is_file()
     assert local_path.is_file()
     assert public["project"]["groundtruth_kb_package_version"] == "0.7.0rc1"
-    assert public["repo_configured_surfaces"]["skills"]["items"] == ["alpha", "zeta"]
+    assert public["repo_configured_surfaces"]["skills"]["items"] == [
+        ".harness-baseline-configuration/skills/alpha/SKILL.md",
+        ".harness-baseline-configuration/skills/zeta/SKILL.md",
+    ]
     assert not module.validate_public_inventory_payload(
         public,
         project_root=tmp_path,
@@ -143,7 +130,11 @@ def test_role_by_harness_matrix_has_all_required_rows_and_dimensions(tmp_path, m
     public, _private = module.collect_inventory(tmp_path, generated_at="2026-05-06T00:00:00Z")
     rows = {(row["harness"], row["role"]): row for row in public["role_by_harness_compatibility"]}
 
-    assert set(rows) == set(module.MATRIX_ROWS)
+    assert set(rows) == {
+        (name, role) for name in ("codex", "claude", "goose") for role in ("prime-builder", "loyal-opposition")
+    }
+    assert all(row["qualification"] == "unqualified" and "assignment" not in row for row in rows.values())
+    assert all(cap["status"] == "unavailable" for row in rows.values() for cap in row["capabilities"].values())
     for row in rows.values():
         assert set(module.CAPABILITY_DIMENSIONS) <= set(row["capabilities"])
         assert all(row["capabilities"][dimension]["evidence"] for dimension in module.CAPABILITY_DIMENSIONS)
@@ -158,7 +149,10 @@ def test_collector_output_is_deterministically_sorted(tmp_path, monkeypatch) -> 
     second, _ = module.collect_inventory(tmp_path, generated_at="2026-05-06T00:00:00Z")
 
     assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
-    assert first["repo_configured_surfaces"]["skills"]["items"] == ["alpha", "zeta"]
+    assert first["repo_configured_surfaces"]["skills"]["items"] == [
+        ".harness-baseline-configuration/skills/alpha/SKILL.md",
+        ".harness-baseline-configuration/skills/zeta/SKILL.md",
+    ]
 
 
 def test_public_validator_rejects_sensitive_values_absolute_paths_and_stale_inventory(tmp_path, monkeypatch) -> None:
@@ -293,3 +287,165 @@ def test_run_tool_version_public_evidence_is_stable_for_success_and_nonzero(monk
     assert failed_public["version"] == "unknown"
     assert failed_public["evidence"] == "gh --version"
     assert failed_private["returncode"] == 1
+
+
+def test_native_inventory_pages_exact_authority_and_ignores_private_role_fields(tmp_path, monkeypatch):
+    module = _load_module()
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\nauthority_url="http://127.0.0.1:65432"\n', encoding="utf-8"
+    )
+    calls = []
+    records = [
+        {
+            "id": name,
+            "harness_name": "codex",
+            "harness_type": "codex",
+            "version": 1,
+            "status": "suspended",
+            "role": "loyal-opposition",
+            "invocation_env": {"key": "private-value"},
+        }
+        for name in ("A", "Z")
+    ]
+
+    def request(client, method, path, *, query):
+        calls.append((client.url, method, path, query))
+        index = 0 if query["after"] is None else 1
+        return {"records": [records[index]], "next_after": "A" if index == 0 else None}
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    inventory = module._harness_inventory(tmp_path)
+    assert [row["id"] for row in inventory["installations"]] == ["A", "Z"]
+    assert "private-value" not in json.dumps(inventory) and "role" not in json.dumps(inventory)
+    assert [(call[0], call[1], call[2], call[3]["after"]) for call in calls] == [
+        ("http://127.0.0.1:65432", "GET", "/v1/harnesses", None),
+        ("http://127.0.0.1:65432", "GET", "/v1/harnesses", "A"),
+    ]
+    matrix = module._compatibility_matrix(inventory)
+    assert len(matrix) == 8  # Both installations and missing Claude/Goose, each in both role scenarios.
+    assert all(row["qualification"] == "unqualified" for row in matrix)
+
+
+@pytest.mark.parametrize(
+    "response", [[], {}, {"records": [{}], "next_after": None}, {"records": [], "next_after": "no-progress"}]
+)
+def test_invalid_native_inventory_response_cannot_become_a_partial_snapshot(tmp_path, monkeypatch, response):
+    module = _load_module()
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\nauthority_url="http://127.0.0.1:65432"\n', encoding="utf-8"
+    )
+    monkeypatch.setattr(AuthorityClient, "request", lambda *_args, **_kwargs: response)
+    with pytest.raises(module.InventoryError):
+        module._harness_inventory(tmp_path)
+
+
+def test_unavailable_authority_does_not_read_old_harness_state_or_write_output(tmp_path, monkeypatch, capsys):
+    module = _load_module()
+    _make_project(tmp_path)
+    config = tmp_path / "groundtruth.toml"
+    config.write_text('[groundtruth]\nauthority_url="http://127.0.0.1:65432"\n', encoding="utf-8")
+    legacy = tmp_path / "harness-state/harness-registry.json"
+    legacy.parent.mkdir()
+    legacy.write_text('{"harnesses":[{"id":"old","role":"prime-builder"}]}', encoding="utf-8")
+
+    def refuse(*_args, **_kwargs):
+        raise AuthorityClientError("authority_unavailable", "private diagnostic", details={"key": "private-value"})
+
+    monkeypatch.setattr(AuthorityClient, "request", refuse)
+    before = {str(path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+    assert module.main(["--project-root", str(tmp_path)]) == 1
+    output = capsys.readouterr().out
+    assert "native_harness_authority_unavailable" in output and "private" not in output
+    assert before == {str(path): path.read_bytes() for path in tmp_path.rglob("*") if path.is_file()}
+
+
+def test_missing_root_configuration_never_discovers_a_parent_authority(tmp_path, monkeypatch):
+    module = _load_module()
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\nauthority_url="http://127.0.0.1:65432"\n', encoding="utf-8"
+    )
+    child = tmp_path / "child"
+    child.mkdir()
+    monkeypatch.setattr(AuthorityClient, "request", lambda *_args, **_kwargs: pytest.fail("unexpected authority read"))
+    with pytest.raises(module.InventoryError, match="native_authority_not_configured"):
+        module._harness_inventory(child)
+
+
+def test_default_writer_emits_only_public_operational_outputs(tmp_path, monkeypatch):
+    module = _load_module()
+    _make_project(tmp_path)
+    _stub_toolchain(monkeypatch, module)
+    before = {path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*") if path.is_file()}
+    assert module.main(["--project-root", str(tmp_path)]) == 0
+    after = {path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*") if path.is_file()}
+    assert after - before == {
+        ".groundtruth/inventory/dev-environment-inventory.json",
+        ".groundtruth/inventory/dev-environment-inventory.md",
+    }
+
+
+@pytest.mark.parametrize(
+    "target",
+    [
+        ".gtkb-state/report.json",
+        "harness-state/report.json",
+        ".claude/report.json",
+        ".harness-baseline-configuration/report.json",
+    ],
+)
+def test_forbidden_output_is_refused_before_any_collection_or_write(tmp_path, monkeypatch, target):
+    module = _load_module()
+    monkeypatch.setattr(
+        module, "collect_inventory", lambda *_args, **_kwargs: pytest.fail("collection before path check")
+    )
+    with pytest.raises(module.InventoryError, match="invalid_inventory_output_path"):
+        module.write_inventory(
+            tmp_path,
+            public_json=tmp_path / "public.json",
+            public_markdown=tmp_path / "public.md",
+            local_json=tmp_path / target,
+        )
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize(
+    "defect", ["missing_primary", "missing_dimension", "invented_pass", "role_assignment", "old_schema"]
+)
+def test_validator_preserves_coverage_and_refuses_unmeasured_qualification(tmp_path, monkeypatch, defect):
+    module = _load_module()
+    _make_project(tmp_path)
+    _stub_toolchain(monkeypatch, module)
+    payload, _ = module.collect_inventory(tmp_path)
+    if defect == "missing_primary":
+        payload["role_by_harness_compatibility"] = [
+            row for row in payload["role_by_harness_compatibility"] if row["harness"] != "goose"
+        ]
+    elif defect == "missing_dimension":
+        del payload["role_by_harness_compatibility"][0]["capabilities"]["native_context_binding"]
+    elif defect == "invented_pass":
+        payload["role_by_harness_compatibility"][0]["capabilities"]["native_bridge_delivery"]["status"] = "verified"
+    elif defect == "role_assignment":
+        payload["harnesses"]["role_assignments"] = {"A": "prime-builder"}
+    else:
+        payload["schema_version"] = 1
+    assert module.validate_public_inventory_payload(payload, project_root=tmp_path)
+
+
+@pytest.mark.parametrize("section", ["redaction", "verification", "harnesses", "collector"])
+def test_malformed_nested_inventory_returns_invalid_diagnostics(tmp_path, monkeypatch, section):
+    module = _load_module()
+    _make_project(tmp_path)
+    _stub_toolchain(monkeypatch, module)
+    payload, _ = module.collect_inventory(tmp_path)
+    payload[section] = ["invalid"]
+    assert module.validate_public_inventory_payload(payload)
+
+
+@pytest.mark.parametrize("key", ["harness_id", "harness", "role"])
+def test_malformed_qualification_identity_returns_a_validation_error(tmp_path, monkeypatch, key):
+    module = _load_module()
+    _make_project(tmp_path)
+    _stub_toolchain(monkeypatch, module)
+    payload, _ = module.collect_inventory(tmp_path)
+    payload["role_by_harness_compatibility"][0][key] = ["invalid"]
+    assert module.validate_public_inventory_payload(payload)

@@ -51,7 +51,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -87,12 +86,6 @@ _SUPERSEDE_BARE_SLUG_RE = re.compile(
 _SCOPING_SUFFIX = "-scoping"
 
 
-def _ensure_groundtruth_importable(project_root: Path) -> None:
-    gt_src = project_root / "groundtruth-kb" / "src"
-    if gt_src.is_dir() and str(gt_src) not in sys.path:
-        sys.path.insert(0, str(gt_src))
-
-
 @dataclass
 class ThreadInfo:
     """All-status bridge-thread facts the backfill needs."""
@@ -111,7 +104,6 @@ def scan_all_threads(project_root: Path) -> dict[str, ThreadInfo]:
     GO/in-flight when its project is backfilled, and the v4 completion gate will
     simply stay paused for that project until the thread reaches VERIFIED.
     """
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
 
     threads: dict[str, ThreadInfo] = {}
@@ -211,7 +203,6 @@ class ProjectClassification:
 
 def discover(project_root: Path = PROJECT_ROOT) -> list[ProjectClassification]:
     """Classify every active-authorization project. Strictly read-only."""
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.db import KnowledgeDB
 
     # Reuse the v4 scanner primitives so classification stays parity-identical.
@@ -303,7 +294,6 @@ def apply_backfill(
     Returns the inserted link records + skipped (already-linked) records +
     the AMBIGUOUS projects surfaced for owner AUQ.
     """
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.db import KnowledgeDB
 
     classifications = discover(project_root)  # refresh-before-mutation

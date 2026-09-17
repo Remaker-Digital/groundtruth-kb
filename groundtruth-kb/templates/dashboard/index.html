@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GroundTruth-KB Dashboard</title>
+  <style>
+    :root {
+      --bg: #f6f8fa;
+      --surface: #fff;
+      --border: #d5dde3;
+      --fg: #102027;
+      --accent: #006b61;
+      --accent-bg: #103f3a;
+      --muted: #54636d;
+      --badge-fresh: #1a7f37;
+      --badge-stale: #9a6700;
+      --badge-expired: #b42318;
+      --code-bg: #edf1f4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #0d1117;
+        --surface: #161b22;
+        --border: #30363d;
+        --fg: #c9d1d9;
+        --accent: #2ea1a0;
+        --accent-bg: #0c2826;
+        --muted: #8b949e;
+        --badge-fresh: #3fb950;
+        --badge-stale: #d29922;
+        --badge-expired: #f85149;
+        --code-bg: #1c2128;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--fg);
+      background: var(--bg);
+      line-height: 1.5;
+    }
+    header {
+      background: var(--accent-bg);
+      color: #fff;
+      padding: 24px 32px;
+    }
+    header h1 { margin: 0 0 4px; font-size: 1.5rem; }
+    header p { margin: 0; opacity: 0.85; }
+    main {
+      max-width: 960px;
+      margin: 28px auto;
+      padding: 0 20px;
+      display: grid;
+      gap: 20px;
+    }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 20px 24px;
+    }
+    section h2 { margin: 0 0 12px; font-size: 1.1rem; }
+    .kpi-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 12px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+    .kpi-grid li {
+      padding: 12px 14px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+    }
+    .kpi-grid .label { font-size: 0.8rem; color: var(--muted); margin-bottom: 4px; }
+    .kpi-grid .value { font-size: 1.4rem; font-weight: 650; }
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 8px;
+    }
+    .btn {
+      display: inline-block;
+      padding: 8px 14px;
+      border-radius: 6px;
+      text-decoration: none;
+      font-weight: 600;
+      border: 1px solid var(--accent);
+      color: var(--accent);
+      background: transparent;
+    }
+    .btn.primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn:hover { opacity: 0.9; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+      vertical-align: middle;
+    }
+    .badge.fresh { background: var(--badge-fresh); }
+    .badge.stale { background: var(--badge-stale); }
+    .badge.expired { background: var(--badge-expired); }
+    code {
+      background: var(--code-bg);
+      border-radius: 4px;
+      padding: 2px 6px;
+      font-size: 0.9em;
+    }
+    #fallback, #snapshot-meta { color: var(--muted); font-size: 0.9rem; }
+    .hidden { display: none !important; }
+    .swimlane-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.9rem;
+    }
+    .swimlane-table th, .swimlane-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid var(--border);
+      text-align: left;
+    }
+    .swimlane-table th { color: var(--muted); font-weight: 600; }
+    .swimlane-status {
+      display: inline-block;
+      padding: 1px 7px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #fff;
+    }
+    .swimlane-status.closed { background: var(--muted); }
+    .swimlane-status.idle { background: var(--muted); }
+    .swimlane-status.prime { background: var(--badge-stale); }
+    .swimlane-status.lo { background: var(--accent); }
+    tr.swimlane-closed td { opacity: 0.65; }
+    #swimlane-summary { margin-bottom: 8px; color: var(--muted); font-size: 0.85rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>GroundTruth-KB Dashboard</h1>
+    <p>Static landing. The live Grafana dashboard is available locally when the refresh stack is running.</p>
+  </header>
+  <main>
+    <section aria-labelledby="snapshot-heading">
+      <h2 id="snapshot-heading">Latest Platform Observations <span id="age-badge" class="badge hidden" aria-live="polite"></span></h2>
+      <p id="snapshot-meta">Loading <code>dashboard-data.json</code>&hellip;</p>
+      <p class="hint">GT-KB platform totals. Record counts do not establish test execution or release readiness. Sources are read separately during the collection interval.</p>
+      <ul id="kpi-grid" class="kpi-grid" aria-live="polite"></ul>
+      <p id="fallback" class="hidden">Observations unavailable. Refresh the dashboard after restoring its data sources.</p>
+    </section>
+    <section aria-labelledby="swimlane-heading">
+      <h2 id="swimlane-heading">Bridge State Swimlane <span id="swimlane-updated" class="badge hidden" aria-live="polite"></span></h2>
+      <div id="swimlane-summary" role="status">Loading <code>bridge-swimlane.json</code>&hellip;</div>
+      <table id="swimlane-table" class="swimlane-table" aria-describedby="swimlane-heading">
+        <thead>
+          <tr>
+            <th scope="col">Attempt</th>
+            <th scope="col">Status</th>
+            <th scope="col">Version</th>
+            <th scope="col">Head age at observation</th>
+            <th scope="col">Coordination</th>
+            <th scope="col">Disposition</th>
+          </tr>
+        </thead>
+        <tbody id="swimlane-tbody"></tbody>
+      </table>
+      <p id="swimlane-fallback" class="hidden">Native bridge observation unavailable.</p>
+      <p class="hint">Eligibility does not dispatch work. A claim covers one next artifact. VERIFIED records review; committed disposition records project commit.</p>
+    </section>
+    <section aria-labelledby="live-heading">
+      <h2 id="live-heading">Open Live Dashboard</h2>
+      <p>The live Grafana dashboard provides full panel rendering, alerting, and drill-downs. It runs locally on <code>127.0.0.1:3000</code>.</p>
+      <div class="actions">
+        <a class="btn primary" href="http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard">Open live dashboard</a>
+        <a class="btn" href="/control">Open refresh control</a>
+      </div>
+    </section>
+    <section aria-labelledby="release-health-heading">
+      <h2 id="release-health-heading">Release Health</h2>
+      <p>These dashboard observations do not establish release acceptance. Unavailable signals remain unknown; use the current release procedure and its required tests for signoff.</p>
+      <p>Refresh the selected project's native observations and derived display:</p>
+      <pre><code>gt --config &lt;path-to-groundtruth.toml&gt; dashboard refresh --json</code></pre>
+    </section>
+    <section aria-labelledby="setup-heading">
+      <h2 id="setup-heading">Local Setup</h2>
+      <p>First-time setup (PowerShell):</p>
+      <pre><code>gt dashboard install</code></pre>
+      <p>Start the dashboard:</p>
+      <pre><code>gt dashboard start</code></pre>
+      <p>Stop the dashboard:</p>
+      <pre><code>gt dashboard stop</code></pre>
+    </section>
+  </main>
+  <script>
+    (function () {
+      var META_LABELS = {
+        backlog_active_items: "Open Backlog Items",
+        membase_open_work_items: "Native Open Work Items",
+        specification_current_total: "Active Formal Records",
+        pytest_file_count: "Tracked Test Files",
+        skill_template_count: "Baseline Skills",
+        rule_template_count: "Baseline Rules",
+        hook_template_count: "Baseline Hooks",
+        drift_changed_path_count: "Changed Git Paths",
+        contention_actionable_bridge_count: "Eligible Bridge Actions",
+        deliberation_archive_current_total: "Deliberation Archive",
+        regression_release_blocker_count: "Release Blockers",
+        tokens_consumed_before_user_input: "Startup Tokens"
+      };
+
+      function validKpiSnapshot(payload) {
+        if (!payload || Array.isArray(payload) || !payload.metrics || Array.isArray(payload.metrics)) return false;
+        if (payload.status !== "partial" && payload.status !== "unavailable") return false;
+        var keys = Object.keys(META_LABELS);
+        if (Object.keys(payload.metrics).length !== keys.length) return false;
+        var measured = 0;
+        for (var i = 0; i < keys.length; i++) {
+          var value = payload.metrics[keys[i]];
+          if (value === null) continue;
+          if (typeof value !== "number" || !Number.isFinite(value) || value < 0) return false;
+          measured++;
+        }
+        if (payload.status !== (measured ? "partial" : "unavailable")) return false;
+        if (!measured && payload.started_at === null && payload.generated_at === null) return true;
+        return [payload.started_at, payload.generated_at].every(function (value) {
+          return typeof value === "string" && /(?:Z|[+-]\d{2}:\d{2})$/.test(value) && Number.isFinite(Date.parse(value));
+        }) && Date.parse(payload.started_at) <= Date.parse(payload.generated_at);
+      }
+
+      function ageBadge(generatedAt) {
+        if (!generatedAt) return null;
+        var ts = Date.parse(generatedAt);
+        if (isNaN(ts)) return null;
+        var minutes = Math.floor((Date.now() - ts) / 60000);
+        var klass = "fresh";
+        if (minutes >= 60) klass = "expired";
+        else if (minutes >= 15) klass = "stale";
+        return { klass: klass, text: minutes + "m ago" + (klass === "expired" ? " (stale)" : "") };
+      }
+
+      function clearChildren(node) {
+        while (node.firstChild) node.removeChild(node.firstChild);
+      }
+
+      function appendKpi(grid, key, labelText, valueText) {
+        var li = document.createElement("li");
+        li.setAttribute("data-metric-key", key);
+        var label = document.createElement("div");
+        label.className = "label";
+        label.textContent = labelText;
+        var value = document.createElement("div");
+        value.className = "value";
+        value.textContent = valueText === null ? "Unavailable" : String(valueText);
+        li.appendChild(label);
+        li.appendChild(value);
+        grid.appendChild(li);
+      }
+
+      function render(payload) {
+        var grid = document.getElementById("kpi-grid");
+        var meta = document.getElementById("snapshot-meta");
+        var badge = document.getElementById("age-badge");
+        var fallback = document.getElementById("fallback");
+        clearChildren(grid);
+        badge.textContent = "";
+        badge.className = "badge hidden";
+        var valid = validKpiSnapshot(payload);
+        var generatedAt = valid ? payload.generated_at : null;
+        meta.textContent = generatedAt
+          ? "Collected from " + payload.started_at + " to " + generatedAt + "."
+          : "Platform observations unavailable.";
+        var badgeInfo = ageBadge(generatedAt);
+        if (badgeInfo) {
+          badge.className = "badge " + badgeInfo.klass;
+          badge.textContent = badgeInfo.text;
+        }
+        Object.keys(META_LABELS).forEach(function (key) {
+          appendKpi(grid, key, META_LABELS[key], valid ? payload.metrics[key] : null);
+        });
+        fallback.classList.toggle("hidden", valid && payload.status === "partial");
+      }
+
+      function statusKlass(thread) {
+        if (thread.disposition !== "active") return "closed";
+        if (thread.queue && thread.queue.role === "pb") return "prime";
+        if (thread.queue && thread.queue.role === "lo") return "lo";
+        return "idle";
+      }
+
+      function ageText(minutes) {
+        if (minutes === null || minutes === undefined) return "n/a";
+        if (minutes < 60) return minutes + "m";
+        var hours = Math.floor(minutes / 60);
+        if (hours < 24) return hours + "h " + (minutes % 60) + "m";
+        var days = Math.floor(hours / 24);
+        return days + "d " + (hours % 24) + "h";
+      }
+
+      function appendSwimlaneRow(tbody, thread) {
+        var tr = document.createElement("tr");
+        if (thread.disposition !== "active") tr.classList.add("swimlane-closed");
+        var threadCell = document.createElement("td");
+        threadCell.textContent = thread.document;
+        var statusCell = document.createElement("td");
+        var statusBadge = document.createElement("span");
+        statusBadge.className = "swimlane-status " + statusKlass(thread);
+        statusBadge.textContent = thread.latest_status || "Unfiled";
+        statusCell.appendChild(statusBadge);
+        var versionCell = document.createElement("td");
+        versionCell.textContent = thread.latest_version === 0 ? "Unfiled" : "v" + thread.latest_version;
+        var ageCell = document.createElement("td");
+        ageCell.textContent = ageText(thread.age_in_state_minutes);
+        tr.appendChild(threadCell);
+        tr.appendChild(statusCell);
+        tr.appendChild(versionCell);
+        tr.appendChild(ageCell);
+        var coordination = document.createElement("td");
+        if (thread.next_artifact_claim) {
+          coordination.textContent = "Next artifact claimed: v" + thread.next_artifact_claim.next_version
+            + " " + thread.next_artifact_claim.intended_status;
+        } else if (thread.queue) {
+          coordination.textContent = thread.queue.state + " " + thread.queue.role.toUpperCase();
+        } else {
+          coordination.textContent = "No queued action";
+        }
+        var disposition = document.createElement("td");
+        disposition.textContent = thread.disposition + (thread.terminal_commit ? " " + thread.terminal_commit.slice(0, 12) : "");
+        tr.appendChild(coordination);
+        tr.appendChild(disposition);
+        tbody.appendChild(tr);
+      }
+
+      function validSwimlane(payload) {
+        var counts = ["thread_count", "active_count", "closed_count", "eligible_pb_count",
+          "eligible_lo_count", "blocked_count", "active_claim_count", "unfiled_count"];
+        if (!payload || payload.status !== "observed" || !Array.isArray(payload.threads) || !payload.summary
+          || typeof payload.observed_at !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(payload.observed_at)
+          || !Number.isFinite(Date.parse(payload.observed_at))) return false;
+        if (!counts.every(function (key) { return Number.isInteger(payload.summary[key]) && payload.summary[key] >= 0; })
+          || payload.summary.thread_count !== payload.threads.length) return false;
+        return payload.threads.every(function (thread) {
+          if (!thread || typeof thread.document !== "string" || !thread.document
+            || !Number.isInteger(thread.latest_version) || thread.latest_version < 0
+            || !(thread.latest_status === null || typeof thread.latest_status === "string")
+            || ["active", "committed", "withdrawn", "superseded", "abandoned"].indexOf(thread.disposition) < 0
+            || !(thread.terminal_commit === null || typeof thread.terminal_commit === "string")
+            || !(thread.age_in_state_minutes === null || (Number.isInteger(thread.age_in_state_minutes) && thread.age_in_state_minutes >= 0))) return false;
+          var queue = thread.queue;
+          if (queue !== null && (!queue || ["pb", "lo"].indexOf(queue.role) < 0
+            || ["eligible", "blocked"].indexOf(queue.state) < 0)) return false;
+          var claim = thread.next_artifact_claim;
+          return claim === null || (claim && Number.isInteger(claim.next_version)
+            && claim.next_version > thread.latest_version && typeof claim.intended_status === "string");
+        });
+      }
+
+      function renderSwimlane(payload) {
+        var summary = document.getElementById("swimlane-summary");
+        var tbody = document.getElementById("swimlane-tbody");
+        var fallback = document.getElementById("swimlane-fallback");
+        var updatedBadge = document.getElementById("swimlane-updated");
+        if (!summary || !tbody || !fallback) return;
+        clearChildren(tbody);
+
+        if (updatedBadge) updatedBadge.classList.add("hidden");
+        if (!validSwimlane(payload)) {
+          summary.textContent = "Native bridge observation unavailable.";
+          fallback.textContent = "Restore the native service and refresh. An unavailable observation is not an empty queue.";
+          fallback.classList.remove("hidden");
+          return;
+        }
+        var s = payload.summary;
+        summary.textContent = s.thread_count + " attempts — active " + s.active_count
+          + ", eligible PB " + s.eligible_pb_count + ", eligible LO " + s.eligible_lo_count
+          + ", blocked " + s.blocked_count + ", next-artifact claims " + s.active_claim_count
+          + ", unfiled " + s.unfiled_count + ", closed " + s.closed_count;
+        if (payload.observed_at && updatedBadge) {
+          var info = ageBadge(payload.observed_at);
+          if (info) {
+            updatedBadge.className = "badge " + info.klass;
+            updatedBadge.textContent = "observation " + info.text;
+            updatedBadge.classList.remove("hidden");
+          }
+        }
+        if (payload.threads.length === 0) {
+          fallback.textContent = "No attempts in this native observation.";
+          fallback.classList.remove("hidden");
+          return;
+        }
+        fallback.classList.add("hidden");
+        for (var i = 0; i < payload.threads.length; i++) {
+          appendSwimlaneRow(tbody, payload.threads[i]);
+        }
+      }
+
+      fetch("dashboard-data.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (payload) { render(payload); });
+
+      fetch("bridge-swimlane.json", { cache: "no-store" })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .catch(function () { return null; })
+        .then(function (payload) { renderSwimlane(payload); });
+    })();
+  </script>
+</body>
+</html>

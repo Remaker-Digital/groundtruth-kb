@@ -21,6 +21,7 @@ import sqlite3
 from pathlib import Path
 
 import pytest
+from groundtruth_kb import get_templates_dir
 
 try:  # PyYAML is a project dep via pytest plugins; import lazily so the test
     # surface gives a clear error if it isn't installed.
@@ -28,11 +29,11 @@ try:  # PyYAML is a project dep via pytest plugins; import lazily so the test
 except ImportError as exc:  # pragma: no cover - surface install hint
     pytest.skip(f"PyYAML required for alert YAML validation: {exc}", allow_module_level=True)
 
-from scripts.gtkb_dashboard.refresh_dashboard_db import refresh_database
+from groundtruth_kb.dashboard import refresh_database
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-ALERTING_DIR = REPO_ROOT / "docs" / "gtkb-dashboard" / "grafana" / "provisioning" / "alerting"
-SCHEMA_SQL = REPO_ROOT / "scripts" / "gtkb_dashboard" / "schema.sql"
+ALERTING_DIR = get_templates_dir() / "dashboard/alerting"
+SCHEMA_SQL = get_templates_dir() / "dashboard/schema.sql"
 
 # Exact metric_key literals Codex mandated (GO -006 condition 2). Alias drift
 # back to the rejected names would be caught by these equality assertions.

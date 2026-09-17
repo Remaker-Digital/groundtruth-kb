@@ -77,30 +77,28 @@ pip install "groundtruth-kb[web]"
 pip install "groundtruth-kb[dev]"
 ```
 
-### 2. Bootstrap a desktop-ready project
+### 2. Initialize the application under its host
+
+Register the application with the GT-KB host, then create its files with the
+single native initializer:
 
 ```bash
-gt bootstrap-desktop my-prototype \
+gt --config <host>/groundtruth.toml application register my-prototype --host-root <host>
+gt --config <host>/groundtruth.toml project init my-prototype \
+  --project-id PROJECT-my-prototype \
+  --host-root <host> \
   --owner "Acme Labs" \
-  --project-type "AI Service Prototype" \
-  --init-git
+  --profile local-only \
+  --harness claude
 ```
 
-This creates:
-
-- `groundtruth.toml`
-- `groundtruth.db`
-- `CLAUDE.md`
-- `MEMORY.md`
-- `BRIDGE-INVENTORY.md`
-- `.claude/hooks/`
-- `.claude/rules/`
-- `.github/workflows/` from the reference CI templates
-
-The resulting layout follows ADR-0001: Three-Tier Memory Architecture — `groundtruth.db` is MemBase; `MEMORY.md` is the operational notepad.
-
-It also seeds MemBase with the standard governance specs plus
-the example domain records.
+This creates the profile's files inside the registered application root:
+`groundtruth.toml` pointing at the host authority, the harness configuration
+projected from the host baseline (`.claude/`), the profile-tiered
+`.github/workflows/`, and the application's artifact-boundary registry. No
+local database is created: specifications, tests and work items live in the
+host's PostgreSQL authority, and `--spec-scaffold minimal|full` writes the
+inferred starter specifications there. Nothing is committed.
 
 ### 3. Verify the environment
 
@@ -137,14 +135,13 @@ Before the first real session:
 
 ## What is automated vs manual
 
-### Automated by `gt bootstrap-desktop`
+### Automated by `gt project init`
 
-- GroundTruth project initialization
-- MemBase creation
-- template copy for rules, memory, hooks, and bridge inventory
-- CI workflow copy
-- governance/example seed data
-- optional `git init`
+- application file initialization for the selected profile
+- harness configuration projected from the host baseline (`--harness`)
+- CI workflow copy (profile-tiered; `--no-include-ci` to skip)
+- inferred starter specifications in the host authority (`--spec-scaffold`)
+- the current core-specification intake question, read after creation
 
 ### Still manual
 
@@ -160,7 +157,7 @@ Use this sequence for a client workshop or kickoff:
 
 1. Install Python, Git, and GroundTruth.
 2. Verify the client has GitHub access to the repo.
-3. Run `gt bootstrap-desktop ...`.
+3. Register the application and run `gt project init ...`.
 4. Generate the dashboard with `gt dashboard init`.
 5. Open the scaffolded project and review `CLAUDE.md`, `MEMORY.md`, and `BRIDGE-INVENTORY.md`.
 6. Create the first spec and linked test.

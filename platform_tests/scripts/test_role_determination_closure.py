@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
-import sqlite3
+import os
 from pathlib import Path
 
+import pytest
+from groundtruth_kb.authority_client import AuthorityClient
+
 ROOT = Path(__file__).resolve().parents[2]
-DB_PATH = ROOT / "groundtruth.db"
 OPERATING_ROLE = ROOT / ".harness-baseline-configuration" / "rules" / "operating-role.md"
 CLAUDE_MD = ROOT / "CLAUDE.md"
 
@@ -18,14 +20,16 @@ CONTRADICTING_SPEC_IDS = {
 
 
 def _current_specs() -> dict[str, tuple[int, str]]:
-    uri = f"file:{DB_PATH.resolve().as_posix()}?mode=ro"
-    with sqlite3.connect(uri, uri=True) as connection:
-        rows = connection.execute(
-            "SELECT id, version, status FROM current_specifications "
-            f"WHERE id IN ({','.join('?' for _ in CONTRADICTING_SPEC_IDS)})",
-            tuple(sorted(CONTRADICTING_SPEC_IDS)),
-        ).fetchall()
-    return {spec_id: (version, status) for spec_id, version, status in rows}
+    """Current versions and statuses from the explicitly selected native authority; no local store is read."""
+    url = os.environ.get("GTKB_FORMAL_TEST_AUTHORITY_URL")
+    if not url:
+        pytest.fail("Set GTKB_FORMAL_TEST_AUTHORITY_URL explicitly for current formal-corpus tests")
+    client = AuthorityClient(url)
+    rows = {}
+    for spec_id in sorted(CONTRADICTING_SPEC_IDS):
+        record = client.request("GET", f"/v1/specifications/{spec_id}")
+        rows[record["id"]] = (record["version"], record["status"])
+    return rows
 
 
 def test_contradicting_formal_records_are_no_longer_active() -> None:

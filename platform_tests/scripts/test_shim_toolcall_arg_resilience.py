@@ -54,7 +54,6 @@ def _cloud_profile() -> cloud_base.AdopterProfile:
         routing_config_path=Path(".api-harness") / "routing.toml",
         dialect=cloud_base.DIALECT_OPENAI_CHAT,
         hook_tier=cloud_base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
-        publish_bridge_verdict_tool=True,
         extra_headers={},
     )
 
@@ -131,8 +130,17 @@ def _ollama_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".api-harness").mkdir()
-    (root / ".api-harness" / "routing.toml").write_text(
+    (root / ".api-harness" / "ollama" / "hooks").mkdir(parents=True)
+    (root / ".api-harness" / "ollama" / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
+    for guard in {
+        *ollama.BRIDGE_WRITE_GUARDS,
+        *ollama.BRIDGE_EDIT_GUARDS,
+        *ollama.WRITE_EDIT_GUARDS,
+        *ollama.BASH_GUARDS,
+    }:
+        (root / guard).parent.mkdir(parents=True, exist_ok=True)
+        (root / guard).write_text("print('{}')\n", encoding="utf-8")
+    (root / ".api-harness" / "ollama" / "routing.toml").write_text(
         "schema_version = 1\n"
         "[models.fixture-model]\n"
         'model_id = "fixture:latest"\n'

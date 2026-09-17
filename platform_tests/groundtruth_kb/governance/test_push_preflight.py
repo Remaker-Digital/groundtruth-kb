@@ -3,15 +3,16 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb import cli  # noqa: E402
 from groundtruth_kb.governance import push_preflight  # noqa: E402
@@ -149,3 +150,130 @@ def test_windows_pre_push_wrappers_delegate_to_push_preflight_and_prefer_project
     for direct_script in ("scan_secrets.py", "groundtruth_kb secrets scan"):
         assert direct_script not in cmd_wrapper
         assert direct_script not in ps1_wrapper
+
+
+@pytest.mark.parametrize(
+    "scan_result,status,exit_code", [(0, "passed", 0), (5, "failed", 1), ("timeout", "inconclusive", 1)]
+)
+@pytest.mark.parametrize("json_output", [False, True])
+@pytest.mark.parametrize("evidence_flag", ["--evidence-out", "--evidence-file"])
+@pytest.mark.parametrize("with_authority", [False, True])
+def test_preflight_route_preserves_scan_boundary_and_evidence(
+    monkeypatch, tmp_path, scan_result, status, exit_code, json_output, evidence_flag, with_authority
+):
+    from groundtruth_kb.authority_client import AuthorityClient
+
+    selected = tmp_path / "selected"
+    caller = tmp_path / "caller"
+    selected.mkdir()
+    caller.mkdir()
+    config = selected / "groundtruth.toml"
+    config.write_text(
+        '[groundtruth]\nproject_root="."\n' + ('authority_url="http://127.0.0.1:1"\n' if with_authority else ""),
+        encoding="utf-8",
+    )
+    sentinel = caller / "groundtruth.db"
+    sentinel.write_bytes(b"foreign database sentinel")
+    monkeypatch.chdir(caller)
+    for key in ["GT_PROJECT_ROOT", "GT_DB_PATH", "GT_AUTHORITY_URL"]:
+        monkeypatch.delenv(key, raising=False)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A local push diagnostic must not access an authority or database")
+
+    monkeypatch.setattr(AuthorityClient, "request", forbidden)
+    monkeypatch.setattr("sqlite3.connect", forbidden)
+    monkeypatch.setattr("groundtruth_kb.postgres_kernel.PostgresKernel._connect", forbidden)
+    calls = []
+
+    def scan(command, **kwargs):
+        calls.append((list(command), kwargs))
+        if scan_result == "timeout":
+            raise subprocess.TimeoutExpired(command, kwargs["timeout"])
+        return _completed(list(command), returncode=scan_result, stdout="redacted fixture result\n")
+
+    monkeypatch.setattr(push_preflight.subprocess, "run", scan)
+    destination = caller / "evidence" / "result.json"
+    args = [
+        "--config",
+        str(config),
+        "push",
+        "preflight",
+        "--python-bin",
+        "selected-python",
+        evidence_flag,
+        str(destination),
+    ]
+    if json_output:
+        args.append("--json")
+    result = CliRunner().invoke(cli.main, args, input="refs/heads/main new-sha refs/heads/main old-sha\n")
+    assert result.exit_code == exit_code, result.output
+    assert len(calls) == 1
+    command, kwargs = calls[0]
+    assert command == [
+        "selected-python",
+        "-m",
+        "groundtruth_kb",
+        "secrets",
+        "scan",
+        "--range",
+        "old-sha..new-sha",
+        "--redacted",
+        "--fail-on",
+        "verified-provider",
+    ]
+    assert kwargs["cwd"] == selected and kwargs["check"] is False
+    packet = json.loads(destination.read_text(encoding="utf-8"))
+    assert packet["status"] == status
+    assert packet["checks"][0]["evidence"]["range"] == "old-sha..new-sha"
+    if json_output:
+        assert json.loads(result.output) == packet
+    else:
+        assert status in result.output.lower()
+        assert "pre-push-ref-1" in result.output
+    assert sentinel.read_bytes() == b"foreign database sentinel"
+    assert not (selected / "groundtruth.db").exists()
+
+
+@pytest.mark.parametrize("module", ["groundtruth_kb", "groundtruth_kb.cli"])
+@pytest.mark.parametrize(
+    "stdin,status,exit_code",
+    [
+        ("", "passed", 0),
+        ("refs/heads/old " + "0" * 40 + " refs/heads/old " + "b" * 40 + "\n", "passed", 0),
+        ("malformed ref tuple\n", "failed", 1),
+    ],
+)
+def test_preflight_cold_cli_entry_preserves_foreign_caller(tmp_path, module, stdin, status, exit_code):
+    import groundtruth_kb
+
+    selected = tmp_path / "selected"
+    caller = tmp_path / "caller"
+    selected.mkdir()
+    caller.mkdir()
+    config = selected / "groundtruth.toml"
+    config.write_text('[groundtruth]\nproject_root="."\nauthority_url="http://127.0.0.1:1"\n', encoding="utf-8")
+    sentinel = caller / "groundtruth.db"
+    sentinel.write_bytes(b"untouched foreign bytes")
+    before = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    env = dict(os.environ, PYTHONIOENCODING="utf-8", PYTHONDONTWRITEBYTECODE="1")
+    for key in list(env):
+        if key.startswith(("GT_", "GTKB_", "PG", "GIT_")):
+            env.pop(key)
+    env["PYTHONPATH"] = str(Path(groundtruth_kb.__file__).resolve().parent.parent)
+    result = subprocess.run(
+        [sys.executable, "-P", "-m", module, "--config", str(config), "push", "preflight", "--json"],
+        cwd=caller,
+        env=env,
+        input=stdin,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=False,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    assert result.returncode == exit_code, result.stdout + result.stderr
+    assert json.loads(result.stdout)["status"] == status
+    after = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert after == before

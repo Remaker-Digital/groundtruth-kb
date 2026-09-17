@@ -1,36 +1,21 @@
-"""Deterministic SPEC-2098 Deliberation Archive coverage for WI-3216.
+"""Legacy data behavior retained while bridge-content archival is removed.
 
-Binds the live ``KnowledgeDB`` Deliberation Archive contract to ``SPEC-2098``:
-structured storage, the closed source-type set, raw-hash / redacted-content
-behavior, source-ref idempotence, multi-link lookup, the always-on SQLite LIKE
-search-fallback contract, ChromaDB chunk/metadata indexing (via a deterministic
-stub collection, no live ChromaDB required), and bridge-thread harvest
-identifier extraction.
-
-This is the WI-3216 ``test_addition`` evidence artifact authorized by
-``bridge/agent-red-wi3216-deliberation-archive-coverage-002.md`` (Loyal
-Opposition GO) under
-``PAUTH-PROJECT-AGENT-RED-TEST-COVERAGE-GAPS-...-BOUNDED-IMPLEMENTATION-2026-06-23``
-/ ``DELIB-20265586``. It adds executable coverage over the already-implemented
-platform behavior in ``groundtruth_kb.db`` and
-``scripts/harvest_session_deliberations.py``; it changes no production source.
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+These tests exercise the legacy KnowledgeDB representation, redaction, search,
+indexing and existing data relationships in disposable fixtures. They do not
+establish that the legacy database is current authority or authorize new bridge,
+owner-conversation or session archival. Current canonical harvest and native
+recovery are qualified separately. Historical source-type rows remain readable;
+removing a producer does not purge old data or retire independent search duties.
 """
 
 from __future__ import annotations
 
 import hashlib
-import importlib.util
-import sys
 from pathlib import Path
 from typing import Any
 
 import pytest
 from groundtruth_kb.db import KnowledgeDB
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-HARVEST_SCRIPT = REPO_ROOT / "scripts" / "harvest_session_deliberations.py"
 
 # Source types of the closed SPEC-2098 set (groundtruth_kb.db.insert_deliberation).
 SOURCE_TYPES = (
@@ -43,26 +28,11 @@ SOURCE_TYPES = (
 )
 
 
-def _load_harvest_module() -> Any:
-    """Load ``scripts/harvest_session_deliberations.py`` as an importable module.
-
-    Mirrors the loader precedent in
-    ``platform_tests/scripts/test_harvest_session_thread_level.py`` so the
-    harvest helpers can be exercised without invoking the CLI ``main()``.
-    """
-    spec = importlib.util.spec_from_file_location("harvest_session_deliberations_spec2098", HARVEST_SCRIPT)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
-    return module
-
-
 @pytest.fixture()
 def kb(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> KnowledgeDB:
     """Temp ``KnowledgeDB`` with semantic indexing disabled by default.
 
-    Disabling ``HAS_CHROMADB`` keeps ``insert_deliberation`` on the canonical
+    Disabling ``HAS_CHROMADB`` keeps ``insert_deliberation`` on the legacy
     SQLite path (no embedding-model load), so the structural-contract tests are
     fast and deterministic. The ChromaDB-indexing test re-enables a stub
     collection explicitly via ``_get_chroma_collection``.
@@ -334,52 +304,3 @@ def test_chroma_index_redacted_versioned_chunks_and_stale_delete(
     )
     assert {"delib_id": "DELIB-0001"} in stub.deleted_where
     assert any(cid.startswith("DELIB-0001::v2::chunk-") for cid in stub.added[-1]["ids"])
-
-
-def test_bridge_thread_harvest_extraction_and_idempotence(kb: KnowledgeDB) -> None:
-    """SPEC-DA-HARVEST-INCLUSION: the harvest building blocks extract SPEC-2098 /
-    WI-3216 identifiers from bridge content and route them to an idempotent
-    ``bridge_thread`` deliberation source.
-    """
-    harvest = _load_harvest_module()
-    bridge_content = (
-        "# Implementation Proposal - WI-3216 Deliberation Archive Coverage\n"
-        "Document: agent-red-wi3216-deliberation-archive-coverage\n"
-        "Adds deterministic coverage for SPEC-2098 against the live archive,\n"
-        "carrying SPEC-1649 forward and resolving WI-3216.\n"
-    )
-    spec_ids = harvest.ordered_unique(harvest.SPEC_RE, bridge_content)
-    wi_ids = harvest.ordered_unique(harvest.WI_RE, bridge_content)
-    assert "SPEC-2098" in spec_ids
-    assert "WI-3216" in wi_ids
-
-    source_ref = "bridge:agent-red-wi3216-deliberation-archive-coverage"
-    first = kb.upsert_deliberation_source(
-        source_type="bridge_thread",
-        source_ref=source_ref,
-        content=bridge_content,
-        title=harvest.extract_title(bridge_content),
-        summary=harvest.extract_summary(bridge_content),
-        changed_by="test",
-        change_reason="harvest bridge thread",
-        spec_id=spec_ids[0],
-        work_item_id=wi_ids[0],
-    )
-    assert first is not None
-    assert first["source_type"] == "bridge_thread"
-    assert first["spec_id"] == "SPEC-2098"
-    assert first["work_item_id"] == "WI-3216"
-
-    repeat = kb.upsert_deliberation_source(
-        source_type="bridge_thread",
-        source_ref=source_ref,
-        content=bridge_content,
-        title=harvest.extract_title(bridge_content),
-        summary=harvest.extract_summary(bridge_content),
-        changed_by="test",
-        change_reason="harvest bridge thread repeat",
-        spec_id=spec_ids[0],
-        work_item_id=wi_ids[0],
-    )
-    assert repeat is not None
-    assert repeat["id"] == first["id"]

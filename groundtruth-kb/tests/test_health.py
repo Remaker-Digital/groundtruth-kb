@@ -237,30 +237,3 @@ class TestF7Regressions:
         assert latest_history[0]["session_id"] == "S2"
 
     # R2. gt health trends shows per-snapshot deltas
-    def test_gt_health_trends_shows_deltas(self, db, tmp_path):
-        """`gt health trends` must print delta/trend output, not just snapshot dumps."""
-        _add_spec(db, "SPEC-001")
-        db.capture_session_snapshot("S1")
-        _add_spec(db, "SPEC-002")
-        db.capture_session_snapshot("S2")
-
-        # Build a minimal groundtruth.toml pointing at the test DB
-        toml_path = tmp_path / "groundtruth.toml"
-        toml_path.write_text(
-            f'[groundtruth]\ndb_path = "{(tmp_path / "test.db").as_posix()}"\n',
-            encoding="utf-8",
-        )
-
-        runner = CliRunner()
-        result = runner.invoke(
-            cli_main,
-            ["--config", str(toml_path), "health", "trends"],
-        )
-        assert result.exit_code == 0, result.output
-        # Must show at least one delta section (either "Deltas vs previous" or "no prior")
-        assert (
-            "Deltas vs previous snapshot" in result.output
-            or "no prior snapshot" in result.output
-            or "no metric changes" in result.output
-        ), result.output
-        assert "Health trends" in result.output

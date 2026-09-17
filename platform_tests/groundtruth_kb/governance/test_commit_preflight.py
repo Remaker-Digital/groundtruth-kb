@@ -4,14 +4,12 @@ from __future__ import annotations
 
 import json
 import subprocess
-import sys
 from pathlib import Path
 from types import SimpleNamespace
 
 from click.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb import cli  # noqa: E402
 from groundtruth_kb.governance import commit_preflight  # noqa: E402

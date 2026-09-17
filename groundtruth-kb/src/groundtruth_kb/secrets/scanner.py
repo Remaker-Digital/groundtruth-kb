@@ -349,9 +349,9 @@ def scan_range(
 
     blob_paths: dict[str, list[str]] = {}
     for relative_posix in eligible_paths:
-        blob_id = path_to_blob.get(relative_posix)
-        if blob_id is not None:
-            blob_paths.setdefault(blob_id, []).append(relative_posix)
+        head_blob_id = path_to_blob.get(relative_posix)
+        if head_blob_id is not None:
+            blob_paths.setdefault(head_blob_id, []).append(relative_posix)
 
     findings_by_path: dict[str, list[Finding]] = {}
     seen_blob_ids: set[str] = set()

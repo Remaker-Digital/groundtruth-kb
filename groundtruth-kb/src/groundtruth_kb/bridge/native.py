@@ -13,14 +13,14 @@ import subprocess
 import unicodedata
 from datetime import UTC, date, datetime
 from pathlib import Path, PurePosixPath
-from typing import Any, Literal
+from typing import Any, Literal, overload
 from uuid import uuid4
 
 from psycopg import sql
 from psycopg.types.json import Jsonb
 from pydantic import Field
 
-from groundtruth_kb.bridge.taxonomy import BridgeKind
+from groundtruth_kb.bridge.taxonomy import BRIDGE_KIND_BY_STATUS
 from groundtruth_kb.bridge.vocabulary import (
     CANONICAL_STATUSES,
     LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
@@ -32,6 +32,7 @@ from groundtruth_kb.bridge.vocabulary import (
     TRANSITIONS,
 )
 from groundtruth_kb.governance.credential_patterns import BASH_EXTRAS, CREDENTIAL_PATTERNS
+from groundtruth_kb.isolation.registry_check import ApplicationRegistryError, resolve_project_repository
 from groundtruth_kb.native_authority import (
     Identifier,
     Mutation,
@@ -58,6 +59,7 @@ from groundtruth_kb.session.worktree import (
     materialize_context_worktree,
     project_worktree,
     publish_context_work,
+    worktree_path,
 )
 
 ROLE_NAMES = {"pb": "prime-builder", "lo": "loyal-opposition"}
@@ -229,10 +231,14 @@ def parse_authored_message(content: str) -> dict[str, Any]:
         )
     if metadata["author_model"].casefold() in {"unknown", "<unknown>", "[unknown]", "tbd", "todo", "n/a", "none"}:
         _error("invalid_bridge_header", "author_model must identify the actual model, not a placeholder")
-    if metadata["bridge_kind"] not in {kind.value for kind in BridgeKind}:
-        _error("invalid_bridge_header", "bridge_kind must use the current canonical taxonomy")
-    if status == "ADVISORY" and metadata["bridge_kind"] != BridgeKind.GOVERNANCE_ADVISORY.value:
-        _error("invalid_bridge_header", "ADVISORY requires governance_advisory")
+    expected_kind = BRIDGE_KIND_BY_STATUS[status].value
+    if metadata["bridge_kind"] != expected_kind:
+        _error(
+            "invalid_bridge_header",
+            f"{status} requires bridge_kind: {expected_kind}",
+            status=status,
+            expected_bridge_kind=expected_kind,
+        )
     retired = {"target_role", "project_authorization", "pauth", "receiver_kind", "spec_ids"} & metadata.keys()
     if retired:
         _error("invalid_bridge_header", "The header contains retired fields", fields=sorted(retired))
@@ -256,7 +262,8 @@ def parse_authored_message(content: str) -> dict[str, Any]:
             _error("invalid_bridge_header", "A non-dispatchable message has no init, activity or recipient role")
     else:
         if (
-            init_lines != [f"::init gtkb {role}"]
+            role is None
+            or init_lines not in ([f"::init gtkb {role}"], [f"::init application {role}"])
             or len(open_lines) != 1
             or open_lines[0] not in {f"::open {activity}" for activity in ACTIVITIES}
             or init_lines[0] not in nonblank[:3]
@@ -264,10 +271,13 @@ def parse_authored_message(content: str) -> dict[str, Any]:
             or metadata.get("recipient_role") != ROLE_NAMES[role]
         ):
             _error("invalid_bridge_header", "The authored envelope and recipient must name the next responder")
-    result: dict[str, Any] = {"status": status, "version": version, "metadata": metadata}
+    result: dict[str, Any] = {
+        "status": status,
+        "version": version,
+        "metadata": metadata,
+        "subject": init_lines[0].split()[1] if init_lines else None,
+    }
     if status in {"NEW", "REVISED"}:
-        if metadata["bridge_kind"] != "implementation_proposal":
-            _error("invalid_bridge_header", "NEW and REVISED require implementation_proposal")
         try:
             observed_work_version = metadata.get("work_item_version", "")
             result["work_item_version"] = int(observed_work_version)
@@ -307,10 +317,6 @@ def parse_authored_message(content: str) -> dict[str, Any]:
                 "invalid_bridge_header",
                 "spec_versions must map each applicable formal ID to its observed positive integer version",
             )
-    if status == "READY" and metadata["bridge_kind"] != "implementation_report":
-        _error("invalid_bridge_header", "READY requires implementation_report")
-    if status in {"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED"} and metadata["bridge_kind"] != "lo_verdict":
-        _error("invalid_bridge_header", "An LO verdict requires lo_verdict")
     return result
 
 
@@ -319,25 +325,74 @@ class NativeBridgeService:
         self.kernel = kernel
         self.project_root = project_root.resolve()
 
-    def work_root(self, project_id: str, *, create: bool = True, refresh_base: bool = False) -> Path:
+    def repository_root(
+        self, tx: PostgresTransaction, project_id: str, *, binding: dict[str, Any] | None = None, lock: bool = False
+    ) -> Path:
+        project = _required(tx, "projects", project_id, lock=lock)
+        if project["kind"] != "project":
+            _error("program_has_no_repository", "Programs do not execute or commit work")
+        reference = project.get("repository_ref")
+        if reference is None:
+            _error(
+                "project_repository_required", "Reconcile the project's explicit repository_ref before executing work"
+            )
+        expected_subject = "gtkb" if reference == "platform" else "application"
+        if binding is not None and binding["subject"] != expected_subject:
+            _error("project_subject_mismatch", "The immutable context subject does not match this project's repository")
         try:
-            return project_worktree(self.project_root, project_id, create=create, refresh_base=refresh_base)
+            return resolve_project_repository(self.project_root, reference)
+        except ApplicationRegistryError as error:
+            raise PostgresKernelError("invalid_repository_ref", str(error)) from error
+
+    def work_root(
+        self, project_id: str, *, create: bool = True, refresh_base: bool = False, tx: PostgresTransaction | None = None
+    ) -> Path:
+        if tx is None:
+            with self.kernel.transaction(read_only=True) as current:
+                return self.work_root(project_id, create=create, refresh_base=refresh_base, tx=current)
+        repository = self.repository_root(tx, project_id)
+        try:
+            return project_worktree(
+                self.project_root, project_id, create=create, refresh_base=refresh_base, repository_root=repository
+            )
         except SessionWorktreeError as error:
             raise PostgresKernelError(error.code, str(error)) from error
 
     def bind(self, request: BindSession) -> dict[str, Any]:
-        markers = {line for line in request.init_command.splitlines() if INIT.fullmatch(line)}
-        if len(markers) != 1:
-            _error("invalid_init_command", "Supply one distinct exact role-bearing init marker")
+        lines = request.init_command.splitlines()
+        markers = {line for line in lines if INIT.fullmatch(line)}
+        # Evidence contains only accepted vocabulary and positions of near misses.
+        # Never echo surrounding owner input or unknown tokens into diagnostics.
+        evidence = {
+            "observed_markers": sorted(markers),
+            "invalid_marker_line_numbers": [
+                index
+                for index, line in enumerate(lines, 1)
+                if not INIT.fullmatch(line) and line.lstrip("\ufeff \t").casefold().startswith(("::init", "init "))
+            ],
+            "recovery_route": (
+                "Read gt session show --native-context-id <actual-native-context-id> --json. "
+                "For an unbound context, use gt session bind with the exact owner- or dispatch-supplied marker. "
+                "Resolve conflicting declarations without changing the actual context identifier or inventing a marker."
+            ),
+        }
+        if len(markers) > 1:
+            _error("session_init_conflict", "Distinct init markers cannot establish one immutable role", **evidence)
+        if not markers:
+            if evidence["invalid_marker_line_numbers"]:
+                _error("invalid_init_marker", "No exact role-bearing init marker was accepted", **evidence)
+            # This is an explicit bind request, not an ordinary prompt handler.
+            # A marker-free owner prompt must not invoke binding implicitly.
+            _error("no_init_marker", "Ordinary prompt input does not request initialization", **evidence)
         marker = markers.pop()
-        subject, role = INIT.fullmatch(marker).groups()
+        subject, role = marker.split()[1:]
         identity = _hash(marker)
         with self.kernel.transaction(serializable=False) as tx:
             existing = self._binding(tx, request.native_context_id, required=False)
             if existing:
                 if existing["subject"] != subject or existing["role"] != ROLE_NAMES[role]:
-                    _error("session_init_conflict", "An existing context's subject and role cannot change")
-                return _public(existing)
+                    _error("session_init_conflict", "An existing context's subject and role cannot change", **evidence)
+                return {"status": "already_initialized_idempotent", "binding": _public(existing)}
             tx.cursor.execute(
                 sql.SQL(
                     "INSERT INTO {}.session_init_bindings (native_context_id,session_context_id,subject,role,"
@@ -349,8 +404,29 @@ class NativeBridgeService:
             inserted = tx.cursor.fetchone()
             binding = dict(inserted) if inserted else self._binding(tx, request.native_context_id)
             if binding["subject"] != subject or binding["role"] != ROLE_NAMES[role]:
-                _error("session_init_conflict", "An existing context's subject and role cannot change")
-            return _public(binding)
+                _error("session_init_conflict", "An existing context's subject and role cannot change", **evidence)
+            # This outcome describes this call, not persistent session state.
+            # A concurrent matching insert is an idempotent retry for this caller.
+            return {
+                "status": "init_requested" if inserted else "already_initialized_idempotent",
+                "binding": _public(binding),
+            }
+
+    @staticmethod
+    @overload
+    def _binding(
+        tx: PostgresTransaction, native_context_id: str, *, required: Literal[True] = True
+    ) -> dict[str, Any]: ...
+
+    @staticmethod
+    @overload
+    def _binding(
+        tx: PostgresTransaction, native_context_id: str, *, required: Literal[False]
+    ) -> dict[str, Any] | None: ...
+
+    @staticmethod
+    @overload
+    def _binding(tx: PostgresTransaction, native_context_id: str, *, required: bool) -> dict[str, Any] | None: ...
 
     @staticmethod
     def _binding(tx: PostgresTransaction, native_context_id: str, *, required: bool = True) -> dict[str, Any] | None:
@@ -368,6 +444,86 @@ class NativeBridgeService:
     def session(self, native_context_id: str) -> dict[str, Any]:
         with self.kernel.transaction(read_only=True) as tx:
             return _public(self._binding(tx, native_context_id))
+
+    def session_context(self, native_context_id: str) -> dict[str, Any]:
+        """Read bounded startup sources without creating context or runtime state."""
+        if not native_context_id.strip():
+            _error("invalid_context_id", "Supply the actual native context identifier")
+        with self.kernel.transaction(read_only=True) as tx:
+            binding = _public(self._binding(tx, native_context_id))
+            specifications = []
+            for record_id in (
+                "GOV-SESSION-SELF-INITIALIZATION-001",
+                "DCL-SESSION-ROLE-RESOLUTION-001",
+                "GOV-HARNESS-ISOLATION-001",
+            ):
+                record = tx.get("specifications", {"id": record_id})
+                if record is None or record["status"] != "active":
+                    _error(
+                        "startup_source_unavailable",
+                        "Reconcile the required startup source before loading context",
+                        id=record_id,
+                        observed_status=record["status"] if record else "missing",
+                        recovery_route=f"gt spec show {record_id} --json",
+                    )
+                specifications.append(record)
+
+        baseline = []
+        for relative in (
+            ".harness-baseline-configuration/rules/session-bootstrap.md",
+            ".harness-baseline-configuration/rules/operating-model.md",
+        ):
+            path = self.project_root / relative
+            try:
+                if path.resolve(strict=True) != path or not path.is_file():
+                    raise ValueError("Required source is not a regular authored file at its selected path")
+                with path.open("rb") as source:
+                    data = source.read(65537)
+                if len(data) > 65536:
+                    raise ValueError("Required source exceeds the bounded startup read of 65536 bytes")
+                content = data.decode("utf-8-sig")
+            except (OSError, UnicodeError, ValueError) as error:
+                _error(
+                    "startup_source_unavailable",
+                    "The required authored baseline is missing, redirected, unreadable or exceeds 65536 bytes",
+                    path=relative,
+                    recovery_route="Reconcile the authored baseline in the authority service's selected project root",
+                    reason=type(error).__name__,
+                )
+            baseline.append({"path": relative, "content": content})
+
+        return {
+            "binding": binding,
+            "specifications": specifications,
+            "baseline": baseline,
+            "scope": (
+                "This bounded startup read does not establish complete semantic closure, "
+                "host startup disclosure, an activity, a work assignment or qualification. "
+                "Canonical records share one read snapshot; authored files are read separately."
+            ),
+            "host_observations": {
+                "activity": {
+                    "status": "unavailable",
+                    "reason": "Use the explicit transient activity in the "
+                    "receiving context; the binding does not store it",
+                },
+                "tools_skills_plugins_hooks": {
+                    "status": "unavailable",
+                    "reason": "Observe availability and execution in the "
+                    "receiving host; source presence cannot establish either",
+                },
+                "startup_tokens": {
+                    "status": "unavailable",
+                    "reason": "Report only a measurement supplied by the receiving harness",
+                },
+            },
+            "retrieval_routes": {
+                "formal_sources": "gt spec show <record-id> --json",
+                "assigned_work": "gt context work-item <owner-selected-work-item-id> --json",
+                "bridge": "gt bridge show <received-document-id> --json",
+                "baseline": "Read applicable authored rules and skills under .harness-baseline-configuration",
+            },
+        }
 
     @staticmethod
     def _attempt(tx: PostgresTransaction, document: str, *, lock: bool = False) -> dict[str, Any] | None:
@@ -398,7 +554,7 @@ class NativeBridgeService:
     @staticmethod
     def _author(binding: dict[str, Any], status: str) -> None:
         allowed = PRIME_AUTHORED_STATUSES if binding["role"] == "prime-builder" else LOYAL_OPPOSITION_AUTHORED_STATUSES
-        if binding["subject"] != "gtkb" or status not in allowed:
+        if status not in allowed:
             _error("wrong_author_role", "The immutable context role cannot author this status")
 
     @staticmethod
@@ -418,7 +574,9 @@ class NativeBridgeService:
         NativeBridgeService._formal_scope(tx, attempt, work, lock=lock)
 
     @staticmethod
-    def _formal_scope(tx, attempt, work, *, lock=False):
+    def _formal_scope(
+        tx: PostgresTransaction, attempt: dict[str, Any], work: dict[str, Any], *, lock: bool = False
+    ) -> None:
         if _work_formal_roots(tx, work, attempt["project_id"], lock=lock) != attempt["formal_roots"]:
             _error("scope_changed", "Canonical formal relationships changed; reconcile the attempt")
         for current in _work_formal_sources(
@@ -438,7 +596,15 @@ class NativeBridgeService:
             for b in right
         )
 
-    def _dependency_readiness(self, tx, work_item_id, *, attempt=None, lock=False, cross_project_only=False):
+    def _dependency_readiness(
+        self,
+        tx: PostgresTransaction,
+        work_item_id: str,
+        *,
+        attempt: dict[str, Any] | None = None,
+        lock: bool = False,
+        cross_project_only: bool = False,
+    ) -> dict[str, Any]:
         work = _required(tx, "work_items", work_item_id, lock=lock)
         project_id = _current_parent(tx, work_item_id)["project_id"]
         if attempt is None:
@@ -533,7 +699,7 @@ class NativeBridgeService:
                             }
                             try:
                                 actual = self._snapshot(
-                                    sorted(required_artifacts), root=self.work_root(parent, create=False)
+                                    sorted(required_artifacts), root=self.work_root(parent, create=False, tx=tx)
                                 )
                             except PostgresKernelError as error:
                                 if error.code not in {
@@ -572,8 +738,18 @@ class NativeBridgeService:
         with self.kernel.transaction(read_only=True) as tx:
             return self._dependency_readiness(tx, work_item_id)
 
-    def _require_work_dependencies(self, tx, work_item_id, **options):
-        result = self._dependency_readiness(tx, work_item_id, **options)
+    def _require_work_dependencies(
+        self,
+        tx: PostgresTransaction,
+        work_item_id: str,
+        *,
+        attempt: dict[str, Any] | None = None,
+        lock: bool = False,
+        cross_project_only: bool = False,
+    ) -> None:
+        result = self._dependency_readiness(
+            tx, work_item_id, attempt=attempt, lock=lock, cross_project_only=cross_project_only
+        )
         if not result["ready"]:
             _error(
                 "work_item_dependencies_unsatisfied",
@@ -581,7 +757,9 @@ class NativeBridgeService:
                 **result,
             )
 
-    def _claim_readiness(self, tx, attempt, intended_status, *, lock=False):
+    def _claim_readiness(
+        self, tx: PostgresTransaction, attempt: dict[str, Any], intended_status: str, *, lock: bool = False
+    ) -> None:
         if not attempt["work_item_id"]:
             return
         work = _required(tx, "work_items", attempt["work_item_id"], lock=lock)
@@ -608,12 +786,13 @@ class NativeBridgeService:
                     _error("work_item_required", "Implementation lifecycle artifacts require one work item")
                 work = _required(tx, "work_items", request.work_item_id, lock=True)
                 project_id = _current_parent(tx, work["id"])["project_id"]
-                project = _required(tx, "projects", project_id)
+                project = _required(tx, "projects", project_id, lock=True)
+                self.repository_root(tx, project_id, binding=binding)
             attempt = self._attempt(tx, document, lock=True)
             if attempt is None:
                 if request.expected_version != 0 or request.intended_status not in THREAD_START_STATUSES:
                     _error("invalid_transition", "A fresh attempt starts with NEW, BLOCKED or ADVISORY")
-                if work and (work["resolution_status"] != "open" or project["status"] != "active"):
+                if work and (work["resolution_status"] != "open" or project is None or project["status"] != "active"):
                     _error("work_not_open", "A new attempt requires open work in an active execution project")
                 tx.cursor.execute(
                     sql.SQL(
@@ -632,15 +811,16 @@ class NativeBridgeService:
             if request.intended_status not in allowed:
                 _error("invalid_transition", "The intended artifact cannot follow the current bridge status")
             self._claim_readiness(tx, attempt, request.intended_status)
-            if request.intended_status == "NEW" and project["authorization"] != "authorized":
+            if request.intended_status == "NEW" and (project is None or project["authorization"] != "authorized"):
                 _error("project_not_authorized", "The parent project is not authorized for a NEW proposal")
             if project_id:
-                self.work_root(project_id)
-            if request.intended_status == "VERIFIED" and attempt["head_status"] == "VERIFIED":
-                if not attempt["finalization_failure"]:
-                    _error(
-                        "verification_not_requested", "Fresh verification requires canonical finalization repair state"
-                    )
+                self.work_root(project_id, tx=tx)
+            if (
+                request.intended_status == "VERIFIED"
+                and attempt["head_status"] == "VERIFIED"
+                and not attempt["finalization_failure"]
+            ):
+                _error("verification_not_requested", "Fresh verification requires canonical finalization repair state")
             head = self._head(tx, attempt)
             predecessor = _hash(head["content"]) if head else None
             tx.cursor.execute(
@@ -665,12 +845,17 @@ class NativeBridgeService:
                     }
                 _error("artifact_already_claimed", "Another request reserves the exact next bridge artifact")
             if request.intended_status == "READY":
+                # Every implementation status resolved its project above.
+                assert project is not None
                 tx.cursor.execute(
                     sql.SQL(
-                        "SELECT a.proposal_paths,a.test_targets FROM {}.work_intent_claims c JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
-                        "WHERE c.expires_at>clock_timestamp() AND c.intended_status='READY' AND c.attempt_id<>%s"
-                    ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
-                    (document,),
+                        "SELECT a.proposal_paths,a.test_targets FROM "
+                        "{}.work_intent_claims c JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
+                        "JOIN {}.projects p ON p.id=a.project_id "
+                        "WHERE c.expires_at>clock_timestamp() AND c.intended_status='READY' AND c.attempt_id<>%s "
+                        "AND p.repository_ref=%s"
+                    ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
+                    (document, project["repository_ref"]),
                 )
                 if any(
                     self._overlap(
@@ -700,14 +885,17 @@ class NativeBridgeService:
             )
             return {**_public(dict(tx.cursor.fetchone())), "predecessor": _public(head) if head else None}
 
-    def _fenced(self, tx: PostgresTransaction, document: str, request: FenceRequest):
+    def _fenced(
+        self, tx: PostgresTransaction, document: str, request: FenceRequest
+    ) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
         binding = self._binding(tx, request.native_context_id)
         attempt = self._attempt(tx, document, lock=True)
         if not attempt or attempt["disposition"] != "active":
             _error("stale_bridge_head", "No active attempt is available for this effect")
         tx.cursor.execute(
             sql.SQL(
-                "SELECT *, expires_at>clock_timestamp() AS live FROM {}.work_intent_claims WHERE attempt_id=%s FOR UPDATE"
+                "SELECT *, expires_at>clock_timestamp() AS live FROM "
+                "{}.work_intent_claims WHERE attempt_id=%s FOR UPDATE"
             ).format(sql.Identifier(tx.schema)),
             (document,),
         )
@@ -775,10 +963,7 @@ class NativeBridgeService:
             reservations = list(tx.cursor.fetchall())
             if not reservations:
                 _error("implementation_claim_required", "Tool work edits require a live implementation-report claim")
-            try:
-                checkout = _registered_context_checkout(self.project_root, binding["session_context_id"])
-            except SessionWorktreeError as error:
-                raise PostgresKernelError(error.code, str(error)) from error
+            checkout = worktree_path(self.project_root, binding["session_context_id"])
             if any(not path.is_relative_to(checkout.resolve()) for path in implementation_paths):
                 _error("effect_outside_checkout", "Work edits must stay in the bound context's registered checkout")
             if any(path.is_dir() for path in implementation_paths):
@@ -786,13 +971,29 @@ class NativeBridgeService:
             relative = [path.relative_to(checkout.resolve()).as_posix() for path in implementation_paths]
             _paths(relative, "Tool targets", error_code="invalid_effect_path")
             matches = []
+            registered = False
             for reservation in reservations:
                 fence = FenceRequest(native_context_id=request.native_context_id, fence=reservation["fence"])
                 _, attempt, claim = self._fenced(tx, reservation["attempt_id"], fence)
+                repository = self.repository_root(tx, attempt["project_id"], binding=binding, lock=True)
+                try:
+                    _registered_context_checkout(
+                        self.project_root, binding["session_context_id"], repository_root=repository
+                    )
+                except SessionWorktreeError as error:
+                    if error.code == "checkout_not_registered":
+                        continue
+                    raise PostgresKernelError(error.code, str(error)) from error
+                registered = True
                 targets = {path.casefold() for path in attempt["proposal_paths"] + attempt["test_targets"]}
                 if all(path.casefold() in targets for path in relative):
                     self._claim_readiness(tx, attempt, claim["intended_status"])
                     matches.append((reservation["attempt_id"], reservation["fence"]))
+            if not registered:
+                _error(
+                    "checkout_not_registered",
+                    "Open the bound context checkout for a current artifact claim before editing",
+                )
             if len(matches) != 1:
                 _error("effect_outside_claim", "Every work target must belong to one exact current artifact claim")
             document, fence = matches[0]
@@ -822,18 +1023,24 @@ class NativeBridgeService:
             self.lock_worktrees(tx)
             binding, attempt, claim = self._fenced(tx, document, request)
             self._claim_readiness(tx, attempt, claim["intended_status"], lock=True)
+            if attempt["project_id"] is None:
+                _error("advisory_is_not_work", "An advisory does not select a project worktree; use context scratch")
+            repository = self.repository_root(tx, attempt["project_id"], binding=binding, lock=True)
             own_paths = set(attempt["proposal_paths"] + attempt["test_targets"])
             paths = set(own_paths)
             tx.cursor.execute(
                 sql.SQL(
-                    "SELECT proposal_paths,test_targets FROM {}.bridge_attempts WHERE project_id=%s AND disposition='active'"
+                    "SELECT proposal_paths,test_targets FROM "
+                    "{}.bridge_attempts WHERE project_id=%s AND disposition='active'"
                 ).format(sql.Identifier(tx.schema)),
                 (attempt["project_id"],),
             )
             for row in tx.cursor.fetchall():
                 paths.update(row["proposal_paths"] + row["test_targets"])
             source = (
-                self.work_root(attempt["project_id"], refresh_base=True) if attempt["project_id"] else self.project_root
+                self.work_root(attempt["project_id"], refresh_base=True, tx=tx)
+                if attempt["project_id"]
+                else self.project_root
             )
             if claim["intended_status"] in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
                 self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
@@ -849,6 +1056,7 @@ class NativeBridgeService:
                     artifacts=artifacts,
                     snapshot=self._snapshot,
                     artifact_source=source,
+                    repository_root=repository,
                 )
                 result["artifact_preimages"] = {path: artifacts[path] for path in sorted(own_paths)}
                 result["loaded_paths"] = sorted(paths)
@@ -866,6 +1074,7 @@ class NativeBridgeService:
                     "implementation_claim_required", "Work publication requires the exact implementation-report claim"
                 )
             self._scope(tx, attempt, lock=True)
+            repository = self.repository_root(tx, attempt["project_id"], binding=binding, lock=True)
             _require_project_dependencies(tx, attempt["project_id"], lock=True)
             self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
             try:
@@ -875,8 +1084,12 @@ class NativeBridgeService:
                     artifact_paths=sorted(set(attempt["proposal_paths"] + attempt["test_targets"])),
                     expected_artifacts=request.expected_artifacts,
                     snapshot=self._snapshot,
-                    artifact_destination=self.work_root(attempt["project_id"]),
-                    before_effect=lambda: self._fenced(tx, document, request),
+                    artifact_destination=self.work_root(attempt["project_id"], tx=tx),
+                    repository_root=repository,
+                    before_effect=lambda: (
+                        self._fenced(tx, document, request),
+                        self.work_root(attempt["project_id"], create=False, tx=tx),
+                    ),
                 )
             except SessionWorktreeError as error:
                 raise PostgresKernelError(error.code, str(error)) from error
@@ -888,13 +1101,15 @@ class NativeBridgeService:
             if not attempt or attempt["disposition"] != "active":
                 _error("not_found", "No active attempt has artifacts to review")
             paths = sorted(set(attempt["proposal_paths"] + attempt["test_targets"]))
-            return self._snapshot(paths, root=self.work_root(attempt["project_id"])) if paths else {}
+            return (
+                self._snapshot(paths, root=self.work_root(attempt["project_id"], create=False, tx=tx)) if paths else {}
+            )
 
     def _snapshot(self, paths: list[str], *, root: Path | None = None) -> dict[str, dict[str, str] | None]:
         """Identify Git mode and normalized blob, including explicit deletions."""
         if paths:
             _paths(paths, "Artifact snapshot targets", error_code="scope_changed")
-        result = {}
+        result: dict[str, dict[str, str] | None] = {}
         try:
             root = _artifact_path(root or self.project_root, ".").resolve()
             modes = _artifact_modes(root, paths)
@@ -972,6 +1187,10 @@ class NativeBridgeService:
             attempt = self._attempt(tx, document, lock=True)
             if attempt is None or attempt["disposition"] != "active":
                 _error("attempt_closed", "The attempt is absent or terminal; inspect current work state")
+            if attempt["project_id"] is not None:
+                self.repository_root(tx, attempt["project_id"], binding=binding, lock=True)
+            if message["subject"] is not None and message["subject"] != binding["subject"]:
+                _error("project_subject_mismatch", "The authored responder envelope must use the project's subject")
             if status != "ADVISORY" and any(
                 key in metadata and metadata[key] != attempt[column]
                 for key, column in (("work_item", "work_item_id"), ("project", "project_id"))
@@ -1043,7 +1262,8 @@ class NativeBridgeService:
                 if message["work_item_version"] != work["version"]:
                     _error(
                         "scope_changed",
-                        "The authored work-item version is no longer current; read the changed scope and revise the proposal",
+                        "The authored work-item version is no longer "
+                        "current; read the changed scope and revise the proposal",
                         id=work["id"],
                         authored_version=message["work_item_version"],
                         current_version=work["version"],
@@ -1066,7 +1286,8 @@ class NativeBridgeService:
                     if spec["version"] != message["spec_versions"][spec["id"]]:
                         _error(
                             "scope_changed",
-                            "The authored formal version is no longer current; read the changed requirement and revise the proposal",
+                            "The authored formal version is no longer current; "
+                            "read the changed requirement and revise the proposal",
                             id=spec["id"],
                             authored_version=message["spec_versions"][spec["id"]],
                             current_version=spec["version"],
@@ -1111,7 +1332,7 @@ class NativeBridgeService:
                     )
                 actual = self._snapshot(
                     sorted(set(attempt["proposal_paths"] + attempt["test_targets"])),
-                    root=self.work_root(attempt["project_id"]),
+                    root=self.work_root(attempt["project_id"], tx=tx),
                 )
                 if not actual or reviewed != actual:
                     _error(
@@ -1127,7 +1348,8 @@ class NativeBridgeService:
                     Mutation(
                         expected_version=work["version"],
                         actor=binding["session_context_id"],
-                        reason="Independent bridge verification of the current artifact bytes; project commit remains separate",
+                        reason="Independent bridge verification of the current "
+                        "artifact bytes; project commit remains separate",
                     ),
                 )
                 updates["work_item_version"] = result["version"]
@@ -1172,11 +1394,20 @@ class NativeBridgeService:
             }
 
     @staticmethod
-    def _publish(tx, document, request, message, binding, claim, updates):
+    def _publish(
+        tx: PostgresTransaction,
+        document: str,
+        request: DeliverRequest,
+        message: dict[str, Any],
+        binding: dict[str, Any],
+        claim: dict[str, Any],
+        updates: dict[str, Any],
+    ) -> None:
         status = message["status"]
         tx.cursor.execute(
             sql.SQL(
-                "INSERT INTO {}.bridge_items (attempt_id,version,status,author_session_context_id,delivery_fence,content) "
+                "INSERT INTO {}.bridge_items "
+                "(attempt_id,version,status,author_session_context_id,delivery_fence,content) "
                 "VALUES (%s,%s,%s,%s,%s,%s)"
             ).format(sql.Identifier(tx.schema)),
             (document, message["version"], status, binding["session_context_id"], claim["fence"], request.content),
@@ -1200,7 +1431,7 @@ class NativeBridgeService:
             attempt = self._attempt(tx, document)
             if attempt is None:
                 _error("not_found", "Canonical attempt does not exist")
-            result = {"attempt": _public(attempt)}
+            result: dict[str, Any] = {"attempt": _public(attempt)}
             if include_content and attempt["disposition"] == "active":
                 tx.cursor.execute(
                     sql.SQL(
@@ -1237,7 +1468,8 @@ class NativeBridgeService:
             if delivery is None or delivery["author_session_context_id"] != binding["session_context_id"]:
                 _error(
                     "bridge_delivery_incomplete",
-                    "No retained canonical delivery by this context proves the assigned successor; final prose is insufficient",
+                    "No retained canonical delivery by this context "
+                    "proves the assigned successor; final prose is insufficient",
                     document=document,
                     version=version,
                     observed_head_version=attempt["head_version"] if attempt else None,
@@ -1305,37 +1537,62 @@ class NativeBridgeService:
         return {"role": role, "eligible": eligible, "blocked": blocked}
 
     def state_report(self) -> dict[str, Any]:
-        """Read canonical attempts and both role queues from one consistent snapshot."""
+        """Read content-free attempt observations and queues from one DB snapshot.
+
+        Counts include unfiled, advisory and closed attempts, not just queues.
+        A claim describes the next artifact slot, never ownership of a work item.
+        VERIFIED is a head status; only disposition and terminal_commit report
+        recorded closure. Purged heads have no head_created_at: consumers must
+        not reconstruct that timestamp from files or substitute closed_at.
+        observed_at is the database transaction time used for claim expiry.
+        This report neither selects work nor changes canonical state.
+        """
         with self.kernel.transaction(read_only=True) as tx:
+            tx.cursor.execute("SELECT transaction_timestamp() AS observed_at")
+            observed_at = tx.cursor.fetchone()["observed_at"].isoformat()
             tx.cursor.execute(
                 sql.SQL(
-                    "SELECT disposition,head_status,count(*) AS count FROM {}.bridge_attempts "
-                    "GROUP BY disposition,head_status"
-                ).format(sql.Identifier(tx.schema))
+                    "SELECT a.id,a.work_item_id,a.project_id,a.head_version,a.head_status,a.disposition,"
+                    "a.created_at,a.closed_at,a.terminal_commit,h.created_at AS head_created_at,"
+                    "c.next_version AS claimed_next_version,c.intended_status AS claimed_status,"
+                    "c.expires_at AS claim_expires_at FROM {}.bridge_attempts a "
+                    "LEFT JOIN {}.bridge_items h ON h.attempt_id=a.id AND h.version=a.head_version "
+                    "LEFT JOIN {}.work_intent_claims c ON c.attempt_id=a.id "
+                    "AND a.disposition='active' AND c.expires_at>transaction_timestamp() "
+                    'ORDER BY a.id COLLATE "C"'
+                ).format(*(sql.Identifier(tx.schema) for _ in range(3)))
             )
-            attempts, statuses, unfiled = {}, {}, 0
-            for row in tx.cursor.fetchall():
-                disposition, status, count = row["disposition"], row["head_status"], row["count"]
-                attempts[disposition] = attempts.get(disposition, 0) + count
+            observations = []
+            attempt_counts: dict[str, int] = {}
+            statuses: dict[str, int] = {}
+            unfiled, active_claims = 0, 0
+            for raw in tx.cursor.fetchall():
+                row = _public(dict(raw))
+                next_version = row.pop("claimed_next_version")
+                intended_status = row.pop("claimed_status")
+                expires_at = row.pop("claim_expires_at")
+                row["next_artifact_claim"] = (
+                    {"next_version": next_version, "intended_status": intended_status, "expires_at": expires_at}
+                    if next_version is not None
+                    else None
+                )
+                observations.append(row)
+                active_claims += next_version is not None
+                disposition, status = row["disposition"], row["head_status"]
+                attempt_counts[disposition] = attempt_counts.get(disposition, 0) + 1
                 if disposition == "active":
                     if status is None:
-                        unfiled += count
+                        unfiled += 1
                     else:
-                        statuses[status] = statuses.get(status, 0) + count
-            tx.cursor.execute(
-                sql.SQL(
-                    "SELECT count(*) AS count FROM {}.work_intent_claims c "
-                    "JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
-                    "WHERE a.disposition='active' AND c.expires_at>transaction_timestamp()"
-                ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema))
-            )
-            active_claims = tx.cursor.fetchone()["count"]
+                        statuses[status] = statuses.get(status, 0) + 1
             return {
-                "attempt_counts": dict(sorted(attempts.items())),
+                "observed_at": observed_at,
+                "attempts": observations,
+                "attempt_counts": dict(sorted(attempt_counts.items())),
                 "unfiled_attempt_count": unfiled,
                 "active_status_mix": [{"status": status, "count": count} for status, count in sorted(statuses.items())],
                 "active_claim_count": active_claims,
-                "queues": {role: self._queue(tx, role) for role in ("pb", "lo")},
+                "queues": {"pb": self._queue(tx, "pb"), "lo": self._queue(tx, "lo")},
             }
 
     def abandon(self, document: str, request: AbandonRequest) -> dict[str, Any]:
@@ -1355,6 +1612,7 @@ class NativeBridgeService:
                 _error("live_artifact_claim", "An attempt with a live artifact claim cannot be abandoned")
             work = _required(tx, "work_items", attempt["work_item_id"], lock=True)
             project = _required(tx, "projects", attempt["project_id"], lock=True)
+            repository = self.repository_root(tx, project["id"], binding=binding)
             if (
                 project["status"] == "verified"
                 or _project_commit(tx, project["id"])
@@ -1384,9 +1642,7 @@ class NativeBridgeService:
                 from groundtruth_kb.project.native_commit import ProjectCommitError, reviewed_git_candidates
 
                 try:
-                    existing = reviewed_git_candidates(
-                        self.project_root, [work["id"]], attempt["verified_artifacts"] or {}
-                    )
+                    existing = reviewed_git_candidates(repository, [work["id"]], attempt["verified_artifacts"] or {})
                 except ProjectCommitError as error:
                     raise PostgresKernelError("git_reconciliation_required", str(error)) from error
                 if existing:
@@ -1395,7 +1651,7 @@ class NativeBridgeService:
                         "Preserve an existing reviewed Git commit and reconcile it before restarting",
                         commit_ids=existing,
                     )
-                source = self.work_root(project["id"], create=False)
+                source = self.work_root(project["id"], create=False, tx=tx)
                 base = subprocess.run(
                     ["git", "-C", str(source), "rev-parse", "HEAD"], capture_output=True, text=True, timeout=30
                 )
@@ -1404,7 +1660,7 @@ class NativeBridgeService:
                         [
                             "git",
                             "-C",
-                            str(self.project_root),
+                            str(repository),
                             "diff",
                             "--name-only",
                             base.stdout.strip(),

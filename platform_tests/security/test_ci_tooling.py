@@ -1,7 +1,11 @@
 """Tests for CI/CD tooling improvements (S161 Group 3).
 
 Validates SPEC-1695 (import-cycle detection), SPEC-1696 (pip-audit),
-SPEC-1697 (Ruff blocking), SPEC-1698 (xdist), SPEC-1699 (radon/vulture).
+SPEC-1697 (Ruff blocking), SPEC-1699 (radon/vulture). The SPEC-1698 (xdist)
+cases read the Agent Red shard workflow `python-tests.yml` and the deleted
+`requirements-test.txt`; they retired with that workflow when application CI
+moved to the application (ADR-APPLICATION-ISOLATION-CONTRACT-001, owner ruling
+D2 of 2026-09-16).
 
 These tests validate CI pipeline configuration files (.github/workflows/)
 which are only present in the git working tree, not in Docker containers.
@@ -33,12 +37,6 @@ def _read_pyproject() -> str:
     import pathlib
 
     return pathlib.Path("pyproject.toml").read_text(encoding="utf-8")
-
-
-def _read_requirements_test() -> str:
-    import pathlib
-
-    return pathlib.Path("requirements-test.txt").read_text(encoding="utf-8")
 
 
 class TestImportCycleDetection:
@@ -118,18 +116,6 @@ class TestRuffBlocking:
                     break
             i += 1
         assert found_blocking, "Must have at least one blocking ruff check step"
-
-
-class TestXdistParallel:
-    """SPEC-1698: python-tests.yml SHOULD use -n auto."""
-
-    def test_xdist_in_test_dependencies(self):
-        deps = _read_requirements_test()
-        assert "pytest-xdist" in deps
-
-    def test_xdist_used_in_ci(self):
-        yml = _read_workflow("python-tests.yml")
-        assert "-n " in yml or "--numprocesses" in yml, "python-tests.yml should use pytest-xdist -n flag"
 
 
 class TestComplexityAnalysis:

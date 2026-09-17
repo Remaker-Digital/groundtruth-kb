@@ -14,7 +14,7 @@ from groundtruth_kb.coherence.checker import (
     emit_json,
     emit_markdown,
     load_rules,
-    load_specs_from_db,
+    load_specs_from_authority,
     make_result,
     run_all,
 )
@@ -31,7 +31,7 @@ __all__ = [
     "emit_json",
     "emit_markdown",
     "load_rules",
-    "load_specs_from_db",
+    "load_specs_from_authority",
     "make_result",
     "run_all",
 ]

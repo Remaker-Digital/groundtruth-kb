@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import re
+import tomllib
 from pathlib import Path
 
 from groundtruth_kb.project.doctor import ToolCheck
@@ -97,14 +98,18 @@ def _check_isolation_service_endpoint_not_raw_db(target: Path) -> ToolCheck:
             message=f"groundtruth.toml unreadable at {toml_path}",
         )
     service = data.get("service") or {}
-    endpoint = service.get("endpoint")
+    groundtruth = data.get("groundtruth") or {}
+    # The native client configuration names its authority directly; the legacy
+    # [service].endpoint key is read only when no authority is selected.
+    endpoint = groundtruth.get("authority_url") if isinstance(groundtruth, dict) else None
+    endpoint = endpoint or (service.get("endpoint") if isinstance(service, dict) else None)
     if not endpoint:
         return ToolCheck(
             name="isolation:service-endpoint",
             required=True,
             found=False,
             status="info",
-            message="[service].endpoint absent; not configured",
+            message="no authority_url or [service].endpoint configured",
         )
     # Raw-DB pattern must be evaluated BEFORE the generic scoped-URL pattern
     # because both `*.db` and `sqlite:///*.db` are explicit raw-DB classes per
@@ -285,83 +290,77 @@ def _check_isolation_no_writable_product_paths(target: Path, profile: str) -> To
 
 
 # ---------------------------------------------------------------------------
-# Check 5: hooks point to wrappers
+# Hook settings structure
 # ---------------------------------------------------------------------------
 
 
-def _check_isolation_hooks_point_to_wrappers(target: Path, profile: str) -> ToolCheck:
-    """Check 5 per Phase 9 §4 line 212-213.
+def _check_isolation_hook_settings_structure(target: Path) -> ToolCheck:
+    """Check the structure needed to preserve and merge settings safely.
 
-    Parses ``.claude/settings.json`` hook registrations; for each registered
-    command, asserts it points to a path under the GT-KB framework or wrapped
-    via ``${CLAUDE_PLUGIN_ROOT}``. Embedded inline logic in adopter hooks
-    triggers a warning.
+    Command text does not establish ownership, wrapper behavior, native
+    authority, or runtime availability. Custom handlers remain the adopter's
+    responsibility. This read-only check never opens or executes their targets.
     """
+    name = "isolation:hook-settings-structure"
     settings_path = target / ".claude" / "settings.json"
     if not settings_path.exists():
         return ToolCheck(
-            name="isolation:hooks-point-to-wrappers",
+            name=name,
             required=True,
             found=False,
             status="info",
-            message=".claude/settings.json absent; no hook registrations",
+            message=".claude/settings.json absent; no hook settings to inspect",
         )
     try:
         data = json.loads(settings_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+    except (OSError, UnicodeError, json.JSONDecodeError):
         return ToolCheck(
-            name="isolation:hooks-point-to-wrappers",
+            name=name,
             required=True,
             found=True,
             status="warning",
-            message=f"invalid JSON at {settings_path}",
+            message=".claude/settings.json is unreadable or invalid JSON; repair it before upgrade",
         )
 
-    hooks = data.get("hooks") or {}
-    embedded: list[str] = []
-    for event_name, registrations in hooks.items():
-        if not isinstance(registrations, list):
-            continue
-        for entry in registrations:
-            for hook in (entry or {}).get("hooks", []) or []:
-                command = (hook or {}).get("command", "")
-                if not command:
-                    continue
-                # Acceptable: framework-package path, ${CLAUDE_PLUGIN_ROOT} wrapper,
-                # adopter-side wrapper that invokes a framework module.
-                if "${CLAUDE_PLUGIN_ROOT}" in command:
-                    continue
-                if "groundtruth_kb" in command or "groundtruth-kb" in command:
-                    continue
-                # Adopter-local hooks under .claude/hooks/ are accepted as wrappers
-                # only if they reference a python module path; raw embedded shell
-                # scripts that don't invoke a module are flagged.
-                if ".claude/hooks/" in command and "python" in command:
-                    continue
-                # Framework local scripts in the scripts/ folder are accepted as
-                # wrappers if we are running in the framework development workspace.
-                if (target / "groundtruth-kb").is_dir() and "scripts/" in command and "python" in command:
-                    continue
-                embedded.append(f"{event_name}: {command[:80]}")
-
-    if embedded:
-        sample = embedded[:3]
+    problem = None
+    if not isinstance(data, dict):
+        problem = "settings root must be an object"
+    elif not isinstance(data.get("hooks", {}), dict):
+        problem = "hooks must be an object"
+    else:
+        for registrations in data.get("hooks", {}).values():
+            if not isinstance(registrations, list):
+                problem = "each hook event must contain a list of groups"
+                break
+            for group in registrations:
+                if not isinstance(group, dict) or not isinstance(group.get("hooks", []), list):
+                    problem = "each hook group must be an object with a list of handlers"
+                    break
+                for handler in group.get("hooks", []):
+                    if not isinstance(handler, dict):
+                        problem = "each hook handler must be an object"
+                        break
+                    if any(key in handler and not isinstance(handler[key], str) for key in ("type", "command")):
+                        problem = "handler type and command must be strings when present"
+                        break
+                if problem:
+                    break
+            if problem:
+                break
+    if problem:
         return ToolCheck(
-            name="isolation:hooks-point-to-wrappers",
+            name=name,
             required=True,
             found=True,
             status="warning",
-            message=(
-                f"hook registrations with embedded logic (not wrapper-shaped): "
-                f"{sample}{'...' if len(embedded) > 3 else ''}"
-            ),
+            message=f"Malformed .claude/settings.json structure: {problem}; repair it before upgrade",
         )
     return ToolCheck(
-        name="isolation:hooks-point-to-wrappers",
+        name=name,
         required=True,
         found=True,
         status="pass",
-        message="hook registrations are wrapper-shaped",
+        message="Hook settings structure is valid; command behavior and availability are not assessed",
     )
 
 
@@ -473,7 +472,12 @@ def _check_isolation_release_readiness_app_subject_header(target: Path) -> ToolC
 
 
 def _check_isolation_chroma_regeneratable(target: Path) -> ToolCheck:
-    """Check 9 per Phase 9 §4 line 219-220."""
+    """Check 9: an existing search cache must be a derivation of the configured authority.
+
+    The cache is disposable. It is regeneratable when the application's
+    ``groundtruth.toml`` selects a native ``authority_url``; a local database is
+    never a source. Absence of the cache is never a defect.
+    """
     chroma = target / ".groundtruth-chroma"
     if not chroma.exists():
         return ToolCheck(
@@ -483,16 +487,16 @@ def _check_isolation_chroma_regeneratable(target: Path) -> ToolCheck:
             status="pass",
             message=".groundtruth-chroma absent (no orphan cache)",
         )
-    db = target / "groundtruth.db"
-    if not db.exists() or db.stat().st_size == 0:
+    authority = _configured_authority_url(target)
+    if authority is None:
         return ToolCheck(
             name="isolation:chroma-regeneratable",
             required=True,
             found=True,
             status="warning",
             message=(
-                f".groundtruth-chroma exists at {chroma} but groundtruth.db is "
-                f"missing or empty; chroma cache is orphaned and not regeneratable"
+                f".groundtruth-chroma exists at {chroma} but groundtruth.toml selects no native "
+                f"authority_url; the cache is orphaned and not regeneratable"
             ),
         )
     return ToolCheck(
@@ -500,8 +504,21 @@ def _check_isolation_chroma_regeneratable(target: Path) -> ToolCheck:
         required=True,
         found=True,
         status="pass",
-        message=".groundtruth-chroma is regeneratable from groundtruth.db",
+        message=f".groundtruth-chroma is regeneratable from the configured authority {authority}",
     )
+
+
+def _configured_authority_url(target: Path) -> str | None:
+    config = target / "groundtruth.toml"
+    if not config.is_file():
+        return None
+    try:
+        payload = tomllib.loads(config.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError):
+        return None
+    section = payload.get("groundtruth", {})
+    value = section.get("authority_url") if isinstance(section, dict) else None
+    return value if isinstance(value, str) and value else None
 
 
 # ---------------------------------------------------------------------------
@@ -523,7 +540,7 @@ def run_isolation_checks(target: Path, profile: str, *, product_root: Path) -> l
     When ``target`` is the platform development repository (detected by the
     presence of the ``groundtruth-kb/`` package directory), adopter-specific
     checks are replaced with pass-with-explanation results. Checks 2 (service
-    endpoint), 4 (writable product paths), and 9 (chroma cache) apply to both
+    endpoint), 4 (writable product paths), hook settings structure, and 9 (chroma cache) apply to both
     contexts and run unconditionally.
     """
     is_platform_dev = (target / "groundtruth-kb").is_dir()
@@ -537,9 +554,7 @@ def run_isolation_checks(target: Path, profile: str, *, product_root: Path) -> l
             _check_isolation_service_endpoint_not_raw_db(target),
             ToolCheck(name="isolation:work-subject", required=False, found=True, status="pass", message=_skip),
             _check_isolation_no_writable_product_paths(target, profile),
-            ToolCheck(
-                name="isolation:hooks-point-to-wrappers", required=False, found=True, status="pass", message=_skip
-            ),
+            _check_isolation_hook_settings_structure(target),
             ToolCheck(
                 name="isolation:workstream-focus-hook-absent", required=False, found=True, status="pass", message=_skip
             ),
@@ -558,7 +573,7 @@ def run_isolation_checks(target: Path, profile: str, *, product_root: Path) -> l
         _check_isolation_service_endpoint_not_raw_db(target),
         _check_isolation_durable_work_subject_application(target),
         _check_isolation_no_writable_product_paths(target, profile),
-        _check_isolation_hooks_point_to_wrappers(target, profile),
+        _check_isolation_hook_settings_structure(target),
         _check_isolation_workstream_focus_hook_absent(target),
         _check_isolation_release_readiness_app_subject_header(target),
         _check_isolation_chroma_regeneratable(target),

@@ -24,6 +24,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_ruff_format.py"
 
@@ -104,10 +106,16 @@ def test_check_files_fails_closed_when_staged_blob_is_unreadable(tmp_path, monke
 # --- F2 regression: deterministic venv-first resolution ---------------------- #
 
 
+def _require_project_venv() -> None:
+    if guardrail._venv_python(REPO_ROOT) is None:
+        pytest.skip("project venv missing in this checkout; venv-first resolution is measured on the production layout")
+
+
 def test_resolve_ruff_prefers_venv(tmp_path):
     """The load-bearing F2 fix: resolution is venv-first, so the gate works even
-    when the launching ``python`` lacks ruff. In this checkout the project venv
-    exists, so ``resolve_ruff`` must return a command pointing into it."""
+    when the launching ``python`` lacks ruff. Where the project venv exists,
+    ``resolve_ruff`` must return a command pointing into it."""
+    _require_project_venv()
     ruff = guardrail.resolve_ruff(REPO_ROOT)
     assert ruff is not None
     interp = ruff[0].replace("\\", "/")
@@ -115,10 +123,11 @@ def test_resolve_ruff_prefers_venv(tmp_path):
 
 
 def test_venv_python_presence_boundary(tmp_path):
-    """WARN/FAIL boundary is gated on project-venv presence: present in the real
-    checkout, absent for an unrelated tmp root."""
-    assert guardrail._venv_python(REPO_ROOT) is not None
+    """WARN/FAIL boundary is gated on project-venv presence: absent for an
+    unrelated tmp root, present where the production layout exists."""
     assert guardrail._venv_python(tmp_path) is None
+    _require_project_venv()
+    assert guardrail._venv_python(REPO_ROOT) is not None
 
 
 # --- end-to-end: main() via the active-hook invocation shape ----------------- #

@@ -28,8 +28,12 @@ pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
 
 @pytest.fixture
-def bridge(native, tmp_path):
+def bridge(native, tmp_path, request):
     service, _, _, _ = native
+    # An indirect parameter selects the host location (a nested path with a space exercises quoting in Git,
+    # hooks and worktrees); consumers without one keep the temporary directory itself.
+    tmp_path = tmp_path / request.param if getattr(request, "param", None) else tmp_path
+    tmp_path.mkdir(parents=True, exist_ok=True)
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
     (tmp_path / "tests").mkdir()
     (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
@@ -72,7 +76,8 @@ def bridge(native, tmp_path):
                 "/v1/sessions/bind", json={"native_context_id": name, "init_command": f"::init gtkb {name[:2]}"}
             )
             assert result.status_code == 200, result.text
-            contexts[name] = result.json()
+            assert result.json()["status"] == "init_requested"
+            contexts[name] = result.json()["binding"]
         work_root = NativeBridgeService(service.kernel, tmp_path).work_root("PROJECT-1")
         yield service, client, contexts, work_root
 
@@ -380,11 +385,82 @@ def test_native_binding_rejects_role_aliases_and_ambiguous_init_without_mutation
         native_id = f"invalid-init-{index}"
         result = client.post("/v1/sessions/bind", json={"native_context_id": native_id, "init_command": marker})
         assert result.status_code == 422, (marker, result.text)
-        assert result.json()["error"]["code"] == "invalid_init_command"
+        expected = "session_init_conflict" if "\n" in marker else "invalid_init_marker"
+        assert result.json()["error"]["code"] == expected
         read = client.get("/v1/sessions/binding", params={"native_context_id": native_id})
         assert read.json()["error"]["code"] == "no_session_binding"
     for native_id, existing in contexts.items():
         assert client.get("/v1/sessions/binding", params={"native_context_id": native_id}).json() == existing
+
+
+@pytest.mark.parametrize(
+    "prompt,code,markers,invalid_lines",
+    [
+        ("An ordinary owner request.\nContinue.", "no_init_marker", [], []),
+        ("Owner text.\r\n::INIT gtkb PB\r\nContinue.", "invalid_init_marker", [], [2]),
+        ("::init gtkb pb # private-owner-content", "invalid_init_marker", [], [1]),
+        ("::init gtkb pb ${private-owner-content}", "invalid_init_marker", [], [1]),
+        ("\ufeff::init gtkb pb", "invalid_init_marker", [], [1]),
+        (
+            "private-owner-content\r\n::init gtkb pb\r\n::init gtkb lo",
+            "session_init_conflict",
+            ["::init gtkb lo", "::init gtkb pb"],
+            [],
+        ),
+        (
+            "::init application pb\n::init gtkb pb",
+            "session_init_conflict",
+            ["::init application pb", "::init gtkb pb"],
+            [],
+        ),
+    ],
+)
+def test_init_refusals_report_marker_evidence_and_recovery_without_effects(
+    bridge, prompt, code, markers, invalid_lines
+):
+    service, client, contexts, root = bridge
+
+    def snapshot():
+        with service.kernel.transaction(read_only=True) as tx:
+            tx.cursor.execute(
+                sql.SQL("SELECT * FROM {}.session_init_bindings ORDER BY native_context_id").format(
+                    sql.Identifier(tx.schema)
+                )
+            )
+            bindings = tx.cursor.fetchall()
+        report = client.get("/v1/bridge/state-report").json()
+        report.pop("observed_at")
+        return bindings, report
+
+    before = snapshot()
+    files = {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()}
+    # Reject on both a fresh identity and an already-bound context. Failure
+    # cannot create a binding, alter one, or acquire bridge work.
+    for native_id in ("unbound-init-refusal", "pb1"):
+        result = client.post("/v1/sessions/bind", json={"native_context_id": native_id, "init_command": prompt})
+        assert result.status_code == 422
+        error = result.json()["error"]
+        assert error["code"] == code
+        assert error["details"]["observed_markers"] == markers
+        assert error["details"]["invalid_marker_line_numbers"] == invalid_lines
+        assert "gt session" in error["details"]["recovery_route"]
+        assert "private-owner-content" not in result.text
+        assert snapshot() == before
+    assert {p.relative_to(root): p.read_bytes() for p in root.rglob("*") if p.is_file()} == files
+    assert client.get("/v1/sessions/binding", params={"native_context_id": "pb1"}).json() == contexts["pb1"]
+
+
+def test_existing_binding_conflicts_report_the_observed_marker_and_remain_immutable(bridge):
+    _service, client, contexts, _root = bridge
+    for marker in ("::init gtkb lo", "::init application pb", "::init application lo"):
+        result = client.post("/v1/sessions/bind", json={"native_context_id": "pb1", "init_command": marker})
+        assert result.status_code == 422
+        error = result.json()["error"]
+        assert error["code"] == "session_init_conflict"
+        assert error["details"]["observed_markers"] == [marker]
+        assert error["details"]["invalid_marker_line_numbers"] == []
+        assert "gt session show" in error["details"]["recovery_route"]
+        assert client.get("/v1/sessions/binding", params={"native_context_id": "pb1"}).json() == contexts["pb1"]
 
 
 @pytest.mark.parametrize("identity", [{}, {"native_context_id": ""}, {"native_context_id": None}])
@@ -413,11 +489,70 @@ def test_native_binding_requires_actual_context_identity_without_creating_state(
     assert not (root / "groundtruth.db").exists()
 
 
+def test_init_success_results_identify_creation_and_retry_without_persisting_status(native):
+    service, client, *_ = native
+    for subject, role in (("gtkb", "pb"), ("gtkb", "lo"), ("application", "pb"), ("application", "lo")):
+        native_id = f"result-contract-{subject}-{role}"
+        marker = f"::init {subject} {role}"
+        request = {"native_context_id": native_id, "init_command": f"Owner input.\r\n{marker}\r\n{marker}"}
+        first = client.post("/v1/sessions/bind", json=request)
+        assert first.status_code == 200
+        result = first.json()
+        assert set(result) == {"status", "binding"}
+        assert result["status"] == "init_requested"
+        binding = result["binding"]
+        assert set(binding) == {
+            "native_context_id",
+            "session_context_id",
+            "subject",
+            "role",
+            "created_at",
+            "minimum_idempotency_identity",
+        }
+        assert binding["native_context_id"] == native_id and binding["subject"] == subject
+        assert binding["role"] == {"pb": "prime-builder", "lo": "loyal-opposition"}[role]
+        repeated = client.post("/v1/sessions/bind", json={**request, "init_command": marker})
+        assert repeated.status_code == 200
+        assert repeated.json() == {"status": "already_initialized_idempotent", "binding": binding}
+        assert client.get("/v1/sessions/binding", params={"native_context_id": native_id}).json() == binding
+        with service.kernel.transaction(read_only=True) as tx:
+            tx.cursor.execute(
+                sql.SQL("SELECT * FROM {}.session_init_bindings WHERE native_context_id=%s").format(
+                    sql.Identifier(tx.schema)
+                ),
+                (native_id,),
+            )
+            assert set(tx.cursor.fetchone()) == set(binding)
+            tx.cursor.execute(
+                sql.SQL("SELECT count(*) AS count FROM {}.record_history").format(sql.Identifier(tx.schema))
+            )
+            assert tx.cursor.fetchone()["count"] == 0
+
+
+def test_concurrent_init_results_have_one_creation_and_identical_immutable_bindings(native, tmp_path):
+    service, _client, *_ = native
+    bridge_service = NativeBridgeService(service.kernel, tmp_path)
+    barrier = Barrier(4)
+
+    def bind():
+        barrier.wait(timeout=10)
+        return bridge_service.bind(BindSession(native_context_id="concurrent-result", init_command="::init gtkb lo"))
+
+    with ThreadPoolExecutor(max_workers=4) as workers:
+        results = list(workers.map(lambda _: bind(), range(4)))
+    assert [r["status"] for r in results].count("init_requested") == 1
+    assert [r["status"] for r in results].count("already_initialized_idempotent") == 3
+    assert all(r["binding"] == results[0]["binding"] for r in results)
+    assert bridge_service.session("concurrent-result") == results[0]["binding"]
+    assert not list(tmp_path.iterdir())
+
+
 def test_binding_is_immutable_exact_and_retry_idempotent(bridge):
     service, client, contexts, root = bridge
     request = {"native_context_id": "pb1", "init_command": "::init gtkb pb\n::init gtkb pb"}
     again = client.post("/v1/sessions/bind", json=request)
-    assert again.status_code == 200 and again.json() == contexts["pb1"]
+    assert again.status_code == 200
+    assert again.json() == {"status": "already_initialized_idempotent", "binding": contexts["pb1"]}
     for marker in ("::init gtkb lo", "::init gtkb pb\n::init gtkb lo", " ::init gtkb pb", "::init gtkb"):
         result = client.post("/v1/sessions/bind", json={**request, "init_command": marker})
         assert result.status_code == 422
@@ -431,7 +566,8 @@ def test_binding_is_immutable_exact_and_retry_idempotent(bridge):
                 range(2),
             )
         )
-    assert bound[0] == bound[1]
+    assert {result["status"] for result in bound} == {"init_requested", "already_initialized_idempotent"}
+    assert bound[0]["binding"] == bound[1]["binding"]
     # Ending a worker process does not delete its immutable role binding or
     # allow that same native context to reinitialize as its own reviewer.
     assert client.post("/v1/sessions/retire", json={"native_context_id": "pb1"}).status_code in {404, 405}
@@ -1483,14 +1619,14 @@ def test_simultaneous_test_artifact_claims_leave_one_live_reservation(bridge, mo
         deliver(client, contexts, document, "pb1", 1, "NEW", work_item_id=work, target_paths=json.dumps([path]))
         deliver(client, contexts, document, "lo1", 2, "GO", work_item_id=work)
     barrier = Barrier(2, timeout=15)
-    original_scope = NativeBridgeService._scope
+    original_claim = NativeBridgeService.claim
 
-    def simultaneous_scope(tx, attempt, **kwargs):
-        original_scope(tx, attempt, **kwargs)
+    def simultaneous_claim(self, document, request):
         barrier.wait()
+        return original_claim(self, document, request)
 
     with monkeypatch.context() as racing:
-        racing.setattr(NativeBridgeService, "_scope", staticmethod(simultaneous_scope))
+        racing.setattr(NativeBridgeService, "claim", simultaneous_claim)
         with ThreadPoolExecutor(max_workers=2) as workers:
             futures = [
                 workers.submit(claim, client, document, context, 2, "READY", work_item_id=work)
@@ -1534,7 +1670,9 @@ def test_state_report_uses_canonical_queues_and_does_not_change_claims(bridge):
     fence = {"native_context_id": "lo1", "fence": held.json()["fence"]}
     assert client.post("/v1/bridge/report-chain/check", json=fence).status_code == 200
     assert client.post("/v1/bridge/report-chain/release", json=fence).status_code == 200
-    assert client.get("/v1/bridge/state-report").json() == report
+    released = client.get("/v1/bridge/state-report").json()
+    assert datetime.fromisoformat(released.pop("observed_at")) >= datetime.fromisoformat(report.pop("observed_at"))
+    assert released == report
 
 
 def test_state_report_counts_and_queues_share_one_snapshot(bridge, monkeypatch):
@@ -1557,10 +1695,14 @@ def test_state_report_counts_and_queues_share_one_snapshot(bridge, monkeypatch):
     assert result.status_code == 200, result.text
     report = result.json()
     assert report["active_status_mix"] == [{"status": "NEW", "count": 1}]
+    assert report["attempts"][0]["head_status"] == "NEW"
+    assert report["attempts"][0]["head_version"] == 1
     assert not report["queues"]["pb"]["eligible"]
     assert [row["id"] for row in report["queues"]["lo"]["eligible"]] == ["report-chain"]
     current = client.get("/v1/bridge/state-report").json()
     assert current["active_status_mix"] == [{"status": "GO", "count": 1}]
+    assert current["attempts"][0]["head_status"] == "GO"
+    assert current["attempts"][0]["head_version"] == 2
     assert [row["id"] for row in current["queues"]["pb"]["eligible"]] == ["report-chain"]
     assert not current["queues"]["lo"]["eligible"]
 
@@ -1799,8 +1941,81 @@ def test_material_formal_change_after_verified_restarts_same_uncommitted_work(br
     for name in ["pb4", "lo4"]:
         contexts[name] = client.post(
             "/v1/sessions/bind", json={"native_context_id": name, "init_command": f"::init gtkb {name[:2]}"}
-        ).json()
+        ).json()["binding"]
     deliver(client, contexts, "new-intent", "pb4", 3, "READY")
     fresh = client.get("/v1/bridge/new-intent/artifacts").json()
     deliver(client, contexts, "new-intent", "lo4", 4, "VERIFIED", verified_artifacts=json.dumps(fresh))
     assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "verified"
+
+
+@pytest.mark.parametrize("context", ["pb1", "lo1"])
+def test_advisory_recommendation_neither_dispatches_nor_reserves_work(bridge, context):
+    _, client, contexts, _ = bridge
+    before = {
+        resource: client.get(f"/v1/{resource}/{identifier}").json()
+        for resource, identifier in (("work-items", "WI-1"), ("projects", "PROJECT-1"), ("harnesses", "HARNESS-1"))
+    }
+    document = "informational-advisory"
+    reserved = claim(client, document, context, 0, "ADVISORY", work_item_id=None)
+    assert reserved.status_code == 200, reserved.text
+    content = authored(contexts[context], document, 1, "ADVISORY")
+    content = content.replace("Project: PROJECT-1\r\n", "").replace("Work Item: WI-1\r\n", "")
+    content += "\r\n## Claim\r\nAdopt this change and launch another harness.\r\n"
+    content += "## Owner Decision Needed\r\nNone within the assigned investigation.\r\n"
+    assert "Classification Slot" not in content and "Grilling" not in content
+    response = client.post(
+        f"/v1/bridge/{document}/deliver",
+        json={"native_context_id": context, "fence": reserved.json()["fence"], "content": content},
+    )
+    assert response.status_code == 200, response.text
+    attempt = client.get(f"/v1/bridge/{document}/show").json()["attempt"]
+    assert attempt["work_item_id"] is None and attempt["project_id"] is None
+    for role in ("pb", "lo"):
+        queue = client.get("/v1/bridge/queue", params={"role": role}).json()
+        assert queue["eligible"] == [] and queue["blocked"] == []
+    for resource, identifier in (("work-items", "WI-1"), ("projects", "PROJECT-1"), ("harnesses", "HARNESS-1")):
+        assert client.get(f"/v1/{resource}/{identifier}").json() == before[resource]
+
+
+def test_advisory_follow_up_uses_fresh_chain_and_new_time_authorization(bridge):
+    _, client, contexts, _ = bridge
+    document = "advisory-follow-up"
+    for version, context in ((1, "lo1"), (2, "pb2")):
+        deliver(client, contexts, document, context, version, "ADVISORY", work_item_id=None)
+    before = client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json()
+    refused = claim(client, document, "pb1", 2, "NEW")
+    assert refused.status_code != 200
+    assert client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json() == before
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
+    assert (
+        client.put(
+            "/v1/projects/PROJECT-1/authorization",
+            json={
+                "authorization": "not authorized",
+                "expected_version": project["version"],
+                "actor": "qualification",
+                "reason": "Owner-selected work ordering",
+            },
+        ).status_code
+        == 200
+    )
+    refused = claim(client, "separate-implementation", "pb1", 0, "NEW")
+    assert refused.status_code != 200
+    assert refused.json()["error"]["code"] == "project_not_authorized"
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
+    assert (
+        client.put(
+            "/v1/projects/PROJECT-1/authorization",
+            json={
+                "authorization": "authorized",
+                "expected_version": project["version"],
+                "actor": "qualification",
+                "reason": "Owner-selected work ordering",
+            },
+        ).status_code
+        == 200
+    )
+    deliver(client, contexts, "separate-implementation", "pb1", 1, "NEW")
+    assert client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json() == before
+    queued = client.get("/v1/bridge/queue", params={"role": "lo"}).json()
+    assert [row["id"] for row in queued["eligible"]] == ["separate-implementation"]

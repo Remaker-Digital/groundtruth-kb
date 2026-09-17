@@ -47,18 +47,13 @@ import json
 import re
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# Add groundtruth-kb/src to import path before importing the DB module.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_KB_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
-if str(_KB_SRC) not in sys.path:
-    sys.path.insert(0, str(_KB_SRC))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
-
 
 RECOVERABILITY_CLASSES = (
     "recoverable_via_source_spec",
@@ -80,11 +75,11 @@ _BRIDGE_PATH_RE = re.compile(r"bridge/([a-z0-9][a-z0-9\-]*?)-\d{3}\.md", re.IGNO
 
 
 def _utc_now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _default_run_id() -> str:
-    return "audit-" + datetime.now(timezone.utc).strftime("%Y-%m-%dT%H-%M-%SZ")
+    return "audit-" + datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%SZ")
 
 
 def _open_db(db_path: Path) -> KnowledgeDB:
@@ -299,7 +294,7 @@ def _render_review_packet(inventory: dict[str, Any]) -> str:
     counts = inventory["orphan_count_by_class"]
 
     lines: list[str] = []
-    lines.append(f"# Orphan WI Membership Discovery — Review Packet")
+    lines.append("# Orphan WI Membership Discovery — Review Packet")
     lines.append("")
     lines.append(f"**Run ID:** `{inventory['run_id']}`")
     lines.append(f"**Generated:** {inventory['generated_at']}")

@@ -32,9 +32,12 @@ def _parse_override_args(module: HarnessModule, args: Sequence[str]) -> argparse
 
 def test_lo_harness_routing_uses_owner_approved_generous_envelope() -> None:
     root = Path(__file__).resolve().parents[2]
-    routing = tomllib.loads((root / ".api-harness" / "routing.toml").read_text(encoding="utf-8"))["routing"]
 
     for provider in ("ollama", "openrouter", "alibaba-cloud-studio"):
+        # The generic .api-harness tree is retired; each provider carries its own projected routing.
+        routing = tomllib.loads((root / ".api-harness" / provider / "routing.toml").read_text(encoding="utf-8"))[
+            "routing"
+        ]
         assert routing[provider]["timeout_seconds"] == 900
         assert routing[provider]["session_timeout_seconds"] == 3600
         assert routing[provider]["max_turns"] == 600

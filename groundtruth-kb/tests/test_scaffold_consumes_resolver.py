@@ -22,55 +22,36 @@ def test_scaffold_local_only_id_set_matches_baseline() -> None:
     Baseline post-canonical-terminology (v0.6.1): 14 hooks + 3 rules.
     Post-Slice-1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL: + rule.canonical-terminology-policy.
     Post-Slice-3 GTKB-ISOLATION-017: + file.readme-quickstart, file.release-readiness-banner.
-    Post-Slice-4 GTKB-ISOLATION-017: + file.upgrade-rehearsal-recipe.
+    Post-Slice-4 GTKB-ISOLATION-017: + file.upgrade-rehearsal-recipe (retired with the legacy upgrade wrapper, O-7 R18).
     Post-WI-4628: - retired scheduler hook.
     """
     ids = sorted(a.id for a in artifacts_for_scaffold("local-only"))
     expected = sorted(
         [
-            "hook.assertion-check",
-            "hook.spec-classifier",
-            "hook.intake-classifier",
             "hook.destructive-gate",
             "hook.credential-scan",
             "hook.scanner-safe-writer",
             "hook.bridge-compliance-gate",
-            "hook.delib-search-gate",
-            "hook.delib-search-tracker",
             "hook.kb-not-markdown",
             "hook.session-health",
-            "hook.session-start-governance",
-            "hook.spec-before-code",
             "rule.prime-builder",
             "rule.canonical-terminology",
             "rule.canonical-terminology-config",
             "rule.canonical-terminology-policy",
+            "rule.session-start-orientation",
+            "skill.baseline-audit.skill-md",
             "file.readme-quickstart",
             "file.release-readiness-banner",
-            "file.upgrade-rehearsal-recipe",
         ]
     )
     assert ids == expected
 
 
 def test_scaffold_dual_agent_id_set_matches_baseline() -> None:
-    """dual-agent scaffold returns the full 61-record registry set.
-
-    Post-C4 (gtkb-settings-merge): 51 → 54 via 3 new adopter-critical
-    gitignore-pattern rows (groundtruth.db, .groundtruth/,
-    .claude/settings.local.json).
-    Post-spec-event-surfacer (Slice A): 54 → 56 (+ hook + settings).
-    Post-Slice-3 GTKB-ISOLATION-017: 56 → 58 (+2 file).
-    Post-Slice-1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL: 58 → 59 (+1 rule).
-    Post-Slice-4 GTKB-ISOLATION-017: 59 → 60 (+1 file upgrade-rehearsal-recipe).
-    Post-WI-4628: - retired scheduler hook.
-
-    Post-governance-completeness: 42 v0.6.1 rows + 9 new governance records
-    (5 hook-class + 4 settings-hook-registration) = 51. See
-    gtkb-da-governance-completeness-implementation-016.
-    """
+    """The current bridge profile delivers the 37 retained registry records (the rehearsal recipe retired, O-7 R18)."""
     ids = sorted(a.id for a in artifacts_for_scaffold("dual-agent"))
-    assert len(ids) == 61
+    assert len(ids) == 37
+    assert "hook._delib_common" not in ids
     # None are ownership-glob.
     for a in artifacts_for_scaffold("dual-agent"):
         assert isinstance(a, (FileArtifact, SettingsHookRegistration, GitignorePattern))

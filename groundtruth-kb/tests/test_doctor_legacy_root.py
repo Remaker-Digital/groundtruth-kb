@@ -73,32 +73,6 @@ def test_active_legacy_root_references_allows_detector_constants(tmp_path: Path)
     assert result.status == "pass"
 
 
-def test_active_legacy_root_references_allows_hygiene_sweep_pattern_catalog(tmp_path: Path) -> None:
-    config_dir = tmp_path / "config" / "governance"
-    config_dir.mkdir(parents=True, exist_ok=True)
-    (config_dir / "hygiene-sweep-patterns.toml").write_text(
-        "\n".join(
-            [
-                "[[patterns]]",
-                'id = "claude-playground"',
-                'description = "Detect legacy root archive path references."',
-                "content_patterns = [",
-                '  "E:\\\\Claude-Playground",',
-                '  "E:/Claude-Playground",',
-                '  "//e/Claude-Playground",',
-                '  "//E/Claude-Playground",',
-                "]",
-                "",
-            ]
-        ),
-        encoding="utf-8",
-    )
-
-    result = _check_active_legacy_root_references(tmp_path)
-
-    assert result.status == "pass"
-
-
 def test_active_legacy_root_references_fails_live_script_use(tmp_path: Path) -> None:
     scripts_dir = tmp_path / "scripts"
     scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -111,3 +85,12 @@ def test_active_legacy_root_references_fails_live_script_use(tmp_path: Path) -> 
 
     assert result.status == "fail"
     assert "scripts/uses_archive_root.py:1" in result.message
+
+
+def test_retired_pattern_name_does_not_exempt_live_legacy_root_use(tmp_path: Path) -> None:
+    config_dir = tmp_path / "config" / "governance"
+    config_dir.mkdir(parents=True)
+    (config_dir / "hygiene-sweep-patterns.toml").write_text('live_root = "E:/Claude-Playground"\n', encoding="utf-8")
+    result = _check_active_legacy_root_references(tmp_path)
+    assert result.status == "fail"
+    assert "hygiene-sweep-patterns.toml" in result.message

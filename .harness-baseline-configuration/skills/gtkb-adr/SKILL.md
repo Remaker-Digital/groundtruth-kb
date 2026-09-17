@@ -1,175 +1,59 @@
 ---
 name: gtkb-adr
-description: Create an Architecture Decision Record (ADR) in the Knowledge Database as a spec with type='architecture_decision'. Records the decision, rationale, consequences, failed approaches, and rejected alternatives so architectural choices are never revisited without context. Part of GOV-20 governance.
-argument-hint: "<decision title>"
+description: Author or amend a canonical architecture decision, preserving its context, rejected alternatives, observed failures and consequences through the native spec CLI.
+argument-hint: "<assigned ADR identifier or topic>"
 allowed-tools: Bash, Read, Grep
-compatibility:
-  - claude-code >= 1.0
 license: "Proprietary - (c) 2026 Remaker Digital"
 metadata:
   project: groundtruth-kb
   category: specifications and governance
-  activity-envelope: deliberation, specification
 ---
-# Activity Envelope Requirement
+# Architecture decision authoring
 
-This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
+Use this guidance for assigned architecture work in the current spec activity.
+Follow the current immutable session binding and assigned scope. GOV-20 and
+GOV-ARTIFACT-AUTHORITY-HIERARCHY-001 govern the formal record; this skill is
+derived authoring guidance, not a separate authority or permission step.
 
+Read the selected ADR and its current formal dependencies with `gt spec show
+<id> --json`. Use `gt spec list --search <topic> --json` to find related current
+records, following its bounded pagination as needed. Do not inspect a legacy
+database, import KnowledgeDB, infer an ID from a numeric maximum, or use a
+generated harness directory as canonical source.
 
-# Architecture Decision Record (ADR) — GOV-20
+Preserve these five information topics in the authored description:
 
-Create a formal ADR in the Knowledge Database. ADRs are stored as **specifications** with `type='architecture_decision'` and `ADR-*` IDs. They document **why** a decision was made, **what was tried and failed**, and **why alternatives were rejected**.
+1. **Context**: the problem, constraints and relevant current requirements.
+2. **Decision**: the chosen behavior and the boundary of the decision.
+3. **Failed Approaches**: approaches actually tried and what was observed.
+   Distinguish them from reasoned rejections. If available evidence establishes
+   no attempted approach, say so; never invent an experiment to fill a heading.
+4. **Alternatives Considered**: meaningful rejected alternatives and why.
+5. **Consequences**: benefits, costs, risks, limitations and affected work.
 
-**Arguments:** `$ARGUMENTS` = decision title (e.g., "Use Redis pub/sub vs NATS for event bus")
+Use clear sections or equivalent organized prose. Cite current formal sources
+where necessary. Keep the record self-contained: it must not depend on a
+retained bridge message, a conversation, an approval ledger or another
+harness's notes for its meaning. Preserve formal history when revising.
 
-## Quick Reference
+Prepare a UTF-8 JSON fields file using the supported native specification
+schema. An ADR has type `architecture_decision`; its authored fields must agree
+with current formal lifecycle and assigned work. Use the selected identifier,
+the freshly read version and the current context's attribution:
 
-| Command | What It Does |
-|---------|-------------|
-| `/kb-adr "Use Redis for session cache"` | Create ADR with guided prompts |
-| `/kb-adr list` | List existing ADRs from KB |
-
-## Workflow
-
-### Handle "list" command
-
-If `$ARGUMENTS` is "list":
-
-```python
-import sys
-import subprocess
-from pathlib import Path
-
-# Per S307 hardcoded-path directive: discover repo root from git, not a
-# machine-local literal. Falls back to GTKB_PROJECT_ROOT env var if git
-# isn't available (e.g. installed-as-package contexts).
-import os
-_repo_root = (
-    subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                   capture_output=True, text=True, check=False).stdout.strip()
-    or os.environ.get("GTKB_PROJECT_ROOT", "")
-)
-if not _repo_root:
-    raise RuntimeError("Cannot resolve GT-KB repo root: git unavailable and GTKB_PROJECT_ROOT unset.")
-sys.path.insert(0, str(Path(_repo_root) / "tools" / "knowledge-db"))
-from db import KnowledgeDB
-db = KnowledgeDB()
-adrs = db.list_specs(type="architecture_decision")
-for a in adrs:
-    print(f"  [{a['id']}] ({a['status']}) {a['title']}")
-print(f"\n{len(adrs)} ADR(s) total.")
-db.close()
+```text
+gt spec record --id <id> --fields-file <fields.json> --expected-version <version> --actor <current-context> --change-reason "<concrete correction>" --json
+gt spec show <id> --json
 ```
 
-### Step 1: Gather Context
+Version zero asserts a new record; an amendment uses the observed current
+version. A conflict requires a fresh read and reconciliation, not an overwrite.
+Compare the returned and reread fields with the intended postimage. Record
+owner direction directly in its canonical result; logs retain conversation.
+Ask only unresolved material choices, one at a time.
 
-Ask the user (or determine from conversation context) these 5 elements:
+An ADR does not authorize or perform implementation. Derived implementation
+uses the current project and Bridge proposal/review/test lifecycle. Structural
+authoring checks do not prove runtime conformance or independent verification.
 
-1. **Context** — What problem or need prompted this decision?
-2. **Decision** — What was chosen?
-3. **Failed Approaches** — What was tried and didn't work? (Include why it failed — prevents future sessions from re-attempting dead ends)
-4. **Consequences** — What are the positive and negative outcomes?
-5. **Alternatives Considered** — What was rejected and why?
-
-### Step 2: Format the ADR Description
-
-Compose a structured description string with these sections:
-
-```
-## Context
-[Problem statement — what need or constraint drove this decision]
-
-## Decision
-[What was chosen and how it will be implemented]
-
-## Failed Approaches
-[What was tried and failed, with reason for failure. This is critical for long-running projects — it prevents future sessions from re-attempting dead ends.]
-
-## Consequences
-### Positive
-- [Benefit 1]
-### Negative
-- [Trade-off 1]
-### Risks
-- [Risk 1 and mitigation]
-
-## Alternatives Considered
-| Alternative | Why Rejected |
-|------------|--------------|
-| [Option A] | [1-line reason] |
-
-## Related Specs
-- [SPEC-XXXX if applicable]
-```
-
-### Step 3: Insert into Knowledge Database
-
-```python
-import sys
-import subprocess
-from pathlib import Path
-
-# Per S307 hardcoded-path directive: discover repo root from git, not a
-# machine-local literal. Falls back to GTKB_PROJECT_ROOT env var if git
-# isn't available (e.g. installed-as-package contexts).
-import os
-_repo_root = (
-    subprocess.run(["git", "rev-parse", "--show-toplevel"],
-                   capture_output=True, text=True, check=False).stdout.strip()
-    or os.environ.get("GTKB_PROJECT_ROOT", "")
-)
-if not _repo_root:
-    raise RuntimeError("Cannot resolve GT-KB repo root: git unavailable and GTKB_PROJECT_ROOT unset.")
-sys.path.insert(0, str(Path(_repo_root) / "tools" / "knowledge-db"))
-from db import KnowledgeDB
-
-db = KnowledgeDB()
-
-# Get next ADR ID
-existing = db.list_specs(type="architecture_decision")
-max_num = max((int(s['id'].split('-')[1]) for s in existing if s['id'].startswith('ADR-')), default=0)
-adr_id = f"ADR-{max_num + 1:03d}"
-
-db.insert_spec(
-    id=adr_id,
-    title="[Decision Title]",
-    status="implemented",
-    changed_by="Claude",
-    change_reason="New architecture decision record (GOV-20)",
-    description="[formatted description from Step 2]",
-    tags=["architecture", "adr"],
-)
-
-print(f"Created {adr_id}: [Decision Title]")
-db.close()
-```
-
-Note: `type` is auto-detected from the `ADR-` prefix — no need to pass it explicitly.
-
-### Step 4: Confirm
-
-Print the created spec ID and summary:
-```
-Created ADR-NNN: [Title]
-Status: implemented
-Failed approaches: [count]
-Alternatives rejected: [count]
-Related specs: [list or "none"]
-```
-
-## When to Create an ADR
-
-- Choosing between competing technologies (Redis vs NATS, Cosmos vs PostgreSQL)
-- Deciding on an architectural pattern (event sourcing vs CRUD, monolith vs microservices)
-- Making a non-obvious trade-off (performance vs maintainability, cost vs features)
-- Cross-cutting decisions that affect multiple modules or specs
-- Any decision the team might revisit in 6 months without context
-
-## When NOT to Create an ADR
-
-- Implementation details that are obvious from the code
-- Decisions already fully captured in requirement specs
-- Trivial choices (variable naming, import ordering)
-
----
-*© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

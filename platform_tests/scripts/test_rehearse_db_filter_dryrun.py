@@ -1,8 +1,8 @@
 """Tests for GTKB-ISOLATION-016 Phase 8 Wave 3 db-filter-dryrun lane.
 
 Per bridge/gtkb-isolation-016-phase8-wave3-execution-007.md (REVISED-3,
-GO -008) and predecessor -005 (REVISED-2). Covers T1-T17 + T-F1 + T21
-+ T22 from the proposal Specification-Derived Verification matrix.
+GO -008) and predecessor -005 (REVISED-2). Covers the surviving database-filter and isolation assertions. The historical
+IPR/CVR presence check is retired; it is not a current review gate.
 """
 
 from __future__ import annotations
@@ -16,7 +16,6 @@ from pathlib import Path
 import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(REPO_ROOT / "tools" / "knowledge-db"))
 
 
 def _load_rehearse_file(stem: str):
@@ -96,9 +95,7 @@ def fixture_legacy_db(tmp_path: Path) -> Path:
         ],
     )
     cur.executemany("INSERT INTO assertion_runs (payload) VALUES (?)", [("noise",)] * 5)
-    cur.executemany(
-        "INSERT INTO pipeline_events (payload) VALUES (?)", [("noise",)] * 3
-    )
+    cur.executemany("INSERT INTO pipeline_events (payload) VALUES (?)", [("noise",)] * 3)
     cur.executemany(
         "INSERT INTO session_prompts VALUES (?, ?, ?)",
         [("S001", 1, "adopter prompt"), ("S002", 1, "framework prompt")],
@@ -244,9 +241,7 @@ def test_filtered_db_excludes_all_framework_classified_rows(
 ) -> None:
     """T1: derives from ADR-ISOLATION-APPLICATION-PLACEMENT-001."""
     output_dir = tmp_path
-    result = _db_filter_dryrun.run(
-        base_manifest_dict, output_dir, dry_run=False, kb_path=fixture_legacy_db
-    )
+    result = _db_filter_dryrun.run(base_manifest_dict, output_dir, dry_run=False, kb_path=fixture_legacy_db)
     assert result["status"] == "ok", result
     out_db = output_dir / "db-filter-dryrun" / "groundtruth-filtered-preview.db"
     conn = sqlite3.connect(str(out_db))
@@ -267,9 +262,7 @@ def test_filtered_db_telemetry_tables_have_zero_rows(
     base_manifest_dict: dict,
 ) -> None:
     """T2: derives from Slice 8 Constraint 2."""
-    result = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    result = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     assert result["status"] == "ok"
     out_db = tmp_path / "db-filter-dryrun" / "groundtruth-filtered-preview.db"
     conn = sqlite3.connect(str(out_db))
@@ -294,9 +287,7 @@ def test_filtered_db_adopter_row_count_matches_partition_manifest_summary(
     base_manifest_dict: dict,
 ) -> None:
     """T3: derives from Slice 8 contract."""
-    result = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    result = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     summary_path = tmp_path / "db-filter-dryrun" / "db-filter-summary.json"
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     # Adopter rows in fixture: AR-WIDGET-001, DELIB-AR-001, WI-AR-001 (3 versioned)
@@ -315,9 +306,7 @@ def test_unclassified_rows_emit_warning_and_are_not_inserted_under_default_dispo
     base_manifest_dict: dict,
 ) -> None:
     """T4: derives from DELIB-S325-UNCLASSIFIED-DISPOSITION-CHOICE; Slice 8 Constraint 4."""
-    _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     out_db = tmp_path / "db-filter-dryrun" / "groundtruth-filtered-preview.db"
     conn = sqlite3.connect(str(out_db))
     ids = {r[0] for r in conn.execute("SELECT id FROM specifications").fetchall()}
@@ -325,9 +314,7 @@ def test_unclassified_rows_emit_warning_and_are_not_inserted_under_default_dispo
     assert "SPEC-MYSTERY-001" not in ids, "unclassified rows must NOT be inserted"
     warnings_path = tmp_path / "db-filter-dryrun" / "db-filter-warnings.txt"
     warnings_text = warnings_path.read_text(encoding="utf-8")
-    assert "SPEC-MYSTERY-001" in warnings_text, (
-        "unclassified row must produce a warning"
-    )
+    assert "SPEC-MYSTERY-001" in warnings_text, "unclassified row must produce a warning"
 
 
 # ----- T5: refuses when partition manifest missing -----
@@ -338,9 +325,7 @@ def test_lane_refuses_when_partition_manifest_missing_at_canonical_path(
 ) -> None:
     """T5: derives from algorithm step 1; Slice 8 dependency contract; F1 from -002."""
     # No fixture_partition_manifest fixture -> path missing
-    result = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    result = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     assert result["status"] == "error"
     assert any("partition_manifest_missing" in w for w in result["warnings"])
 
@@ -359,9 +344,7 @@ def test_lane_propagates_partition_manifest_status_error_for_unknown_table(
         json.dumps({"status": "error", "warnings": ["unknown_table: foo_bar"]}),
         encoding="utf-8",
     )
-    result = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    result = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     assert result["status"] == "error"
     assert any("partition_manifest_status_error" in w for w in result["warnings"])
 
@@ -376,9 +359,7 @@ def test_legacy_db_is_opened_read_only(
     base_manifest_dict: dict,
 ) -> None:
     """T7: derives from ADR-ISOLATION-APPLICATION-PLACEMENT-001; §3.5 owner decision."""
-    _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     # Verify legacy DB row counts unchanged (read-only proof).
     conn = sqlite3.connect(str(fixture_legacy_db))
     spec_count = conn.execute("SELECT COUNT(*) FROM specifications").fetchone()[0]
@@ -396,15 +377,9 @@ def test_filtered_db_passes_pragma_integrity_check(
     base_manifest_dict: dict,
 ) -> None:
     """T8: derives from algorithm step 7."""
-    result = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    result = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     assert result["status"] == "ok"
-    summary = json.loads(
-        (tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    summary = json.loads((tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(encoding="utf-8"))
     assert summary["integrity_check"] == "ok"
 
 
@@ -418,12 +393,8 @@ def test_orphan_relationship_rows_emit_warning_not_silent_drop(
     base_manifest_dict: dict,
 ) -> None:
     """T9: derives from Slice 8 Constraint 3."""
-    _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
-    warnings_text = (
-        tmp_path / "db-filter-dryrun" / "db-filter-warnings.txt"
-    ).read_text(encoding="utf-8")
+    _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
+    warnings_text = (tmp_path / "db-filter-dryrun" / "db-filter-warnings.txt").read_text(encoding="utf-8")
     # The framework-vs-framework relationship row should be flagged as orphan
     assert "orphan_relationship" in warnings_text
 
@@ -438,22 +409,10 @@ def test_lane_is_idempotent_on_re_run(
     base_manifest_dict: dict,
 ) -> None:
     """T10: derives from Slice 3 idempotency contract."""
-    r1 = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
-    summary1 = json.loads(
-        (tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(
-            encoding="utf-8"
-        )
-    )
-    r2 = _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
-    summary2 = json.loads(
-        (tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    r1 = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
+    summary1 = json.loads((tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(encoding="utf-8"))
+    r2 = _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
+    summary2 = json.loads((tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(encoding="utf-8"))
     assert r1["status"] == r2["status"] == "ok"
     assert summary1["row_counts"] == summary2["row_counts"]
 
@@ -469,16 +428,12 @@ def test_lane_writes_only_under_output_dir_db_filter_dryrun_subdir(
 ) -> None:
     """T11: derives from Rule M2 sandbox-output-dir contract; sandbox-output exception amendment."""
     pre_files = {p for p in tmp_path.rglob("*") if p.is_file()}
-    _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
+    _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
     post_files = {p for p in tmp_path.rglob("*") if p.is_file()}
     new_files = post_files - pre_files
     for f in new_files:
         rel = f.relative_to(tmp_path)
-        assert rel.parts[0] == "db-filter-dryrun", (
-            f"unexpected write outside lane subdir: {rel}"
-        )
+        assert rel.parts[0] == "db-filter-dryrun", f"unexpected write outside lane subdir: {rel}"
 
 
 # ----- T12, T13, T14, T15: load_manifest M6 and M1 backward compat -----
@@ -558,14 +513,8 @@ def test_db_filter_summary_json_has_required_keys(
     base_manifest_dict: dict,
 ) -> None:
     """T16: derives from Output Layout schema (top-level + per-table enum)."""
-    _db_filter_dryrun.run(
-        base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-    )
-    summary = json.loads(
-        (tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(
-            encoding="utf-8"
-        )
-    )
+    _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
+    summary = json.loads((tmp_path / "db-filter-dryrun" / "db-filter-summary.json").read_text(encoding="utf-8"))
 
     # Top-level schema
     required = {
@@ -579,9 +528,7 @@ def test_db_filter_summary_json_has_required_keys(
         "integrity_check",
         "elapsed_seconds",
     }
-    assert required.issubset(summary.keys()), (
-        f"missing: {required - set(summary.keys())}"
-    )
+    assert required.issubset(summary.keys()), f"missing: {required - set(summary.keys())}"
 
     # Per-table schema: every entry must have category (in approved enum) +
     # adopter, framework, unclassified counts. Per Output Layout schema in
@@ -602,9 +549,7 @@ def test_db_filter_summary_json_has_required_keys(
             f"must be one of {sorted(valid_categories)}"
         )
         for k in ("adopter", "framework", "unclassified"):
-            assert isinstance(info[k], int), (
-                f"table {table_name}.{k} must be int, got {type(info[k])}"
-            )
+            assert isinstance(info[k], int), f"table {table_name}.{k} must be int, got {type(info[k])}"
 
 
 # ----- T17: NotImplementedError for non-default dispositions -----
@@ -619,9 +564,7 @@ def test_lane_raises_NotImplementedError_for_non_default_dispositions(
     """T17: derives from Implementation Plan explicit scope-deferral."""
     base_manifest_dict["unclassified_disposition"] = "carry_forward_to_adopter"
     with pytest.raises(NotImplementedError):
-        _db_filter_dryrun.run(
-            base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db
-        )
+        _db_filter_dryrun.run(base_manifest_dict, tmp_path, dry_run=False, kb_path=fixture_legacy_db)
 
 
 # ----- T-F1: lane input path matches Slice 8 output constant -----
@@ -639,49 +582,11 @@ def test_lane_input_path_matches_slice8_output_path_constant() -> None:
 # ----- T21: rule amendment text matches _OUTPUT_DIR_ALLOWLIST_DESC verbatim -----
 
 
-def test_project_root_boundary_amendment_text_matches_output_dir_allowlist_desc_constant() -> (
-    None
-):
+def test_project_root_boundary_amendment_text_matches_output_dir_allowlist_desc_constant() -> None:
     """T21 (per -005 F1 fix): rule text and source code stay aligned."""
     rule_path = REPO_ROOT / ".claude" / "rules" / "project-root-boundary.md"
     rule_text = rule_path.read_text(encoding="utf-8")
     assert _common._OUTPUT_DIR_ALLOWLIST_DESC in rule_text, (
         "_OUTPUT_DIR_ALLOWLIST_DESC source constant not found verbatim in "
         "project-root-boundary.md; rule text and code have drifted."
-    )
-
-
-# ----- T22: IPR + CVR documents exist and link to ADR -----
-
-
-def test_ipr_and_cvr_documents_exist_and_link_to_adr_isolation_application_placement_001() -> (
-    None
-):
-    """T22 (per -005 F2 fix): GOV-20 Phase 1 advisory pilot compliance.
-
-    Skips with pending marker before each artifact's creation phase:
-    - IPR: created at implementation-commit time (this commit).
-    - CVR: created at post-implementation-report-commit time.
-    """
-    try:
-        from db import KnowledgeDB
-    except ImportError:
-        pytest.skip("KnowledgeDB module not importable")
-
-    db = KnowledgeDB(str(REPO_ROOT / "groundtruth.db"))
-
-    ipr = db.get_document("IPR-WAVE3-DB-FILTER-001")
-    if ipr is None:
-        pytest.skip("IPR not yet created (pre-IPR-insert phase)")
-    ipr_tags = ipr.get("tags") or []
-    assert "ADR-ISOLATION-APPLICATION-PLACEMENT-001" in ipr_tags, (
-        f"IPR-WAVE3-DB-FILTER-001 must link to ADR; tags = {ipr_tags}"
-    )
-
-    cvr = db.get_document("CVR-WAVE3-DB-FILTER-001")
-    if cvr is None:
-        pytest.skip("CVR not yet created (pre-post-impl-commit phase)")
-    cvr_tags = cvr.get("tags") or []
-    assert "ADR-ISOLATION-APPLICATION-PLACEMENT-001" in cvr_tags, (
-        f"CVR-WAVE3-DB-FILTER-001 must link to ADR; tags = {cvr_tags}"
     )

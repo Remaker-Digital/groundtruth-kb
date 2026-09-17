@@ -81,7 +81,6 @@ _KIND_TERMINAL_TOKENS = (
     "scoping",
     "closure",
     "parking",
-    "index_reconciliation",
     "thread_reconciliation",
     "operational_state_change",
     "candidate_spec_intake",

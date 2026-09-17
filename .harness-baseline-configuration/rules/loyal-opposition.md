@@ -57,6 +57,13 @@ Do not assume this reviewing context will resume the thread.
 
 ## Inspect and test the actual result
 
+Review evidence comes from inspecting the proposal and the current state, not
+from changing the sources under review. Do not make speculative source changes
+to see whether a proposal could work; such changes manufacture self-fulfilling
+evidence. When a proposal claims something that does not exist, answer NO-GO
+and name the gap. Experiments need explicit owner authorization, happen in an
+isolated checkout, and are reverted when the verdict is NO-GO.
+
 Read source, inspect artifacts, run the required tests and use current CLI
 queries or diagnostics to establish each requirement. Validate the purpose and
 effects of a proposed command before running it. Use bounded disposable fixtures

@@ -137,8 +137,8 @@ class PreflightCheck:
     def to_dict(self) -> dict[str, Any]:
         return {
             "name": self.name,
-            "outcome": self.outcome.value,
-            "severity": self.severity.value,
+            "outcome": str(self.outcome),
+            "severity": str(self.severity),
             "summary": self.summary,
             "detail": self.detail,
             "evidence": dict(self.evidence),
@@ -188,7 +188,7 @@ class PreflightEvidence:
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
-            "status": self.status.value,
+            "status": str(self.status),
             "generated_at": self.generated_at,
             "evidence_path": self.evidence_path,
             "summary": self.summary,
@@ -201,21 +201,21 @@ class PreflightEvidence:
 
     def to_text_summary(self) -> str:
         lines = [
-            f"Status: {self.status.value}",
+            f"Status: {str(self.status)}",
             f"Summary: {self.summary}",
             f"Generated: {self.generated_at}",
         ]
         if self.evidence_path:
             lines.append(f"Evidence path: {self.evidence_path}")
         for check in self.checks:
-            lines.append(f"- {check.name}: {check.outcome.value} ({check.severity.value}) - {check.summary}")
+            lines.append(f"- {check.name}: {str(check.outcome)} ({str(check.severity)}) - {check.summary}")
         return "\n".join(lines)
 
     def to_markdown(self, *, title: str = "Governance Preflight Evidence") -> str:
         lines = [
             f"## {title}",
             "",
-            f"- Status: `{self.status.value}`",
+            f"- Status: `{str(self.status)}`",
             f"- Summary: {self.summary}",
             f"- Generated: `{self.generated_at}`",
         ]
@@ -231,7 +231,7 @@ class PreflightEvidence:
         for check in self.checks:
             blocks = "yes" if check.blocks_release else "no"
             lines.append(
-                f"| `{check.name}` | `{check.outcome.value}` | `{check.severity.value}` | {blocks} | {check.summary} |"
+                f"| `{check.name}` | `{str(check.outcome)}` | `{str(check.severity)}` | {blocks} | {check.summary} |"
             )
         return "\n".join(lines)
 

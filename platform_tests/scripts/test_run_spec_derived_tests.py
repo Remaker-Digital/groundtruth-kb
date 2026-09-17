@@ -1,1127 +1,399 @@
-# (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for scripts/run_spec_derived_tests.py.
+"""Selected execution observations for DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001.
 
-Implements the verification required by bridge
-``gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md`` REVISED-1
-(Codex GO at -004); REVISED-2 closures per Codex `-006` NO-GO F1 + F2.
-
-Each test derives from one of the linked governing specifications:
-
-- ``DCL-VERIFIED-BRIDGE-HISTORY-001`` (A1 union accumulation, A2 removal-with-waiver)
-- ``DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001`` (gate behavior consumed by Codex)
-- ``DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001`` (exit-code semantics IS the enforcement signal)
-- ``GOV-FILE-BRIDGE-AUTHORITY-001`` (no INDEX mutation; INDEX.md is canonical state)
-- ``ADR-CODEX-HOOK-PARITY-FALLBACK-001`` (JSON output schema consumable by Codex review skill)
-- ``DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE`` (deterministic CLI output across repeated invocations)
-
-Plus the linked rule files: ``.claude/rules/project-root-boundary.md``,
-``.claude/rules/file-bridge-protocol.md``,
-``.claude/rules/bridge-essential.md``, ``.claude/rules/codex-review-gate.md``.
-
-Test architecture: tests use synthesized INDEX + bridge file fixtures under
-``tmp_path``; the runner module is loaded once via importlib because the
-script lives under ``scripts/`` (outside the package root). Each test
-monkeypatches the module-level path constants so the runner reads from the
-synthesized fixture rather than the live repo.
-
-Authority:
-- bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-003.md REVISED-1
-- bridge/gtkb-platform-spec-coverage-verified-runner-2026-04-29-004.md GO
+GOV-SOURCE-OF-TRUTH-FRESHNESS-001: current canonical inputs, no stale pass.
+These tests exercise selection and reporting; complete applicability and an
+independent review remain separate obligations even when every case passes.
 """
 
 from __future__ import annotations
 
+import copy
 import importlib.util
 import json
-import sqlite3
+import os
+import socket
+import subprocess
 import sys
+import time
 from pathlib import Path
-from types import ModuleType
 
+import groundtruth_kb
 import pytest
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native_authority_fixture
+from platform_tests.groundtruth_kb.test_native_authority_service import put
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RUNNER_PATH = REPO_ROOT / "scripts" / "run_spec_derived_tests.py"
-
-pytestmark = pytest.mark.timeout(180)
-
-
-def _load_runner() -> ModuleType:
-    """Load the runner script as a module via importlib."""
-    if "run_spec_derived_tests" in sys.modules:
-        return sys.modules["run_spec_derived_tests"]
-    spec = importlib.util.spec_from_file_location("run_spec_derived_tests", RUNNER_PATH)
-    assert spec is not None and spec.loader is not None
-    mod = importlib.util.module_from_spec(spec)
-    sys.modules["run_spec_derived_tests"] = mod
-    spec.loader.exec_module(mod)
-    return mod
+RUNNER_PATH = REPO_ROOT / "scripts/run_spec_derived_tests.py"
+pytestmark = pytest.mark.timeout(120)
+native = native_authority_fixture
 
 
-def _patch_paths(monkeypatch: pytest.MonkeyPatch, project_root: Path) -> None:
-    """Point the runner at a synthesized project root."""
-    runner = _load_runner()
-    monkeypatch.setattr(runner, "PROJECT_ROOT", project_root)
-    monkeypatch.setattr(runner, "BRIDGE_DIR", project_root / "bridge")
-    monkeypatch.setattr(runner, "DB_PATH", project_root / "groundtruth.db")
-    monkeypatch.setattr(runner, "APPROVALS_DIR", project_root / ".groundtruth" / "formal-artifact-approvals")
-    monkeypatch.setattr(
-        runner,
-        "TEST_DIRS",
-        (project_root / "tests",),
+@pytest.fixture
+def runner():
+    spec = importlib.util.spec_from_file_location("selected_test_runner", RUNNER_PATH)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+class CurrentAuthority:
+    def __init__(self):
+        self.specs = {"SPEC-1": {"id": "SPEC-1", "version": 1, "status": "active"}}
+        self.tests = []
+        self.context = None
+        self.calls = []
+        self.on_read = None
+
+    def request(self, method, path, *, query=None):
+        assert method == "GET"
+        self.calls.append((method, path, query))
+        if self.on_read:
+            self.on_read(path)
+        if path.endswith("/context"):
+            return copy.deepcopy(self.context)
+        if path == "/v1/tests":
+            rows = [t for t in self.tests if t["spec_id"] == query["spec_id"]]
+            # Deliberately paginate at one record to exercise continuation.
+            rows = [t for t in rows if query["after"] is None or t["id"] > query["after"]]
+            return {"records": copy.deepcopy(rows[:1]), "next_after": rows[0]["id"] if len(rows) > 1 else None}
+        ident = path.rsplit("/", 1)[-1]
+        if ident not in self.specs:
+            raise AuthorityClientError("not_found", "No current record")
+        return copy.deepcopy(self.specs[ident])
+
+
+def write_test(root, relative="platform_tests/test_probe.py", body=None, docstring="SPEC-1"):
+    path = root / relative
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        f'"""{docstring}"""\n' + (body or "def test_observed():\n    assert 2 + 2 == 4\n"), encoding="utf-8"
     )
+    return path
 
 
-def _seed_index(project_root: Path, doc_name: str, versions: list[tuple[str, str]]) -> None:
-    """Seed bridge/INDEX.md with one document entry. versions = [(status, filename)]."""
-    bridge_dir = project_root / "bridge"
-    bridge_dir.mkdir(exist_ok=True)
-    lines = [f"Document: {doc_name}"]
-    for status, filename in versions:
-        lines.append(f"{status}: bridge/{filename}")
-    lines.append("")
-    (bridge_dir / "INDEX.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
+@pytest.fixture
+def setup(runner, tmp_path, monkeypatch):
+    for key in ("GT_AUTHORITY_URL", "GT_PROJECT_ROOT", "GTKB_PROJECT_ROOT", "GT_DB_PATH"):
+        monkeypatch.delenv(key, raising=False)
+    config = tmp_path / "groundtruth.toml"
+    config.write_text('[groundtruth]\nproject_root="."\nauthority_url="http://127.0.0.1:1"\n', encoding="utf-8")
+    authority = CurrentAuthority()
+    monkeypatch.setattr(runner, "AuthorityClient", lambda url: authority)
+    return runner, tmp_path, config, authority
 
 
-def _seed_bridge_file(
-    project_root: Path,
-    filename: str,
-    *,
-    spec_links: list[str] = None,
-    waivers: list[dict] = None,
-    status_header: str = "NEW",
-) -> None:
-    """Write a synthesized bridge file with given Specification Links + waivers."""
-    spec_links = spec_links or []
-    waivers = waivers or []
-    body = [status_header, "", f"# Synthetic bridge file ({filename})", ""]
-    if spec_links:
-        body.append("## Specification Links")
-        body.append("")
-        for spec_id in spec_links:
-            body.append(f"- `{spec_id}` — synthetic spec citation.")
-        body.append("")
-    if waivers:
-        body.append("## Specification-Coverage-Waivers")
-        body.append("")
-        for w in waivers:
-            body.append(f"- spec_id: {w['spec_id']}")
-            for k, v in w.items():
-                if k != "spec_id":
-                    body.append(f"  {k}: {v}")
-        body.append("")
-    (project_root / "bridge" / filename).write_text("\n".join(body) + "\n", encoding="utf-8")
+def observe(setup, capsys, **kwargs):
+    runner, _, config, _ = setup
+    code = runner.run(config_path=config, spec_ids=["SPEC-1"], json_output=True, **kwargs)
+    report = json.loads(capsys.readouterr().out)
+    assert report["verification_result"] == "UNASSESSED"
+    assert "verified_overall" not in report
+    return code, report
 
 
-def _seed_test_file(project_root: Path, name: str, docstring_specs: list[str], passing: bool = True) -> None:
-    """Write a synthetic test file under tests/ whose module-level docstring cites the given spec IDs."""
-    tests_dir = project_root / "tests"
-    tests_dir.mkdir(exist_ok=True)
-    spec_lines = "\n".join(f"- {s}" for s in docstring_specs)
-    pass_or_fail = "    assert True" if passing else "    assert False"
-    body = f'''"""Synthetic test for {name}.
-
-Linked specs:
-{spec_lines}
-"""
-
-def test_synth_{name.replace("-", "_")}():
-{pass_or_fail}
-'''
-    (tests_dir / f"test_{name}.py").write_text(body, encoding="utf-8")
+@pytest.mark.parametrize("test_root", ["tests", "groundtruth-kb/tests", "platform_tests"])
+def test_each_supported_root_runs_real_pytest_without_full_verification(setup, capsys, test_root):
+    write_test(setup[1], test_root + "/test_probe.py")
+    code, report = observe(setup, capsys)
+    assert code == 1 and report["result"] == "PARTIAL"
+    assert report["execution_result"] == "PASS" and report["inputs_unchanged"]
+    execution = next(iter(report["executions"].values()))
+    assert execution["passed"] == 1 and execution["returncode"] == 0
 
 
-def _seed_db(project_root: Path, delibs: list[dict] = None, delib_specs: list[tuple[str, str]] = None) -> None:
-    """Create a minimal groundtruth.db with deliberations + deliberation_specs tables."""
-    delibs = delibs or []
-    delib_specs = delib_specs or []
-    db_path = project_root / "groundtruth.db"
-    conn = sqlite3.connect(db_path)
-    conn.executescript(
-        """
-        CREATE TABLE deliberations (
-            id TEXT, version INTEGER, spec_id TEXT, work_item_id TEXT,
-            source_type TEXT, source_ref TEXT, title TEXT, summary TEXT,
-            content TEXT, content_hash TEXT, participants TEXT,
-            session_id TEXT, outcome TEXT
-        );
-        CREATE TABLE deliberation_specs (
-            deliberation_id TEXT, spec_id TEXT, role TEXT
-        );
-        """
+def test_mixed_roots_execute_without_conftest_import_collisions(setup, capsys):
+    for test_root in setup[0].TEST_ROOTS:
+        write_test(setup[1], test_root + "/test_probe.py")
+        (setup[1] / test_root / "conftest.py").write_text("import pytest\n", encoding="utf-8")
+    code, report = observe(setup, capsys)
+    assert code == 1 and len(report["executions"]) == 3
+    assert report["execution_result"] == "PASS"
+
+
+def test_unknown_requirement_cannot_pass_from_local_docstring(setup, capsys):
+    write_test(setup[1])
+    setup[3].specs.clear()
+    code, report = observe(setup, capsys)
+    assert code == 2 and report["problems"] == ["not_found"] and not report["executions"]
+
+
+@pytest.mark.parametrize("status", ["retired", "superseded", "draft", None])
+def test_inactive_requirement_is_visible_failure(setup, capsys, status):
+    setup[3].specs["SPEC-1"]["status"] = status
+    write_test(setup[1])
+    code, report = observe(setup, capsys)
+    assert code == 2 and "inactive_requirement" in report["problems"][0]
+
+
+def test_registry_pagination_and_exact_selector_run_unreferenced_test(setup, capsys):
+    write_test(
+        setup[1],
+        "platform_tests/check.py",
+        body="class TestScope:\n    def test_pass(self):\n        assert True\n\ndef test_unselected():\n    assert False\n",
+        docstring="No linked requirement",
     )
-    for d in delibs:
-        conn.execute(
-            "INSERT INTO deliberations (id, version, source_type, outcome, content) VALUES (?, ?, ?, ?, ?)",
-            (d["id"], d.get("version", 1), d.get("source_type", ""), d.get("outcome", ""), d.get("content", "")),
-        )
-    for did, sid in delib_specs:
-        conn.execute(
-            "INSERT INTO deliberation_specs (deliberation_id, spec_id, role) VALUES (?, ?, ?)",
-            (did, sid, "linked"),
-        )
-    conn.commit()
-    conn.close()
+    setup[3].tests = [
+        {
+            "id": f"TEST-{n}",
+            "version": 1,
+            "spec_id": "SPEC-1",
+            "test_file": "platform_tests/check.py",
+            "test_class": "TestScope",
+            "test_function": "test_pass",
+            "last_result": "FAIL",
+        }
+        for n in (1, 2)
+    ]
+    code, report = observe(setup, capsys)
+    assert code == 1 and report["execution_result"] == "PASS"
+    assert report["matrix"]["SPEC-1"]["registered_tests"] == ["TEST-1", "TEST-2"]
+    assert len(report["executions"]) == 1
+    assert any(q and q.get("after") == "TEST-1" for _, _, q in setup[3].calls)
 
 
-# ---------------------------------------------------------------------------
-# DCL-VERIFIED-BRIDGE-HISTORY-001 — Procedure step 1 (ERR_NO_INDEX_ENTRY)
-# ---------------------------------------------------------------------------
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("test_file", None),
+        ("test_file", "../outside.py"),
+        ("test_file", "elsewhere.py"),
+        ("test_file", "platform_tests/missing.py"),
+        ("test_file", "platform_tests/test_probe.py::test_observed"),
+        ("test_class", "--help"),
+        ("test_function", "bad()"),
+        ("test_function", ""),
+    ],
+)
+def test_invalid_registered_target_cannot_be_waived_by_passing_discovery(setup, capsys, field, value):
+    write_test(setup[1])
+    row = {"id": "TEST-1", "version": 1, "spec_id": "SPEC-1", "test_file": "platform_tests/test_probe.py"}
+    row[field] = value
+    setup[3].tests = [row]
+    code, report = observe(setup, capsys)
+    assert code == 2 and any("TEST-1" in p for p in report["problems"]) and not report["executions"]
 
 
-def test_runner_fails_closed_when_document_not_in_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Step 1 fail-closed: missing INDEX entry returns ERR_NO_INDEX_ENTRY."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text("Document: other-thing\nNEW: bridge/foo-001.md\n", encoding="utf-8")
-    rc = runner.run(bridge_id="missing-thing")
-    assert rc == 2  # ERR_NO_INDEX_ENTRY exit code
+def test_function_docstrings_and_longer_identifiers_do_not_supply_coverage(setup, capsys):
+    write_test(setup[1], body='def test_pass():\n    """SPEC-1"""\n    assert True\n', docstring="SPEC-10 SPEC-1-EXTRA")
+    code, report = observe(setup, capsys)
+    assert code == 2 and "SPEC-1: no_derived_tests" in report["problems"]
 
 
-def test_runner_resolves_versioned_bridge_files_without_index(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    """No-index bridge state: status-bearing version files replace INDEX lookup."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    bridge_id = "no-index-thread"
-    (tmp_path / "bridge").mkdir()
-    _seed_bridge_file(
-        tmp_path,
-        f"{bridge_id}-001.md",
-        spec_links=["SPEC-NOINDEX-001"],
-        status_header="NEW",
+def test_dry_run_reports_no_execution_or_pass(setup, capsys):
+    write_test(setup[1], body="def test_would_fail():\n    assert False\n")
+    code, report = observe(setup, capsys, dry_run=True)
+    assert code == 1 and report["execution_result"] == "NOT_RUN" and not report["executions"]
+
+
+@pytest.mark.parametrize(
+    "body,reason",
+    [
+        ("def test_bad():\n    assert False\n", "pytest_nonzero_exit"),
+        ("import pytest\ndef test_skip():\n    pytest.skip('unavailable')\n", "incomplete_execution"),
+        ("def no_test():\n    pass\n", "pytest_nonzero_exit"),
+        ("raise RuntimeError('collection error')\n", "pytest_nonzero_exit"),
+    ],
+)
+def test_real_pytest_incomplete_or_failed_execution_is_nonpassing(setup, capsys, body, reason):
+    write_test(setup[1], body=body)
+    code, report = observe(setup, capsys)
+    assert code == 2 and report["execution_result"] == "FAIL"
+    assert next(iter(report["executions"].values()))["reason"] == reason
+
+
+def test_nonzero_pytest_exit_cannot_be_overridden_by_passing_test(setup, capsys):
+    write_test(setup[1])
+    (setup[1] / "conftest.py").write_text(
+        "def pytest_sessionfinish(session, exitstatus):\n    session.exitstatus = 2\n", encoding="utf-8"
     )
-    _seed_test_file(tmp_path, "noindex", ["SPEC-NOINDEX-001"])
-
-    rc = runner.run(bridge_id=bridge_id, dry_run=True)
-
-    captured = capsys.readouterr()
-    assert rc == 0
-    assert "Bridge: no-index-thread" in captured.out
-    assert "Overall verified: DRY-RUN" in captured.out
-
-
-# ---------------------------------------------------------------------------
-# DCL-VERIFIED-BRIDGE-HISTORY-001 — Procedure step 2 (enumerate ALL versions)
-# ---------------------------------------------------------------------------
-
-
-def test_runner_enumerates_all_versions_regardless_of_status(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Step 2: All versions of a document are read, not just the latest."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("VERIFIED", "thread-004.md"),
-            ("NEW", "thread-003.md"),
-            ("GO", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(tmp_path, "thread-001.md", status_header="NEW")
-    _seed_bridge_file(tmp_path, "thread-002.md", status_header="GO")
-    _seed_bridge_file(tmp_path, "thread-003.md", status_header="NEW")
-    _seed_bridge_file(tmp_path, "thread-004.md", status_header="VERIFIED")
-    versions = runner._parse_index_for_document("thread")
-    assert len(versions) == 4
-    statuses = [v.status for v in versions]
-    assert statuses == ["VERIFIED", "NEW", "GO", "NEW"]
-
-
-# ---------------------------------------------------------------------------
-# DCL-VERIFIED-BRIDGE-HISTORY-001.A1 — Union accumulation across versions
-# ---------------------------------------------------------------------------
-
-
-def test_runner_unions_specs_across_all_versions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A1: REVISED versions can ADD specs without disruption; the union is computed."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("REVISED", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_bridge_file(tmp_path, "thread-002.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="REVISED")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"])
-    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"])
-    rc = runner.run(bridge_id="thread", json_output=True, advisory=True)
-    # The test counts what the runner returns; stdout capture not needed for unit coverage.
-    assert rc == 0  # advisory always 0
-
-
-# ---------------------------------------------------------------------------
-# DCL-VERIFIED-BRIDGE-HISTORY-001.A2 — Removal requires waiver
-# ---------------------------------------------------------------------------
-
-
-def test_runner_rejects_removal_without_waiver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A2: removed specs without waiver fail closed with ERR_REMOVAL_WITHOUT_WAIVER."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("REVISED", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="NEW")
-    _seed_bridge_file(
-        tmp_path, "thread-002.md", spec_links=["SPEC-B-001"], status_header="REVISED"
-    )  # SPEC-A removed; no waiver
-    rc = runner.run(bridge_id="thread")
-    assert rc == 3  # ERR_REMOVAL_WITHOUT_WAIVER
-
-
-def test_runner_strips_code_fenced_examples_from_waiver_extraction(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Code-fenced waiver schemas (e.g., proposal §1.5 examples) must NOT be
-    parsed as real waivers. Regression for the dogfood bug where -003's
-    embedded schema example produced false-positive waiver-validation errors."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    (tmp_path / "bridge" / "thread-001.md").write_text(
-        "NEW\n\n# Synthetic\n\n## Specification Links\n\n- `SPEC-A-001`\n\n"
-        "## Specification-Coverage-Waivers\n\n"
-        "(Schema example follows in a code fence; not a real waiver.)\n\n"
-        "```markdown\n"
-        "## Specification-Coverage-Waivers\n\n"
-        "- spec_id: SPEC-EXAMPLE\n"
-        "  approved_by: DELIB-FAKE\n"
-        "  applies_from_version: 003\n"
-        "```\n",
-        encoding="utf-8",
-    )
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    waivers = runner._extract_waivers_section((tmp_path / "bridge" / "thread-001.md").read_text(encoding="utf-8"))
-    # Code-fenced waiver entries should NOT be parsed.
-    assert "SPEC-EXAMPLE" not in waivers
-
-
-def test_runner_strips_code_fenced_spec_ids_from_link_extraction(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Spec IDs in code-fenced blocks (illustrative pseudocode) must NOT be
-    counted as cited specs. Otherwise example code referencing 'SPEC-X-001'
-    in a snippet would inflate the spec coverage count."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    content = (
-        "## Specification Links\n\n- `SPEC-REAL-001`\n\n"
-        "## Pseudocode\n\n```python\n# Example: SPEC-FAKE-001 is illustrative\n```\n"
-    )
-    extracted = runner._extract_spec_links_section(content)
-    assert "SPEC-REAL-001" in extracted
-    # Pseudocode is in a separate section; even if it were inside Spec Links,
-    # the fence stripper would exclude it.
-
-
-def test_runner_a2_treats_carry_forward_revised_as_non_removal(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A1 + A2: a REVISED proposal that carries forward via prose ("Carried
-    forward from -001 unchanged") rather than re-enumerating is NOT a removal.
-    A2 only fires when a Prime version EXPLICITLY emits a Specification Links
-    section that omits a previously-cited spec.
-
-    Regression for the dogfood bug: -003 of this very thread says
-    "(Carried forward from `-001` §Specification Links unchanged.)" — the
-    extractor sees no SPEC-* tokens in -003's section, but A1 union from -001
-    still has them. A2 should not flag this as removal.
-    """
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("REVISED", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    # -002 has a Specification Links section with no enumerated SPEC-* tokens
-    # (carry-forward via prose). Empty enumeration → no A2 trigger.
-    (tmp_path / "bridge" / "thread-002.md").write_text(
-        "REVISED\n\n# Synthetic\n\n## Specification Links\n\n"
-        "(Carried forward from `-001` §Specification Links unchanged.)\n",
-        encoding="utf-8",
-    )
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    rc = runner.run(bridge_id="thread")
-    assert rc == 0
-
-
-def test_runner_a2_uses_operative_prime_version_not_verdict_file(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """A2 + operative-Prime-version pattern: when the latest version is a
-    Codex verdict file (GO/NO-GO/VERIFIED), A2 enforcement compares against
-    the most-recent NEW/REVISED, not the verdict file. Codex verdicts don't
-    carry Specification Links sections.
-
-    This catches the dogfood bug surfaced when running the runner against
-    its own bridge thread: the GO verdict at the top has no spec section, so
-    a naive 'compare to latest version' rule fires false-positive
-    ERR_REMOVAL_WITHOUT_WAIVER.
-    """
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("GO", "thread-002.md"),  # Codex verdict — no spec section
-            ("NEW", "thread-001.md"),  # Prime proposal — cites SPEC-A
-        ],
-    )
-    # Verdict file (no Specification Links section)
-    (tmp_path / "bridge" / "thread-002.md").write_text(
-        "GO\n\n# Loyal Opposition Review\n\nApproved.\n", encoding="utf-8"
-    )
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    rc = runner.run(bridge_id="thread")
-    # Should pass: SPEC-A-001 is cited in the Prime version (the latest among
-    # NEW/REVISED), no removal occurred, derived test passes.
-    assert rc == 0
-
-
-def test_runner_accepts_removal_with_owner_waiver(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """A2: removed specs WITH owner-approved waiver are accepted; spec marked waived."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
-            {
-                "id": "DELIB-100",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "Retire SPEC-A-001",
-            }
-        ],
-        delib_specs=[("DELIB-100", "SPEC-A-001")],
-    )
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("REVISED", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="NEW")
-    _seed_bridge_file(
-        tmp_path,
-        "thread-002.md",
-        spec_links=["SPEC-B-001"],
-        status_header="REVISED",
-        waivers=[{"spec_id": "SPEC-A-001", "approved_by": "DELIB-100", "applies_from_version": 2, "reason": "retired"}],
-    )
-    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"])
-    rc = runner.run(bridge_id="thread", json_output=True, advisory=True)
-    assert rc == 0
-
-
-# ---------------------------------------------------------------------------
-# F3 negative tests — waiver validation per Codex -002 F3 + -003 §1.5
-# ---------------------------------------------------------------------------
-
-
-def test_waiver_validation_rejects_nonexistent_delib_reference(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path)  # empty DB
-    waiver = runner.Waiver(spec_id="SPEC-X", approved_by="DELIB-999", applies_from_version=1)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "nonexistent_delib"
-
-
-def test_waiver_validation_rejects_non_owner_decision_delib(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(tmp_path, delibs=[{"id": "DELIB-200", "source_type": "lo_review", "outcome": "informational"}])
-    waiver = runner.Waiver(spec_id="SPEC-X", approved_by="DELIB-200", applies_from_version=1)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "not_owner_decision"
-
-
-def test_waiver_validation_rejects_waiver_for_wrong_spec(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
-            {
-                "id": "DELIB-300",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "About something else entirely",
-            }
-        ],
-        delib_specs=[("DELIB-300", "SPEC-Y-001")],
-    )
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="DELIB-300", applies_from_version=1)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "wrong_spec"
-
-
-def test_waiver_validation_rejects_empty_approved_by(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    waiver = runner.Waiver(spec_id="SPEC-X", approved_by="", applies_from_version=1)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "malformed"
-
-
-def test_waiver_validation_rejects_negative_applies_from_version(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex Q2: applies_from_version must be a non-negative int (0 acceptable as 'before 001')."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[{"id": "DELIB-400", "source_type": "owner_conversation", "outcome": "owner_decision"}],
-        delib_specs=[("DELIB-400", "SPEC-X-001")],
-    )
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="DELIB-400", applies_from_version=-1)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "version_mismatch"
-
-
-def test_waiver_validation_rejects_missing_applies_from_version(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    waiver = runner.Waiver(spec_id="SPEC-X", approved_by="DELIB-500", applies_from_version=None)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "version_mismatch"
-
-
-def test_waiver_validation_accepts_valid_owner_approval(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
-            {
-                "id": "DELIB-600",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "Approving retirement of SPEC-X-001",
-            }
-        ],
-        delib_specs=[("DELIB-600", "SPEC-X-001")],
-    )
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="DELIB-600", applies_from_version=2)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err is None
-
-
-def test_waiver_validation_accepts_formal_approval_packet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    approvals_dir = tmp_path / ".groundtruth" / "formal-artifact-approvals"
-    approvals_dir.mkdir(parents=True)
-    (approvals_dir / "spec-x-retirement.json").write_text(
-        json.dumps({"artifact_id": "SPEC-X-001", "approval_mode": "manual"}),
-        encoding="utf-8",
-    )
-    waiver = runner.Waiver(
-        spec_id="SPEC-X-001", approved_by="approval_packet:spec-x-retirement.json", applies_from_version=2
-    )
-    err = runner._validate_waiver_evidence(waiver)
-    assert err is None
-
-
-def test_waiver_validation_rejects_nonexistent_approval_packet(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:missing.json", applies_from_version=2)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "nonexistent_packet"
-
-
-def test_waiver_validation_rejects_packet_with_wrong_artifact_id(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    approvals_dir = tmp_path / ".groundtruth" / "formal-artifact-approvals"
-    approvals_dir.mkdir(parents=True)
-    (approvals_dir / "wrong.json").write_text(
-        json.dumps({"artifact_id": "SPEC-Y-001", "approval_mode": "manual"}),
-        encoding="utf-8",
-    )
-    waiver = runner.Waiver(spec_id="SPEC-X-001", approved_by="approval_packet:wrong.json", applies_from_version=2)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "wrong_spec"
-
-
-def test_waiver_validation_rejects_malformed_approved_by(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    waiver = runner.Waiver(spec_id="SPEC-X", approved_by="just-some-text", applies_from_version=1)
-    err = runner._validate_waiver_evidence(waiver)
-    assert err == "malformed"
-
-
-# ---------------------------------------------------------------------------
-# DCL-VERIFIED-BRIDGE-HISTORY-001 — Procedure step 5 (derived test discovery)
-# ---------------------------------------------------------------------------
-
-
-def test_runner_discovers_derived_tests_via_docstring_citation(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Step 5: a test file whose docstring cites SPEC-X-001 is found for that spec."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_test_file(tmp_path, "matched", ["SPEC-X-001"])
-    _seed_test_file(tmp_path, "unmatched", ["SPEC-Y-002"])
-    matches = runner._discover_derived_tests("SPEC-X-001")
-    assert len(matches) == 1
-    assert "test_matched.py" in matches[0]
-
-
-def test_runner_excludes_function_level_docstrings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Conservative discovery: only module-level docstrings count."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    tests_dir = tmp_path / "tests"
-    tests_dir.mkdir()
-    (tests_dir / "test_function_level.py").write_text(
-        '"""Module docstring without spec citations."""\n\ndef test_x():\n    """Per SPEC-X-001."""\n    pass\n',
-        encoding="utf-8",
-    )
-    matches = runner._discover_derived_tests("SPEC-X-001")
-    assert matches == []
-
-
-# ---------------------------------------------------------------------------
-# Procedure steps 6-7 (pytest execution + VERIFIED criteria)
-# ---------------------------------------------------------------------------
-
-
-def test_runner_returns_verified_only_when_all_specs_have_passing_tests(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Step 7: coverage gap (no test for spec) returns non-VERIFIED + non-zero exit."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-NO-TESTS-001"], status_header="NEW")
-    rc = runner.run(bridge_id="thread")
-    assert rc == 5  # ERR_VERIFIED_GATE_FAILED
-
-
-def test_runner_advisory_mode_exits_zero_on_coverage_gap(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """F2 fix: --advisory turns gate failure into exit 0 with warning."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-NO-TESTS-001"], status_header="NEW")
-    rc = runner.run(bridge_id="thread", advisory=True)
-    assert rc == 0
-
-
-def test_runner_default_invocation_fails_closed_on_no_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """F2 fix: missing INDEX entry → fail-closed (default mode)."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    (tmp_path / "bridge").mkdir()
-    (tmp_path / "bridge" / "INDEX.md").write_text("", encoding="utf-8")
-    rc = runner.run(bridge_id="anything")
-    assert rc == 2
-
-
-def test_runner_default_invocation_exits_zero_on_fully_verified_thread(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """F2 fix: fully-passing thread → exit 0 in default fail-closed mode."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    rc = runner.run(bridge_id="thread")
-    assert rc == 0
-
-
-# ---------------------------------------------------------------------------
-# Procedure step 8 — JSON output schema
-# ---------------------------------------------------------------------------
-
-
-def test_runner_outputs_per_spec_execution_matrix_as_json(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
-) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    rc = runner.run(bridge_id="thread", json_output=True)
-    captured = capsys.readouterr()
-    payload = json.loads(captured.out)
-    assert payload["bridge_document_name"] == "thread"
-    assert "matrix" in payload
-    assert "SPEC-A-001" in payload["matrix"]
-    assert payload["matrix"]["SPEC-A-001"]["verified"] is True
-    assert payload["verified_overall"] is True
-    assert rc == 0
-
-
-# ---------------------------------------------------------------------------
-# Governing-spec coverage per F1 closure
-# ---------------------------------------------------------------------------
-
-
-def test_runner_makes_zero_writes_to_bridge_index_md(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """GOV-FILE-BRIDGE-AUTHORITY-001 + ``.claude/rules/bridge-essential.md``:
-    the runner is read-only against ``bridge/INDEX.md``. ``bridge-essential.md``
-    states that ``INDEX.md`` is canonical state and must not be mutated by
-    readers; this test asserts mechanical compliance."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    index_path = tmp_path / "bridge" / "INDEX.md"
-    sha_before = index_path.read_bytes()
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    runner.run(bridge_id="thread", json_output=True)
-    sha_after = index_path.read_bytes()
-    assert sha_before == sha_after
-
-
-def test_runner_default_exit_code_is_failclosed_on_unverified_state(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """DCL-MECHANICAL-ENFORCEMENT-MANDATORY-001: exit code IS the enforcement signal."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-COVERAGE-GAP"], status_header="NEW")
-    rc = runner.run(bridge_id="thread")
-    assert rc != 0
-
-
-def test_runner_output_is_deterministic_across_repeated_invocations(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
-) -> None:
-    """DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE: identical input → identical output."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001", "SPEC-B-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
-    runner.run(bridge_id="thread", json_output=True)
-    out1 = capsys.readouterr().out
-    runner.run(bridge_id="thread", json_output=True)
-    out2 = capsys.readouterr().out
-    assert out1 == out2
-
-
-def test_runner_json_output_schema_validates_against_consumer_contract(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys
-) -> None:
-    """ADR-CODEX-HOOK-PARITY-FALLBACK-001 + ``.claude/rules/codex-review-gate.md``:
-    JSON output keys match the consumer contract used by the Codex review
-    skill. ``codex-review-gate.md`` is the procedural rule that wires the
-    review skill to runner output; the runtime invariant the rule depends
-    on is the schema asserted here, so this test serves both linked
-    artifacts."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    runner.run(bridge_id="thread", json_output=True)
-    payload = json.loads(capsys.readouterr().out)
-    required_top_keys = {
-        "bridge_document_name",
-        "cited_specs_count",
-        "matrix",
-        "verified_overall",
-        "waivers_applied",
-        "waiver_errors",
+    code, report = observe(setup, capsys)
+    execution = next(iter(report["executions"].values()))
+    assert code == 2 and execution["passed"] == 1 and execution["returncode"] == 2
+
+
+def test_actual_pytest_timeout_is_failure(setup, capsys):
+    write_test(setup[1], body="import time\ndef test_slow():\n    time.sleep(10)\n")
+    code, report = observe(setup, capsys, pytest_timeout_s=1)
+    assert code == 2 and next(iter(report["executions"].values()))["reason"] == "pytest_timeout"
+
+
+@pytest.mark.parametrize("change", ["modify", "add", "delete", "config"])
+def test_source_change_during_actual_execution_invalidates_report(setup, capsys, change):
+    bodies = {
+        "modify": "p=Path(__file__); p.write_text(p.read_text()+'\\n# changed\\n')",
+        "add": "Path(__file__).with_name('test_added.py').write_text('def test_new(): pass')",
+        "delete": "Path(__file__).unlink()",
+        "config": "Path('groundtruth.toml').write_text('[groundtruth]\\n')",
     }
-    assert required_top_keys <= set(payload.keys())
-    for spec_entry in payload["matrix"].values():
-        required_entry_keys = {"tests_found", "tests_passed", "tests_failed", "verified", "reason"}
-        assert required_entry_keys <= set(spec_entry.keys())
+    write_test(setup[1], body="from pathlib import Path\ndef test_change():\n    " + bodies[change] + "\n")
+    code, report = observe(setup, capsys)
+    assert code == 2 and report["inputs_unchanged"] is False
+    assert "selected_inputs_changed" in report["problems"]
 
 
-def test_runner_writes_no_files_outside_project_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """`.claude/rules/project-root-boundary.md`: no out-of-root writes."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    files_before = sorted(p.name for p in tmp_path.rglob("*") if p.is_file())
-    runner.run(bridge_id="thread", json_output=True, advisory=True)
-    files_after = sorted(p.name for p in tmp_path.rglob("*") if p.is_file())
-    # Allow for pytest's __pycache__ creation in the tests dir; assert no
-    # unexpected new top-level files.
-    assert "INDEX.md" in files_before
-    assert "INDEX.md" in files_after
+@pytest.mark.parametrize("change", ["version", "unavailable", "new_test"])
+def test_canonical_change_or_loss_invalidates_passing_execution(setup, capsys, change):
+    write_test(setup[1])
+    reads = []
+
+    def change_on_second_read(path):
+        if path.endswith("/SPEC-1"):
+            reads.append(path)
+            if len(reads) == 2:
+                if change == "unavailable":
+                    raise AuthorityClientError("authority_unavailable", "Unavailable")
+                if change == "version":
+                    setup[3].specs["SPEC-1"]["version"] = 2
+                else:
+                    setup[3].tests.append({"id": "TEST-2", "version": 1, "spec_id": "SPEC-1"})
+
+    setup[3].on_read = change_on_second_read
+    code, report = observe(setup, capsys)
+    assert code == 2 and report["result"] == "FAIL"
 
 
-def test_runner_parses_document_block_format_per_protocol(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that _status_from_bridge_file extracts the status token correctly."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-
-    # Create files on disk
-    (bridge_dir / "thread-a-001.md").write_text("NEW\n", encoding="utf-8")
-    (bridge_dir / "thread-a-002.md").write_text("GO\n", encoding="utf-8")
-    (bridge_dir / "thread-b-001.md").write_text("  * REVISED\n", encoding="utf-8")
-
-    versions_a = runner._parse_index_for_document("thread-a")
-    versions_b = runner._parse_index_for_document("thread-b")
-    assert len(versions_a) == 2
-    assert len(versions_b) == 1
-    assert [v.status for v in versions_a] == ["GO", "NEW"]
-    assert versions_b[0].status == "REVISED"
+def test_work_item_selection_uses_current_context_and_preserves_it(setup, capsys):
+    write_test(setup[1])
+    setup[3].context = {
+        "work_item": {"id": "WI-1", "version": 1},
+        "specifications": [setup[3].specs["SPEC-1"]],
+        "test": None,
+    }
+    before = copy.deepcopy(setup[3].context)
+    code = setup[0].run(config_path=setup[2], work_item="WI-1", json_output=True)
+    report = json.loads(capsys.readouterr().out)
+    assert code == 1 and report["execution_result"] == "PASS" and setup[3].context == before
 
 
-def test_runner_rejects_malformed_document_blocks(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Verifies that malformed or status-less files are ignored or skipped, but valid status lines work."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    bridge_dir = tmp_path / "bridge"
-    bridge_dir.mkdir()
-
-    # Write one file with a valid status but comments
-    (bridge_dir / "foo-001.md").write_text("> GO\n", encoding="utf-8")
-    # Write one file with no valid status
-    (bridge_dir / "foo-002.md").write_text("this-is-not-a-status-line\n", encoding="utf-8")
-
-    versions = runner._parse_index_for_document("foo")
-    # foo-002 should be ignored because status is None, leaving only foo-001
-    assert len(versions) == 1
-    assert versions[0].status == "GO"
-    assert versions[0].version_number == 1
+@pytest.mark.parametrize("argument", ["--bridge-id", "--advisory", "--strict"])
+def test_retired_bridge_and_waiver_modes_are_rejected(runner, argument):
+    with pytest.raises(SystemExit) as error:
+        runner.main(["--config", "unused.toml", "--spec", "SPEC-1", argument, "old-thread"])
+    assert error.value.code == 2
 
 
-# ---------------------------------------------------------------------------
-# Backward compatibility: --strict accepted as no-op
-# ---------------------------------------------------------------------------
+def test_no_authority_has_no_sqlite_or_bridge_fallback(setup, capsys):
+    setup[2].write_text('[groundtruth]\nproject_root="."\n', encoding="utf-8")
+    sentinel = setup[1] / "groundtruth.db"
+    sentinel.write_bytes(b"must remain unopened")
+    (setup[1] / "bridge").mkdir()
+    bridge = setup[1] / "bridge/probe-001.md"
+    bridge.write_text("VERIFIED\nSPEC-1\n", encoding="utf-8")
+    code, report = observe(setup, capsys)
+    assert code == 2 and report["problems"] == ["native_authority_required"]
+    assert sentinel.read_bytes() == b"must remain unopened" and bridge.read_text() == "VERIFIED\nSPEC-1\n"
 
 
-def test_runner_accepts_strict_flag_as_noop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Per Codex non-blocking note: --strict accepted as no-op without masking failure."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    rc = runner.main(["--bridge-id", "thread", "--strict", "--json"])
-    assert rc == 0
+def test_malformed_source_is_not_silently_omitted(setup, capsys):
+    write_test(setup[1], body="def bad syntax\n")
+    code, report = observe(setup, capsys)
+    assert code == 2 and "invalid_test_source" in report["problems"][0]
 
 
-# ---------------------------------------------------------------------------
-# CLI argparse + entry point
-# ---------------------------------------------------------------------------
-
-
-def test_runner_cli_requires_bridge_id() -> None:
-    runner = _load_runner()
-    with pytest.raises(SystemExit):
-        runner.main([])
-
-
-def test_runner_cli_advisory_flag_propagates(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(tmp_path, "thread-001.md", spec_links=["SPEC-A-001"], status_header="NEW")
-    # No test file -> coverage gap; in advisory mode rc=0.
-    rc = runner.main(["--bridge-id", "thread", "--advisory", "--json"])
-    assert rc == 0
-
-
-# ---------------------------------------------------------------------------
-# Codex `-006` F1 — DELIB and rule-file path extraction + discovery
-# ---------------------------------------------------------------------------
-
-
-def test_runner_extracts_delib_ids_from_spec_links_section(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Codex `-006` F1 closure: DELIB-* IDs cited in Specification Links must
-    be extracted into the runner matrix, not silently dropped because of a
-    too-narrow ID prefix regex."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    content = (
-        "## Specification Links\n\n"
-        "- `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` — deterministic CLI.\n"
-        "- `SPEC-FOO-001` — companion spec.\n"
+def test_native_service_and_separate_cli_report_without_canonical_writes(native, tmp_path):
+    service, client, _, service_name = native
+    assert (
+        put(
+            client,
+            "specifications",
+            "SPEC-1",
+            {"title": "Selected behavior", "description": "Keep selected tests bounded", "status": "active"},
+        ).status_code
+        == 200
     )
-    extracted = runner._extract_spec_links_section(content)
-    assert "DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE" in extracted
-    assert "SPEC-FOO-001" in extracted
-
-
-def test_runner_extracts_rule_file_paths_from_spec_links_section(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex `-006` F1 closure: `.claude/rules/*.md` paths cited in
-    Specification Links must be extracted into the runner matrix."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    content = (
-        "## Specification Links\n\n"
-        "- `.claude/rules/file-bridge-protocol.md` — bridge protocol.\n"
-        "- `.claude/rules/project-root-boundary.md` — root boundary.\n"
-    )
-    extracted = runner._extract_spec_links_section(content)
-    assert ".claude/rules/file-bridge-protocol.md" in extracted
-    assert ".claude/rules/project-root-boundary.md" in extracted
-
-
-def test_runner_discovers_tests_for_delib_ids(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Codex `-006` F1 closure: a test whose module docstring cites
-    DELIB-X is discoverable for that DELIB-X."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_test_file(tmp_path, "delib_match", ["DELIB-S999-EXAMPLE"], passing=True)
-    matches = runner._discover_derived_tests("DELIB-S999-EXAMPLE")
-    assert len(matches) == 1
-    assert "test_delib_match.py" in matches[0]
-
-
-def test_runner_discovers_tests_for_rule_file_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Codex `-006` F1 closure: a test whose module docstring cites a
-    rule-file path (e.g. ``.claude/rules/example.md``) is discoverable for
-    that path. Word-boundary anchoring is omitted for paths because `.` and
-    `/` are non-word characters."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_test_file(tmp_path, "rule_match", [".claude/rules/example.md"], passing=True)
-    matches = runner._discover_derived_tests(".claude/rules/example.md")
-    assert len(matches) == 1
-    assert "test_rule_match.py" in matches[0]
-
-
-def test_runner_full_flow_includes_delib_and_rule_paths_in_matrix(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex `-006` F1 closure: end-to-end — a thread that lists DELIB-*
-    and rule-path artifacts in Specification Links plus tests that cite
-    those artifacts in their docstrings exits 0 with all five entries
-    appearing in the matrix."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_index(tmp_path, "thread", [("NEW", "thread-001.md")])
-    _seed_bridge_file(
-        tmp_path,
-        "thread-001.md",
-        spec_links=[
-            "SPEC-A-001",
-            "DELIB-S888-EXAMPLE",
-            ".claude/rules/example-rule.md",
-        ],
-        status_header="NEW",
-    )
-    _seed_test_file(tmp_path, "spec_a", ["SPEC-A-001"], passing=True)
-    _seed_test_file(tmp_path, "delib_x", ["DELIB-S888-EXAMPLE"], passing=True)
-    _seed_test_file(tmp_path, "rule_x", [".claude/rules/example-rule.md"], passing=True)
-    rc = runner.run(bridge_id="thread", json_output=True)
-    assert rc == 0
-
-
-# ---------------------------------------------------------------------------
-# Codex `-006` F2 — Waiver effective-version coherence
-# ---------------------------------------------------------------------------
-
-
-def test_waiver_validation_rejects_future_effective_waiver_when_removal_version_known(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex `-006` F2 closure: a waiver with applies_from_version greater
-    than the version where the spec was removed is a future-effective waiver
-    that retroactively authorizes a removal before its own effective version.
-    It must be rejected with ``version_mismatch``.
-
-    Concrete example required by Codex `-006`: ``applies_from_version: 999``
-    on a version-002 removal."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
+    assert (
+        put(
+            client,
+            "tests",
+            "TEST-1",
             {
-                "id": "DELIB-700",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "About SPEC-X-001",
-            }
-        ],
-        delib_specs=[("DELIB-700", "SPEC-X-001")],
+                "title": "Actual selected execution",
+                "test_type": "integration",
+                "spec_id": "SPEC-1",
+                "expected_outcome": "Selected execution is partial",
+                "test_file": "platform_tests/test_probe.py",
+                "test_function": "test_observed",
+            },
+        ).status_code
+        == 200
     )
-    waiver = runner.Waiver(
-        spec_id="SPEC-X-001",
-        approved_by="DELIB-700",
-        applies_from_version=999,
+    before = {
+        domain: client.get(f"/v1/{domain}/{ident}").json()
+        for domain, ident in [("specifications", "SPEC-1"), ("tests", "TEST-1")]
+    }
+    with service.kernel.transaction(read_only=True) as tx:
+        history_before = tx.cursor.execute("SELECT count(*) AS count FROM record_history").fetchone()["count"]
+    write_test(tmp_path)
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    url = f"http://127.0.0.1:{port}"
+    server_config = tmp_path / "server.toml"
+    server_config.write_text(
+        f'[groundtruth]\nproject_root="."\n[postgresql]\nservice="{service_name}"\n', encoding="utf-8"
     )
-    err = runner._validate_waiver_evidence(waiver, removal_version=2)
-    assert err == "version_mismatch"
-
-
-def test_waiver_validation_accepts_waiver_effective_at_or_before_removal(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex `-006` F2 closure: a waiver with
-    applies_from_version <= removal_version is accepted (the waiver is
-    already effective at the time of removal)."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
-            {
-                "id": "DELIB-800",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "About SPEC-X-001",
-            }
-        ],
-        delib_specs=[("DELIB-800", "SPEC-X-001")],
-    )
-    # applies_from_version == removal_version: effective at removal.
-    waiver_at = runner.Waiver(
-        spec_id="SPEC-X-001",
-        approved_by="DELIB-800",
-        applies_from_version=2,
-    )
-    assert runner._validate_waiver_evidence(waiver_at, removal_version=2) is None
-    # applies_from_version < removal_version: effective before removal.
-    waiver_before = runner.Waiver(
-        spec_id="SPEC-X-001",
-        approved_by="DELIB-800",
-        applies_from_version=1,
-    )
-    assert runner._validate_waiver_evidence(waiver_before, removal_version=2) is None
-
-
-def test_runner_full_flow_rejects_removal_with_future_effective_waiver(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex `-006` F2 closure: end-to-end — a thread that removes a spec
-    in version 002 with a waiver claiming applies_from_version: 999 must
-    fail closed at exit code 4 (ERR_WAIVER_VERSION_MISMATCH)."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
-            {
-                "id": "DELIB-900",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "About SPEC-A-001",
-            }
-        ],
-        delib_specs=[("DELIB-900", "SPEC-A-001")],
-    )
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("REVISED", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(
-        tmp_path,
-        "thread-001.md",
-        spec_links=["SPEC-A-001", "SPEC-B-001"],
-        status_header="NEW",
-    )
-    _seed_bridge_file(
-        tmp_path,
-        "thread-002.md",
-        spec_links=["SPEC-B-001"],
-        status_header="REVISED",
-        waivers=[
-            {
-                "spec_id": "SPEC-A-001",
-                "approved_by": "DELIB-900",
-                "applies_from_version": 999,
-                "reason": "future-effective; should be rejected",
-            }
-        ],
-    )
-    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
-    rc = runner.run(bridge_id="thread")
-    assert rc == 4  # ERR_WAIVER_VERSION_MISMATCH
-
-
-def test_runner_full_flow_accepts_removal_with_effective_at_removal_waiver(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Codex `-006` F2 closure: end-to-end positive — a thread that removes
-    a spec in version 002 with a waiver effective from version 002 (or
-    earlier) is accepted."""
-    runner = _load_runner()
-    _patch_paths(monkeypatch, tmp_path)
-    _seed_db(
-        tmp_path,
-        delibs=[
-            {
-                "id": "DELIB-1000",
-                "source_type": "owner_conversation",
-                "outcome": "owner_decision",
-                "content": "About SPEC-A-001",
-            }
-        ],
-        delib_specs=[("DELIB-1000", "SPEC-A-001")],
-    )
-    _seed_index(
-        tmp_path,
-        "thread",
-        [
-            ("REVISED", "thread-002.md"),
-            ("NEW", "thread-001.md"),
-        ],
-    )
-    _seed_bridge_file(
-        tmp_path,
-        "thread-001.md",
-        spec_links=["SPEC-A-001", "SPEC-B-001"],
-        status_header="NEW",
-    )
-    _seed_bridge_file(
-        tmp_path,
-        "thread-002.md",
-        spec_links=["SPEC-B-001"],
-        status_header="REVISED",
-        waivers=[
-            {
-                "spec_id": "SPEC-A-001",
-                "approved_by": "DELIB-1000",
-                "applies_from_version": 2,
-                "reason": "effective at removal",
-            }
-        ],
-    )
-    _seed_test_file(tmp_path, "spec_b", ["SPEC-B-001"], passing=True)
-    rc = runner.run(bridge_id="thread")
-    assert rc == 0
+    config = tmp_path / "client.toml"
+    config.write_text(f'[groundtruth]\nproject_root="."\nauthority_url="{url}"\n', encoding="utf-8")
+    foreign = tmp_path / "foreign"
+    foreign.mkdir()
+    sentinel = foreign / "groundtruth.db"
+    sentinel.write_bytes(b"unchanged local sentinel")
+    env = dict(os.environ, PYTHONPATH=str(Path(groundtruth_kb.__file__).resolve().parent.parent))
+    for key in ("GT_AUTHORITY_URL", "GT_PROJECT_ROOT", "GTKB_PROJECT_ROOT"):
+        env.pop(key, None)
+    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    with (tmp_path / "service.log").open("wb") as log:
+        process = subprocess.Popen(
+            [
+                sys.executable,
+                "-m",
+                "groundtruth_kb",
+                "--config",
+                str(server_config),
+                "service",
+                "serve",
+                "--port",
+                str(port),
+            ],
+            cwd=tmp_path,
+            env=env,
+            stdout=log,
+            stderr=log,
+            creationflags=flags,
+        )
+        try:
+            deadline = time.monotonic() + 30
+            http = AuthorityClient(url, timeout=1)
+            while True:
+                try:
+                    http.request("GET", "/v1/status")
+                    break
+                except AuthorityClientError:
+                    if process.poll() is not None or time.monotonic() >= deadline:
+                        pytest.fail("Disposable service failed to start; inspect service.log")
+                    time.sleep(0.1)
+            client_env = {k: v for k, v in env.items() if not k.startswith(("PG", "GT_POSTGRES_"))}
+            client_env["GT_DB_PATH"] = str(sentinel)
+            observed = subprocess.run(
+                [sys.executable, str(RUNNER_PATH), "--config", str(config), "--spec", "SPEC-1", "--json"],
+                cwd=foreign,
+                env=client_env,
+                capture_output=True,
+                encoding="utf-8",
+                timeout=40,
+                creationflags=flags,
+            )
+            assert observed.returncode == 1, observed.stdout + observed.stderr
+            report = json.loads(observed.stdout)
+            assert report["execution_result"] == "PASS" and report["result"] == "PARTIAL"
+            assert report["verification_result"] == "UNASSESSED" and report["inputs_unchanged"]
+            for domain, ident in [("specifications", "SPEC-1"), ("tests", "TEST-1")]:
+                assert http.request("GET", f"/v1/{domain}/{ident}") == before[domain]
+        finally:
+            process.terminate()
+            process.wait(timeout=15)
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.cursor.execute("SELECT count(*) AS count FROM record_history").fetchone()["count"] == history_before
+    assert sentinel.read_bytes() == b"unchanged local sentinel"

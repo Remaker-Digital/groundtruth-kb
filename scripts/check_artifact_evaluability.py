@@ -13,9 +13,6 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-PACKAGE_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
-if str(PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(PACKAGE_SRC))
 
 from groundtruth_kb.assertions import _VALID_ASSERTION_TYPES, run_single_assertion  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402

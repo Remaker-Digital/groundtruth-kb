@@ -32,18 +32,6 @@ notes = "Written once at scaffold; adopter edits freely. Any scaffold_version bu
 
 [[artifacts]]
 class = "ownership-glob"
-id = "adopter-groundtruth-db"
-path_glob = "groundtruth.db"
-priority = 100
-initial_profiles = []
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "legacy-exception"
-upgrade_policy = "preserve"
-notes = "Fresh scaffold gitignores; Agent Red tracks. Owner decision pending on product default (S296-S299 context)."
-
-[[artifacts]]
-class = "ownership-glob"
 id = "adopter-bridge-files"
 path_glob = "bridge/**/*.md"
 priority = 50
@@ -98,27 +86,3 @@ upgrade_policy = "transient"
 # owner-decision-pending entries in the classification report. See
 # `bridge/gtkb-artifact-ownership-matrix-004.md` §C3.
 notes = "Transient staging directory for `gt project upgrade --apply`; product-managed because the staging-area contract is framework-defined."
-
-[[artifacts]]
-class = "ownership-glob"
-id = "adopter-requirements-local-txt"
-path_glob = "requirements-local.txt"
-priority = 100
-initial_profiles = []
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "legacy-exception"
-upgrade_policy = "preserve"
-notes = "GT-KB pip dependency pin location. Owner decision pending on adoption cadence (stale v0.2.1 pin as of 2026-04-17)."
-
-[[artifacts]]
-class = "ownership-glob"
-id = "adopter-requirements-test-txt"
-path_glob = "requirements-test.txt"
-priority = 100
-initial_profiles = []
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "legacy-exception"
-upgrade_policy = "preserve"
-notes = "GT-KB pip test dependency pin location. Owner decision pending on adoption cadence (stale v0.2.1 pin as of 2026-04-17)."

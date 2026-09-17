@@ -17,7 +17,7 @@ service the project should own.
 
 This skill implements `SPEC-LO-OPPORTUNITY-RADAR-001`. It operationalizes the
 strategic self-improvement directive and the deterministic-services principle
-(`DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE`): repetitive work performed by an
+(`GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001`): repetitive work performed by an
 AI is a defect, and noticing it is part of the review, not an afterthought.
 
 ## When to invoke
@@ -63,19 +63,16 @@ made deterministic.
 
 ### 5. Routing pass
 
-If a finding is material, record it as a Loyal Opposition advisory via an
-**Advisory Proposal** bridge entry (ADVISORY status; see
-`gtkb-bridge-advisory-status-001`, VERIFIED). `independent-progress-assessments/`
-is retired; do not write there. Do not mutate the backlog directly from this
-skill: detection is read-only, and backlog promotion happens downstream through
-the advisory and the owner-directed intake.
+Report a material finding as a native ADVISORY with complete author provenance
+and no recipient or work-item reservation. Follow SPEC-ADVISORY-REPORT-TEMPLATE-001.
+State the recommendation, observed evidence, uncertainty and any unresolved
+material owner choice. Routine choices within existing direction need no
+blanket interview or permission transcript.
 
-Classify each routed advisory as `adopt`, `adapt`, `reject`, `defer`, or
-`monitor`. For `adopt` or `adapt`, the advisory MUST include a `Required Prime
-Builder Owner-Grilling Gate` section before any derived implementation proposal
-exists. The gate names the owner questions Prime Builder must ask, practical
-options, tradeoffs, and the durable artifact outcome expected from the
-decision.
+Detection does not promote backlog work or dispatch a harness. The owner selects
+any follow-up, which uses canonical project/work-item state and a separate NEW
+chain. Advisory classifications are optional analysis words, not disposition
+records or authorization carriers.
 
 ## Output discipline
 

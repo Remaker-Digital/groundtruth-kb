@@ -1,8 +1,7 @@
-"""Read-only cross-harness diagnostic projection.
+"""Read-only native harness metadata and explicitly selected context diagnostics.
 
-The active harness registry supplies the coverage inventory and identity
-metadata. Worker role is resolved exclusively from the validated session
-document; dispatcher configuration is intentionally not read here.
+Registry declarations are not measurements of an installed harness. This local
+report makes no provider request and cannot qualify host behavior or parity.
 """
 
 from __future__ import annotations
@@ -12,266 +11,176 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
+
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+from groundtruth_kb.config import GTConfig, GTConfigError
 
 SCHEMA_ID = "gtkb.harness_diagnostic.v1"
 SCHEMA_VERSION = 1
 MAX_RECENT_RECORDS = 50
-_SAFE_TOOL_NAMES = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
-_NUMERIC_USAGE_FIELDS = ("input_tokens", "output_tokens", "total_tokens", "cache_read_tokens", "cache_write_tokens")
 
 
-def _now() -> str:
-    return datetime.now(UTC).replace(microsecond=0).isoformat().replace("+00:00", "Z")
-
-
-def _text(value: Any) -> str | None:
-    if not isinstance(value, str):
-        return None
-    value = value.strip()
-    return value or None
-
-
-def _mapping(value: Any) -> dict[str, Any]:
-    return dict(value) if isinstance(value, dict) else {}
-
-
-def _safe_id(value: Any) -> str | None:
-    return _text(value)
-
-
-def _read_registry(project_root: Path) -> dict[str, Any]:
-    from groundtruth_kb.harness_projection import HarnessStateError, read_roles
-
-    try:
-        data = read_roles(project_root=project_root)
-    except HarnessStateError as exc:
-        raise ValueError(f"harness registry unavailable: {exc}") from exc
-    return data if isinstance(data, dict) else {}
-
-
-def _registry_record(project_root: Path, harness_id: str) -> dict[str, Any] | None:
-    rows = _read_registry(project_root).get("harnesses")
-    if not isinstance(rows, list):
-        return None
-    for row in rows:
-        if isinstance(row, dict) and str(row.get("id") or "") == harness_id:
-            return row
-    return None
-
-
-def _worker_document(project_root: Path, harness_name: str) -> tuple[Path | None, dict[str, Any] | None]:
-    root = project_root / "harness-state" / harness_name
-    # WI-6067: the shared per-harness pointer is no longer written or read. The
-    # authoritative per-session documents are the only candidates.
-    candidates = list((root / "session-envelopes").glob("*.json"))
-    loaded: list[tuple[str, Path, dict[str, Any]]] = []
-    for path in candidates:
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            continue
-        if not isinstance(data, dict) or data.get("status") != "open":
-            continue
-        loaded.append((str(data.get("opened_at") or data.get("session_id") or ""), path, data))
-    if not loaded:
-        return None, None
-    _sort_key, path, data = sorted(loaded, key=lambda item: (item[0], item[1].name), reverse=True)[0]
-    return path, data
-
-
-def _document_role(project_root: Path, harness_name: str) -> dict[str, Any]:
-    path, document = _worker_document(project_root, harness_name)
-    if path is None or document is None:
-        return {
-            "role": None,
-            "source": None,
-            "document": None,
-            "status": "unavailable",
-            "reason": "worker_session_document_missing",
-        }
-    session_id = _text(document.get("session_id"))
-    if session_id is None:
-        return {
-            "role": None,
-            "source": path.as_posix(),
-            "document": path.as_posix(),
-            "status": "unavailable",
-            "reason": "worker_session_document_missing_session_id",
-        }
-    # The session-envelope role provenance substrate is retired; a worker document
-    # cannot establish a role. Roles belong to the native session binding.
+def _field(source: str | None = None, *, reason: str | None = None) -> dict[str, Any]:
     return {
-        "role": None,
-        "source": path.as_posix(),
-        "document": path.as_posix(),
-        "status": "unavailable",
-        "reason": "worker_role_provenance_retired",
-    }
-
-
-def _configuration_projection(record: dict[str, Any]) -> dict[str, Any]:
-    surfaces = record.get("invocation_surfaces")
-    surface_keys = sorted(surfaces) if isinstance(surfaces, dict) else []
-    return {
-        key: record.get(key)
-        for key in (
-            "id",
-            "harness_name",
-            "harness_type",
-            "status",
-            "capabilities_ref",
-            "activity_envelope_projection_mode",
-            "compact_result_envelope_mode",
-            "compact_session_envelope_mode",
-            "full_transcript_archive_required",
-            "can_receive_dispatch",
-            "can_fire_events",
-        )
-    } | {"invocation_surface_keys": surface_keys}
-
-
-def _fingerprint(record: dict[str, Any]) -> str:
-    material = json.dumps(_configuration_projection(record), sort_keys=True, default=str, separators=(",", ":"))
-    return hashlib.sha256(material.encode("utf-8")).hexdigest()
-
-
-def _model_identity(record: dict[str, Any]) -> str | None:
-    surfaces = _mapping(record.get("invocation_surfaces"))
-    headless = _mapping(surfaces.get("headless"))
-    argv = headless.get("argv")
-    if not isinstance(argv, list):
-        return None
-    for index, value in enumerate(argv):
-        if value == "--model" and index + 1 < len(argv):
-            return _text(argv[index + 1])
-        if isinstance(value, str) and value.startswith("--model="):
-            return _text(value.partition("=")[2])
-    return None
-
-
-def _recent_telemetry(project_root: Path, harness_id: str, harness_name: str) -> list[dict[str, Any]]:
-    """The dispatcher-launched shim telemetry substrate is retired; no records exist."""
-    return []
-
-
-def _field(status: str, *, reason: str | None = None, record_count: int = 0) -> dict[str, Any]:
-    return {
-        "status": status,
-        "coverage": "observed" if status == "observed" else "unavailable",
-        "freshness": "local",
-        "record_count": record_count,
+        "status": "observed" if source else "unavailable",
+        "coverage": "canonical_record" if source else "unavailable",
+        "freshness": "current_read" if source else None,
+        "source": source,
         "unavailable_reason": reason,
     }
 
 
-def diagnose_harness(project_root: Path, harness_id: str) -> dict[str, Any]:
-    """Return one bounded local diagnostic projection without provider calls."""
-    root = project_root.resolve()
-    normalized_id = _text(harness_id)
-    if normalized_id is None:
-        raise ValueError("harness_id must be non-empty")
-    record = _registry_record(root, normalized_id)
-    if record is None:
-        return {
-            "schema_id": SCHEMA_ID,
-            "schema_version": SCHEMA_VERSION,
-            "status": "error",
-            "errors": ["harness_not_registered"],
-            "harness": {"harness_id": normalized_id},
-        }
-    harness_name = _text(record.get("harness_name")) or "unknown"
-    role = _document_role(root, harness_name)
-    _worker_path, worker_document = _worker_document(root, harness_name)
-    recent = _recent_telemetry(root, normalized_id, harness_name)
-    recent_correlation = _mapping(recent[0].get("correlation")) if recent else {}
-    surfaces = record.get("invocation_surfaces")
-    surface_keys = sorted(surfaces) if isinstance(surfaces, dict) else []
-    status = _text(record.get("status")) or "unknown"
-    provider_identity = _text(record.get("provider")) or _text(record.get("harness_type"))
-    model_identity = _model_identity(record)
+def _error(harness_id: str, code: str) -> dict[str, Any]:
+    # Never copy arbitrary service bodies, details or exception text into reports.
     return {
         "schema_id": SCHEMA_ID,
         "schema_version": SCHEMA_VERSION,
-        "generated_at": _now(),
-        "status": "ok" if status == "active" else "partial",
-        "errors": [] if status == "active" else ["harness_not_active"],
+        "status": "error",
+        "errors": [code],
+        "harness": {"harness_id": harness_id},
+    }
+
+
+def collect_harness_diagnostic(
+    client: AuthorityClient, harness_id: str, *, native_context_id: str | None = None
+) -> dict[str, Any]:
+    """Read the selected installation and optional exact immutable binding."""
+    if not harness_id or harness_id != harness_id.strip():
+        raise ValueError("harness_id must be non-empty and exact")
+    if native_context_id is not None and (not native_context_id or native_context_id != native_context_id.strip()):
+        raise ValueError("native_context_id must be non-empty and exact")
+    path = f"/v1/harnesses/{quote(harness_id, safe='')}"
+    try:
+        record = client.request("GET", path)
+    except AuthorityClientError as error:
+        code = "harness_not_registered" if error.code == "not_found" else "harness_authority_unavailable"
+        return _error(harness_id, code)
+    if not isinstance(record, dict) or record.get("id") != harness_id:
+        return _error(harness_id, "invalid_harness_response")
+
+    binding = None
+    binding_reason: str | None = "native_context_not_selected"
+    if native_context_id is not None:
+        try:
+            binding = client.request("GET", "/v1/sessions/binding", query={"native_context_id": native_context_id})
+        except AuthorityClientError as error:
+            binding_reason = (
+                "no_session_binding" if error.code == "no_session_binding" else "session_authority_unavailable"
+            )
+        else:
+            if (
+                not isinstance(binding, dict)
+                or binding.get("native_context_id") != native_context_id
+                or binding.get("role") not in {"prime-builder", "loyal-opposition"}
+                or not isinstance(binding.get("session_context_id"), str)
+                or not binding["session_context_id"]
+                or binding.get("subject") != "gtkb"
+            ):
+                binding = None
+                binding_reason = "invalid_session_response"
+            else:
+                binding_reason = None
+
+    # Exclude invocation argv, environment, arbitrary nested values and
+    # configuration file contents, even from the metadata fingerprint.
+    metadata = {key: record.get(key) for key in ("id", "harness_name", "harness_type", "status", "capabilities_ref")}
+    fingerprint = hashlib.sha256(
+        json.dumps(metadata, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+    role_field = _field("native_session_binding" if binding else None, reason=binding_reason)
+    lifecycle = record.get("status")
+    return {
+        "schema_id": SCHEMA_ID,
+        "schema_version": SCHEMA_VERSION,
+        "generated_at": datetime.now(UTC).isoformat(),
+        "status": "partial",
+        "errors": [] if lifecycle == "active" else ["harness_not_active"],
         "harness": {
-            "harness_id": normalized_id,
-            "harness_name": harness_name,
-            "harness_type": _text(record.get("harness_type")),
-            "provider_identity": provider_identity,
-            "model_identity": model_identity,
-            "lifecycle_status": status,
-            "configuration_fingerprint": _fingerprint(record),
-            "capabilities": {
-                "invocation_surface_keys": surface_keys,
-                "can_receive_dispatch": record.get("can_receive_dispatch"),
-                "can_fire_events": record.get("can_fire_events"),
-            },
+            "harness_id": harness_id,
+            "harness_name": metadata["harness_name"],
+            "harness_type": metadata["harness_type"],
+            "record_version": record.get("version"),
+            "lifecycle_status": lifecycle,
+            "capabilities": {"declared_reference": metadata["capabilities_ref"], "observed": None},
+            "provider_identity": None,
+            "model_identity": None,
+            "configuration_fingerprint": fingerprint,
+            "configuration_fingerprint_scope": "canonical_installation_metadata_only",
         },
-        "role": role,
+        "role": {
+            **role_field,
+            "role": binding["role"] if binding else None,
+            "native_context_id": native_context_id,
+            "session_context_id": binding["session_context_id"] if binding else None,
+            "scope": "explicitly_selected_context; no_harness_association_asserted",
+        },
         "correlation": {
-            "session_id": _text(worker_document.get("session_id")) if worker_document else None,
-            "dispatch_id": _safe_id(recent_correlation.get("dispatch_id")),
-            "run_id": _safe_id(recent_correlation.get("run_id")),
-            "bridge_document_id": _safe_id(recent_correlation.get("bridge_document_id")),
-            "claim_id": _safe_id(recent_correlation.get("claim_id")),
+            "session_id": binding["session_context_id"] if binding else None,
+            "dispatch_id": None,
+            "run_id": None,
+            "bridge_document_id": None,
+            "claim_id": None,
         },
         "checks": {
-            "session_document": _field(role["status"], reason=role["reason"]),
-            "role_provenance": _field(role["status"], reason=role["reason"]),
-            "guard": _field("unavailable", reason="diagnostic_does_not_execute_mutating_guards"),
-            "hooks": _field("observed" if record.get("invocation_surfaces") is not None else "unavailable"),
-            "tool_surface": _field(
-                "observed" if surface_keys else "unavailable",
-                reason=None if surface_keys else "tool_surface_unavailable",
-            ),
-            "adapter_readiness": _field("observed" if record.get("harness_type") else "unavailable"),
+            "session_binding": role_field,
+            "role_provenance": role_field,
+            **{
+                key: _field(reason="actual_host_behavior_not_measured")
+                for key in ("guard", "hooks", "tool_surface", "adapter_readiness")
+            },
         },
-        "provider_health": {
-            "mode": "local",
-            "status": "unavailable",
-            "freshness": "local",
-            "coverage": "not_requested",
-            "unavailable_reason": "provider_request_forbidden",
+        "provider_health": {"mode": "local", **_field(reason="provider_request_not_performed")},
+        "recent_runs": [],
+        "recent_runs_bounds": {"record_limit": MAX_RECENT_RECORDS, "records_returned": 0},
+        "measurements": {
+            key: None
+            for key in (
+                "elapsed_ms",
+                "turns_used",
+                "tool_calls",
+                "input_tokens",
+                "output_tokens",
+                "total_tokens",
+                "cache_read_tokens",
+                "cache_write_tokens",
+                "cost",
+                "failure_class",
+            )
         },
-        "recent_runs": recent,
-        "recent_runs_bounds": {"record_limit": MAX_RECENT_RECORDS, "records_returned": len(recent)},
         "parity": {
-            "status": "implemented",
+            "status": "unqualified",
             "contract": SCHEMA_ID,
-            "coverage_inventory": "active_harness_registry",
-            "waiver": None,
+            "coverage_inventory": "canonical_harness_records",
+            "unavailable_reason": "local_metadata_does_not_establish_behavioral_parity",
         },
         "field_status": {
-            "identity": _field("observed"),
-            "provider_identity": _field(
-                "observed" if provider_identity else "unavailable",
-                reason=None if provider_identity else "provider_identity_unavailable",
-            ),
-            "model_identity": _field(
-                "observed" if model_identity else "unavailable",
-                reason=None if model_identity else "model_identity_unavailable",
-            ),
-            "role": _field(role["status"], reason=role["reason"]),
-            "telemetry": _field(
-                "observed" if recent else "unavailable",
-                reason=None if recent else "telemetry_unavailable",
-            ),
-            "provider_health": _field("unavailable", reason="provider_request_forbidden"),
+            "identity": _field("canonical_harness_record"),
+            "configuration_fingerprint": _field("canonical_harness_record"),
+            "capabilities": _field(reason="capability_reference_is_a_declaration"),
+            "provider_identity": _field(reason="runtime_identity_not_measured"),
+            "model_identity": _field(reason="runtime_identity_not_measured"),
+            "role": role_field,
+            "correlation": _field(reason="only_explicit_session_binding_is_available"),
+            "telemetry": _field(reason="current_run_evidence_source_unavailable"),
+            "provider_health": _field(reason="provider_request_not_performed"),
         },
     }
 
 
-collect_harness_diagnostic = diagnose_harness
-diagnostic_report = diagnose_harness
+def diagnose_harness(project_root: Path, harness_id: str, *, native_context_id: str | None = None) -> dict[str, Any]:
+    """Use the selected root's native authority; never discover a different root."""
+    try:
+        config = GTConfig.load(config_path=project_root.resolve() / "groundtruth.toml", discover=False)
+    except FileNotFoundError:
+        return _error(harness_id, "native_authority_not_configured")
+    except (OSError, GTConfigError, ValueError):
+        return _error(harness_id, "native_authority_configuration_invalid")
+    if not config.authority_url:
+        return _error(harness_id, "native_authority_not_configured")
+    return collect_harness_diagnostic(
+        AuthorityClient(config.authority_url), harness_id, native_context_id=native_context_id
+    )
 
 
-__all__ = [
-    "MAX_RECENT_RECORDS",
-    "SCHEMA_ID",
-    "SCHEMA_VERSION",
-    "collect_harness_diagnostic",
-    "diagnose_harness",
-    "diagnostic_report",
-]
+__all__ = ["MAX_RECENT_RECORDS", "SCHEMA_ID", "SCHEMA_VERSION", "collect_harness_diagnostic", "diagnose_harness"]

@@ -7,6 +7,7 @@ construction.
 
 from __future__ import annotations
 
+import json
 import sqlite3
 
 from groundtruth_kb.db import (
@@ -125,18 +126,40 @@ def test_migrations_are_idempotent(tmp_path) -> None:
     assert before == after
 
 
-def test_schema_version_matches_migration_count() -> None:
-    """Guard against adding a migration without bumping ``SCHEMA_VERSION``.
+def test_schema_version_matches_migration_count(tmp_path) -> None:
+    """Retained selector checks an actual stale-schema upgrade, not comments.
 
-    A new migration on a stamped database would otherwise never run.
+    Comment counts do not define schema generations. Exercise a supported
+    column missing at the preceding generation and preserve pre-existing rows,
+    including an inert old prompt table. This is not a complete migration audit.
     """
-    from pathlib import Path
-
-    import groundtruth_kb.db as db_module
-
-    text = Path(db_module.__file__).read_text(encoding="utf-8")
-    migration_markers = text.count("# Migration ")
-    assert migration_markers == SCHEMA_VERSION, (
-        f"{migration_markers} migrations declared but SCHEMA_VERSION={SCHEMA_VERSION}; "
-        "bump SCHEMA_VERSION when adding a migration."
-    )
+    path = tmp_path / "prior-generation.db"
+    KnowledgeDB(path).close()
+    with sqlite3.connect(path) as connection:
+        connection.execute("ALTER TABLE specifications DROP COLUMN source_paths")
+        connection.execute("CREATE TABLE session_prompts (id INTEGER PRIMARY KEY, prompt_text TEXT)")
+        connection.execute("INSERT INTO session_prompts VALUES (1, 'OLD_PROMPT_RETAINED')")
+        connection.execute("CREATE TABLE unrelated_payload (id INTEGER PRIMARY KEY, value TEXT)")
+        connection.execute("INSERT INTO unrelated_payload VALUES (7, 'UNRELATED_RETAINED')")
+        connection.execute(f"PRAGMA user_version = {SCHEMA_VERSION - 1}")
+    db = KnowledgeDB(path)
+    try:
+        spec = db.insert_spec(
+            id="SPEC-MIGRATION-FIXTURE",
+            title="Supported source paths after migration",
+            status="specified",
+            source_paths=["src/current.py"],
+            changed_by="test",
+            change_reason="exercise repaired column",
+        )
+        assert json.loads(db.get_spec(spec["id"])["source_paths"]) == ["src/current.py"]
+        with sqlite3.connect(path) as connection:
+            assert connection.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+            assert connection.execute("SELECT * FROM session_prompts").fetchall() == [(1, "OLD_PROMPT_RETAINED")]
+            assert connection.execute("SELECT * FROM unrelated_payload").fetchall() == [(7, "UNRELATED_RETAINED")]
+            before = list(connection.iterdump())
+    finally:
+        db.close()
+    KnowledgeDB(path).close()
+    with sqlite3.connect(path) as connection:
+        assert list(connection.iterdump()) == before

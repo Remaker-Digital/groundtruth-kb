@@ -18,6 +18,7 @@ ANCHOR_RE = re.compile(r"\b(?P<prefix>SPEC|GOV|DCL|ADR|PB|REQ|DELIB|WI|GTKB)-[A-
 BRIDGE_RE = re.compile(r"\bbridge/[A-Za-z0-9_.-]+-\d{3}\.md\b")
 SOURCE_EXTENSIONS = {".py", ".md"}
 DEFAULT_SCAN_DIRS = (
+    "src",
     "scripts",
     "groundtruth-kb/src",
     "groundtruth-kb/tests",

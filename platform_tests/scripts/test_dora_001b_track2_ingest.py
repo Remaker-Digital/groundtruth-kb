@@ -29,7 +29,7 @@ if str(SCRIPTS_DIR) not in sys.path:
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from scripts.gtkb_dashboard.refresh_dashboard_db import (  # noqa: E402
+from groundtruth_kb.dashboard import (  # noqa: E402
     _REQUIRED_MIGRATION_COLUMNS,
     _classify_manifest,
     _ingest_canonical_pipeline_manifests,
@@ -737,3 +737,40 @@ def test_t17_track1_manifest_with_full_evidence_capped_at_medium_until_reconcile
         "reconciliation may upgrade to high. Regression check against "
         "the confidence-contract mistake from -003."
     )
+
+
+@pytest.mark.parametrize("outcome", ["missing-settings", "failed-command", "missing-command"])
+def test_azure_reconciliation_warning_uses_existing_logger_once_per_pass(outcome, monkeypatch, caplog, capsys):
+    import logging
+
+    from groundtruth_kb import dashboard
+
+    calls = []
+    if outcome == "missing-settings":
+        monkeypatch.delenv(dashboard._AZURE_CONTAINER_APP_MAP_ENV, raising=False)
+        monkeypatch.delenv(dashboard._AZURE_RESOURCE_GROUP_ENV, raising=False)
+    else:
+        monkeypatch.setenv(dashboard._AZURE_CONTAINER_APP_MAP_ENV, json.dumps({"one": "app-one", "two": "app-two"}))
+        monkeypatch.setenv(dashboard._AZURE_RESOURCE_GROUP_ENV, "fixture-group")
+
+    def command(args, **kwargs):
+        calls.append(args)
+        if outcome == "missing-command":
+            raise FileNotFoundError("fixture command unavailable")
+        return subprocess.CompletedProcess(args, 3, stdout="", stderr="fixture command failed")
+
+    monkeypatch.setattr(subprocess, "run", command)
+    with _make_conn() as conn, caplog.at_level(logging.WARNING, logger="groundtruth_kb.dashboard"):
+        before = conn.iterdump()
+        before_text = list(before)
+        counts = _reconcile_against_azure_revisions(conn, ["one", "two"])
+        assert list(conn.iterdump()) == before_text
+    assert counts == {"rows_checked": 0, "rows_matched": 0, "rows_drift": 0, "rows_unknown": 0}
+    warnings = [r for r in caplog.records if r.name == "groundtruth_kb.dashboard"]
+    assert len(warnings) == 1 and warnings[0].levelno == logging.WARNING
+    assert "Azure reconciliation" in warnings[0].getMessage()
+    expected = {"missing-settings": "skipped", "failed-command": "returned 3", "missing-command": "FileNotFoundError"}
+    assert expected[outcome] in warnings[0].getMessage()
+    assert len(calls) == (0 if outcome == "missing-settings" else 2)
+    captured = capsys.readouterr()
+    assert captured.out == captured.err == ""

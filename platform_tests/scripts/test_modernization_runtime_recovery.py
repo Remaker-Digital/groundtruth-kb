@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import sys
 import threading
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,9 +9,6 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-SOURCE = ROOT / "groundtruth-kb" / "src"
-if str(SOURCE) not in sys.path:
-    sys.path.insert(0, str(SOURCE))
 
 from groundtruth_kb.runtime_recovery import (  # noqa: E402
     ClaimOutcome,

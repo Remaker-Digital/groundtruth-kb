@@ -14,8 +14,7 @@ from pathlib import Path
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS = _PROJECT_ROOT / "scripts"
-_SRC = _PROJECT_ROOT / "groundtruth-kb" / "src"
-for _path in (_SCRIPTS, _SRC):
+for _path in (_SCRIPTS,):
     if _path.is_dir() and str(_path) not in sys.path:
         sys.path.insert(0, str(_path))
 

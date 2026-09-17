@@ -24,9 +24,7 @@ PROFILES: dict[str, ProjectProfile] = {
     "local-only": ProjectProfile(
         name="local-only",
         display_name="Local Only",
-        description=(
-            "Minimal setup: KB, CLI, hooks, and rules. Single-agent workflow with no bridge, containers, or cloud."
-        ),
+        description=("Minimal application files and native authority configuration; no containers or cloud stubs."),
         includes_bridge=False,
         includes_docker=False,
         includes_cloud=False,
@@ -36,9 +34,7 @@ PROFILES: dict[str, ProjectProfile] = {
     "dual-agent": ProjectProfile(
         name="dual-agent",
         display_name="Dual Agent",
-        description=(
-            "Prime Builder + Loyal Opposition with file bridge protocol, setup prompt, and Codex bootstrap documents."
-        ),
+        description=("Application development files with standard CI. Agent roles are explicit context input."),
         includes_bridge=True,
         includes_docker=False,
         includes_cloud=False,
@@ -49,8 +45,8 @@ PROFILES: dict[str, ProjectProfile] = {
         name="dual-agent-webapp",
         display_name="Dual Agent Web App",
         description=(
-            "Full stack: file bridge dual-agent workflow, Docker containers, cloud infrastructure stubs, "
-            "and CI/CD workflows."
+            "Application development files, container templates and full CI/CD workflows. "
+            "Agent roles and deployment choices remain explicit."
         ),
         includes_bridge=True,
         includes_docker=True,

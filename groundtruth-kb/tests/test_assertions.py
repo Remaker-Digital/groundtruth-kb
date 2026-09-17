@@ -299,7 +299,7 @@ class TestSpecAssertions:
         spec = db.get_spec("SPEC-T02")
         result = run_spec_assertions(db, spec, "test", project_dir)
         assert result["overall_passed"] is False
-        assert result["evaluation_result"] == "NOT_APPLICABLE"
+        assert result["evaluation_result"] == "UNASSESSED"
         assert result.get("skipped") is True
 
     def test_spec_with_text_assertion(self, db: KnowledgeDB, project_dir: Path) -> None:
@@ -355,7 +355,10 @@ class TestSpecAssertions:
         summary = run_all_assertions(db, project_dir, triggered_by="test")
         assert summary["total_specs"] == 2
         assert summary["passed"] == 1
-        assert summary["skipped"] == 1
+        assert summary["skipped"] == 0
+        assert summary["unassessed"] == 1
+        assert summary["specs_with_assertions"] == 1
+        assert summary["aggregate_result"] == "PARTIAL"
         assert summary["failed"] == 0
 
     def test_run_single_spec_filter(self, db: KnowledgeDB, project_dir: Path) -> None:
@@ -422,8 +425,8 @@ class TestSpecAssertions:
             "passed": 1,
             "failed": 1,
             "partial": 1,
-            "unassessed": 1,
-            "skipped": 1,
+            "unassessed": 2,
+            "skipped": 0,
         }
         assert (
             sum(summary[key] for key in ("passed", "failed", "partial", "unassessed", "skipped"))

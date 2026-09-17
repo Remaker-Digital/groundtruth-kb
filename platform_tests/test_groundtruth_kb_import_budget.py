@@ -19,14 +19,12 @@ from pathlib import Path
 
 import pytest
 
-_REPO_ROOT = Path(__file__).resolve().parents[1]
-_GROUNDTRUTH_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
-
 
 def _subprocess_env() -> dict[str, str]:
+    import groundtruth_kb
+
     env = dict(os.environ)
-    existing = env.get("PYTHONPATH", "")
-    env["PYTHONPATH"] = str(_GROUNDTRUTH_SRC) + (os.pathsep + existing if existing else "")
+    env["PYTHONPATH"] = str(Path(groundtruth_kb.__file__).resolve().parent.parent)
     return env
 
 
@@ -39,8 +37,10 @@ def test_chromadb_not_eagerly_imported() -> None:
     result = subprocess.run(
         [
             sys.executable,
+            "-P",
             "-c",
-            "import sys, groundtruth_kb; "
+            "import sys, os, groundtruth_kb; from pathlib import Path; "
+            "assert Path(groundtruth_kb.__file__).resolve().parent.parent == Path(os.environ['PYTHONPATH']).resolve(); "
             "leaked = sorted(m for m in sys.modules if m == 'chromadb' or m.startswith('chromadb.')); "
             "assert not leaked, leaked",
         ],
@@ -57,7 +57,7 @@ def test_chromadb_not_eagerly_imported() -> None:
 def test_has_chromadb_is_eager_bool() -> None:
     """HAS_CHROMADB stays an eagerly-resolved bool (not None-until-first-use).
 
-    Consumers (cli.py, operating_state.py, project/chroma.py) and several test
+    Consumers (cli.py, operating_status.py, project/chroma.py) and several test
     suites read this module attribute at import time; find_spec keeps it eager.
     """
     from groundtruth_kb.db import HAS_CHROMADB

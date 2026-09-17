@@ -1,70 +1,34 @@
-import os
+"""Observe existing slot content without filename or content-based exemptions."""
+
 from pathlib import Path
 from typing import Any
 
-from .allowlist import is_allowlisted_file
-from .registry_check import has_registry_entry
-from .strong_markers import has_strong_marker
+from .registry_check import application_slot_path, has_registry_entry
 
 
 def detect_occupancy(project_root: Path, app_name: str) -> dict[str, Any]:
-    """Detect occupancy status for the given application slot.
+    """Return read-only presence facts, never permission to register or remove files.
 
-    Returns a dict with:
-        occupied: bool
-        trigger: str | None ("strong_marker", "non_allowlisted_content", "registry_entry", None)
-        details: str | None (e.g. filename, or list of unrecognized files)
-        strong_marker: str | None
-        non_allowlisted_files: list[str]
+    Every top-level entry counts. No file body, historical cleanup marker,
+    ignore rule, generated projection or filename implies that data is disposable.
     """
-    app_dir = project_root / "applications" / app_name
-
-    # 1. Check strong markers
-    has_marker, marker_name = has_strong_marker(app_dir)
-    if has_marker:
-        return {
-            "occupied": True,
-            "trigger": "strong_marker",
-            "details": f"Strong marker present: {marker_name}",
-            "strong_marker": marker_name,
-            "non_allowlisted_files": [],
-        }
-
-    # 2. Check non-allowlisted contents
-    non_allowlisted = []
-    if app_dir.is_dir():
-        for root, _dirs, files in os.walk(app_dir):
-            root_path = Path(root)
-            for file in files:
-                file_path = root_path / file
-                if not is_allowlisted_file(file_path):
-                    # Compute relative path to app_dir
-                    rel = file_path.relative_to(app_dir).as_posix()
-                    non_allowlisted.append(rel)
-
-    if non_allowlisted:
-        non_allowlisted.sort()
-        details = f"Non-allowlisted content present: {', '.join(non_allowlisted[:3])}"
-        if len(non_allowlisted) > 3:
-            details += f", and {len(non_allowlisted) - 3} more"
-        return {
-            "occupied": True,
-            "trigger": "non_allowlisted_content",
-            "details": details,
-            "strong_marker": None,
-            "non_allowlisted_files": non_allowlisted,
-        }
-
-    # 3. Check registry entry
-    if has_registry_entry(project_root, app_name):
+    app_dir = application_slot_path(project_root, app_name)
+    registered = has_registry_entry(project_root, app_name)
+    entries = sorted(child.name for child in app_dir.iterdir()) if app_dir.is_dir() else []
+    if registered:
         return {
             "occupied": True,
             "trigger": "registry_entry",
-            "details": "Registry entry exists but no application directory"
-            if not app_dir.is_dir()
-            else "Registry entry exists",
-            "strong_marker": None,
-            "non_allowlisted_files": [],
+            "details": "Registry entry exists"
+            if app_dir.is_dir()
+            else "Registry entry exists but no application directory",
+            "entries": entries,
         }
-
-    return {"occupied": False, "trigger": None, "details": None, "strong_marker": None, "non_allowlisted_files": []}
+    if entries:
+        return {
+            "occupied": True,
+            "trigger": "existing_content",
+            "details": f"Existing top-level content: {', '.join(entries[:3])}",
+            "entries": entries,
+        }
+    return {"occupied": False, "trigger": None, "details": None, "entries": []}

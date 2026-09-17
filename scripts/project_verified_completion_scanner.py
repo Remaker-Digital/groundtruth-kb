@@ -24,7 +24,6 @@ import argparse
 import json
 import re
 import sqlite3
-import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -159,12 +158,6 @@ class MemberCompletionReadiness:
         }
 
 
-def _ensure_groundtruth_importable(project_root: Path) -> None:
-    gt_src = project_root / "groundtruth-kb" / "src"
-    if gt_src.is_dir() and str(gt_src) not in sys.path:
-        sys.path.insert(0, str(gt_src))
-
-
 def _implements_links_by_project(project_root: Path) -> dict[str, set[str]]:
     """Return ``{project_id: {bridge_thread_slug}}`` for active implements links.
 
@@ -252,7 +245,6 @@ def _verified_thread_work_items(project_root: Path) -> dict[str, set[str]]:
     ``Work Item:`` metadata; the metadata lives in the Prime implementation
     report one or more versions below).
     """
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
     bridge_dir = project_root / "bridge"
@@ -287,7 +279,6 @@ def _latest_bridge_thread_statuses(project_root: Path) -> dict[str, str | None]:
 
     Mirrors ``ProjectLifecycleService._latest_bridge_thread_statuses``.
     """
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
     bridge_dir = project_root / "bridge"
@@ -329,7 +320,6 @@ def _augment_verified_with_related_threads(
     db_path = project_root / "groundtruth.db"
     if not db_path.is_file():
         return
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(db_path)
@@ -409,7 +399,6 @@ def scan(project_root: Path = PROJECT_ROOT) -> list[AuthorizationReadiness]:
 
     Read-only: opens MemBase for reads only and closes it before returning.
     """
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.db import KnowledgeDB
 
     db = KnowledgeDB(project_root / "groundtruth.db")
@@ -475,7 +464,6 @@ def completion_ready(project_root: Path = PROJECT_ROOT) -> list[AuthorizationRea
 
 def member_completion_scan(project_root: Path = PROJECT_ROOT) -> list[MemberCompletionReadiness]:
     """Compute v6 member-WI automatic-retirement readiness for active projects."""
-    _ensure_groundtruth_importable(project_root)
     from groundtruth_kb.db import KnowledgeDB
     from groundtruth_kb.project.lifecycle import ProjectLifecycleService
 

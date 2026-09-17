@@ -14,15 +14,11 @@ asserted here alongside the new classifications.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
-if str(SRC) not in sys.path:
-    sys.path.insert(0, str(SRC))
 
 from groundtruth_kb.governance.project_authorization_operation_time import (  # noqa: E402
     classify_target,

@@ -32,7 +32,7 @@ def test_registry_is_valid_and_covers_required_sot_classes() -> None:
     assert "Deliberation Archive" in classes
     assert "Dispatcher daemon state" in classes
     assert "Harness-local transcript metadata" in classes
-    assert "Bridge numbered ADVISORY chain" in classes
+    assert "Native bridge coordination" in classes
     assert "Bridge numbered file chain" in classes
     assert "MemBase project_authorizations" in classes
 
@@ -41,7 +41,7 @@ def test_registry_is_valid_and_covers_required_sot_classes() -> None:
     ("command", "expected"),
     [
         ("gt bridge show demo --json --compact", _h.COMMAND_KIND_COMPACT),
-        ("python scripts/advisory_backlog_router.py --dry-run --compact", _h.COMMAND_KIND_COMPACT),
+        ("gt backlog list --compact", _h.COMMAND_KIND_COMPACT),
         ("gt deliberations search compact --limit 5 --json", _h.COMMAND_KIND_BOUNDED),
         ("gt session envelope show --harness-name codex", _h.COMMAND_KIND_BOUNDED),
         ("gt bridge show demo --json --history", _h.COMMAND_KIND_ARCHIVAL),
@@ -93,11 +93,11 @@ def test_rows_as_json_is_compact_and_omits_raw_payloads() -> None:
     assert "full_payload" not in encoded
 
 
-def test_advisory_surface_is_bridge_only_and_report_writer_is_retired() -> None:
-    advisory = next(record for record in _h.default_registry() if record.surface_id == "advisory-router-output")
+def test_advisory_surface_reads_native_state_without_a_candidate_writer() -> None:
+    advisory = next(record for record in _h.default_registry() if record.surface_id == "advisory-state-report")
 
-    assert advisory.sot_class == "Bridge numbered ADVISORY chain"
-    assert "--source bridge" in advisory.routine_command
+    assert advisory.sot_class == "Native bridge coordination"
+    assert advisory.routine_command == "gt bridge state-report --json"
     assert "dropbox" not in advisory.routine_command.lower()
     assert not hasattr(_h, "write_report")
     assert not hasattr(_h, "default_report_path")

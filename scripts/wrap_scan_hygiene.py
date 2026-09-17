@@ -155,19 +155,10 @@ def check_git_untracked_in_tracked_dirs(project_root: Path) -> list[dict]:
 BRIDGE_NUMBERED_FILE_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+-\d{3}\.md$")
 
 
-def _ensure_bridge_helpers_importable(project_root: Path) -> None:
-    gt_src = project_root / "groundtruth-kb" / "src"
-    if gt_src.exists():
-        src_text = str(gt_src)
-        if src_text not in sys.path:
-            sys.path.insert(0, src_text)
-
-
 def check_bridge_files_without_status(project_root: Path) -> list[dict]:
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
         return []
-    _ensure_bridge_helpers_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
     findings: list[dict] = []

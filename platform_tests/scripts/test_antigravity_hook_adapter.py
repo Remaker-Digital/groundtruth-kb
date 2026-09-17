@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -264,21 +265,47 @@ def test_posttool_failure_is_nonzero_without_fabricated_permission(runtime):
     assert result.returncode != 0 and output == {} and result.stderr
 
 
-def test_native_registration_keeps_unsupported_baseline_events_visible():
+@pytest.mark.timeout(300)
+def test_native_registration_keeps_unsupported_baseline_events_visible(tmp_path, generated_harness_root):
+    from groundtruth_kb.project.doctor import _check_harness_projection_conformance
+
     from scripts.check_harness_parity import _load_projector, _registration_events, check_harness_parity
 
-    engine = _load_projector(ROOT)
+    root = tmp_path / "current-baseline"
+    shutil.copytree(generated_harness_root, root)
+    assert _check_harness_projection_conformance(root).status == "pass"
+    engine = _load_projector(root)
     profile = engine.load_profiles()["harnesses"]["antigravity"]
     plan = engine.build_plan("antigravity")
     registration = json.loads(plan.writes[profile["hooks_json_path"]])
     assert set(registration) == {"gtkb"}
     events = _registration_events(profile, registration)
-    assert set(events) == {"PreToolUse", "PostToolUse", "Stop"}
-    assert all("hooks" in group for event in ("PreToolUse", "PostToolUse") for group in events[event])
+    # The registered native events are exactly the baseline's declared events that antigravity supports;
+    # the retired PostToolUse baseline hook is not restored here.
+    manifest = root / ".harness-baseline-configuration/hooks/manifest.toml"
+    declared = {hook["event"] for hook in tomllib.loads(manifest.read_text(encoding="utf-8"))["hook"]}
+    supported = {profile["hook_events"][event] for event in declared if event in profile["hook_events"]}
+    assert "PreToolUse" in supported and set(events) == supported
+    assert all("hooks" in group for event in supported for group in events[event])
+    assert not plan.gaps
+    assert check_harness_parity(root, harness="antigravity", installed=False)["status"] == "pass"
+
+    # Declared negative fixture: keep unsupported-event visibility and the Stop
+    # registration shape under test without restoring retired baseline hooks.
+    with manifest.open("a", encoding="utf-8") as stream:
+        for event in ("turn_end", "prompt_submit", "session_start"):
+            stream.write(
+                '\n[[hook]]\nevent = "' + event + '"\nintents = ["all"]\n'
+                'script = "sot-read-discipline.py"\nblocking = false\n'
+            )
+    plan = engine.build_plan("antigravity")
+    registration = json.loads(plan.writes[profile["hooks_json_path"]])
+    events = _registration_events(profile, registration)
+    assert set(events) == supported | {"Stop"}
     assert all("command" in handler and "hooks" not in handler for handler in events["Stop"])
     assert all("--event Stop" in handler["command"] for handler in events["Stop"])
     assert not any(".claude" in content or "CODEX_" in content for content in [json.dumps(registration)])
-    report = check_harness_parity(ROOT, harness="antigravity", installed=False)
+    report = check_harness_parity(root, harness="antigravity", installed=False)
     assert report["status"] == "fail"
     assert plan.gaps and all(
         "no native event for prompt_submit" in gap or "no native event for session_start" in gap for gap in plan.gaps

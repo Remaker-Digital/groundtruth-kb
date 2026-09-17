@@ -1,29 +1,13 @@
-"""Tests for the Phase-1 Ollama dispatch verification script (WI-4322).
+"""Bounded Ollama diagnostics and direct runtime component tests.
 
-Spec-derived tests for ``scripts/verify_ollama_dispatch.py`` per the Phase-1
-Child 3 proposal (bridge/gtkb-ollama-integration-phase-1-verification-005.md)
-and the GO verdict (bridge/gtkb-ollama-integration-phase-1-verification-006.md).
-
-The script's verification surface has seven check functions across two modes:
-
-- Live mode: ``_check_tool_loop_round_trip``, ``_check_author_metadata``,
-  ``_check_bridge_filing_via_dispatch``.
-- Guard-only mode: ``_check_guard_destructive_bash``,
-  ``_check_guard_formal_artifact``, ``_check_guard_out_of_root``,
-  ``_check_guard_bridge_bash_denial``.
-
-Tests stub the live ``urllib.request`` reachability probe, inject deterministic
-mock chat functions through the shim, and exercise the dispatch path against
-disposable fixture workspaces.
-
-Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
-All rights reserved.
-Licensed under AGPL-3.0-or-later.
+Provider responses and hook verdicts here are controlled. The separate native
+provider/CLI suite proves binding, claims, publication and project finalization
+against disposable PostgreSQL; these component tests do not qualify a live host.
 """
 
 from __future__ import annotations
 
-import importlib.util
+import json
 import os
 import subprocess
 import sys
@@ -31,33 +15,20 @@ from pathlib import Path
 
 import pytest
 
+from platform_tests.scripts.test_provider_native_cli_delivery import create_provider_guard_fixtures
+from scripts import ollama_harness, verify_ollama_dispatch
+
 _REPO_ROOT = Path(__file__).resolve().parents[2]
 _SCRIPTS_DIR = _REPO_ROOT / "scripts"
 
 
-def _load_script_module():
-    """Load scripts/verify_ollama_dispatch.py as a module for direct test access."""
-    if str(_SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(_SCRIPTS_DIR))
-    # Ensure ollama_harness is importable from the same directory.
-    spec = importlib.util.spec_from_file_location("verify_ollama_dispatch", _SCRIPTS_DIR / "verify_ollama_dispatch.py")
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
-
-
 @pytest.fixture(scope="module")
 def verify_module():
-    return _load_script_module()
+    return verify_ollama_dispatch
 
 
 @pytest.fixture(scope="module")
 def ollama_harness_module():
-    if str(_SCRIPTS_DIR) not in sys.path:
-        sys.path.insert(0, str(_SCRIPTS_DIR))
-    import ollama_harness  # noqa: PLC0415
-
     return ollama_harness
 
 
@@ -70,39 +41,6 @@ def _fixture_route(ollama_harness_module, *, key: str, allowed_tools: tuple[str,
         tool_calling_supported=True,
         allowed_tools=allowed_tools,
     )
-
-
-# ── Reachability probe ────────────────────────────────────────────────────
-
-
-def test_reachability_probe_returns_false_when_endpoint_dead(verify_module, monkeypatch) -> None:
-    """The reachability probe must return False on URLError / OSError."""
-    import urllib.error
-
-    def fail(url, timeout):
-        raise urllib.error.URLError("connection refused")
-
-    monkeypatch.setattr("urllib.request.urlopen", fail)
-    assert verify_module._ollama_reachable("http://localhost:11434") is False
-
-
-def test_reachability_probe_returns_true_when_endpoint_alive(verify_module, monkeypatch) -> None:
-    """The reachability probe must return True on HTTP 200."""
-
-    class FakeResp:
-        status = 200
-
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *a):
-            return False
-
-        def read(self, n=64):
-            return b'{"models":[]}'
-
-    monkeypatch.setattr("urllib.request.urlopen", lambda url, timeout: FakeResp())
-    assert verify_module._ollama_reachable("http://localhost:11434") is True
 
 
 def test_autostart_probe_detects_windows_task(verify_module) -> None:
@@ -168,40 +106,6 @@ def test_autostart_installer_script_is_guarded() -> None:
     assert '-Argument "serve"' in script
 
 
-# ── Live-mode: tool-loop round-trip ──────────────────────────────────────
-
-
-def test_tool_loop_round_trip_invokes_chat_twice(verify_module, ollama_harness_module, tmp_path) -> None:
-    """L1: round-trip must invoke chat at least twice (tool_call turn + final-text turn)."""
-    # Construct a route directly to avoid depending on a real routing TOML.
-    route = _fixture_route(ollama_harness_module, key="fixture-read", allowed_tools=("Read",))
-    # Plant the routing TOML the script uses to resolve the model.
-    (tmp_path / ollama_harness_module.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
-    (tmp_path / ollama_harness_module.ROUTING_CONFIG_PATH).write_text(
-        "schema_version = 1\n"
-        "[models.fixture-read]\n"
-        'model_id = "fixture-read:current"\n'
-        "tool_calling_supported = true\n"
-        'allowed_tools = ["Read"]\n'
-        "[routing]\n"
-        'default_model = "fixture-read"\n',
-        encoding="utf-8",
-    )
-    ok = verify_module._check_tool_loop_round_trip(route, "http://localhost:11434", tmp_path)
-    assert ok is True
-
-
-def test_tool_loop_probe_refuses_a_failed_read(verify_module, ollama_harness_module, tmp_path) -> None:
-    route = _fixture_route(ollama_harness_module, key="fixture-read", allowed_tools=("Read",))
-    assert verify_module._check_tool_loop_round_trip(route, "http://localhost:11434", tmp_path) is False
-
-
-def test_author_metadata_check_passes_when_model_id_matches(verify_module, ollama_harness_module) -> None:
-    """L2: metadata model_id matches route model_id."""
-    route = _fixture_route(ollama_harness_module, key="metadata-route", allowed_tools=("Read",))
-    assert verify_module._check_author_metadata(route, "http://localhost:11434") is True
-
-
 def test_ollama_guard_payload_uses_its_native_identity(ollama_harness_module, tmp_path, monkeypatch) -> None:
     monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-run")
     monkeypatch.setenv("CODEX_THREAD_ID", "parent-codex-thread")
@@ -211,6 +115,9 @@ def test_ollama_guard_payload_uses_its_native_identity(ollama_harness_module, tm
 
     def guard_runner(path, payload, env, timeout):  # noqa: ANN001, ARG001
         captured.append(dict(payload))
+        assert env["GTKB_AUTHOR_MODEL"] == metadata.model_id
+        assert env["GTKB_AUTHOR_MODEL_VERSION"] == metadata.model_version
+        assert env["GTKB_NATIVE_CONTEXT_ID"] == metadata.native_context_id
         return ollama_harness_module.GuardExecutionResult(0, "{}")
 
     metadata = ollama_harness_module.ModelMetadata(
@@ -231,9 +138,6 @@ def test_ollama_guard_payload_uses_its_native_identity(ollama_harness_module, tm
     assert captured[0]["session_id"] == metadata.native_context_id
 
 
-# ── Live-mode: bridge filing via dispatch ────────────────────────────────
-
-
 def test_dispatch_read_missing_file_returns_model_visible_error(ollama_harness_module, tmp_path) -> None:
     metadata = ollama_harness_module.ModelMetadata(
         model_id="qwen3-coder-next:cloud",
@@ -244,12 +148,12 @@ def test_dispatch_read_missing_file_returns_model_visible_error(ollama_harness_m
 
     result = ollama_harness_module.dispatch_tool_call(
         "Read",
-        {"path": "harness-state/d/operating-role.md"},
+        {"path": "missing-fixture.txt"},
         metadata,
         tmp_path,
     )
 
-    assert result == "Read failed: file not found: harness-state/d/operating-role.md"
+    assert result == "Read failed: file not found: missing-fixture.txt"
 
 
 def test_dispatch_bash_nonzero_returns_model_visible_evidence(ollama_harness_module, tmp_path) -> None:
@@ -387,114 +291,113 @@ def test_default_ollama_bridge_review_route_uses_deepseek_v4_flash_cloud(ollama_
     assert ollama_harness_module.derive_session_timeout_from_route_timeout(config.timeout_seconds) == 3660
 
 
-def test_bridge_filing_writes_fixture_file_with_NEW_first_line(verify_module, ollama_harness_module, tmp_path) -> None:
-    """L3: fixture write through dispatch_tool_call must produce a file whose
-    first non-blank line is exactly ``NEW``."""
-    route = _fixture_route(ollama_harness_module, key="bridge-write-route", allowed_tools=("Write",))
-    ok = verify_module._check_bridge_filing_via_dispatch(route, "http://localhost:11434", tmp_path)
-    assert ok is True
+@pytest.mark.parametrize("exists", [True, False])
+def test_read_tool_loop_returns_actual_fixture_result_and_schemas(tmp_path, exists):
+    create_provider_guard_fixtures(ollama_harness, tmp_path)
+    path = tmp_path / "source.txt"
+    if exists:
+        path.write_text("Exact readback.", encoding="utf-8")
+    calls = []
 
+    def chat(endpoint, payload, timeout):
+        calls.append(payload)
+        if len(calls) == 1:
+            return {
+                "message": {
+                    "role": "assistant",
+                    "tool_calls": [{"id": "read-one", "function": {"name": "Read", "arguments": {"path": str(path)}}}],
+                }
+            }
+        result = next(m["content"] for m in reversed(payload["messages"]) if m.get("role") == "tool")
+        return {"message": {"role": "assistant", "content": result}}
 
-def test_bridge_filing_does_not_touch_production_index(verify_module, ollama_harness_module, tmp_path) -> None:
-    """L3: production bridge/INDEX.md must be untouched after the fixture write.
-
-    The verification script writes to a tempfile.mkdtemp root, never the live
-    project root, so the production INDEX.md mtime must not change.
-    """
-    prod_index = _REPO_ROOT / "bridge" / "INDEX.md"
-    if not prod_index.is_file():
-        pytest.skip("production bridge/INDEX.md absent; live-repo invariant")
-    before = prod_index.stat().st_mtime_ns
-    route = _fixture_route(ollama_harness_module, key="production-index-route", allowed_tools=("Write",))
-    verify_module._check_bridge_filing_via_dispatch(route, "http://localhost:11434", tmp_path)
-    after = prod_index.stat().st_mtime_ns
-    assert before == after, "production bridge/INDEX.md was modified"
-
-
-def test_bridge_filing_writes_numbered_fixture_file_with_status_token(
-    verify_module, ollama_harness_module, tmp_path
-) -> None:
-    """L3: fixture bridge filing must create a status-bearing numbered file."""
-    route = _fixture_route(ollama_harness_module, key="fixture-index-route", allowed_tools=("Write",))
-    fixture_root = tmp_path / "fixture"
-    ok = verify_module._check_bridge_filing_via_dispatch(
-        route,
-        "http://localhost:11434",
-        tmp_path,
-        fixture_root=fixture_root,
+    route = _fixture_route(ollama_harness, key="fixture-read", allowed_tools=("Read",))
+    result = ollama_harness.run_tool_loop(
+        "Read the selected fixture.", route, "https://fixture.invalid", 3, tmp_path, chat_func=chat
     )
-    assert ok is True
-    fixture_bridge_file = fixture_root / "bridge" / "gtkb-ollama-e2e-fixture-001.md"
-    assert fixture_bridge_file.is_file(), "fixture bridge file missing after filing"
-    first_nonblank = next(
-        (line.strip() for line in fixture_bridge_file.read_text(encoding="utf-8").splitlines() if line.strip()),
-        "",
+    assert len(calls) == 2 and calls[0]["tools"]
+    if exists:
+        assert result == "Exact readback."
+    else:
+        assert "file not found" in result.lower()
+
+
+@pytest.mark.parametrize(
+    "tool,arguments",
+    [
+        ("Write", {"path": "artifact.json", "content": "new"}),
+        ("Edit", {"path": "artifact.json", "old_string": "old", "new_string": "new"}),
+        ("Bash", {"command": "fixture-controlled-command"}),
+    ],
+)
+@pytest.mark.parametrize("guard_exit,reason", [(0, "fixture guard denial"), (2, "guard exited nonzero")])
+def test_guard_block_preserves_fixture_and_prevents_command(tool, arguments, guard_exit, reason, tmp_path):
+    create_provider_guard_fixtures(ollama_harness, tmp_path)
+    target = tmp_path / "artifact.json"
+    target.write_text("old", encoding="utf-8")
+    metadata = ollama_harness.ModelMetadata("fixture-model", "v1", "https://fixture.invalid", "fixture-route")
+    guards = []
+
+    def block(path, payload, env, timeout):
+        guards.append(payload)
+        return ollama_harness.GuardExecutionResult(guard_exit, '{"decision":"block","reason":"fixture guard denial"}')
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A blocked request must not execute a command")
+
+    with pytest.raises(ollama_harness.OllamaHarnessError, match=reason):
+        ollama_harness.dispatch_tool_call(
+            tool, arguments, metadata, tmp_path, guard_runner=block, command_runner=forbidden
+        )
+    assert guards and guards[0]["session_id"] == metadata.native_context_id
+    assert target.read_text(encoding="utf-8") == "old"
+
+
+def test_bash_bridge_write_is_denied_before_guards_or_command(tmp_path):
+    metadata = ollama_harness.ModelMetadata("fixture-model", "v1", "https://fixture.invalid", "fixture-route")
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A bridge-file mutation must not invoke guards or commands")
+
+    with pytest.raises(ollama_harness.OllamaHarnessError, match="Bash bridge artifact mutation denied"):
+        ollama_harness.dispatch_tool_call(
+            "Bash",
+            {"command": "Set-Content bridge/fixture-001.md 'GO'"},
+            metadata,
+            tmp_path,
+            guard_runner=forbidden,
+            command_runner=forbidden,
+        )
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_out_of_root_read_is_rejected_before_reading(tmp_path):
+    metadata = ollama_harness.ModelMetadata("fixture-model", "v1", "https://fixture.invalid", "fixture-route")
+    with pytest.raises(ollama_harness.OllamaHarnessError, match="escapes project root"):
+        ollama_harness.dispatch_tool_call("Read", {"path": "../unrelated-file.txt"}, metadata, tmp_path)
+
+
+@pytest.mark.parametrize("stdout,returncode", [("not JSON", 0), ("[]", 0), ('{"scheduled_tasks":[]}', 1)])
+def test_invalid_autostart_response_warns_without_echoing_raw_output(stdout, returncode):
+    report = verify_ollama_dispatch.evaluate_ollama_autostart(
+        platform="win32",
+        executable_resolver=lambda name: "powershell.exe",
+        command_runner=lambda command, **kwargs: subprocess.CompletedProcess(
+            command, returncode, stdout=stdout, stderr="private-response"
+        ),
     )
-    assert first_nonblank == "NEW"
-    assert not (fixture_root / "bridge" / "INDEX.md").exists()
+    assert report["configured"] is False and report["warning"]
+    assert "private-response" not in json.dumps(report)
 
 
-# ── Guard-only: destructive Bash rejection ───────────────────────────────
-
-
-def test_guard_destructive_bash_rejected(verify_module, ollama_harness_module, tmp_path) -> None:
-    """G1: ``rm -rf /`` payload through the mocked guard pipeline must be rejected."""
-    route = _fixture_route(ollama_harness_module, key="destructive-bash-route", allowed_tools=("Bash",))
-    ok = verify_module._check_guard_destructive_bash(tmp_path, route, "http://localhost:11434")
-    assert ok is True
-
-
-# ── Guard-only: formal-artifact rejection ────────────────────────────────
-
-
-def test_guard_formal_artifact_rejected(verify_module, ollama_harness_module, tmp_path) -> None:
-    """G2: write to a formal-artifact-approval path must be rejected by the mocked guard."""
-    route = _fixture_route(ollama_harness_module, key="formal-artifact-route", allowed_tools=("Write",))
-    # Ensure the .groundtruth/formal-artifact-approvals path resolves under tmp_path,
-    # which the script will use to construct the test write target.
-    (tmp_path / ".groundtruth" / "formal-artifact-approvals").mkdir(parents=True, exist_ok=True)
-    ok = verify_module._check_guard_formal_artifact(tmp_path, route, "http://localhost:11434")
-    assert ok is True
-
-
-# ── Guard-only: out-of-root rejection ────────────────────────────────────
-
-
-def test_guard_out_of_root_rejected(verify_module, ollama_harness_module, tmp_path) -> None:
-    """G3: read of an out-of-root path is rejected by ``_ensure_under_root``.
-
-    Out-of-root rejection happens at the path-resolution layer, not via the
-    guard runner. The check passes when ``dispatch_tool_call`` raises
-    ``OllamaHarnessError`` containing the escape diagnostic.
-    """
-    route = _fixture_route(ollama_harness_module, key="out-of-root-route", allowed_tools=("Read",))
-    ok = verify_module._check_guard_out_of_root(tmp_path, route, "http://localhost:11434")
-    assert ok is True
-
-
-# ── Guard-only: bridge Bash mutation rejection ──────────────────────────
-
-
-def test_guard_bridge_bash_denial_blocks_file_and_index_mutation(
-    verify_module, ollama_harness_module, tmp_path
-) -> None:
-    """G4: Bash bridge writes are rejected before guards or subprocess execution."""
-    route = _fixture_route(ollama_harness_module, key="bridge-bash-route", allowed_tools=("Bash",))
-    ok = verify_module._check_guard_bridge_bash_denial(tmp_path, route, "http://localhost:11434")
-    assert ok is True
-
-
-# ── Smoke test: script importable with no side effects ──────────────────
-
-
-def test_script_importable_without_side_effects() -> None:
-    """Importing the verification script must not contact the network or modify state."""
-    mod = _load_script_module()
-    assert hasattr(mod, "_check_tool_loop_round_trip")
-    assert hasattr(mod, "_check_author_metadata")
-    assert hasattr(mod, "_check_bridge_filing_via_dispatch")
-    assert hasattr(mod, "_check_guard_destructive_bash")
-    assert hasattr(mod, "_check_guard_formal_artifact")
-    assert hasattr(mod, "_check_guard_out_of_root")
-    assert hasattr(mod, "_check_guard_bridge_bash_denial")
-    assert callable(getattr(mod, "main", None))
+def test_diagnostic_cli_help_exposes_no_mock_or_role_promotion_mode():
+    result = subprocess.run(
+        [sys.executable, str(_SCRIPTS_DIR / "verify_ollama_dispatch.py"), "--help"],
+        capture_output=True,
+        encoding="utf-8",
+        timeout=20,
+    )
+    assert result.returncode == 0
+    assert "--skip-daemon" in result.stdout
+    assert "--readiness-only" not in result.stdout
+    assert "Live Mode" not in result.stdout and "Guard-Only Mode" not in result.stdout

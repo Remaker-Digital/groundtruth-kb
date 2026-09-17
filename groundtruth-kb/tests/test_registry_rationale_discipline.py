@@ -10,9 +10,6 @@ T3 enforces that ownership flips against the golden snapshot include a
 T-SCHEMA-NOTES proves the `OwnershipMeta.notes` field exists and round-trips
 through `_to_ownership_record()` for FILE-class records.
 
-T-IPR-CVR (GOV-20 Phase 1 advisory pilot) asserts the IPR + CVR docs exist
-in KB with the ADR tag.
-
 Bridge authority: ``bridge/gtkb-isolation-017-slice2-5-rationale-schema-extension-006.md`` GO.
 """
 
@@ -122,8 +119,3 @@ def test_ownership_meta_has_notes_field_with_round_trip() -> None:
         "At least one FILE-class record must have non-empty notes (proves projection works); "
         "found 0. Either the schema extension didn't ship or no TOML row populated notes."
     )
-
-
-def _kb_path() -> Path:
-    here = Path(__file__).resolve()
-    return here.parents[2] / "groundtruth.db"

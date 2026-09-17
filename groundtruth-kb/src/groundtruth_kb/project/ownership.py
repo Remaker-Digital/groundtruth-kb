@@ -21,12 +21,13 @@ row already defined in §1.4.
 
 from __future__ import annotations
 
+import json
 import os
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from groundtruth_kb.project.managed_registry import (
     DivergencePolicyEnum,
@@ -98,7 +99,9 @@ _DEFAULT_IGNORE_GLOBS: tuple[str, ...] = (
     "**/*.pyo",
 )
 
-_SourceClass = Literal["file", "settings-hook-registration", "gitignore-pattern", "ownership-glob", "__fallback__"]
+_SourceClass = Literal[
+    "file", "settings-hook-registration", "gitignore-pattern", "ownership-glob", "registry", "__fallback__"
+]
 
 
 @dataclass(frozen=True)
@@ -123,10 +126,14 @@ class OwnershipRecord:
 
 @dataclass(frozen=True)
 class ClassificationRow:
-    """One path classified against the ownership map.
+    """One path classified against the selected root's declarations or, when it carries none, the template map.
 
-    Emitted by :meth:`OwnershipResolver.classify_tree` and rendered into the
-    Agent Red classification report per §4 of the proposal.
+    Emitted by :meth:`OwnershipResolver.classify_tree` and rendered by the tree classification report. ``finding``
+    names a diagnostic the classification cannot resolve: ``undeclared`` (no current declaration of the selected root
+    covers the path; without a declaration source, no template row does) or ``unreadable`` (the walk could not read
+    it). A finding grants no ownership or authorization. ``template_hint`` names the packaged template record that
+    knows an undeclared path: orientation only, never coverage — a packaged copy cannot independently grant
+    membership (GOV-PLATFORM-SOT-REGISTRY-001).
     """
 
     path: str
@@ -134,8 +141,9 @@ class ClassificationRow:
     upgrade_policy: UpgradePolicyEnum
     adopter_divergence_policy: DivergencePolicyEnum | None
     notes: str
-    owner_decision_pending: bool
     record_id: str
+    finding: str | None = None
+    template_hint: str | None = None
 
 
 class OwnershipResolver:
@@ -242,18 +250,33 @@ class OwnershipResolver:
         *,
         max_depth: int = 10,
         ignore_globs: tuple[str, ...] = _DEFAULT_IGNORE_GLOBS,
+        declared: DeclarationLookup | None = None,
     ) -> list[ClassificationRow]:
         """Walk *tree_root* and classify every file.
 
         The walk is READ-ONLY — no filesystem writes are performed by this
         method or any of its helpers. Directories matched by *ignore_globs*
         are pruned from ``os.walk``. ``max_depth`` is measured relative to
-        ``tree_root`` (0 = only files in the root).
+        ``tree_root`` (0 = only files in the root). When *declared* is given
+        (see :func:`load_target_declarations`) the selected root's current
+        declarations are the sole coverage: a path it covers takes that
+        declaration and every other path is an ``undeclared`` finding whose
+        template match, if any, is reported as a hint. Without *declared* the
+        template map classifies (a target that carries no declaration file).
         """
         tree_root = tree_root.resolve()
         rows: list[ClassificationRow] = []
+        unreadable: list[str] = []
 
-        for dirpath, dirnames, filenames in os.walk(tree_root):
+        def _record_unreadable(error: OSError) -> None:
+            failed = Path(str(error.filename or tree_root))
+            try:
+                relative = str(failed.resolve().relative_to(tree_root)).replace(os.sep, "/")
+            except (OSError, ValueError):
+                relative = str(failed)
+            unreadable.append(relative if relative != "." else "")
+
+        for dirpath, dirnames, filenames in os.walk(tree_root, onerror=_record_unreadable):
             # Depth relative to tree_root (rel may be "." for root).
             try:
                 rel_dir = str(Path(dirpath).resolve().relative_to(tree_root)).replace(os.sep, "/")
@@ -286,26 +309,78 @@ class OwnershipResolver:
                 rel_path = (rel_prefix + filename).lstrip("/")
                 if any(_match_glob(g, rel_path) for g in ignore_globs):
                     continue
-                record = self.classify_path(rel_path)
-                rows.append(
-                    ClassificationRow(
-                        path=rel_path,
-                        ownership=record.ownership,
-                        upgrade_policy=record.upgrade_policy,
-                        adopter_divergence_policy=record.adopter_divergence_policy,
-                        notes=record.notes,
-                        owner_decision_pending=(record.ownership == "legacy-exception"),
-                        record_id=record.id,
-                    )
+                rows.append(self._classify_row(rel_path, declared))
+        for rel_path in sorted(set(unreadable)):
+            rows.append(
+                ClassificationRow(
+                    path=rel_path,
+                    ownership="adopter-owned",
+                    upgrade_policy="preserve",
+                    adopter_divergence_policy=None,
+                    notes="The walk could not read this path.",
+                    record_id=f"__fallback__:{rel_path}",
+                    finding="unreadable",
                 )
+            )
 
         rows.sort(key=lambda r: (_OWNERSHIP_SORT_ORDER[r.ownership], r.path))
         return rows
+
+    def _classify_row(self, rel_path: str, declared: DeclarationLookup | None) -> ClassificationRow:
+        """Classify one walked file; the selected root's declarations, when consulted, are the sole coverage."""
+        template_hint: str | None = None
+        if declared is None:
+            record = self.classify_path(rel_path)
+        else:
+            declared_record = declared(rel_path)
+            if declared_record is not None:
+                record = declared_record
+            else:
+                template = self.classify_path(rel_path)
+                if template.source_class != "__fallback__":
+                    template_hint = template.id
+                record = _undeclared_record(rel_path, template)
+        return ClassificationRow(
+            path=rel_path,
+            ownership=record.ownership,
+            upgrade_policy=record.upgrade_policy,
+            adopter_divergence_policy=record.adopter_divergence_policy,
+            notes=record.notes,
+            record_id=record.id,
+            finding="undeclared" if record.source_class == "__fallback__" else None,
+            template_hint=template_hint,
+        )
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _undeclared_record(norm: str, template: OwnershipRecord) -> OwnershipRecord:
+    """The finding record for a path no current declaration of the selected root covers.
+
+    *template* is the packaged template map's answer for the same path; a match is reported in the notes as a hint.
+    It grants nothing: the row stays adopter-owned/preserve with an ``undeclared`` finding.
+    """
+    notes = "No current declaration of the selected root covers this path."
+    if template.source_class != "__fallback__":
+        notes += (
+            f" Template hint: {template.id} ({template.ownership}, {template.upgrade_policy});"
+            " a packaged template grants no membership."
+        )
+    return OwnershipRecord(
+        id=f"__fallback__:{norm}",
+        ownership="adopter-owned",
+        upgrade_policy="preserve",
+        adopter_divergence_policy=None,
+        source_class="__fallback__",
+        workflow_targets=(),
+        notes=notes,
+        source=None,
+        path_glob=None,
+        priority=None,
+    )
 
 
 def _to_ownership_record(artifact: ManagedArtifact) -> OwnershipRecord:
@@ -481,47 +556,340 @@ def _literal_prefix_length(glob: str) -> int:
 
 
 # ---------------------------------------------------------------------------
+# The selected target's current declarations
+# ---------------------------------------------------------------------------
+
+PLATFORM_DECLARATION = "config/registry/sot-artifacts.toml"
+APPLICATION_DECLARATION = ".gtkb-app-isolation.json"
+DeclarationLookup = Callable[[str], "OwnershipRecord | None"]
+
+
+@dataclass(frozen=True)
+class DeclarationSource:
+    """Which current declaration the classification consulted for the selected target.
+
+    ``kind`` is ``platform-registry`` (the target's SoT artifact registry through the registry resolver),
+    ``application-registry`` (the application's artifact-boundary registry, validated by the application-boundary
+    validator), ``none`` (neither file exists at the target: template classifications only) or ``unavailable`` (a
+    declaration file exists but cannot be read or validated; its cause is in ``detail`` and ``findings``, nothing is
+    covered and every walked path is an ``undeclared`` finding — the packaged templates infer nothing). ``findings``
+    carries the validator's structured findings (``code``, ``message``, ``severity`` and, where known, ``path``).
+    """
+
+    kind: Literal["platform-registry", "application-registry", "none", "unavailable"]
+    path: str | None
+    declarations: int
+    detail: str
+    findings: tuple[dict[str, str], ...] = ()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "kind": self.kind,
+            "path": self.path,
+            "declarations": self.declarations,
+            "detail": self.detail,
+            "findings": [dict(finding) for finding in self.findings],
+        }
+
+
+def _platform_declaration_record(record: Any) -> OwnershipRecord:
+    generated = record.lifecycle == "generated"
+    return OwnershipRecord(
+        id=record.id,
+        ownership="gt-kb-managed",
+        upgrade_policy="overwrite" if generated else "preserve",
+        adopter_divergence_policy=None,
+        source_class="registry",
+        workflow_targets=(),
+        notes=(
+            f"Declared by the platform registry: domain {record.domain}, lifecycle {record.lifecycle}, "
+            f"coverage {record.coverage_mode}, owner role {record.owner_role}."
+        ),
+        source=None,
+        path_glob=None,
+        priority=None,
+    )
+
+
+# One row per classification the application-boundary validator allows (``ALLOWED_CLASSIFICATIONS`` in
+# ``groundtruth_kb.isolation.app_root_minimization``); the validator rejects any other value before lookup, so the
+# map is indexed directly and never defaults.
+_APPLICATION_CLASSIFICATIONS: dict[str, tuple[OwnershipEnum, UpgradePolicyEnum]] = {
+    "authoritative_input": ("adopter-owned", "preserve"),
+    "generated_output": ("gt-kb-managed", "overwrite"),
+    "runtime_data": ("adopter-owned", "transient"),
+    "bounded_temporary_output": ("adopter-owned", "transient"),
+}
+
+
+def _uncovered(_relative: str) -> OwnershipRecord | None:
+    """The lookup of an unavailable declaration source: nothing is covered and nothing is inferred."""
+    return None
+
+
+def _load_platform_declarations(platform_path: Path) -> tuple[DeclarationSource, DeclarationLookup]:
+    from groundtruth_kb.project.registry_control_plane import RegistryCoverageError, RegistryResolver
+    from groundtruth_kb.project.sot_registry import InvalidSoTRecord, load_toml
+
+    try:
+        records = load_toml(platform_path)
+        resolver = RegistryResolver(records)
+    except (InvalidSoTRecord, RegistryCoverageError, OSError, ValueError) as error:
+        finding = {
+            "code": "registry_invalid",
+            "message": f"{type(error).__name__}: {error}",
+            "severity": "error",
+            "path": PLATFORM_DECLARATION,
+        }
+        return (
+            DeclarationSource("unavailable", PLATFORM_DECLARATION, 0, f"{PLATFORM_DECLARATION}: {error}", (finding,)),
+            _uncovered,
+        )
+    usable = sum(1 for record in records if record.lifecycle != "archive" and record.coverage_mode != "virtual")
+
+    def platform_lookup(relative: str) -> OwnershipRecord | None:
+        try:
+            record = resolver.resolve(relative)
+        except RegistryCoverageError:
+            return None
+        if record is None or record.coverage_mode == "virtual":
+            return None
+        return _platform_declaration_record(record)
+
+    return (
+        DeclarationSource(
+            "platform-registry",
+            PLATFORM_DECLARATION,
+            usable,
+            f"{usable} current declaration(s) with filesystem coverage; archived declarations excluded",
+        ),
+        platform_lookup,
+    )
+
+
+def _load_application_declarations(target: Path, application_path: Path) -> tuple[DeclarationSource, DeclarationLookup]:
+    from groundtruth_kb.isolation.app_root_minimization import (
+        AppRootFinding,
+        _load_registry,
+        _normalize_registry_entries,
+    )
+
+    findings: list[AppRootFinding] = []
+    payload = _load_registry(application_path, target, findings)
+    entries = _normalize_registry_entries(payload, target, application_path, findings)
+    errors = [finding for finding in findings if finding.severity == "error"]
+    if errors:
+        summary = "; ".join(f"{finding.code}: {finding.message}" for finding in errors[:3])
+        if len(errors) > 3:
+            summary += f"; +{len(errors) - 3} more"
+        return (
+            DeclarationSource(
+                "unavailable",
+                APPLICATION_DECLARATION,
+                0,
+                f"{APPLICATION_DECLARATION}: {len(errors)} declaration finding(s): {summary}",
+                tuple(finding.to_dict() for finding in findings),
+            ),
+            _uncovered,
+        )
+    by_key: dict[tuple[str, str], dict[str, Any]] = {
+        (str(entry["name"]), str(entry["type"])): entry for entry in entries
+    }
+
+    def application_lookup(relative: str) -> OwnershipRecord | None:
+        top, _, rest = relative.partition("/")
+        entry = by_key.get((top, "DIR" if rest else "FILE"))
+        if entry is None:
+            return None
+        classification = str(entry["classification"])
+        ownership, upgrade = _APPLICATION_CLASSIFICATIONS[classification]
+        return OwnershipRecord(
+            id=f"application-registry:{top}",
+            ownership=ownership,
+            upgrade_policy=upgrade,
+            adopter_divergence_policy=None,
+            source_class="registry",
+            workflow_targets=(),
+            notes=f"Declared by the application registry as {classification}: {str(entry['purpose']).strip()}",
+            source=None,
+            path_glob=None,
+            priority=None,
+        )
+
+    return (
+        DeclarationSource(
+            "application-registry",
+            APPLICATION_DECLARATION,
+            len(entries),
+            f"{len(entries)} validated top-level artifact entr{'y' if len(entries) == 1 else 'ies'}",
+        ),
+        application_lookup,
+    )
+
+
+def load_target_declarations(target: Path) -> tuple[DeclarationSource, DeclarationLookup | None]:
+    """Return the selected target's current declaration source and a path lookup over it.
+
+    The platform registry is consulted through the existing registry resolver so exact, recursive, glob and
+    opaque-container coverage and the archived-declaration exclusion match every other reader of that file. An
+    application root's ``.gtkb-app-isolation.json`` is read and validated by the application-boundary validator
+    (:mod:`groundtruth_kb.isolation.app_root_minimization`: schema version, application identity, entry names, types,
+    classifications, purposes, duplicate entries and duplicate JSON keys); a validated ``FILE`` entry covers that
+    top-level file and a ``DIR`` entry covers its descendants. A source that cannot be read or validated is
+    ``unavailable`` with the findings listed, and its lookup covers nothing, so every path stays a finding. The lookup
+    is ``None`` only when neither file exists (``none``): the one case in which the caller classifies from the
+    packaged templates. Declarations are never inferred from the templates.
+    """
+    platform_path = target / PLATFORM_DECLARATION
+    if platform_path.is_file():
+        return _load_platform_declarations(platform_path)
+    application_path = target / APPLICATION_DECLARATION
+    if application_path.is_file():
+        return _load_application_declarations(target, application_path)
+    return (
+        DeclarationSource(
+            "none",
+            None,
+            0,
+            f"neither {PLATFORM_DECLARATION} nor {APPLICATION_DECLARATION} exists at the target; "
+            "template classifications only",
+        ),
+        None,
+    )
+
+
+@dataclass(frozen=True)
+class TreeClassification:
+    """The classification of one selected target: its declaration source and the classified rows."""
+
+    target: str
+    declaration_source: DeclarationSource
+    rows: list[ClassificationRow]
+
+
+def classify_target(
+    target: Path,
+    *,
+    max_depth: int = 10,
+    ignore_globs: tuple[str, ...] = _DEFAULT_IGNORE_GLOBS,
+    resolver: OwnershipResolver | None = None,
+) -> TreeClassification:
+    """Classify a selected target against its own current declarations.
+
+    The template map classifies only a target that carries no declaration file; otherwise it supplies hints for
+    the paths the declarations do not cover, which remain findings.
+    """
+    target = target.resolve()
+    source, lookup = load_target_declarations(target)
+    rows = (resolver or OwnershipResolver()).classify_tree(
+        target, max_depth=max_depth, ignore_globs=ignore_globs, declared=lookup
+    )
+    return TreeClassification(str(target), source, rows)
+
+
+# ---------------------------------------------------------------------------
 # Report generation
 # ---------------------------------------------------------------------------
+
+
+def _report_payload(
+    rows: list[ClassificationRow],
+    *,
+    gt_kb_version: str,
+    target_tree: str,
+    declaration_source: DeclarationSource | None = None,
+) -> dict[str, Any]:
+    sorted_rows = sorted(rows, key=lambda r: (_OWNERSHIP_SORT_ORDER[r.ownership], r.path))
+    findings = [r for r in sorted_rows if r.finding]
+    source = declaration_source or DeclarationSource("none", None, 0, "no declaration source was consulted")
+    return {
+        "report": "tree-classification",
+        "gt_kb_version": gt_kb_version,
+        "target_tree": target_tree,
+        "declaration_source": source.to_dict(),
+        "total_paths_classified": len(sorted_rows),
+        "findings": {
+            "undeclared": sum(1 for r in findings if r.finding == "undeclared"),
+            "unreadable": sum(1 for r in findings if r.finding == "unreadable"),
+        },
+        "rows": [
+            {
+                "path": r.path,
+                "ownership": r.ownership,
+                "upgrade_policy": r.upgrade_policy,
+                "adopter_divergence_policy": r.adopter_divergence_policy,
+                "notes": r.notes,
+                "record_id": r.record_id,
+                "finding": r.finding,
+                "template_hint": r.template_hint,
+            }
+            for r in sorted_rows
+        ],
+    }
+
+
+def _describe_source(source: dict[str, Any]) -> str:
+    if source["kind"] in ("platform-registry", "application-registry"):
+        return f"{source['kind']} ({source['path']}; {source['detail']})"
+    return f"{source['kind']} ({source['detail']})"
 
 
 def render_classification_report_markdown(
     rows: list[ClassificationRow],
     *,
     gt_kb_version: str,
-    gt_kb_head: str,
     target_tree: str,
-    target_head: str,
+    declaration_source: DeclarationSource | None = None,
 ) -> str:
-    """Render a classification row list as a Markdown report per §4.
+    """Render a classification row list as a deterministic Markdown report.
 
-    Ordering is by (ownership enum, path); ``classify_tree`` already does this,
-    but the function re-sorts defensively so callers can pass rows from any
-    source.
+    Ordering is by (ownership enum, path); ``classify_tree`` already does this, but the function re-sorts
+    defensively so callers can pass rows from any source. Findings (undeclared, unreadable) are diagnostics: they
+    grant no ownership or authorization. The header names the declaration source the classification consulted. Two
+    optional sections follow the table: the template hints for undeclared paths (not coverage) and the declaration
+    findings of an unavailable source.
     """
-    sorted_rows = sorted(rows, key=lambda r: (_OWNERSHIP_SORT_ORDER[r.ownership], r.path))
-    decision_pending = [r for r in sorted_rows if r.owner_decision_pending]
-    generated = datetime.now(UTC).isoformat(timespec="seconds")
-
+    payload = _report_payload(
+        rows, gt_kb_version=gt_kb_version, target_tree=target_tree, declaration_source=declaration_source
+    )
     lines: list[str] = []
-    lines.append("# Agent Red Classification Report")
+    lines.append("# Tree classification report")
     lines.append("")
-    lines.append(f"- Generated: {generated}")
     lines.append(f"- GT-KB version: {gt_kb_version}")
-    lines.append(f"- GT-KB HEAD: {gt_kb_head}")
     lines.append(f"- Target tree: {target_tree}")
-    lines.append(f"- Target HEAD: {target_head}")
-    lines.append(f"- Total paths classified: {len(sorted_rows)}")
-    lines.append(f"- Owner-decision-pending rows: {len(decision_pending)}")
+    lines.append(f"- Declaration source: {_describe_source(payload['declaration_source'])}")
+    lines.append(f"- Total paths classified: {payload['total_paths_classified']}")
+    lines.append(
+        f"- Findings: {payload['findings']['undeclared']} undeclared, {payload['findings']['unreadable']} unreadable"
+    )
     lines.append("")
-    lines.append("| path | ownership | upgrade_policy | divergence_policy | notes | owner_decision_pending |")
+    lines.append("| path | ownership | upgrade_policy | divergence_policy | record | finding |")
     lines.append("|---|---|---|---|---|---|")
-    for r in sorted_rows:
-        div = r.adopter_divergence_policy if r.adopter_divergence_policy is not None else "—"
-        pend = "YES" if r.owner_decision_pending else ""
-        notes = (r.notes or "").replace("|", "\\|").replace("\n", " ")
-        path = r.path.replace("|", "\\|")
-        lines.append(f"| {path} | {r.ownership} | {r.upgrade_policy} | {div} | {notes} | {pend} |")
+    for r in payload["rows"]:
+        div = r["adopter_divergence_policy"] if r["adopter_divergence_policy"] is not None else "—"
+        path = str(r["path"]).replace("|", "\\|")
+        record = str(r["record_id"]).replace("|", "\\|")
+        lines.append(f"| {path} | {r['ownership']} | {r['upgrade_policy']} | {div} | {record} | {r['finding'] or ''} |")
+    hinted = [r for r in payload["rows"] if r["template_hint"]]
+    if hinted:
+        lines.append("")
+        lines.append("## Template hints")
+        lines.append("")
+        lines.append("Packaged template records that know an undeclared path. A hint is not coverage.")
+        lines.append("")
+        for r in hinted:
+            path = str(r["path"]).replace("|", "\\|")
+            lines.append(f"- {path}: {r['template_hint']}")
+    source_findings = payload["declaration_source"]["findings"]
+    if source_findings:
+        lines.append("")
+        lines.append("## Declaration findings")
+        lines.append("")
+        lines.append("The declaration source is unavailable; nothing was inferred and every path is a finding.")
+        lines.append("")
+        for finding in source_findings:
+            location = f" ({finding['path']})" if finding.get("path") else ""
+            lines.append(f"- {finding['code']}: {finding['message']}{location}")
     lines.append("")
     return "\n".join(lines)
 
@@ -530,34 +898,17 @@ def render_classification_report_json(
     rows: list[ClassificationRow],
     *,
     gt_kb_version: str,
-    gt_kb_head: str,
     target_tree: str,
-    target_head: str,
+    declaration_source: DeclarationSource | None = None,
 ) -> str:
-    """Render a classification row list as a JSON report."""
-    import json
-
-    sorted_rows = sorted(rows, key=lambda r: (_OWNERSHIP_SORT_ORDER[r.ownership], r.path))
-    decision_pending_count = sum(1 for r in sorted_rows if r.owner_decision_pending)
-    payload = {
-        "generated": datetime.now(UTC).isoformat(timespec="seconds"),
-        "gt_kb_version": gt_kb_version,
-        "gt_kb_head": gt_kb_head,
-        "target_tree": target_tree,
-        "target_head": target_head,
-        "total_paths_classified": len(sorted_rows),
-        "owner_decision_pending_rows": decision_pending_count,
-        "rows": [
-            {
-                "path": r.path,
-                "ownership": r.ownership,
-                "upgrade_policy": r.upgrade_policy,
-                "adopter_divergence_policy": r.adopter_divergence_policy,
-                "notes": r.notes,
-                "owner_decision_pending": r.owner_decision_pending,
-                "record_id": r.record_id,
-            }
-            for r in sorted_rows
-        ],
-    }
-    return json.dumps(payload, indent=2)
+    """Render a classification row list as a deterministic JSON report."""
+    return (
+        json.dumps(
+            _report_payload(
+                rows, gt_kb_version=gt_kb_version, target_tree=target_tree, declaration_source=declaration_source
+            ),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )

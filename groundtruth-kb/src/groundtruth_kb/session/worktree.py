@@ -17,14 +17,20 @@ Two properties are deliberate.
 **The path is derived, never stored.** ``DCL-INIT-BOUND-SESSION-IDENTITY-001``
 fixes session identity in one immutable binding that carries no mutable
 lifecycle state, so this module writes no pointer anywhere. The directory name
-*is* the session identity, which also means any session can name the owner of
-any checkout by reading one row through the shared source of truth rather than
-by looking inside another harness's directory.
+*is* the session identity. The immutable binding supplies attribution; it
+establishes neither ownership of a work item nor liveness of a context.
+No checkout needs to be inspected to recover that attribution.
 
 **A session worktree is always on a branch.** A commit made on a detached HEAD
 inside a worktree is reachable only through that worktree; remove the checkout
 and it survives only in the reflog. Twenty-eight of the forty-six checkouts that
 predate this module are detached.
+
+Application repositories use the same platform workspace locations. The
+repository root selects Git history, while the platform root selects temporary
+checkout paths. A checkout registered in one repository cannot be reused in
+another. Repository selection comes from the caller's current canonical project
+and catalog resolution; these filesystem helpers grant no claim or authority.
 
 Nothing here deletes a checkout that holds work, and nothing commits on another
 session's behalf. Abandoned work is preserved in place, on its own branch, or it
@@ -33,12 +39,13 @@ is left alone.
 
 from __future__ import annotations
 
+import os
 import re
-import shutil
-import sqlite3
 import subprocess
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 __all__ = [
     "SESSION_BRANCH_PREFIX",
@@ -47,12 +54,8 @@ __all__ = [
     "SessionWorktreeError",
     "WorktreeState",
     "classify_worktrees",
-    "close_worktree",
     "is_session_context_id",
-    "live_session_context_ids",
-    "open_worktree",
     "session_branch",
-    "show_worktree",
     "worktree_path",
 ]
 
@@ -108,7 +111,9 @@ def session_branch(session_context_id: str) -> str:
     return f"{SESSION_BRANCH_PREFIX}{session_context_id}"
 
 
-def _git(project_root: Path | str, *args: str, check: bool = False) -> subprocess.CompletedProcess[str]:
+def _git(
+    project_root: Path | str, *args: str, check: bool = False, read_only: bool = False
+) -> subprocess.CompletedProcess[str]:
     """Run one git command. ``--no-optional-locks`` keeps reads off the index lock."""
     return subprocess.run(
         ["git", "--no-optional-locks", "--literal-pathspecs", *args],
@@ -117,30 +122,25 @@ def _git(project_root: Path | str, *args: str, check: bool = False) -> subproces
         text=True,
         encoding="utf-8",
         errors="replace",
-        timeout=_GIT_TIMEOUT_SECONDS,
+        timeout=15 if read_only else _GIT_TIMEOUT_SECONDS,
+        env={key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")},
         check=check,
     )
 
 
 @dataclass(frozen=True)
 class WorktreeState:
-    """Everything known about one checkout, all of it read fresh.
-
-    No field is cached anywhere: the classification is derived from
-    ``git worktree list``, one ``git status`` and one ancestry test each time it
-    is asked for, per the source-of-truth freshness rule.
-    """
+    """Fresh Git observations, with no claim about context liveness or disposal."""
 
     path: Path
     session_context_id: str | None
     branch: str | None
     head: str | None
-    binding_live: bool
-    tracked_dirty: int
-    untracked: int
-    head_is_ancestor: bool
+    tracked_dirty: int | None
+    untracked: int | None
+    head_is_ancestor: bool | None
     classification: str
-    candidate_action: str
+    candidate_action: str = "report_only"
     notes: tuple[str, ...] = field(default=())
 
     def as_dict(self) -> dict[str, object]:
@@ -149,7 +149,6 @@ class WorktreeState:
             "session_context_id": self.session_context_id,
             "branch": self.branch,
             "head": self.head,
-            "binding_live": self.binding_live,
             "tracked_dirty": self.tracked_dirty,
             "untracked": self.untracked,
             "head_is_ancestor": self.head_is_ancestor,
@@ -157,29 +156,6 @@ class WorktreeState:
             "candidate_action": self.candidate_action,
             "notes": list(self.notes),
         }
-
-
-def live_session_context_ids(db_path: Path | str) -> frozenset[str]:
-    """Return every session context id that still has a binding.
-
-    Retirement deletes the binding row, so presence is liveness. A missing or
-    unreadable database yields the empty set, which classifies every checkout as
-    unowned and therefore never a removal candidate: the fail-closed direction.
-    """
-    path = Path(db_path)
-    if not path.is_file():
-        return frozenset()
-    try:
-        conn = sqlite3.connect(f"file:{path.as_posix()}?mode=ro", uri=True)
-    except sqlite3.Error:
-        return frozenset()
-    try:
-        rows = conn.execute("SELECT session_context_id FROM session_init_bindings").fetchall()
-    except sqlite3.Error:
-        return frozenset()
-    finally:
-        conn.close()
-    return frozenset(str(row[0]) for row in rows if row and row[0])
 
 
 def _parse_worktree_list(output: str) -> list[dict[str, str]]:
@@ -201,263 +177,152 @@ def _parse_worktree_list(output: str) -> list[dict[str, str]]:
 
 
 def _integration_head(project_root: Path | str, integration_ref: str) -> str | None:
-    result = _git(project_root, "rev-parse", "--verify", "--quiet", integration_ref)
-    head = result.stdout.strip()
-    return head or None
+    result = _git(project_root, "rev-parse", "--verify", "--quiet", integration_ref, read_only=True)
+    return result.stdout.strip() or None if result.returncode == 0 else None
 
 
 def _work_state(path: Path) -> tuple[int, int]:
-    """Return (tracked modifications, untracked files) for one checkout."""
-    result = _git(path, "status", "--porcelain")
+    """Count fresh tracked changes and untracked files without refreshing the index."""
+    result = _git(path, "status", "--porcelain=v1", "-z", "--untracked-files=all", read_only=True)
     if result.returncode != 0:
-        return (0, 0)
-    tracked = 0
-    untracked = 0
-    for line in result.stdout.splitlines():
-        if not line:
+        raise SessionWorktreeError("git_status_unavailable", "Git could not inspect this checkout")
+    tracked = untracked = 0
+    entries = iter(result.stdout.split("\0"))
+    for entry in entries:
+        if not entry:
             continue
-        if line.startswith("??"):
+        status = entry[:2]
+        if status == "??":
             untracked += 1
         else:
             tracked += 1
-    return (tracked, untracked)
+        if "R" in status or "C" in status:
+            next(entries, None)
+    return tracked, untracked
 
 
-def _is_ancestor(project_root: Path | str, head: str | None, integration_head: str | None) -> bool:
+def _is_ancestor(project_root: Path | str, head: str | None, integration_head: str | None) -> bool | None:
     if not head or not integration_head:
-        return False
-    result = _git(project_root, "merge-base", "--is-ancestor", head, integration_head)
+        return None
+    result = _git(project_root, "merge-base", "--is-ancestor", head, integration_head, read_only=True)
+    if result.returncode not in (0, 1):
+        return None
     return result.returncode == 0
 
 
 def classify_worktrees(
     project_root: Path | str,
-    db_path: Path | str,
     *,
     integration_ref: str = "develop",
 ) -> list[WorktreeState]:
-    """Classify every registered checkout plus any orphan under ``.worktrees/``.
+    """Report repository checkouts without treating identity or absence as liveness.
 
-    Classifications:
-
-    ``live``
-        The name resolves to a binding that still exists. Never a candidate.
-    ``abandoned_clean``
-        Binding gone, no tracked modification, HEAD already contained in the
-        integration head. Removable.
-    ``abandoned_with_work``
-        Binding gone, but tracked modifications or an unmerged HEAD. The bytes
-        must be preserved on the checkout's own branch before it can be removed,
-        and never by folding them into someone else's commit.
-    ``unowned``
-        A registered checkout whose name is not a session context id. Every
-        checkout predating this module is in this class. Reported, never removed
-        by a session.
-    ``orphaned_checkout``
-        A directory under ``.worktrees/`` that git does not know about.
+    A clean status does not prove a checkout disposable: ignored files and
+    current artifact claims are outside this Git report. Every result is
+    report-only. Unknown observations remain null rather than becoming zero.
     """
-    root = Path(project_root).resolve()
-    live = live_session_context_ids(db_path)
-    integration_head = _integration_head(root, integration_ref)
+    lexical_root = Path(project_root).absolute()
+    _artifact_path(lexical_root, ".")
+    _artifact_path(lexical_root, ".git")
+    root = lexical_root.resolve()
+    try:
+        top = _git(root, "rev-parse", "--show-toplevel", read_only=True)
+        if top.returncode or Path(top.stdout.strip()).resolve() != root:
+            raise SessionWorktreeError("not_checkout_root", "Use the exact Git checkout root")
+        listing = _git(root, "worktree", "list", "--porcelain", read_only=True)
+        if listing.returncode:
+            raise SessionWorktreeError("worktree_listing_unavailable", "Git could not list repository checkouts")
+        common = _git(root, "rev-parse", "--path-format=absolute", "--git-common-dir", read_only=True)
+        if common.returncode:
+            raise SessionWorktreeError("git_observation_unavailable", "Git could not identify this repository")
+        common_dir = Path(common.stdout.strip()).resolve()
+        integration_head = _integration_head(root, integration_ref)
+    except (OSError, subprocess.TimeoutExpired) as exc:
+        raise SessionWorktreeError(
+            "git_observation_unavailable", "Git is unavailable or exceeded the 15-second read timeout"
+        ) from exc
 
-    listing = _git(root, "worktree", "list", "--porcelain")
     states: list[WorktreeState] = []
     registered: set[Path] = set()
-
     for record in _parse_worktree_list(listing.stdout):
         raw_path = record.get("worktree")
         if not raw_path:
             continue
-        path = Path(raw_path).resolve()
+        path = Path(raw_path).absolute()
         registered.add(path)
         if path == root:
             continue
-
         branch = record.get("branch")
         if branch and branch.startswith("refs/heads/"):
             branch = branch[len("refs/heads/") :]
         head = record.get("HEAD")
-        name = path.name
-        notes: list[str] = []
+        notes = ["Git facts do not establish context liveness or disposal eligibility"]
         if "detached" in record:
-            notes.append("detached HEAD: a commit here is reachable only from this checkout")
-
-        tracked_dirty, untracked = _work_state(path)
-        head_is_ancestor = _is_ancestor(root, head, integration_head)
-
-        if is_session_context_id(name):
-            session_id: str | None = name
-            binding_live = name in live
+            notes.append("detached HEAD; inspect commit reachability before any separate operation")
+        if "locked" in record:
+            notes.append("Git marks this checkout locked")
+        if "prunable" in record:
+            notes.append("Git marks this checkout prunable; this grants no disposal eligibility")
+        tracked_dirty = untracked = head_is_ancestor = None
+        try:
+            _artifact_path(path, ".")
+            _artifact_path(path, ".git")
+            top = _git(path, "rev-parse", "--show-toplevel", read_only=True)
+            common = _git(path, "rev-parse", "--path-format=absolute", "--git-common-dir", read_only=True)
+            if (
+                top.returncode
+                or common.returncode
+                or Path(top.stdout.strip()).resolve() != path.resolve()
+                or Path(common.stdout.strip()).resolve() != common_dir
+            ):
+                raise SessionWorktreeError("checkout_identity_unavailable", "Checkout identity could not be confirmed")
+            tracked_dirty, untracked = _work_state(path)
+            head_is_ancestor = _is_ancestor(root, head, integration_head)
+        except (OSError, subprocess.TimeoutExpired, SessionWorktreeError):
+            notes.append("Checkout observation unavailable; preserve it for inspection")
+        if tracked_dirty or untracked or head_is_ancestor is False:
+            classification = "holds_work"
+        elif tracked_dirty is None or untracked is None or head_is_ancestor is None:
+            classification = "unknown"
         else:
-            session_id = None
-            binding_live = False
-            notes.append("name is not a session context id; predates the session-worktree lifecycle")
-
-        if session_id is not None and binding_live:
-            classification, action = "live", "skip"
-        elif session_id is None:
-            classification, action = "unowned", "report_only"
-        elif tracked_dirty or not head_is_ancestor:
-            classification, action = "abandoned_with_work", "preserve_then_close"
-        else:
-            classification, action = "abandoned_clean", "close_session_worktree"
-
+            classification = "no_reported_work"
         states.append(
             WorktreeState(
                 path=path,
-                session_context_id=session_id,
+                session_context_id=path.name if is_session_context_id(path.name) else None,
                 branch=branch,
                 head=head,
-                binding_live=binding_live,
                 tracked_dirty=tracked_dirty,
                 untracked=untracked,
                 head_is_ancestor=head_is_ancestor,
                 classification=classification,
-                candidate_action=action,
                 notes=tuple(notes),
             )
         )
 
     worktrees_root = root / WORKTREES_DIRNAME
+    if worktrees_root.is_symlink() or worktrees_root.is_junction():
+        raise SessionWorktreeError("worktree_root_redirected", "The local worktree directory is redirected")
     if worktrees_root.is_dir():
         for child in sorted(worktrees_root.iterdir()):
-            if not child.is_dir() or child.resolve() in registered:
+            # Identify links without traversing their targets.
+            redirected = child.is_symlink() or child.is_junction()
+            if child in registered or (not redirected and not child.is_dir()):
                 continue
             states.append(
                 WorktreeState(
-                    path=child.resolve(),
+                    path=child,
                     session_context_id=child.name if is_session_context_id(child.name) else None,
                     branch=None,
                     head=None,
-                    binding_live=False,
-                    tracked_dirty=0,
-                    untracked=0,
-                    head_is_ancestor=False,
+                    tracked_dirty=None,
+                    untracked=None,
+                    head_is_ancestor=None,
                     classification="orphaned_checkout",
-                    candidate_action="report_only",
-                    notes=("git does not know about this directory",),
+                    notes=("Git does not list this path; no content inspected and no disposal eligibility inferred",),
                 )
             )
-
     return sorted(states, key=lambda state: state.path.as_posix())
-
-
-def _state_for(
-    project_root: Path,
-    path: Path,
-    session_context_id: str,
-    db_path: Path | str,
-    integration_ref: str,
-) -> WorktreeState:
-    for state in classify_worktrees(project_root, db_path, integration_ref=integration_ref):
-        if state.path == path:
-            return state
-    raise SessionWorktreeError(
-        "not_registered",
-        f"{path} is not a registered worktree for session {session_context_id}",
-    )
-
-
-def open_worktree(
-    project_root: Path | str,
-    session_context_id: str,
-    *,
-    db_path: Path | str,
-    base: str | None = None,
-    integration_ref: str = "develop",
-) -> WorktreeState:
-    """Create this session's checkout, or report the one that already exists.
-
-    Idempotent by design: the hook that calls this fires on an init line, and an
-    init that arrives twice must not produce a second checkout or an error the
-    operator has to reason about.
-    """
-    root = Path(project_root).resolve()
-    path = worktree_path(root, session_context_id)
-    branch = session_branch(session_context_id)
-
-    if path.exists():
-        try:
-            return _state_for(root, path, session_context_id, db_path, integration_ref)
-        except SessionWorktreeError as exc:
-            raise SessionWorktreeError(
-                "path_occupied",
-                f"{path} exists but is not a registered worktree; resolve it before opening a session checkout",
-            ) from exc
-
-    base_ref = base or integration_ref
-    if _integration_head(root, base_ref) is None:
-        raise SessionWorktreeError("unknown_base", f"base ref {base_ref!r} does not resolve")
-
-    path.parent.mkdir(parents=True, exist_ok=True)
-    branch_exists = _git(root, "rev-parse", "--verify", "--quiet", f"refs/heads/{branch}").returncode == 0
-    args = ["worktree", "add"]
-    if not branch_exists:
-        args += ["-b", branch]
-    args += [str(path)]
-    if not branch_exists:
-        args += [base_ref]
-    else:
-        args += [branch]
-
-    result = _git(root, *args)
-    if result.returncode != 0:
-        raise SessionWorktreeError("git_worktree_add_failed", (result.stderr or result.stdout).strip())
-    return _state_for(root, path, session_context_id, db_path, integration_ref)
-
-
-def show_worktree(
-    project_root: Path | str,
-    session_context_id: str,
-    *,
-    db_path: Path | str,
-    integration_ref: str = "develop",
-) -> WorktreeState | None:
-    """Return the state of one session's checkout, or ``None`` when it has none."""
-    root = Path(project_root).resolve()
-    path = worktree_path(root, session_context_id)
-    for state in classify_worktrees(root, db_path, integration_ref=integration_ref):
-        if state.path == path:
-            return state
-    return None
-
-
-def close_worktree(
-    project_root: Path | str,
-    session_context_id: str,
-    *,
-    db_path: Path | str,
-    integration_ref: str = "develop",
-) -> WorktreeState:
-    """Remove a session checkout that holds nothing, and delete its branch.
-
-    Refuses whenever the checkout still holds work. Closing is a convenience for
-    the clean case; it is never a way to discard bytes, because discarding
-    another session's bytes is the failure this whole module exists to prevent.
-    """
-    root = Path(project_root).resolve()
-    path = worktree_path(root, session_context_id)
-    state = show_worktree(root, session_context_id, db_path=db_path, integration_ref=integration_ref)
-    if state is None:
-        raise SessionWorktreeError("no_worktree", f"session {session_context_id} has no registered worktree")
-
-    if state.tracked_dirty or not state.head_is_ancestor:
-        raise SessionWorktreeError(
-            "holds_work",
-            f"refusing to close {path}: {state.tracked_dirty} tracked modification(s), "
-            f"head_is_ancestor={state.head_is_ancestor}. Commit on {state.branch} first; "
-            "this command never discards work and never commits on a session's behalf.",
-        )
-
-    result = _git(root, "worktree", "remove", str(path))
-    if result.returncode != 0:
-        raise SessionWorktreeError("git_worktree_remove_failed", (result.stderr or result.stdout).strip())
-
-    branch = session_branch(session_context_id)
-    _git(root, "branch", "-d", branch)
-    if path.exists() and not any(path.iterdir()):
-        shutil.rmtree(path, ignore_errors=True)
-    return state
 
 
 def _artifact_path(root: Path, relative: str | Path) -> Path:
@@ -470,13 +335,33 @@ def _artifact_path(root: Path, relative: str | Path) -> Path:
     return path
 
 
-def _registered_context_checkout(project_root: Path, session_context_id: str) -> Path:
+def _worktree_repository(project_root: Path, repository_root: Path | None) -> Path:
+    """Keep the workspace on the platform while Git operates in the selected repository."""
+    workspace = Path(project_root).absolute()
+    repository = Path(repository_root).absolute() if repository_root is not None else workspace
+    _artifact_path(workspace, ".")
+    _artifact_path(repository, ".")
+    _artifact_path(repository, ".git")
+    if repository != workspace and workspace.is_relative_to(repository):
+        raise SessionWorktreeError(
+            "workspace_inside_repository", "Application workspaces must remain outside the application repository"
+        )
+    top = _git(repository, "rev-parse", "--show-toplevel", read_only=True)
+    if top.returncode or Path(top.stdout.strip()).resolve() != repository.resolve():
+        raise SessionWorktreeError("not_checkout_root", "Use the selected repository's exact Git checkout root")
+    return repository.resolve()
+
+
+def _registered_context_checkout(
+    project_root: Path, session_context_id: str, *, repository_root: Path | None = None
+) -> Path:
     """Resolve only the caller's checkout, without reading peer work products."""
+    repository = _worktree_repository(project_root, repository_root)
     path = worktree_path(project_root, session_context_id)
     _artifact_path(path, ".")
     if not path.resolve().is_relative_to(project_root.resolve() / WORKTREES_DIRNAME):
         raise SessionWorktreeError("checkout_outside_root", "The context checkout escapes the worktree root")
-    records = _parse_worktree_list(_git(project_root, "worktree", "list", "--porcelain").stdout)
+    records = _parse_worktree_list(_git(repository, "worktree", "list", "--porcelain").stdout)
     expected_branch = "refs/heads/" + session_branch(session_context_id)
     if not any(
         Path(record.get("worktree", "")).resolve() == path.resolve() and record.get("branch") == expected_branch
@@ -573,6 +458,12 @@ def _apply_artifact_modes(root: Path, identities: dict[str, dict[str, str] | Non
             path.chmod(permissions | stat.S_IXUSR if mode == "100755" else permissions & ~0o111)
 
 
+class _ArtifactSnapshot(Protocol):
+    """Current scoped Git identities read at the selected artifact root."""
+
+    def __call__(self, paths: list[str], *, root: Path | None = None) -> dict[str, dict[str, str] | None]: ...
+
+
 def _replace_artifacts(root: Path, postimages: dict[str, bytes | None]) -> None:
     """Apply only this operation's named files; restore them on ordinary failure."""
     import os
@@ -581,7 +472,7 @@ def _replace_artifacts(root: Path, postimages: dict[str, bytes | None]) -> None:
     preimages = _artifact_bytes(root, list(postimages))
     written = []
 
-    def put(relative, content):
+    def put(relative: str, content: bytes | None) -> None:
         path = _artifact_path(root, relative)
         if content is None:
             path.unlink(missing_ok=True)
@@ -620,12 +511,13 @@ def materialize_context_worktree(
     *,
     expected_head: str,
     artifacts: dict[str, dict[str, str] | None],
-    snapshot,
+    snapshot: _ArtifactSnapshot,
     artifact_source: Path | None = None,
+    repository_root: Path | None = None,
 ) -> dict[str, object]:
     """Derive this context's workspace from canonical work, never another worker."""
-    root = project_root.resolve()
-    path = worktree_path(root, session_context_id)
+    root = _worktree_repository(project_root, repository_root)
+    path = worktree_path(project_root, session_context_id)
     _artifact_path(path, ".")
     branch = session_branch(session_context_id)
     if not path.exists():
@@ -640,7 +532,7 @@ def materialize_context_worktree(
         result = _git(root, *args)
         if result.returncode:
             raise SessionWorktreeError("checkout_open_failed", result.stderr.strip())
-    path = _registered_context_checkout(root, session_context_id)
+    path = _registered_context_checkout(project_root, session_context_id, repository_root=root)
     if _git(path, "rev-parse", "HEAD").stdout.strip() != expected_head:
         raise SessionWorktreeError(
             "checkout_base_changed", "Preserve this checkout's work and continue in a fresh context"
@@ -712,13 +604,14 @@ def publish_context_work(
     *,
     artifact_paths: list[str],
     expected_artifacts: dict[str, dict[str, str] | None],
-    snapshot,
+    snapshot: _ArtifactSnapshot,
     artifact_destination: Path | None = None,
-    before_effect=None,
+    repository_root: Path | None = None,
+    before_effect: Callable[[], object] | None = None,
 ) -> dict[str, dict[str, str] | None]:
     """Copy the caller's scoped work to the canonical work product under a fence."""
-    root = project_root.resolve()
-    path = _registered_context_checkout(root, session_context_id)
+    root = _worktree_repository(project_root, repository_root)
+    path = _registered_context_checkout(project_root, session_context_id, repository_root=root)
     destination = _artifact_path(artifact_destination or root, ".").resolve()
     if set(expected_artifacts) != set(artifact_paths):
         raise SessionWorktreeError("incomplete_artifact_preimage", "Supply the exact claimed artifact scope")
@@ -746,16 +639,24 @@ def publish_context_work(
     return result
 
 
-def project_worktree(project_root: Path, project_id: str, *, create: bool = True, refresh_base: bool = False) -> Path:
+def project_worktree(
+    project_root: Path,
+    project_id: str,
+    *,
+    create: bool = True,
+    refresh_base: bool = False,
+    repository_root: Path | None = None,
+) -> Path:
     """Keep a project's uncommitted work out of the integration checkout."""
     import hashlib
 
-    root = project_root.resolve()
+    root = _worktree_repository(project_root, repository_root)
+    workspace = project_root.resolve()
     label = re.sub(r"[^A-Za-z0-9_.-]", "-", project_id)[:48]
     key = label + "-" + hashlib.sha256(project_id.encode("utf-8")).hexdigest()[:12]
-    path = root / WORKTREES_DIRNAME / "projects" / key
+    path = workspace / WORKTREES_DIRNAME / "projects" / key
     _artifact_path(path, ".")
-    if not path.resolve().is_relative_to(root / WORKTREES_DIRNAME / "projects"):
+    if not path.resolve().is_relative_to(workspace / WORKTREES_DIRNAME / "projects"):
         raise SessionWorktreeError("project_checkout_outside_root", "The project checkout escapes its directory")
     branch = "project/" + key
     if not path.exists():

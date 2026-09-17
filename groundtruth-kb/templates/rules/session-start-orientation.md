@@ -10,7 +10,7 @@ Produce a **7-item ORIENT block** once per session after memory read and bridge 
 
 ```
 ORIENT <session_id-short> @ HH:MMZ
-  1 bridge:     <status>                                  # TAFE/dispatcher + versioned bridge scan
+  1 bridge:     <status>                                  # bridge state + versioned bridge scan
   2 branch:     <repo>@<sha-short>  (<ahead/behind N>)    # git rev-parse + git status -sb
   3 worktree:   <N modified, M untracked>  [relevant: <scoped subset>]
   4 wrap:       DELIB-<id> / INSIGHTS-<date>-<topic>.md   # DA search + LO dropbox latest

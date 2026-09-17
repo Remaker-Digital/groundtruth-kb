@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import importlib
 import re
 import tomllib
 from pathlib import Path
@@ -53,9 +52,10 @@ def test_root_pyproject_and_ci_paths_are_platform_scoped_and_extant() -> None:
     assert "python -m pytest tests/" in groundtruth_workflow
     assert "python -m pytest platform_tests/" not in groundtruth_workflow
 
-    python_workflow = _read_text(".github/workflows/python-tests.yml")
-    assert "platform_tests/test_conftest_smoke.py" not in python_workflow
-    assert "applications/Agent_Red/tests/test_conftest_smoke.py" in python_workflow
+    # Owner ruling D2 (2026-09-16): the Agent Red shard workflows are application-owned and retired from the
+    # platform repository; the residue check is that none of them exists here any more.
+    for retired_workflow in ("python-tests.yml", "accessibility.yml", "visual-regression.yml"):
+        assert not (ROOT / ".github" / "workflows" / retired_workflow).exists(), retired_workflow
 
     sonar_workflow = _read_text(".github/workflows/sonarcloud.yml")
     assert 'pip install "./groundtruth-kb[dev,search]" pytest pytest-cov pytest-timeout' in sonar_workflow
@@ -119,69 +119,3 @@ def test_agent_red_tooling_files_live_under_application_scope() -> None:
 
     seed_skill = _read_text("applications/Agent_Red/.claude/skills/seed-tenant/SKILL.md")
     assert "python applications/Agent_Red/scripts/seed_tenant.py $ARGUMENTS" in seed_skill
-
-
-def test_session_self_initialization_is_subject_gated_for_platform_mode(monkeypatch) -> None:
-    session_init = importlib.import_module("scripts.session_self_initialization")
-    package_json_calls: list[str] = []
-
-    def fail_on_package_json(_project_root: Path, relative_path: str) -> dict:
-        package_json_calls.append(relative_path)
-        return {}
-
-    monkeypatch.setattr(
-        session_init,
-        "_active_work_subject",
-        lambda _project_root: session_init.FOCUS_GTKB_INFRASTRUCTURE,
-    )
-    monkeypatch.setattr(session_init, "_package_json", fail_on_package_json)
-
-    manifest = session_init._current_version_manifest(ROOT)
-    integrations = session_init._testing_service_integrations(ROOT, [], fast_hook=True)
-
-    assert manifest["versions"]["groundtruth_kb_package"] == "0.7.0rc1"
-    assert not any(key.startswith("agent_red") for key in manifest["versions"])
-    assert package_json_calls == []
-    assert integrations["github"]["queried_work_subject"] == session_init.FOCUS_GTKB_INFRASTRUCTURE
-
-    metrics = {
-        "regression": {"release_blocker_count": 0},
-        "contention": {"actionable_count": 0, "raw_advisory_documents": []},
-        "drift": {"changed_path_count": 0},
-        "work_subject": {"current_subject": session_init.FOCUS_GTKB_INFRASTRUCTURE},
-    }
-    infrastructure = {
-        "testing_service_integrations": {
-            "github": {
-                "health": "failing",
-                "display_name": "GitHub Actions",
-                "latest_run_summary": "failing test run",
-                "remediation": "rerun",
-                "queried_work_subject": session_init.FOCUS_GTKB_INFRASTRUCTURE,
-            }
-        },
-        "gtkb_upgrade_posture": {"upgrade_plan": {"mutating_action_count": 0}},
-        "dev_environment_inventory": {"health": "green"},
-    }
-
-    dashboard = session_init._dashboard_intelligence(
-        project_root=ROOT,
-        generated_at="2026-06-12T00:00:00Z",
-        metrics=metrics,
-        top_actions=[],
-        blockers=[],
-        infrastructure=infrastructure,
-    )
-
-    shortcuts = dashboard["shortcuts"]
-    assert any(shortcut["target"].endswith("/groundtruth-kb/actions") for shortcut in shortcuts)
-    assert not any(shortcut["target"].endswith("/agent-red-customer-engagement/actions") for shortcut in shortcuts)
-
-
-def test_hygiene_sweep_scans_root_claude_files_for_agent_red_recurrence() -> None:
-    patterns = _read_toml("config/governance/hygiene-sweep-patterns.toml")
-    agent_red_pattern = next(pattern for pattern in patterns["patterns"] if pattern["id"] == "agent-red-config-drift")
-
-    assert ".claude/**/*.md" in agent_red_pattern["file_globs"]
-    assert ".claude/**/*.json" in agent_red_pattern["file_globs"]
-    assert ".claude/**" not in agent_red_pattern["exclusion_globs"]

@@ -41,21 +41,13 @@ def _read_text(relative_path: str) -> str:
     return (PROJECT_ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def test_owner_action_visibility_contract_is_present_for_blocking_decisions() -> None:
-    ag_contract = _read_text("AGENTS.md")
-    prime_role = _read_text(".claude/rules/prime-builder-role.md")
-    claude_settings = _read_text(".claude/settings.json")
+def test_harness_parity_skill_separates_derivation_installed_output_and_execution() -> None:
+    skill_text = " ".join(
+        _read_text(".harness-baseline-configuration/skills/gtkb-harness-parity-review/SKILL.md").split()
+    )
 
-    assert "OWNER ACTION REQUIRED" in ag_contract
-    assert "AskUserQuestion as the Only Valid Owner-Decision Channel" in prime_role
-    assert "owner-decision-tracker.py" in claude_settings
-
-
-def test_harness_parity_skill_separates_catalog_operational_and_hook_scope() -> None:
-    skill_text = _read_text(".claude/skills/gtkb-harness-parity-review/SKILL.md")
-
-    assert "phase-1 catalog parity" in skill_text
-    assert "phase-2 operational readiness" in skill_text
-    assert "Discovery-diff applies only where a" in skill_text
-    assert "API/provider harness readiness must" in skill_text
-    assert "python scripts/parity_discovery_diff.py --project-root . --markdown" in skill_text
+    assert "The reviewed sources can produce the required configuration" in skill_text
+    assert "The selected installed configuration agrees with those sources" in skill_text
+    assert "Real fresh-context execution invokes the required hooks and native CLI paths" in skill_text
+    assert "A clean render does not prove invocation, delivery or effect containment" in skill_text
+    assert "gt harness diagnostic --harness-id <ID> --json" in skill_text

@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 import shutil
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -137,8 +138,19 @@ def test_codex_stop_and_startup_are_explicit_native_events():
     plan = parity._load_projector(ROOT).build_plan("codex")
     assert not plan.gaps
     value = json.loads(plan.writes[".codex/hooks.json"])
-    assert set(value["hooks"]) == {"PreToolUse", "PostToolUse", "Stop"}
-    assert all(not g.get("matcher") for g in value["hooks"]["Stop"])
+    profile = parity._load_projector(ROOT).load_profiles()["harnesses"]["codex"]
+    manifest = tomllib.loads((ROOT / ".harness-baseline-configuration/hooks/manifest.toml").read_text(encoding="utf-8"))
+    declared = {hook["event"] for hook in manifest["hook"]}
+    # Every declared baseline event maps to one explicit native Codex event; the retired PostToolUse
+    # and Stop hooks are not restored, and the mapping itself stays explicit.
+    assert {"pre_tool_use", "post_tool_use", "turn_end", "session_start", "prompt_submit"} <= set(
+        profile["hook_events"]
+    )
+    assert profile["hook_events"]["turn_end"] == "Stop" and profile["hook_events"]["session_start"] == "SessionStart"
+    assert set(value["hooks"]) == {
+        profile["hook_events"][event] for event in declared if event in profile["hook_events"]
+    }
+    assert all(not g.get("matcher") for g in value["hooks"].get("Stop", []))
     commands = [h["command"] for groups in value["hooks"].values() for g in groups for h in g["hooks"]]
     hook_paths = {match for command in commands for match in re.findall(r"'([^']+\.py)'", command)}
     assert hook_paths and all(path in plan.writes or (ROOT / path).is_file() for path in hook_paths)

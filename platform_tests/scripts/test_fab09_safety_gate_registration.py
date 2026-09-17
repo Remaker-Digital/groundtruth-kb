@@ -162,8 +162,10 @@ def _template_parity(hook_name: str) -> None:
     )
 
 
-def test_delib_common_template_parity():
-    _template_parity("_delib_common.py")
+def test_retired_deliberation_archive_helper_is_absent():
+    assert not (_HOOKS_DIR / "_delib_common.py").exists()
+    assert not (_TEMPLATES_DIR / "_delib_common.py").exists()
+    assert not (_SOURCE_ROOT / ".harness-baseline-configuration/hooks/_delib_common.py").exists()
 
 
 # --- Structural: capture hooks import _delib_common ---

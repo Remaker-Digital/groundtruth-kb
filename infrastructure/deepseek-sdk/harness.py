@@ -94,11 +94,24 @@ def cli_runner(root: Path, config: Path | None, environment: dict[str, str]) -> 
 
 def bind_context(cli: CliRunner, native_context_id: str, init_line: str) -> dict[str, Any]:
     try:
-        binding = cli(["session", "bind", "--native-context-id", native_context_id, "--init-keyword", init_line])
+        result = cli(["session", "bind", "--native-context-id", native_context_id, "--init-keyword", init_line])
     except LauncherError as error:
         raise LauncherError(EXIT_BIND_FAILED, str(error)) from error
-    if not binding.get("session_context_id") or not binding.get("role"):
-        raise LauncherError(EXIT_BIND_FAILED, "The binding readback lacks a session context or role")
+    if not isinstance(result, dict):
+        raise LauncherError(EXIT_BIND_FAILED, "The initialization response is not an object")
+    binding = result.get("binding")
+    if result.get("status") not in {"init_requested", "already_initialized_idempotent"} or not isinstance(
+        binding, dict
+    ):
+        raise LauncherError(EXIT_BIND_FAILED, "The initialization response lacks a successful outcome and binding")
+    if (
+        not binding.get("session_context_id")
+        or not binding.get("role")
+        or binding.get("native_context_id") != native_context_id
+    ):
+        raise LauncherError(
+            EXIT_BIND_FAILED, "The binding readback lacks identity or role, or names a different native context"
+        )
     return binding
 
 

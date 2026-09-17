@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from threading import Barrier
 
 import pytest
@@ -15,6 +16,7 @@ from platform_tests.groundtruth_kb.test_native_authority_service import native a
 from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
 from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
 from platform_tests.groundtruth_kb.test_native_project_dependencies import ready_checkout
+from platform_tests.groundtruth_kb.test_native_project_finalization import base, git, integration
 from platform_tests.groundtruth_kb.test_project_association_consistency import membership_cli as membership_cli
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
@@ -269,6 +271,37 @@ def test_native_authorization_change_preserves_initiated_effect_and_finalization
         },
     )
     assert prepared.status_code == 200, prepared.text
+    ready = prepared.json()
+    assert ready["status"] == "ready_to_commit"
+    assert ready["required_citations"] == ["(WI-1)"]
+    checkout = Path(ready["checkout"]["path"])
+    main = integration(checkout)
+    assert base(main) == ready["expected_parent"]
+    git(checkout, "add", "--", "code.py", "tests/test_effect.py")
+    git(checkout, "commit", "-m", "Complete initiated project after ordering change (WI-1)")
+    commit = base(checkout)
+    confirmation = {
+        "native_context_id": "lo3",
+        "expected_version": project["version"],
+        "commit_id": commit,
+        "expected_parent": ready["expected_parent"],
+    }
+    result = client.post("/v1/projects/PROJECT-1/confirm-commit", json=confirmation)
+    assert result.status_code == 200 and result.json()["status"] == "confirmed", result.text
+    assert base(main) == commit
+    assert git(main, "rev-list", "--count", ready["expected_parent"] + "..HEAD").stdout.strip() == "1"
+    terminal = client.get("/v1/projects/PROJECT-1").json()["project"]
+    assert terminal["status"] == "verified" and terminal["authorization"] == "not authorized"
+    work = client.get("/v1/work-items/WI-1").json()
+    assert work["work_item"]["completion_evidence"] == "git:" + commit
+    assert work["membership"]["project_id"] == "PROJECT-1"
+    state = client.get("/v1/bridge/effect-chain/show", params={"include_content": True}).json()
+    assert state["attempt"]["disposition"] == "committed"
+    assert state["attempt"]["terminal_commit"] == commit
+    assert "messages" not in state
+    retry = client.post("/v1/projects/PROJECT-1/confirm-commit", json=confirmation)
+    assert retry.status_code == 200 and retry.json()["status"] == "already_confirmed", retry.text
+    assert base(main) == commit
 
 
 def test_real_cli_authorization_readback_stale_and_unavailable_refusals(membership_cli):

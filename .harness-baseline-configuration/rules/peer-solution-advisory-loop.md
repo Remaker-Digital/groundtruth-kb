@@ -1,144 +1,48 @@
-# Peer Solution Advisory Loop Procedure
+# Peer solution and advisory workflow
 
-This rule is the durable procedure for handling Loyal Opposition (LO) peer-solution advisories — investigations of external systems, frameworks, libraries, or processes that may inform GT-KB's design. It formalizes the classification vocabulary, the owner-dialogue workflow, and the Prime-side response template that the parent Slice-0 thread `bridge/gtkb-peer-solution-advisory-loop-conversion-003.md` (Loyal Opposition GO at `-004`) authorized.
+Peer-system ideas can inform GT-KB. The owner selects material changes; current
+formal records and PostgreSQL-backed domain services carry the resulting state.
+DAG words such as nodes, edges, gates and evaluators are informative vocabulary.
+They introduce no peer runtime or second workflow authority.
 
-This rule is auto-loaded via `{{HARNESS_RULES_DIR}}/` convention.
+## Authoring and reading
 
-## Purpose
+Either role may author an ADVISORY through the native bridge CLI. It is
+non-dispatchable and carries complete author provenance with no recipient_role,
+::init or ::open. Describe the claim, evidence, uncertainty, recommendation and
+any unresolved material owner choice. An advisory reserves no work item.
 
-The Peer Solution Advisory Loop is a durable input pattern that converts LO investigations of external peer systems (e.g., Archon, BMAD, Symphony, GSD, Google Opal) into governed, owner-visible decision artifacts rather than chat-only context that fades between sessions.
+Read current state through `gt bridge show`, `gt projects show`, `gt backlog
+show` and `gt spec show` as applicable. Advisory content is ephemeral context.
+Do not treat a retained message, generated projection or conversation log as
+durable authority. Use the canonical baseline and projector for guidance edits.
 
-Without this loop, LO peer-system findings can remain scattered in non-authoritative session context and may not be revisited. With this loop, every peer-solution advisory either lands as a concrete bridge proposal (adoption / adaptation), is documented as rejected with rationale, is explicitly deferred with a trigger condition, or is recorded as a monitored peer whose evolution is watched. The loop is bidirectional: LO surfaces a peer solution; Prime responds with one of the classification states below; the owner approves or modifies Prime's response when material; the decision is preserved in the Deliberation Archive and (when applicable) in MemBase.
+## Owner-directed follow-up
 
-The procedure is required when an LO advisory's `Recommended action` cites a specific external system or framework as a candidate solution to a GT-KB problem.
+The words adopt, adapt, reject, defer and monitor may describe a recommendation;
+they do not create a disposition lifecycle or automatically trigger artifacts.
+Ask only unresolved material questions outside existing direction, one at a
+time, with practical options and consequences. Routine research and engineering
+choices within assigned scope proceed without a blanket interview.
 
-## Classification Vocabulary
+Apply owner-directed changes through the relevant formal or domain writer and
+read back the result. Do not create an approval packet, decision ledger, waiver
+store, candidate ledger or deliberation-based permission carrier. Session logs
+retain conversational context; no AUQ-only evidence predicate applies.
 
-Prime responses to LO peer-solution advisories use one of these five classification states. Each is unambiguous and preserves the decision in a way that future sessions can recall:
+Only ADVISORY follows ADVISORY on the same chain. Owner-selected implementation
+uses a separate NEW chain with current project membership, specification links,
+executable tests and independent review. Before NEW, check the parent project's
+authorization field. An already dispatched chain does not acquire a second
+authorization check from advisory intake. Claims reserve the next artifact,
+never the work item or its whole chain.
 
-### `adopt`
+Do not launch another harness, promote backlog work or choose an implementation
+target from an advisory. Both role queues exclude ADVISORY. Reporting may expose
+informational advisories separately from eligible and blocked continuation work.
 
-Prime accepts the peer solution AS-IS and files an implementation proposal to bring the peer pattern into GT-KB. Use when the peer solution addresses the GT-KB problem cleanly and no adaptation is needed beyond standard integration work.
+## Governing records
 
-Required follow-on: a NEW bridge proposal whose Specification Links cite the LO advisory + the relevant peer-system documentation + any new specs the adoption creates. Standard GO-NO-GO discipline applies.
-
-### `adapt`
-
-Prime accepts the peer solution's CORE PATTERN but rejects part of its surface in favor of a GT-KB-native equivalent. Use when the peer pattern is correct in shape but its implementation depends on assumptions GT-KB cannot accept (different governance model, different runtime, different tradeoffs).
-
-Required follow-on: a NEW bridge proposal documenting WHICH parts adopt and WHICH parts adapt, with rationale for each adaptation. The proposal must cite the peer-system source AND the GT-KB-native alternative chosen.
-
-### `reject`
-
-Prime rejects the peer solution because it does not address the GT-KB problem, conflicts with established GT-KB governance, or its tradeoffs are unacceptable. Use when adoption or adaptation would weaken GT-KB rather than strengthen it.
-
-(per `{{HARNESS_RULES_DIR}}/deliberation-protocol.md`)
-
-### `defer`
-
-Prime defers a decision on the peer solution to a later session. Use when the peer solution may become relevant after a specific GT-KB milestone (e.g., "after release readiness lands", "after multi-tenant story stabilizes"), when more evidence is needed, or when the GT-KB problem the peer would solve is itself not yet specified.
-
-Required follow-on: a Deliberation Archive record with an explicit DEFER-TRIGGER CONDITION (e.g., "Revisit after `GTKB-DASHBOARD-002` Slice 3 lands", or "Revisit if `GOV-RELEASE-READINESS-001` blockers reach P0"). When the trigger condition is met, the procedure resumes from the original advisory.
-
-### `monitor`
-
-Prime records the peer solution as worth watching but takes no current action. Use when the peer solution is evolving (e.g., a new framework's API is unstable) and the right disposition depends on its future state.
-
-Required follow-on: a Deliberation Archive record citing the peer-system URL or repo for future cross-reference. Monitoring is passive; the loop does not require periodic re-evaluation unless the owner explicitly invokes the advisory again.
-
-## Owner-Dialogue Workflow
-
-The loop runs as follows:
-
-1. **LO files peer-solution advisory.** LO investigates a peer system on owner request (or proactively when LO encounters one in the course of normal review work). LO files the advisory as an LO Advisory Proposal bridge entry when it may create future Prime Builder work, or as a Deliberation Archive record when it is a process/review finding with no derived-work implication.
-2. **Prime reads the advisory** as part of the standard Loyal-Opposition-insight review path defined in `{{HARNESS_RULES_DIR}}/way-of-working.md`.
-3. **Prime classifies the advisory** using the five-state vocabulary above. The classification IS a Prime decision recorded in the response.
-4. **Prime drafts the response artifact** appropriate to the classification:
-   - `adopt` / `adapt` -> NEW bridge proposal.
-   - `reject` / `defer` / `monitor` -> Deliberation Archive entry.
-5. **Owner reviews when material.** Routine `monitor` decisions and obvious `reject` rationales may proceed without owner AskUserQuestion. Substantive `adopt` / `adapt` proposals always run through standard Prime/LO bridge review including any AUQ-required owner approvals (per the AUQ-only enforcement stack). `defer` decisions with non-obvious trigger conditions surface to the owner via AUQ.
-6. **Decision is preserved.** Bridge proposals carry their own audit trail. Deliberation Archive entries are searchable via `gt deliberations search` so future sessions surfacing the same peer find the prior decision before duplicating analysis.
-
-The loop's defining feature is that **no peer-solution advisory dies in chat scrollback.** Every advisory ends in one of five recorded states, with the rationale captured in a structure that future sessions can recall.
-
-## Owner-Grilling Gate (Authority: GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001)
-
-Any LO advisory whose recommended Prime Builder disposition is `adopt` or
-`adapt` MUST include a `## Required Prime Builder Owner-Grilling Gate`
-section in the advisory body. The gate section enumerates:
-
-1. Whether this advisory implies future implementation work (yes/no with
-   brief rationale).
-2. What Prime Builder must grill the owner about before drafting any
-   implementation proposal derived from this advisory.
-3. What owner decisions must be durable, recorded via `AskUserQuestion`
-   per `{{HARNESS_RULES_DIR}}/prime-builder-role.md` § "AskUserQuestion as the
-   Only Valid Owner-Decision Channel", before an implementation
-   proposal can exist.
-
-Prime Builder must conduct a structured owner clarification/grilling
-pass — using the `/grill-me-for-clarification` skill or an equivalent
-AUQ-recorded structured interview — and the resulting AUQ evidence
-MUST land in the resulting bridge proposal's mandatory `## Owner
-Decisions / Input` section (per `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md`
-§ "Mandatory Owner Decisions / Input Section Gate") before the proposal
-is filed as `NEW`.
-
-Scope: The gate fires for `adopt`/`adapt` classifications only.
-`reject`/`monitor` advisories are terminal; `defer` advisories receive
-the gate at defer-trigger reactivation, not at original filing.
-
-Mechanical contract: `DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001` specifies
-advisory-shape detection, gate-presence assertion, gate-content
-assertion, two-phase enforcement (warning then blocking via separate
-owner approval), and the owner-waiver path. The deterministic lint that
-enforces the contract lands in Slice 3 of
-PROJECT-LO-ADVISORY-OWNER-GRILLING-GATE-001; Slices 1 and 2 are
-advisory-only until Slice 3 ships the lint.
-
-LO authors start from the following skeleton when authoring an advisory
-classified `adopt` or `adapt`. It is a fenced documentation example
-(rendered as code, not a live section of this rule); copy the inner
-content into the advisory body:
-
-```
-## Required Prime Builder Owner-Grilling Gate
-
-### Implementation implied
-Yes — this advisory recommends adopt/adapt of <pattern>, which requires
-<files/specs> to be modified. OR: No — recommendation is procedural only,
-no source mutation expected.
-
-### Grill-the-owner questions
-Prime Builder must obtain durable AUQ-recorded answers to:
-1. <question 1 about scope>
-2. <question 2 about rule home / authority>
-3. <question 3 about risks or alternatives>
-
-### Required durable owner decisions
-The following AUQ answers must exist before an implementation proposal
-can be filed:
-- <decision 1>
-- <decision 2>
-```
-
-## Bridge Integration
-
-Peer-solution advisories enter the bridge as standard `ADVISORY` status entries with `bridge_kind: loyal_opposition_advisory`. The advisory has its own bridge thread with a conventional version chain (e.g., `Version: 001`). ADVISORY entries surface in the Prime Builder actionable list (so an interactive Prime session sees them on the next `/bridge` scan) and are strictly non-dispatchable for headless runs.
-
-Prime responses (the classification + the follow-on artifact) are bridge-tracked:
-
-- `adopt` / `adapt` Prime responses are normal NEW bridge proposals — Prime authors them, Loyal Opposition reviews them.
-- `reject` / `defer` / `monitor` Prime responses are Deliberation Archive entries. They do NOT receive bridge GO/NO-GO verdicts; the DA preservation IS the durable record.
-
-## Approval-Gate
-
-protected paths (e.g., `{{HARNESS_RULES_DIR}}/*.md`, `AGENTS.md`, the root harness instruction file)
-
-This separation preserves the layered approval model: owner approves the strategic decision (adopt vs adapt) at the bridge-review level; owner approves the specific protected-file content at the per-artifact packet level. A peer solution's adoption can be approved without committing the owner to every detail of its protected-file implementation.
-
-For MemBase artifact creation (ADR / DCL / SPEC / GOV inserts) recommended by an adopted peer solution, the per-artifact formal-artifact-approval packet is similarly required per `GOV-ARTIFACT-APPROVAL-001`.
-
-## Copyright
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+ADR-PEER-SOLUTION-WORKFLOW-CONTRACT-001, DCL-ADVISORY-ROUTING-001,
+DCL-PEER-SOLUTION-OWNER-GATE-001, GOV-LO-ADVISORY-OWNER-GRILLING-GATE-001,
+DCL-LO-ADVISORY-OWNER-GRILLING-GATE-001, SPEC-ADVISORY-REPORT-TEMPLATE-001.

@@ -120,9 +120,24 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
                 raise ValueError(f"{key} escapes this target's configuration root")
         plan = engine.build_plan(harness)
         issues.extend(_issue("projector_gap", ENGINE, gap) for gap in plan.gaps)
-        for rel in [*plan.writes, *plan.removes]:
+        for rel in plan.writes:
             if not _relative(rel).is_relative_to(config_dir):
                 raise ValueError(f"Planned effect escapes the selected target: {rel}")
+        exact_retired = {_relative(rel) for rel in profile.get("leftover_paths", [])}
+        active_roots = [_relative(row["config_dir"]) for row in profiles["harnesses"].values()]
+        for rel in plan.removes:
+            path = _relative(rel)
+            if path.is_relative_to(config_dir):
+                continue
+            # A moved target may retire its explicitly classified former files.
+            # This does not permit writes outside its root, directory sweeps,
+            # or removal in/above any currently registered target.
+            if path not in exact_retired or any(
+                path.is_relative_to(active) or active.is_relative_to(path) for active in active_roots
+            ):
+                raise ValueError(f"Planned removal escapes the selected target: {rel}")
+            if (root / rel).is_dir():
+                raise ValueError(f"Exact retired output is a directory: {rel}")
         result["files"] = len(plan.writes)
 
         base = root / BASELINE

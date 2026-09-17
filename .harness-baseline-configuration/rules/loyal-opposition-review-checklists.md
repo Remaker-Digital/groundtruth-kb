@@ -44,8 +44,8 @@ Purpose: reusable checklists for rigorous proposal review, code review, and alte
   derived from that specification.
 - Execute or inspect execution evidence for those tests against the
   implementation.
-- Issue `NO-GO`, not `VERIFIED`, for any linked specification without executed
-  test coverage unless an explicit owner waiver is documented.
+- Issue `NOT-READY` for an implementation report whose linked requirements
+  lack executed test coverage; identify the missing evidence and recovery route.
 
 ## Alternatives Investigation Checklist
 
@@ -62,19 +62,17 @@ Purpose: reusable checklists for rigorous proposal review, code review, and alte
 
 ## Advisory Report Checklist
 
-- Is the advisory classified as exactly one of `adopt`, `adapt`, `reject`,
-  `defer`, or `monitor`?
-- For `adopt` or `adapt`, does the report include a `Required Prime Builder
-  Owner-Grilling Gate` section before any derived implementation proposal
-  exists?
-- Does the gate identify the owner questions, practical options, tradeoffs,
-  and expected durable artifact outcome?
-- Does the report say whether Prime Builder should create a bridge proposal,
-  capture a deliberation, defer the item, or reject the recommendation?
-- Are blocking owner decisions routed through the owner-decision channel rather
-  than buried in prose?
-- Are source advisory paths, affected specs/WIs, and verification expectations
-  concrete enough for Prime Builder to act without rediscovery?
+- Does the report distinguish observed evidence, inference and uncertainty?
+- Does the recommendation explain its scope and expected result?
+- Does it identify only unresolved material owner choices, with practical options
+  and consequences, or say none remains?
+- Does the header carry full author provenance and omit routing envelopes?
+- Is the advisory informational, absent from both role queues and free of a
+  work-item reservation or automatic follow-up assignment?
+- Will any owner-selected implementation use a separate NEW chain with current
+  specification links, executable tests and independent review?
+- Are owner-directed changes applied through canonical writers and read back,
+  without a permission ledger, mandatory interview or AUQ-only receipt?
 
 ## Configuration Review Checklist
 

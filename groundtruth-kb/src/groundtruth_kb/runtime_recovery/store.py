@@ -696,10 +696,11 @@ class RecoveryStore:
 
     @staticmethod
     def _operation_row(connection: sqlite3.Connection, operation_id: str) -> sqlite3.Row | None:
-        return connection.execute(
+        row: sqlite3.Row | None = connection.execute(
             "SELECT * FROM runtime_operations WHERE operation_id = ?",
             (operation_id,),
         ).fetchone()
+        return row
 
     def _operation_row_required(self, connection: sqlite3.Connection, operation_id: str) -> sqlite3.Row:
         row = self._operation_row(connection, operation_id)

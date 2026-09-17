@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, cast
 
 from groundtruth_kb.governance.credential_patterns import db_pattern_list
+from groundtruth_kb.spec_quality import score_spec_quality
 
 _log = logging.getLogger(__name__)
 
@@ -412,16 +413,6 @@ CREATE TABLE IF NOT EXISTS assertion_runs (
     overall_passed INTEGER NOT NULL,
     results TEXT NOT NULL,
     triggered_by TEXT NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS session_prompts (
-    rowid INTEGER PRIMARY KEY AUTOINCREMENT,
-    session_id TEXT NOT NULL,
-    version INTEGER NOT NULL DEFAULT 1,
-    event_type TEXT NOT NULL DEFAULT 'created',
-    created_at TEXT NOT NULL,
-    prompt_text TEXT NOT NULL,
-    context TEXT
 );
 
 CREATE TABLE IF NOT EXISTS dispatch_events (
@@ -1134,7 +1125,6 @@ CREATE INDEX IF NOT EXISTS idx_specs_changed_at ON specifications(changed_at);
 CREATE INDEX IF NOT EXISTS idx_test_procs_id_version ON test_procedures(id, version);
 CREATE INDEX IF NOT EXISTS idx_op_procs_id_version ON operational_procedures(id, version);
 CREATE INDEX IF NOT EXISTS idx_assertion_runs_spec ON assertion_runs(spec_id, rowid);
-CREATE INDEX IF NOT EXISTS idx_session_prompts_session ON session_prompts(session_id, rowid);
 CREATE INDEX IF NOT EXISTS idx_dispatch_events_rule ON dispatch_events(rule_id, rowid);
 CREATE INDEX IF NOT EXISTS idx_env_config_id_version ON environment_config(id, version);
 CREATE INDEX IF NOT EXISTS idx_env_config_env_cat ON environment_config(environment, category);
@@ -1965,7 +1955,7 @@ class KnowledgeDB:
         if added_f1:
             _log.debug("Applied migration: F1 schema enrichment columns %s", added_f1)
 
-        # Migration 4: Add source_paths column for spec-before-code governance hook
+        # Migration 4: Add source_paths column for specification metadata
         cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
         if "source_paths" not in cols:
             conn.execute("ALTER TABLE specifications ADD COLUMN source_paths TEXT DEFAULT NULL")
@@ -2739,7 +2729,7 @@ class KnowledgeDB:
                   'structural', or 'untestable'.
             source_paths: Optional list of relative file paths or glob patterns this spec
                   covers. JSON-encoded into the source_paths TEXT column. Used by the
-                  spec-before-code governance hook.
+                  specification source-path metadata.
             application_scope: Optional application-scope marker. Valid values are
                   'gtkb_platform' and 'agent_red_application'; NULL remains allowed
                   for rows outside the partition-in-place migration.
@@ -3160,107 +3150,9 @@ class KnowledgeDB:
         """Compute quality score for a single spec.
 
         Returns dict with overall, d1-d5 dimension scores, tier, and flags.
-        Gracefully degrades when F1 fields are absent (adjusts denominators).
+        The pure scorer lives in :mod:`groundtruth_kb.spec_quality`.
         """
-        flags: list[str] = []
-        assertions = spec.get("assertions_parsed") or spec.get("_assertions_parsed") or []
-
-        # Executable assertion types per assertions.py
-        _EXECUTABLE = {"grep", "glob", "grep_absent", "file_exists", "count", "json_path", "all_of", "any_of"}
-
-        has_assertions = bool(assertions)
-        has_executable = (
-            any(isinstance(a, dict) and a.get("type") in _EXECUTABLE for a in assertions) if has_assertions else False
-        )
-
-        if not has_assertions:
-            flags.append("NO_ASSERTIONS")
-        elif not has_executable:
-            flags.append("NO_EXECUTABLE_ASSERTIONS")
-
-        # D1: Clarity
-        d1 = 0.0
-        title = spec.get("title", "")
-        if title and 40 <= len(title) <= 120:
-            d1 += 0.2
-        if title and any(w in title.lower() for w in ("must", "shall", "should", "requires")):
-            d1 += 0.3
-        if spec.get("description") and len(spec.get("description", "")) > 50:
-            d1 += 0.3
-        if spec.get("description") and any(
-            w in spec["description"].lower() for w in ("because", "rationale", "reason", "ensures")
-        ):
-            d1 += 0.2
-
-        # D2: Testability
-        d2 = 0.0
-        if has_assertions:
-            d2 += 0.3
-        if has_executable:
-            d2 += 0.4
-        if has_assertions and any(isinstance(a, dict) and a.get("description") for a in assertions):
-            d2 += 0.15
-        if has_assertions and any(isinstance(a, dict) and a.get("file") for a in assertions):
-            d2 += 0.15
-        # F1 bonus: testability field
-        if spec.get("testability"):
-            d2 = min(1.0, d2 + 0.1)
-
-        # D3: Completeness (dynamic denominator)
-        d3_checks = 0
-        d3_hits = 0
-        for field in ("type", "tags", "section", "scope", "priority", "description"):
-            d3_checks += 1
-            if spec.get(field):
-                d3_hits += 1
-        # F1 fields: only count if present in spec dict (graceful degradation)
-        for f1_field in ("authority", "constraints", "affected_by"):
-            if f1_field in spec:
-                d3_checks += 1
-                val = spec.get(f1_field)
-                if val is not None and val != "" and val != "[]" and val != "{}":
-                    d3_hits += 1
-        d3 = d3_hits / max(d3_checks, 1)
-
-        # D4: Isolation
-        d4 = 0.0
-        if spec.get("section"):
-            d4 += 0.4
-        if spec.get("handle"):
-            d4 += 0.3
-        if spec.get("affected_by_parsed") or spec.get("_affected_by_parsed"):
-            d4 += 0.3
-
-        # D5: Freshness (simplified — based on version existence)
-        d5 = 0.5  # Base freshness
-        if has_assertions:
-            d5 += 0.3
-        if spec.get("version", 0) > 1:
-            d5 += 0.2
-        d5 = min(1.0, d5)
-
-        overall = (d1 + d2 + d3 + d4 + d5) / 5.0
-
-        # Tier classification
-        if overall >= 0.8:
-            tier = "gold"
-        elif overall >= 0.6:
-            tier = "silver"
-        elif overall >= 0.4:
-            tier = "bronze"
-        else:
-            tier = "needs-work"
-
-        return {
-            "overall": round(overall, 4),
-            "d1_clarity": round(d1, 4),
-            "d2_testability": round(d2, 4),
-            "d3_completeness": round(d3, 4),
-            "d4_isolation": round(d4, 4),
-            "d5_freshness": round(d5, 4),
-            "tier": tier,
-            "flags": flags,
-        }
+        return score_spec_quality(spec)
 
     def persist_quality_scores(self, session_id: str) -> int:
         """Score all current specs and persist to spec_quality_scores. Returns row count."""
@@ -7846,156 +7738,6 @@ class KnowledgeDB:
         return [_row_to_dict(r) for r in rows]
 
     # ------------------------------------------------------------------
-    # Session Prompts
-    # ------------------------------------------------------------------
-
-    def _next_session_prompt_version(self, session_id: str) -> int:
-        row = (
-            self._get_conn()
-            .execute(
-                "SELECT MAX(version) FROM session_prompts WHERE session_id = ?",
-                (session_id,),
-            )
-            .fetchone()
-        )
-        return (row[0] or 0) + 1
-
-    def insert_session_prompt(
-        self,
-        session_id: str,
-        prompt_text: str,
-        context: dict[str, Any] | None = None,
-    ) -> dict[str, Any] | None:
-        """Store a next-session handoff prompt (append-only).
-
-        Args:
-            session_id: The session that generated this prompt (e.g. "S97").
-            prompt_text: The full prompt text for the next session.
-            context: Optional structured context (WIs changed, test counts, etc.).
-
-        Multiple calls for the same session_id create versioned records.
-        """
-        version = self._next_session_prompt_version(session_id)
-        conn = self._get_conn()
-        conn.execute(
-            """INSERT INTO session_prompts
-               (session_id, version, event_type, created_at, prompt_text, context)
-               VALUES (?, ?, 'created', ?, ?, ?)""",
-            (session_id, version, _now(), prompt_text, json.dumps(context) if context else None),
-        )
-        conn.commit()
-        return self.get_session_prompt(session_id)
-
-    def get_session_prompt(self, session_id: str) -> dict[str, Any] | None:
-        """Get the latest event for a specific session's handoff prompt."""
-        row = (
-            self._get_conn()
-            .execute(
-                """SELECT * FROM session_prompts
-               WHERE session_id = ? ORDER BY rowid DESC LIMIT 1""",
-                (session_id,),
-            )
-            .fetchone()
-        )
-        return _row_to_dict(row) if row else None
-
-    def get_session_prompt_by_idempotency_key(
-        self,
-        session_id: str,
-        idempotency_key: str,
-    ) -> dict[str, Any] | None:
-        """Retrieve a session prompt by its idempotency key.
-
-        Args:
-            idempotency_key: Unique key to identify the session prompt.
-
-        Returns:
-            Dictionary containing session prompt data or None if not found.
-        """
-        # Idempotency lookup for the deterministic handoff service
-        # (SPEC-HANDOFF-PROMPT-DETERMINISTIC-SERVICE-001). The key is stored
-        # inside the existing ``context`` JSON field, not a dedicated column.
-        rows = (
-            self._get_conn()
-            .execute(
-                """SELECT * FROM session_prompts
-                   WHERE session_id = ? AND context IS NOT NULL
-                   ORDER BY rowid DESC""",
-                (session_id,),
-            )
-            .fetchall()
-        )
-        for row in rows:
-            raw_context = row["context"]
-            if not raw_context:
-                continue
-            try:
-                ctx = json.loads(raw_context)
-            except (TypeError, ValueError):
-                continue
-            if isinstance(ctx, dict) and ctx.get("idempotency_key") == idempotency_key:
-                return _row_to_dict(row)
-        return None
-
-    def get_next_session_prompt(self) -> dict[str, Any] | None:
-        """Get the latest unconsumed handoff prompt.
-
-        A prompt is unconsumed if its most recent event is 'created' (not 'consumed').
-        Returns the most recently created prompt that hasn't been consumed.
-        """
-        # Find session_ids whose latest event is 'created'
-        row = (
-            self._get_conn()
-            .execute(
-                """SELECT p.* FROM session_prompts p
-               INNER JOIN (
-                   SELECT session_id, MAX(rowid) AS max_rowid
-                   FROM session_prompts GROUP BY session_id
-               ) m ON p.session_id = m.session_id AND p.rowid = m.max_rowid
-               WHERE p.event_type = 'created'
-               ORDER BY p.rowid DESC LIMIT 1"""
-            )
-            .fetchone()
-        )
-        return _row_to_dict(row) if row else None
-
-    def consume_session_prompt(self, session_id: str) -> None:
-        """Record consumption of a session prompt (append-only — inserts new row)."""
-        current = self.get_session_prompt(session_id)
-        if not current:
-            return
-        version = self._next_session_prompt_version(session_id)
-        conn = self._get_conn()
-        conn.execute(
-            """INSERT INTO session_prompts
-               (session_id, version, event_type, created_at, prompt_text, context)
-               VALUES (?, ?, 'consumed', ?, ?, ?)""",
-            (session_id, version, _now(), current.get("prompt_text", ""), current.get("context")),
-        )
-        conn.commit()
-
-    def list_session_prompts(self, *, include_consumed: bool = False) -> list[dict[str, Any]]:
-        """List session prompts, optionally including consumed ones."""
-        if include_consumed:
-            rows = self._get_conn().execute("SELECT * FROM session_prompts ORDER BY rowid DESC").fetchall()
-        else:
-            # Only show sessions whose latest event is 'created'
-            rows = (
-                self._get_conn()
-                .execute(
-                    """SELECT p.* FROM session_prompts p
-                   INNER JOIN (
-                       SELECT session_id, MAX(rowid) AS max_rowid
-                       FROM session_prompts GROUP BY session_id
-                   ) m ON p.session_id = m.session_id AND p.rowid = m.max_rowid
-                   WHERE p.event_type = 'created'
-                   ORDER BY p.rowid DESC"""
-                )
-                .fetchall()
-            )
-        return [_row_to_dict(r) for r in rows]
-
-    # ------------------------------------------------------------------
     # Dispatch Events
     # ------------------------------------------------------------------
 
@@ -8247,11 +7989,11 @@ class KnowledgeDB:
     # ------------------------------------------------------------------
 
     def export_json(self, output_path: str | Path | None = None) -> str:
-        """Export the entire database as a JSON file (all tables, all rows).
+        """Export selected legacy knowledge tables as a JSON file.
 
-        This is a full logical backup — every row from every table, preserving
-        the complete append-only history. The export can be used to reconstruct
-        the database from scratch if the SQLite file is lost or corrupted.
+        Export the selected legacy knowledge tables below. Retired context-prompt
+        payloads are excluded; this is not a complete database backup. Current
+        platform backup and recovery use the native PostgreSQL operations.
 
         Args:
             output_path: Where to write the JSON. Defaults to sibling of the DB
@@ -8268,7 +8010,6 @@ class KnowledgeDB:
             "test_procedures",
             "operational_procedures",
             "assertion_runs",
-            "session_prompts",
             "dispatch_events",
             "environment_config",
             "documents",

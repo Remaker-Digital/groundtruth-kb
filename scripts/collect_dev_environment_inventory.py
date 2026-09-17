@@ -23,12 +23,11 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-SCHEMA_VERSION = 1
-COLLECTOR_VERSION = "gtkb-dev-environment-inventory-v1"
+SCHEMA_VERSION = 2
+COLLECTOR_VERSION = "gtkb-dev-environment-inventory-v2"
 DEFAULT_MAX_AGE_HOURS = 336
 PUBLIC_JSON_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.json")
 PUBLIC_MARKDOWN_RELATIVE_PATH = Path(".groundtruth/inventory/dev-environment-inventory.md")
-LOCAL_JSON_RELATIVE_PATH = Path(".gtkb-state/dev-environment-inventory/local.json")
 PUBLIC_REQUIRED_SECTIONS = (
     "project",
     "collector",
@@ -42,18 +41,17 @@ PUBLIC_REQUIRED_SECTIONS = (
     "redaction",
     "verification",
 )
-MATRIX_ROWS = (
-    ("claude", "prime-builder"),
-    ("codex", "prime-builder"),
-    ("claude", "loyal-opposition"),
-    ("codex", "loyal-opposition"),
-)
+# Required qualification coverage is independent of installation lifecycle.
+# ADR-CROSS-HARNESS-PARITY-001 also requires discovery beyond these primaries.
+PRIMARY_HARNESSES = ("claude", "codex", "goose")
+CONTEXT_ROLES = ("prime-builder", "loyal-opposition")
+
 CAPABILITY_DIMENSIONS = (
     "startup_support",
     "canonical_terminology_load",
-    "role_record_resolution",
-    "file_bridge_read_write",
-    "formal_artifact_mutation_gates",
+    "native_context_binding",
+    "native_bridge_delivery",
+    "canonical_mutation_validation",
     "hook_support",
     "skill_support",
     "command_support",
@@ -78,7 +76,6 @@ SENSITIVE_VALUE_RE = re.compile(
     re.IGNORECASE,
 )
 ABSOLUTE_PATH_RE = re.compile(r"([A-Za-z]:\\|/Users/|/home/|/root/)")
-BRIDGE_NUMBERED_FILE_RE = re.compile(r"^[^/\\]+-\d{3}\.md$")
 
 
 def _now_iso() -> str:
@@ -353,89 +350,100 @@ def _toolchain_inventory() -> tuple[dict[str, Any], dict[str, Any]]:
     return dict(sorted(public_tools.items())), dict(sorted(private_tools.items()))
 
 
-def _harness_inventory(project_root: Path) -> dict[str, Any]:
-    # WI-3342 IP-4: harness identity + role state both resolve from the
-    # DB-backed registry projection (harness-state/harness-registry.json). The
-    # legacy standalone harness-state files are no longer read here. The
-    # projection's ``harnesses`` is a LIST of unified
-    # records ({id, harness_name, harness_type, role, status, ...}); this
-    # collector needs ``harness_type``, which the IP-3 foundational loaders
-    # strip, so it reads the projection directly via load_harness_projection
-    # rather than through scripts.harness_roles / scripts.harness_identity.
-    from scripts.harness_projection_reader import load_harness_projection
+class InventoryError(RuntimeError):
+    """A content-free inventory refusal; no stale source is substituted."""
 
-    projection = load_harness_projection(project_root)
-    identities: dict[str, dict[str, Any]] = {}
-    role_assignments: dict[str, dict[str, Any]] = {}
-    for record in projection.get("harnesses", []):
-        if not isinstance(record, dict):
-            continue
-        harness_name = record.get("harness_name")
-        harness_id = record.get("id")
-        role = record.get("role")
-        status = record.get("status")  # noqa: F841 - retained for future schema parity; pre-existing
-        if isinstance(harness_name, str) and harness_name:
-            identities[harness_name] = {
-                "id": harness_id,
-                "status": "verified" if harness_id else "unknown",
-            }
-        if isinstance(harness_id, str) and harness_id:
-            role_assignments[harness_id] = {
-                "harness_type": record.get("harness_type"),
-                "role": role,
-                "status": "verified" if role else "unknown",
-            }
-    codex_config = _read_toml(project_root / ".codex" / "config.toml")
-    codex_hooks = _read_json(project_root / ".codex" / "hooks.json")
-    claude_settings = _read_json(project_root / ".claude" / "settings.json")
+
+def _native_harness_records(project_root: Path) -> list[dict[str, Any]]:
+    from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+    from groundtruth_kb.config import GTConfig, GTConfigError
+
+    try:
+        config = GTConfig.load(config_path=project_root.resolve() / "groundtruth.toml", discover=False)
+    except FileNotFoundError as error:
+        raise InventoryError("native_authority_not_configured") from error
+    except (OSError, GTConfigError, ValueError) as error:
+        raise InventoryError("native_authority_configuration_invalid") from error
+    if not config.authority_url:
+        raise InventoryError("native_authority_not_configured")
+    client = AuthorityClient(config.authority_url)
+    records = []
+    seen = set()
+    after = None
+    while True:
+        try:
+            page = client.request("GET", "/v1/harnesses", query={"after": after, "limit": 1000})
+        except AuthorityClientError as error:
+            raise InventoryError("native_harness_authority_unavailable") from error
+        if not isinstance(page, dict) or not isinstance(page.get("records"), list) or "next_after" not in page:
+            raise InventoryError("invalid_native_harness_response")
+        for record in page["records"]:
+            if (
+                not isinstance(record, dict)
+                or any(
+                    not isinstance(record.get(key), str) or not record[key].strip()
+                    for key in ("id", "harness_name", "harness_type", "status")
+                )
+                or not isinstance(record.get("version"), int)
+                or isinstance(record["version"], bool)
+            ):
+                raise InventoryError("invalid_native_harness_response")
+            if record["id"] in seen:
+                raise InventoryError("duplicate_native_harness_identity")
+            seen.add(record["id"])
+            records.append(record)
+        following = page["next_after"]
+        if following is None:
+            break
+        if not page["records"] or following != page["records"][-1]["id"] or following == after:
+            raise InventoryError("invalid_native_harness_pagination")
+        after = following
+    return records
+
+
+def _harness_inventory(project_root: Path) -> dict[str, Any]:
+    # Installation declarations never assert runtime capability or a role.
+    # Do not read private harness configuration, invocation argv or environment.
+    records = _native_harness_records(project_root)
     return {
-        "identity_source": _file_state(project_root, "harness-state/harness-registry.json"),
-        "role_assignment_source": _file_state(project_root, "harness-state/harness-registry.json"),
-        "identities": {name: details for name, details in sorted(identities.items())},
-        "role_assignments": {harness_id: details for harness_id, details in sorted(role_assignments.items())},
-        "codex": {
-            "config": _file_state(project_root, ".codex/config.toml"),
-            "hooks": _file_state(project_root, ".codex/hooks.json"),
-            "hooks_enabled": bool((codex_config.get("features") or {}).get("hooks")),
-            "session_start_configured": "SessionStart" in (codex_hooks.get("hooks") or {}),
+        "identity_source": {
+            "source": "native_authority/harnesses",
+            "status": "observed",
+            "coverage": "canonical_installation_records",
         },
-        "claude": {
-            "settings": _file_state(project_root, ".claude/settings.json"),
-            "session_start_configured": "SessionStart" in (claude_settings.get("hooks") or {}),
-        },
+        "installations": [
+            {key: record[key] for key in ("id", "harness_name", "harness_type", "status", "version")}
+            for record in sorted(records, key=lambda row: row["id"])
+        ],
+        "qualification": "unqualified",
+        "discovery_limit": "Canonical installations only; unregistered surfaces and actual host behavior require independent qualification.",
     }
 
 
 def _repo_surfaces(project_root: Path) -> dict[str, Any]:
-    command_registry = _read_json(project_root / ".claude" / "commands" / "registry.json")
-    command_entries = command_registry.get("commands") if isinstance(command_registry.get("commands"), dict) else {}
-    workflows = _directory_entries(project_root, ".github/workflows", "*.yml") + _directory_entries(
-        project_root, ".github/workflows", "*.yaml"
+    baseline = ".harness-baseline-configuration"
+    workflows = sorted(
+        set(
+            _directory_entries(project_root, ".github/workflows", "*.yml")
+            + _directory_entries(project_root, ".github/workflows", "*.yaml")
+        )
     )
-    skills = sorted(Path(path).parent.name for path in _directory_entries(project_root, ".claude/skills", "*/SKILL.md"))
-    hooks = _directory_entries(project_root, ".claude/hooks", "*.py")
-    codex_hooks = _directory_entries(project_root, ".codex/gtkb-hooks", "*.py") + _directory_entries(
-        project_root, ".codex/gtkb-hooks", "*.cmd"
-    )
+
+    def entries(relative: str, pattern: str) -> dict[str, Any]:
+        items = _directory_entries(project_root, relative, pattern)
+        return {
+            "count": len(items),
+            "items": items,
+            "classification": "public_safe",
+            "coverage": "authored_file_presence_only",
+        }
+
     return {
-        "rules": {
-            "count": len(_directory_entries(project_root, ".claude/rules", "*.md")),
-            "items": _directory_entries(project_root, ".claude/rules", "*.md"),
-            "classification": "public_safe",
-        },
-        "skills": {"count": len(skills), "items": skills, "classification": "public_safe"},
-        "claude_hooks": {"count": len(hooks), "items": hooks, "classification": "public_safe"},
-        "codex_hooks": {"count": len(codex_hooks), "items": codex_hooks, "classification": "public_safe"},
-        "commands": {
-            "count": len(command_entries),
-            "items": sorted(command_entries),
-            "registry": ".claude/commands/registry.json",
-            "classification": "public_safe",
-        },
-        "git_hooks": {
-            "pre_commit": _file_state(project_root, ".githooks/pre-commit"),
-            "classification": "public_safe",
-        },
+        "rules": entries(baseline + "/rules", "*.md"),
+        "skills": entries(baseline + "/skills", "*/SKILL.md"),
+        "hooks": entries(baseline + "/hooks", "*.py"),
+        "commands": entries(baseline + "/commands", "*.md"),
+        "git_hooks": {"pre_commit": _file_state(project_root, ".githooks/pre-commit"), "classification": "public_safe"},
         "github_workflows": {"count": len(workflows), "items": workflows, "classification": "public_safe"},
         "mcp_config": _file_state(project_root, ".mcp.json", classification="local_only"),
     }
@@ -444,126 +452,45 @@ def _repo_surfaces(project_root: Path) -> dict[str, Any]:
 def _runtime_capabilities() -> dict[str, Any]:
     return {
         "repo_local_collector_limit": {
-            "status": "unsupported",
-            "classification": "unsupported",
-            "evidence": "active Codex/Claude plugin and MCP runtime lists are not exposed to this repo-local script",
-            "recommended_source": "startup payload or harness-provided tool metadata when available",
+            "status": "unavailable",
+            "classification": "unmeasured",
+            "evidence": "This collector does not observe actual harness tool, plugin, hook or MCP invocation.",
+            "recommended_source": "Controlled qualification on each actual host.",
         }
     }
 
 
-def _capability(status: str, evidence: str) -> dict[str, str]:
-    return {"status": status, "evidence": evidence}
+def _matrix_targets(harnesses: dict[str, Any]) -> list[dict[str, Any]]:
+    installations = harnesses.get("installations", [])
+    targets = [{"harness_id": row["id"], "harness": row["harness_name"]} for row in installations]
+    names = {row["harness_name"] for row in installations}
+    targets.extend({"harness_id": None, "harness": name} for name in PRIMARY_HARNESSES if name not in names)
+    return sorted(targets, key=lambda row: (row["harness"], row["harness_id"] or ""))
 
 
-def _compatibility_matrix(
-    project_root: Path, harnesses: dict[str, Any], surfaces: dict[str, Any]
-) -> list[dict[str, Any]]:
-    bridge_dir = project_root / "bridge"
-    bridge_present = bridge_dir.is_dir() and any(
-        path.is_file() and BRIDGE_NUMBERED_FILE_RE.match(path.name) for path in bridge_dir.glob("*.md")
-    )
-    canonical_terms = (project_root / ".claude" / "rules" / "canonical-terminology.md").is_file()
-    formal_gate = (project_root / ".claude" / "hooks" / "formal-artifact-approval-gate.py").is_file()
-    credential_gate = (project_root / ".claude" / "hooks" / "credential-scan.py").is_file()
-    pre_commit = (project_root / ".githooks" / "pre-commit").is_file()
-    release_gate = (project_root / "scripts" / "release_candidate_gate.py").is_file()
-    command_registry = (project_root / ".claude" / "commands" / "registry.json").is_file()
-    skills_present = bool(surfaces.get("skills", {}).get("count"))
-    workflows_present = bool(surfaces.get("github_workflows", {}).get("count"))
-    mcp_present = (project_root / ".mcp.json").is_file()
-    matrix = []
-    for harness, role in MATRIX_ROWS:
-        startup_configured = bool(harnesses.get(harness, {}).get("session_start_configured"))
-        hook_configured = bool(
-            harnesses.get(harness, {}).get("hooks", {}).get("present")
-            or harnesses.get(harness, {}).get("settings", {}).get("present")
-        )
-        matrix.append(
-            {
-                "harness": harness,
-                "role": role,
-                "assignment": _assignment_status_for(harness, role, harnesses),
-                "capabilities": {
-                    "startup_support": _capability(
-                        "configured" if startup_configured else "unknown",
-                        f"{'.codex/hooks.json' if harness == 'codex' else '.claude/settings.json'} SessionStart",
-                    ),
-                    "canonical_terminology_load": _capability(
-                        "configured" if canonical_terms else "unknown",
-                        ".harness-baseline-configuration/rules/canonical-terminology.md",
-                    ),
-                    "role_record_resolution": _capability(
-                        "verified" if harnesses.get("role_assignment_source", {}).get("present") else "unknown",
-                        "harness-state/harness-registry.json",
-                    ),
-                    "file_bridge_read_write": _capability(
-                        "verified" if bridge_present else "unknown", "bridge/*-NNN.md"
-                    ),
-                    "formal_artifact_mutation_gates": _capability(
-                        "configured" if formal_gate else "unknown",
-                        ".claude/hooks/formal-artifact-approval-gate.py",
-                    ),
-                    "hook_support": _capability(
-                        "configured" if hook_configured else "unknown",
-                        ".codex/hooks.json" if harness == "codex" else ".claude/settings.json",
-                    ),
-                    "skill_support": _capability(
-                        "configured" if skills_present else "unknown", ".claude/skills/*/SKILL.md"
-                    ),
-                    "command_support": _capability(
-                        "configured" if command_registry else "unknown", ".claude/commands/registry.json"
-                    ),
-                    "subagent_team_support": _capability(
-                        "runtime_provided" if harness == "codex" else "unknown",
-                        "harness runtime; not repo-configured",
-                    ),
-                    "mcp_support": _capability(
-                        "configured" if mcp_present else "unknown",
-                        ".mcp.json presence only; contents are local_only",
-                    ),
-                    "browser_automation": _capability(
-                        "runtime_provided" if harness == "codex" else "unknown",
-                        "harness runtime; not repo-configured",
-                    ),
-                    "github_pr_ci_access": _capability(
-                        "configured" if workflows_present else "unknown", ".github/workflows/"
-                    ),
-                    "shell_runtime_behavior": _capability("verified", "collector executed in current shell"),
-                    "permission_approval_model": _capability("configured", "AGENTS.md and harness role assignment"),
-                    "credential_safety_gates": _capability(
-                        "configured" if credential_gate and pre_commit else "unknown",
-                        ".claude/hooks/credential-scan.py and .githooks/pre-commit",
-                    ),
-                    "release_package_command_support": _capability(
-                        "configured" if release_gate else "unknown", "scripts/release_candidate_gate.py"
-                    ),
-                },
-            }
-        )
-    return matrix
-
-
-def _assignment_status_for(harness: str, role: str, harnesses: dict[str, Any]) -> dict[str, str]:
-    identities = harnesses.get("identities") or {}
-    assignments = harnesses.get("role_assignments") or {}
-    harness_id = (identities.get(harness) or {}).get("id")
-    assigned_role = (assignments.get(str(harness_id)) or {}).get("role")
-    return {
-        "harness_id": str(harness_id or "unknown"),
-        "current_role": str(assigned_role or "unknown"),
-        "matrix_role": role,
-        "status": "verified" if assigned_role == role else "configured",
-        "evidence": "harness-state/harness-registry.json",
-    }
+def _compatibility_matrix(harnesses: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        {
+            **target,
+            "role": role,
+            "role_scope": "qualification_scenario_only",
+            "qualification": "unqualified",
+            "capabilities": {
+                dimension: {"status": "unavailable", "evidence": "actual_host_behavior_not_measured"}
+                for dimension in CAPABILITY_DIMENSIONS
+            },
+        }
+        for target in _matrix_targets(harnesses)
+        for role in CONTEXT_ROLES
+    ]
 
 
 def collect_inventory(project_root: Path, *, generated_at: str | None = None) -> tuple[dict[str, Any], dict[str, Any]]:
     project_root = project_root.resolve()
     generated = generated_at or _now_iso()
+    harnesses = _harness_inventory(project_root)
     redaction_public, redaction_private = _redaction_summary()
     toolchain_public, toolchain_private = _toolchain_inventory()
-    harnesses = _harness_inventory(project_root)
     surfaces = _repo_surfaces(project_root)
     public = {
         "schema_version": SCHEMA_VERSION,
@@ -581,12 +508,14 @@ def collect_inventory(project_root: Path, *, generated_at: str | None = None) ->
         "harnesses": harnesses,
         "repo_configured_surfaces": surfaces,
         "runtime_provided_capabilities": _runtime_capabilities(),
-        "role_by_harness_compatibility": _compatibility_matrix(project_root, harnesses, surfaces),
+        "role_by_harness_compatibility": _compatibility_matrix(harnesses),
         "redaction": redaction_public,
         "verification": {
             "latest_command": ("python scripts/collect_dev_environment_inventory.py"),
             "release_gate_check": "python scripts/release_candidate_gate.py --skip-python --skip-frontend",
             "status": "generated",
+            "behavioral_qualification": "unqualified",
+            "scope": "inventory_structure_freshness_and_privacy_only",
         },
     }
     private = {
@@ -596,11 +525,6 @@ def collect_inventory(project_root: Path, *, generated_at: str | None = None) ->
         "local_only": {
             **redaction_private,
             "mcp_config_present": (project_root / ".mcp.json").is_file(),
-            "codex_hook_runtime_files": sorted(
-                _relative(path, project_root)
-                for path in (project_root / ".codex" / "gtkb-hooks").glob("last-*.json")
-                if path.is_file()
-            ),
         },
     }
     return public, private
@@ -627,6 +551,12 @@ def validate_public_inventory_payload(
     missing_sections = [section for section in PUBLIC_REQUIRED_SECTIONS if section not in payload]
     if missing_sections:
         errors.append(f"missing required sections: {', '.join(missing_sections)}")
+    for section in PUBLIC_REQUIRED_SECTIONS:
+        expected = list if section == "role_by_harness_compatibility" else dict
+        if section in payload and not isinstance(payload[section], expected):
+            errors.append(f"{section} must be a {expected.__name__}")
+    if errors:
+        return errors
     age = inventory_age_hours(payload, now=now)
     if age is None:
         errors.append("generated_at is missing or invalid")
@@ -635,26 +565,63 @@ def validate_public_inventory_payload(
     if (payload.get("redaction") or {}).get("status") != "pass":
         errors.append("redaction.status must be pass")
 
+    harnesses = payload.get("harnesses")
+    installations = harnesses.get("installations") if isinstance(harnesses, dict) else None
+    valid_installations = isinstance(installations, list) and all(
+        isinstance(row, dict)
+        and isinstance(row.get("id"), str)
+        and bool(row["id"])
+        and isinstance(row.get("harness_name"), str)
+        and bool(row["harness_name"])
+        and not (set(row) - {"id", "harness_name", "harness_type", "status", "version"})
+        for row in installations
+    )
+    if not valid_installations:
+        errors.append("harnesses.installations must contain current role-neutral metadata")
+    elif len({row["id"] for row in installations}) != len(installations):
+        errors.append("duplicate harness installation identity")
+    if isinstance(harnesses, dict) and ("role_assignments" in harnesses or "role_assignment_source" in harnesses):
+        errors.append("harness role assignments are forbidden")
     matrix = payload.get("role_by_harness_compatibility")
     if not isinstance(matrix, list):
         errors.append("role_by_harness_compatibility must be a list")
-    else:
-        seen_rows = {(row.get("harness"), row.get("role")) for row in matrix if isinstance(row, dict)}
-        missing_rows = [f"{harness}/{role}" for harness, role in MATRIX_ROWS if (harness, role) not in seen_rows]
-        if missing_rows:
-            errors.append(f"missing compatibility rows: {', '.join(missing_rows)}")
+    elif valid_installations:
+        expected = {
+            (row["harness_id"], row["harness"], role) for row in _matrix_targets(harnesses) for role in CONTEXT_ROLES
+        }
+        seen = set()
         for row in matrix:
             if not isinstance(row, dict):
+                errors.append("invalid qualification row")
                 continue
+            if (
+                row.get("harness_id") is not None
+                and not isinstance(row["harness_id"], str)
+                or not isinstance(row.get("harness"), str)
+                or not isinstance(row.get("role"), str)
+            ):
+                errors.append("invalid qualification target identity")
+                continue
+            key = (row.get("harness_id"), row.get("harness"), row.get("role"))
+            if key in seen:
+                errors.append("duplicate qualification row")
+            seen.add(key)
+            if "assignment" in row or row.get("role_scope") != "qualification_scenario_only":
+                errors.append("qualification roles must not assign a harness role")
+            if row.get("qualification") != "unqualified":
+                errors.append("inventory cannot assert actual-host qualification")
             capabilities = row.get("capabilities")
-            if not isinstance(capabilities, dict):
-                errors.append(f"{row.get('harness')}/{row.get('role')} missing capabilities")
-                continue
-            missing_capabilities = [name for name in CAPABILITY_DIMENSIONS if name not in capabilities]
-            if missing_capabilities:
-                errors.append(
-                    f"{row.get('harness')}/{row.get('role')} missing capabilities: {', '.join(missing_capabilities)}"
-                )
+            if not isinstance(capabilities, dict) or set(capabilities) != set(CAPABILITY_DIMENSIONS):
+                errors.append("missing or invalid capability dimensions")
+            elif any(
+                not isinstance(cap, dict) or cap.get("status") != "unavailable" or not cap.get("evidence")
+                for cap in capabilities.values()
+            ):
+                errors.append("inventory capabilities require unavailable status until actual-host measurement")
+        if seen != expected:
+            errors.append("qualification coverage must include every installation and required primary harness")
+    if (payload.get("verification") or {}).get("behavioral_qualification") != "unqualified":
+        errors.append("inventory structure does not establish behavioral qualification")
 
     rendered = json.dumps(payload, sort_keys=True)
     if SENSITIVE_VALUE_RE.search(rendered):
@@ -680,8 +647,7 @@ def render_markdown(payload: dict[str, Any]) -> str:
         if isinstance(entry, dict)
     )
     matrix_rows = "\n".join(
-        f"| {row.get('harness')} | {row.get('role')} | {row.get('assignment', {}).get('status')} | "
-        f"{sum(1 for cap in (row.get('capabilities') or {}).values() if cap.get('status') in {'verified', 'configured', 'runtime_provided'})} |"
+        f"| {row.get('harness')} | {row.get('harness_id') or 'not registered'} | {row.get('role')} | {row.get('qualification')} |"
         for row in matrix
         if isinstance(row, dict)
     )
@@ -713,18 +679,17 @@ def render_markdown(payload: dict[str, Any]) -> str:
             "",
             "## Harness And Repo Surfaces",
             "",
-            f"- Harness identity source present: {harnesses.get('identity_source', {}).get('present')}",
-            f"- Role assignment source present: {harnesses.get('role_assignment_source', {}).get('present')}",
+            f"- Harness identity source: {harnesses.get('identity_source', {}).get('source')}",
+            "- Roles below identify qualification scenarios, never harness assignments.",
             f"- Skills: {surfaces.get('skills', {}).get('count')}",
-            f"- Claude hooks: {surfaces.get('claude_hooks', {}).get('count')}",
-            f"- Codex hooks: {surfaces.get('codex_hooks', {}).get('count')}",
+            f"- Authored baseline hooks: {surfaces.get('hooks', {}).get('count')}",
             f"- GitHub workflows: {surfaces.get('github_workflows', {}).get('count')}",
             f"- MCP config: {surfaces.get('mcp_config', {}).get('classification')} presence only",
             "",
-            "## Role By Harness Compatibility",
+            "## Required role scenarios by harness",
             "",
-            "| Harness | Role | Assignment Status | Configured/Verified Capabilities |",
-            "|---|---|---|---:|",
+            "| Harness | Installation | Scenario role | Qualification |",
+            "|---|---|---|---|",
             matrix_rows or "| none | none | unknown | 0 |",
             "",
             "## Verification",
@@ -741,19 +706,38 @@ def write_inventory(
     *,
     public_json: Path,
     public_markdown: Path,
-    local_json: Path,
+    local_json: Path | None = None,
     generated_at: str | None = None,
 ) -> dict[str, Any]:
+    targets = [public_json, public_markdown] + ([local_json] if local_json is not None else [])
+    forbidden = {
+        ".gtkb-state",
+        "harness-state",
+        ".agent",
+        ".antigravity",
+        ".api-harness",
+        ".claude",
+        ".codex",
+        ".cursor",
+        ".goose",
+        ".harness-baseline-configuration",
+    }
+    resolved = [target.resolve() for target in targets]
+    if len(set(resolved)) != len(resolved) or any(
+        forbidden.intersection(part.lower() for part in target.parts) for target in resolved
+    ):
+        raise InventoryError("invalid_inventory_output_path")
     public, private = collect_inventory(project_root, generated_at=generated_at)
     errors = validate_public_inventory_payload(public, project_root=project_root, max_age_hours=None)
     if errors:
         raise SystemExit("Public inventory validation failed before write: " + "; ".join(errors))
     public_json.parent.mkdir(parents=True, exist_ok=True)
     public_markdown.parent.mkdir(parents=True, exist_ok=True)
-    local_json.parent.mkdir(parents=True, exist_ok=True)
     public_json.write_text(json.dumps(public, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     public_markdown.write_text(render_markdown(public), encoding="utf-8")
-    local_json.write_text(json.dumps(private, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if local_json is not None:
+        local_json.parent.mkdir(parents=True, exist_ok=True)
+        local_json.write_text(json.dumps(private, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return {"public": public, "private": private}
 
 
@@ -762,7 +746,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--project-root", type=Path, default=Path(__file__).resolve().parent.parent)
     parser.add_argument("--public-json", type=Path, default=PUBLIC_JSON_RELATIVE_PATH)
     parser.add_argument("--public-markdown", type=Path, default=PUBLIC_MARKDOWN_RELATIVE_PATH)
-    parser.add_argument("--local-json", type=Path, default=LOCAL_JSON_RELATIVE_PATH)
+    parser.add_argument(
+        "--local-json", type=Path, help="Optional explicit destination for redacted local details; omitted by default."
+    )
     parser.add_argument("--generated-at", default=None, help="Override generated_at for deterministic tests.")
     parser.add_argument(
         "--check-only", action="store_true", help="Validate the public inventory without writing files."
@@ -775,7 +761,11 @@ def main(argv: list[str] | None = None) -> int:
     public_markdown = (
         args.public_markdown if args.public_markdown.is_absolute() else project_root / args.public_markdown
     )
-    local_json = args.local_json if args.local_json.is_absolute() else project_root / args.local_json
+    local_json = (
+        (args.local_json if args.local_json.is_absolute() else project_root / args.local_json)
+        if args.local_json
+        else None
+    )
 
     if args.check_only:
         if not public_json.is_file():
@@ -786,19 +776,26 @@ def main(argv: list[str] | None = None) -> int:
         if errors:
             print("FAIL development environment inventory invalid: " + "; ".join(errors))
             return 1
-        print(f"PASS development environment inventory: {_relative(public_json, project_root)}")
+        print(
+            f"PASS inventory structure/freshness/privacy only: {_relative(public_json, project_root)}; behavioral qualification remains unqualified"
+        )
         return 0
 
-    result = write_inventory(
-        project_root,
-        public_json=public_json,
-        public_markdown=public_markdown,
-        local_json=local_json,
-        generated_at=args.generated_at,
-    )
+    try:
+        result = write_inventory(
+            project_root,
+            public_json=public_json,
+            public_markdown=public_markdown,
+            local_json=local_json,
+            generated_at=args.generated_at,
+        )
+    except InventoryError as error:
+        print(f"FAIL development environment inventory: {error}")
+        return 1
     print(f"Wrote public JSON: {_relative(public_json, project_root)}")
     print(f"Wrote public Markdown: {_relative(public_markdown, project_root)}")
-    print(f"Wrote local JSON: {_relative(local_json, project_root)}")
+    if local_json is not None:
+        print(f"Wrote local JSON: {_relative(local_json, project_root)}")
     print(f"Redaction status: {result['public']['redaction']['status']}")
     return 0
 

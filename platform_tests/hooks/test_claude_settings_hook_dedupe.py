@@ -22,7 +22,6 @@ _ROOT = Path(__file__).resolve().parents[2]
 
 # Retained duplicate-prone commands; automatic assertion startup was retired.
 _DEDUPED_REGISTRATIONS = (
-    ("PostToolUse", "spec-event-surfacer.py"),
     ("UserPromptSubmit", "intake-classifier.py"),
     ("UserPromptSubmit", "gov09-capture.py"),
 )

@@ -331,7 +331,19 @@ def test_final_prose_requires_exact_canonical_delivery(provider, failure, tmp_pa
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
-def test_bridge_task_requires_an_explicit_successor_before_model_execution(provider, tmp_path):
+@pytest.mark.parametrize(
+    "assignment",
+    [
+        {"skill": "bridge-review"},
+        {"skill": "verification"},
+        {"bridge_document": "assigned"},
+        {"bridge_version": 2},
+        {"bridge_document": "assigned", "bridge_version": True},
+        {"bridge_document": "", "bridge_version": 2},
+        {"bridge_document": "assigned", "bridge_version": 0},
+    ],
+)
+def test_bridge_task_requires_an_explicit_successor_before_model_execution(provider, assignment, tmp_path):
     def chat(*args):
         pytest.fail("An unscoped bridge task must be refused before contacting the model")
 
@@ -344,8 +356,62 @@ def test_bridge_task_requires_an_explicit_successor_before_model_execution(provi
         args.append("fixture-key")
     args.extend([1, tmp_path])
     with pytest.raises(RuntimeError, match="--bridge-document") as incomplete:
-        provider.run_tool_loop(*args, chat_func=chat)
+        provider.run_tool_loop(*args, chat_func=chat, **assignment)
     assert incomplete.value.code == "bridge_delivery_incomplete"
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize("subject,role", [("gtkb", "pb"), ("gtkb", "lo"), ("application", "pb"), ("application", "lo")])
+def test_init_prompt_is_preserved_without_inventing_a_bridge_assignment(provider, subject, role, tmp_path):
+    runtime = create_provider_guard_fixtures(provider, tmp_path)
+    settings = tmp_path / provider.ROUTING_CONFIG_PATH.parent / "settings.json"
+    settings.write_text(
+        json.dumps(
+            {
+                "hooks": {
+                    event: [{"hooks": [{"type": "command", "command": "fixture hook"}]}]
+                    for event in ("SessionStart", "UserPromptSubmit", "Stop")
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    original = f"Preserve this first message: café.\r\n::init {subject} {role}\r\n::open deliberation\r\nExplain the current model."
+    observed = []
+    prompts = []
+    hook_ids = []
+
+    def hook(command, payload, env, timeout):
+        observed.append(payload["hook_event_name"])
+        hook_ids.append(payload["session_id"])
+        if payload["hook_event_name"] == "UserPromptSubmit":
+            assert payload["prompt"] == original
+        return runtime.GuardExecutionResult(0, "{}")
+
+    def chat(*args):
+        payload = args[-2]
+        prompts.append([m["content"] for m in payload["messages"] if m["role"] == "user"])
+        assert prompts[-1] == [original]
+        assert native_id_from_payload(payload) in hook_ids
+        return _response(provider, content="No measurements were supplied.")
+
+    args = [original, provider.ModelRoute("fixture", "fixture-model", "v1", True, ()), "https://fixture.invalid"]
+    if provider is not ollama:
+        args.append("fixture-key")
+    args.extend([1, tmp_path])
+    before = {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert (
+        provider.run_tool_loop(
+            *args,
+            chat_func=chat,
+            native_hook_runner=hook,
+            command_runner=lambda *_: pytest.fail("Initialization alone must not require bridge delivery"),
+        )
+        == "No measurements were supplied."
+    )
+    assert len(prompts) == 1
+    assert observed == ["SessionStart", "UserPromptSubmit", "Stop"] and len(set(hook_ids)) == 1
+    assert {p.relative_to(tmp_path): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()} == before
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)

@@ -99,16 +99,12 @@ def test_boundary_check_fails_rather_than_aborting(tmp_path: Path) -> None:
     and that is the false-PASS outcome DELIB-202667656 forbids.
     """
     (tmp_path / ".claude" / "rules").mkdir(parents=True)
-    (tmp_path / "AGENTS.md").write_bytes(INVALID_UTF8)
-    (tmp_path / ".claude" / "rules" / "project-root-boundary.md").write_text(
-        "harness-local scratchpads are non-authoritative",
-        encoding="utf-8",
-    )
+    (tmp_path / ".claude" / "rules" / "project-root-boundary.md").write_bytes(INVALID_UTF8)
 
     result = _check_harness_local_scratchpad_boundary(tmp_path)
 
     assert result.status == "fail"
-    assert "AGENTS.md" in result.message
+    assert "project-root-boundary.md" in result.message
 
 
 def test_boundary_check_passes_on_valid_input(tmp_path: Path) -> None:

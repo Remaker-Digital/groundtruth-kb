@@ -43,16 +43,7 @@ def _finding(check: str, message: str, **details: Any) -> dict[str, Any]:
     }
 
 
-def _ensure_bridge_helpers_importable(project_root: Path) -> None:
-    gt_src = project_root / "groundtruth-kb" / "src"
-    if gt_src.exists():
-        src_text = str(gt_src)
-        if src_text not in sys.path:
-            sys.path.insert(0, src_text)
-
-
 def _bridge_status_counts(project_root: Path, bridge_dir: Path | None = None) -> dict[str, int]:
-    _ensure_bridge_helpers_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
 
     resolved_bridge_dir = bridge_dir or project_root / "bridge"

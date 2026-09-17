@@ -20,7 +20,7 @@ CREATE TABLE {schema}.specifications (
     implementation_verified_at TIMESTAMPTZ,
     retired_at TIMESTAMPTZ,
     parent TEXT,
-    application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application')),
+    application_scope TEXT CHECK (application_scope ~ '^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$'),
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
@@ -117,7 +117,7 @@ CREATE TABLE {schema}.tests (
     last_result TEXT,
     last_executed_at TIMESTAMPTZ,
     last_executed_on DATE,
-    application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application')),
+    application_scope TEXT CHECK (application_scope ~ '^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$'),
     changed_by TEXT NOT NULL,
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
@@ -195,6 +195,7 @@ CREATE TABLE {schema}.projects (
     kind TEXT NOT NULL CHECK (kind IN ('program', 'project')),
     status TEXT NOT NULL DEFAULT 'active',
     "authorization" TEXT,
+    repository_ref TEXT CHECK (repository_ref IS NULL OR repository_ref = 'platform' OR repository_ref ~ '^application:[A-Za-z][A-Za-z0-9_-]*$'),
     rank INTEGER,
     parent_project_id TEXT,
     purpose TEXT,
@@ -210,7 +211,7 @@ CREATE TABLE {schema}.projects (
     changed_at TIMESTAMPTZ NOT NULL,
     change_reason TEXT NOT NULL,
     FOREIGN KEY (parent_project_id) REFERENCES {schema}.projects(id) DEFERRABLE INITIALLY DEFERRED,
-    CHECK ((kind = 'program' AND "authorization" IS NULL AND parent_project_id IS NULL) OR
+    CHECK ((kind = 'program' AND "authorization" IS NULL AND parent_project_id IS NULL AND repository_ref IS NULL) OR
            (kind = 'project' AND "authorization" IS NOT NULL AND "authorization" IN ('authorized', 'not authorized'))),
     CHECK (id <> 'PROJECT-GTKB-NEW-WORK-INTAKE' OR (kind = 'project' AND "authorization" = 'not authorized'))
 );

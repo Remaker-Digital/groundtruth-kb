@@ -143,12 +143,12 @@ def test_isolation_suite_skips_adopter_checks_on_platform(tmp_path: Path) -> Non
     names = {r.name for r in results}
     assert "isolation:adopter-root-placement" in names
     assert "isolation:work-subject" in names
+    assert "isolation:hook-settings-structure" in names
 
     for r in results:
         if r.name in (
             "isolation:adopter-root-placement",
             "isolation:work-subject",
-            "isolation:hooks-point-to-wrappers",
             "isolation:workstream-focus-hook-absent",
             "isolation:release-readiness-app-subject-header",
         ):
@@ -165,6 +165,7 @@ def test_isolation_suite_runs_adopter_checks_on_adopter(tmp_path: Path) -> None:
     names = [r.name for r in results]
     assert "isolation:adopter-root-placement" in names
     assert "isolation:work-subject" in names
+    assert "isolation:hook-settings-structure" in names
     for r in results:
         if r.name in ("isolation:adopter-root-placement", "isolation:work-subject"):
             assert "platform development repository" not in r.message

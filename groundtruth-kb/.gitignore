@@ -13,3 +13,13 @@ dist/
 site/
 .groundtruth-chroma/
 .implementation-log-*.md
+
+# Synthetic scanner metrics fixtures are test inputs, not runtime logs.
+!/tests/fixtures/phase_a_metrics/canonical_only.log
+!/tests/fixtures/phase_a_metrics/empty.log
+!/tests/fixtures/phase_a_metrics/fallback_only.log
+!/tests/fixtures/phase_a_metrics/malformed_lines.log
+!/tests/fixtures/phase_a_metrics/mixed_catalogs.log
+!/tests/fixtures/phase_a_metrics/pattern_name_stability.log
+!/tests/fixtures/phase_a_metrics/unknown_schema_version.log
+!/tests/fixtures/phase_a_metrics/wrong_event.log

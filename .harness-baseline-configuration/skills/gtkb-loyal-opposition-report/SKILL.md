@@ -1,6 +1,6 @@
 ---
 name: gtkb-loyal-opposition-report
-description: "Generate a Loyal Opposition report with required evidence structure. Files as an Advisory Proposal bridge entry or Deliberation Archive record."
+description: "Generate a Loyal Opposition report with required evidence structure. Files informational findings as a native ADVISORY."
 argument-hint: "<report-slug>"
 allowed-tools: Bash, Read, Write
 license: "Proprietary - Remaker Digital"
@@ -47,23 +47,18 @@ Include for most reports:
 
 ## Advisory Report Mode
 
-When the report is an advisory rather than a bridge verdict, classify the
-recommendation as `adopt`, `adapt`, `reject`, `defer`, or `monitor`. For
-`adopt` or `adapt`, include a `Required Prime Builder Owner-Grilling Gate`
-section before any implementation proposal exists. That section must name the
-owner questions Prime Builder must resolve, practical options, tradeoffs, and
-the durable artifact outcome expected from the decision.
+Use the native bridge ADVISORY shape defined by SPEC-ADVISORY-REPORT-TEMPLATE-001.
+State evidence, uncertainty, the recommendation and any unresolved material
+owner choice with options and consequences. If none remains, say so. No blanket
+interview, classification slot or owner-answer transcript is required.
 
 ## Output
 
-`independent-progress-assessments/` is retired (contents deleted by owner
-directive); do not write there. File the report as one of:
-
-- An **Advisory Proposal** bridge entry (ADVISORY status; see
-  `gtkb-bridge-advisory-status-001`, VERIFIED) when the report may create
-  future Prime Builder work.
-- A **Deliberation Archive** record (`gt deliberations record`) for
-  process/review findings with no derived-work implication.
+File an informational ADVISORY through the native bridge CLI with complete
+author provenance and no routing envelope or work-item reservation. It grants
+no implementation assignment. Owner-selected follow-up uses a separate NEW
+chain and the normal independent-review workflow. Apply resulting formal or
+domain changes to canonical state; reports and conversation logs are context.
 
 ## Severity Levels
 

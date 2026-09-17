@@ -1,128 +1,41 @@
-# Prime Bridge Collaboration Protocol
+# Independent bridge collaboration
 
-This rule defines mandatory collaboration behavior between Prime Builder and
-Loyal Opposition agents over the file bridge.
+Use the [bridge protocol](file-bridge-protocol.md) and
+[delivery guidance](bridge-essential.md) with current formal and work state
+retrieved through the native CLI. This rule describes role responsibilities; it
+does not assign a harness, model or previous agent to future work.
 
-> **GT-KB host note (2026-06-15):** In the GT-KB host after the
-> TAFE/dispatcher cutover, retired bridge-index artifacts are not canonical
-> bridge-state or dispatcher authority.
+Each response is addressed to whichever eligible context next receives the named
+role's assignment. A claim reserves one next artifact and never ownership of a
+work item or chain. A successor obtains its own claim; no original author must
+return. A bridge message is authoritative at receipt and has no continuing
+authority. Re-query canonical domain state before later actions.
 
-## Operating Model
+Prime Builder authors NEW/REVISED proposals, implements independently accepted
+intent and authors READY reports. Loyal Opposition independently reviews
+proposals with GO/NO-GO and reports with VERIFIED/NOT-READY. An implementation
+report is not a new proposal. The complete formal bridge transition contract
+governs other responses, abandonment and fresh verification.
 
-- The active bridge is TAFE-backed and dispatcher-driven in current GT-KB
-  hosts.
-- Retired bridge-index artifacts are historical material, not dispatcher/TAFE
-  state.
-- Bridge documents under `bridge/` are the auditable exchange artifacts.
-- Dispatcher/TAFE bridge state provides the latest actionable status for each
-  document; no generated bridge-index artifact is part of current operation.
-- Only the latest status for each document entry is actionable.
-- The archived SQLite/MCP bridge runtime is historical legacy code and must
-  not be used as the active coordination channel for new projects.
+Proposals identify the actual parent project, work item, target paths, complete
+applicable formal requirements and executable verification plan. Review checks
+the actual result and test evidence, including failed or unexecuted obligations.
+A partial selection cannot establish complete verification. Agents author full
+headers and content; writers validate them without repairing or inventing the
+message.
 
-## Status Semantics
+VERIFIED records exact-byte review. When all project members are verified, the
+native CLI instructs Loyal Opposition to commit the complete reviewed project
+through normal hooks. Exclude bridge payloads and generated projections. A failed
+commit or changed reviewed bytes require fresh independent verification;
+committed work remains terminal and later changes are forward work.
 
-| Status | Written by | Meaning |
-|--------|------------|---------|
-| `NEW` | Prime Builder | New implementation report or review request |
-| `REVISED` | Prime Builder | Revised submission after a prior verdict |
-| `GO` | Loyal Opposition | Work is accepted or may proceed |
-| `NO-GO` | Loyal Opposition | Blockers remain; Prime Builder must respond |
-| `VERIFIED` | Loyal Opposition | Terminal verification; no Prime response is expected |
+The owner dispatches until Dispatcher Next is independently qualified and
+activated. Harnesses coordinate only through CLI/domain services and bridge,
+without reading or contacting a peer harness. Do not restore retired automation
+or invent a second queue. An unavailable service is an incomplete operation with
+a specific recovery route. A read-only suggestion does not select work.
 
-## Directional Rules
-
-### Prime Builder to Loyal Opposition
-
-Prime Builder writes `NEW` or `REVISED` entries when review is needed.
-
-The submission must include:
-
-- summary of work performed or proposed
-- artifact paths and relevant KB IDs
-- a `Specification Links` section citing every relevant governing specification,
-  rule, ADR, DCL, proposal standard, or durable specification artifact
-- a spec-to-test plan showing how tests are derived from the linked
-  specifications
-- verification already performed
-- specific review questions or acceptance criteria
-- known risks, gaps, or owner decisions needed
-
-Implementation proposals without complete specification linkage are invalid and
-must receive `NO-GO`.
-
-Loyal Opposition MUST reject all implementation proposals that are not linked to
-specifications. Without linked specifications, there MUST NOT be an approved
-implementation plan.
-
-### Loyal Opposition to Prime Builder
-
-Loyal Opposition processes latest `NEW` and `REVISED` entries, then writes the
-next numbered bridge file with one of:
-
-- `GO`
-- `NO-GO`
-- `VERIFIED`
-
-Every verdict must include evidence inspected, findings, impact, recommended
-action, and verification performed.
-
-For proposal review, Loyal Opposition must verify that every relevant
-specification is linked and that proposed tests derive from those specifications.
-For post-implementation verification, Loyal Opposition must carry forward the
-linked specifications, confirm specification-derived tests were created or
-identified, execute or inspect execution of those tests against the
-implementation, and issue `NO-GO` instead of `VERIFIED` for any untested linked
-specification unless an explicit owner waiver is documented.
-
-### Prime Builder Response
-
-Prime Builder processes latest `GO` and `NO-GO` entries.
-
-- `GO`: proceed or close as directed by the verdict.
-- `NO-GO`: fix blockers and write a `REVISED` entry.
-- `VERIFIED`: terminal; do not respond unless the owner explicitly reopens the
-  work.
-
-## Bridge Dispatch Automation
-
-Routine collaboration must not depend on manual owner prompting.
-
-- The dispatcher daemon
-  (`scripts/gtkb_dispatcher_daemon.py`) runs through the headless dispatcher
-  supervisor path.
-- On bounded daemon cycles, current GT-KB hosts inspect dispatcher/TAFE bridge
-  state and dispatch the appropriate counterpart harness when its actionable
-  queue signature has changed.
-- Manual bridge scans remain available as a fallback when the trigger is
-  unhealthy. Use dispatcher/TAFE bridge state and versioned bridge files in
-  current GT-KB hosts.
-
-## Escalation Boundary
-
-Escalate to the owner only when:
-
-- The action exceeds prior approval.
-- A destructive action is required.
-- There is a true owner-only product or risk decision.
-- The bridge protocol itself is ambiguous or contradictory.
-- The dispatcher daemon fails repeatedly and cannot be
-  recovered from documented procedures.
-
-## Configuration Capture
-
-Keep `BRIDGE-INVENTORY.md` current with:
-
-- hook registrations (`.claude/settings.json` and `.codex/hooks.json`)
-- dispatch-state path (`.gtkb-state/bridge-poller/dispatch-state.json`)
-- trigger script path (`scripts/gtkb_dispatcher_daemon.py`)
-- manual bridge-scan fallback procedure
-- log and lock paths
-- CLI commands and working directories
-- exact prompt text or prompt file paths
-- plugins, MCP servers, skills, and config files required by each agent
-- health checks and recovery procedure
-
----
-
-*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+Formal retrieval: GOV-FILE-BRIDGE-AUTHORITY-001,
+DCL-SESSION-ROLE-RESOLUTION-001, DCL-BRIDGE-CLAIM-LIFECYCLE-001,
+GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001.

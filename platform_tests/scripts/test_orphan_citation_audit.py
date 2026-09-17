@@ -12,9 +12,6 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "orphan_citation_audit.py"
-SRC_ROOT = REPO_ROOT / "groundtruth-kb" / "src"
-if str(SRC_ROOT) not in sys.path:
-    sys.path.insert(0, str(SRC_ROOT))
 
 
 def _load_audit_module():
@@ -111,6 +108,11 @@ def test_cli_exit_code_reflects_orphan_presence(tmp_path: Path) -> None:
 def test_doctor_check_invokes_audit_and_surfaces_orphans(tmp_path: Path) -> None:
     from groundtruth_kb.project import doctor
 
+    # The audit executable is a project input, independent of package placement.
+    # Stage the actual script so the installed-package test runs the same audit.
+    script = tmp_path / "scripts" / "orphan_citation_audit.py"
+    script.parent.mkdir()
+    script.write_bytes(SCRIPT_PATH.read_bytes())
     src = tmp_path / "src"
     src.mkdir()
     (src / "sample.py").write_text("# See SPEC-MISSING-001\n", encoding="utf-8")
@@ -121,3 +123,4 @@ def test_doctor_check_invokes_audit_and_surfaces_orphans(tmp_path: Path) -> None
     assert check.name == "Orphan citations"
     assert check.status == "warning"
     assert "1 orphan citation" in check.message
+    assert script.read_bytes() == SCRIPT_PATH.read_bytes()

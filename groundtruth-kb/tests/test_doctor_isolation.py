@@ -23,7 +23,7 @@ from groundtruth_kb.project.doctor_isolation import (
     _check_isolation_adopter_root_not_under_product_root,
     _check_isolation_chroma_regeneratable,
     _check_isolation_durable_work_subject_application,
-    _check_isolation_hooks_point_to_wrappers,
+    _check_isolation_hook_settings_structure,
     _check_isolation_no_writable_product_paths,
     _check_isolation_release_readiness_app_subject_header,
     _check_isolation_service_endpoint_not_raw_db,
@@ -211,28 +211,81 @@ def test_check_isolation_no_writable_product_paths_fails_when_writable(tmp_path:
 
 
 # ---------------------------------------------------------------------------
-# T8: hooks-point-to-wrappers (Phase 9 §4 check 5)
+# Hook settings structure and custom-handler boundaries
 # ---------------------------------------------------------------------------
 
 
-def test_check_isolation_hooks_point_to_wrappers_warns_on_embedded_logic(tmp_path: Path) -> None:
-    """T8: Phase 9 §4 check 5 - non-wrapper hook commands warn."""
-    settings_dir = tmp_path / ".claude"
-    settings_dir.mkdir()
+@pytest.mark.parametrize(
+    "command",
+    [
+        "echo 'embedded logic right in settings.json'",
+        "python owner-hook.py",
+        "python .claude/hooks/owner-hook.py",
+        "python groundtruth_kb_fake.py",
+        "bash /tmp/adopter-script.sh",
+        "${CLAUDE_PLUGIN_ROOT}/custom-script",
+    ],
+)
+def test_hook_settings_structure_does_not_infer_command_behavior(tmp_path: Path, command: str) -> None:
+    """The old inline-command scenario and path controls do not establish native behavior."""
+    settings_path = tmp_path / ".claude/settings.json"
+    settings_path.parent.mkdir()
     settings = {
+        "permissions": {"allow": ["Read(*)"]},
         "hooks": {
             "PreToolUse": [
-                {
-                    "hooks": [
-                        {"type": "command", "command": "echo 'embedded logic right in settings.json'"},
-                    ],
-                },
-            ],
+                {"matcher": "Write|Edit", "owner_note": "preserve", "hooks": [{"type": "command", "command": command}]},
+            ]
         },
     }
-    (settings_dir / "settings.json").write_text(json.dumps(settings), encoding="utf-8")
-    result = _check_isolation_hooks_point_to_wrappers(tmp_path, "dual-agent")
+    settings_path.write_text(json.dumps(settings), encoding="utf-8")
+    before = settings_path.read_bytes()
+    result = _check_isolation_hook_settings_structure(tmp_path)
+    assert result.status == "pass"
+    assert "behavior and availability are not assessed" in result.message
+    assert settings_path.read_bytes() == before
+    assert {p.relative_to(tmp_path).as_posix() for p in tmp_path.rglob("*") if p.is_file()} == {".claude/settings.json"}
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        b"{broken",
+        b"\xff",
+        b"[]",
+        b"null",
+        b'{"hooks": []}',
+        b'{"hooks": null}',
+        b'{"hooks": {"PreToolUse": {}}}',
+        b'{"hooks": {"PreToolUse": [null]}}',
+        b'{"hooks": {"PreToolUse": [{"hooks": {}}]}}',
+        b'{"hooks": {"PreToolUse": [{"hooks": [false]}]}}',
+        b'{"hooks": {"PreToolUse": [{"hooks": [{"command": []}]}]}}',
+        b'{"hooks": {"PreToolUse": [{"hooks": [{"type": 1}]}]}}',
+    ],
+)
+def test_hook_settings_structure_reports_invalid_inputs_without_mutation(tmp_path: Path, payload: bytes) -> None:
+    settings_path = tmp_path / ".claude/settings.json"
+    settings_path.parent.mkdir()
+    settings_path.write_bytes(payload)
+    result = _check_isolation_hook_settings_structure(tmp_path)
     assert result.status == "warning"
+    assert "repair it before upgrade" in result.message
+    assert settings_path.read_bytes() == payload
+
+
+@pytest.mark.parametrize("platform", [False, True])
+def test_hook_settings_structure_is_checked_in_both_contexts(tmp_path: Path, platform: bool) -> None:
+    if platform:
+        (tmp_path / "groundtruth-kb").mkdir()
+    checks = run_isolation_checks(tmp_path, "dual-agent", product_root=tmp_path / "product")
+    assert next(c for c in checks if c.name == "isolation:hook-settings-structure").status == "info"
+    settings_path = tmp_path / ".claude/settings.json"
+    settings_path.parent.mkdir()
+    settings_path.write_bytes(b"[]")
+    checks = run_isolation_checks(tmp_path, "dual-agent", product_root=tmp_path / "product")
+    assert next(c for c in checks if c.name == "isolation:hook-settings-structure").status == "warning"
+    assert settings_path.read_bytes() == b"[]"
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +360,7 @@ def test_run_isolation_checks_returns_checks_in_preflight_order(tmp_path: Path) 
         "isolation:service-endpoint",
         "isolation:work-subject",
         "isolation:no-writable-product-paths",
-        "isolation:hooks-point-to-wrappers",
+        "isolation:hook-settings-structure",
         "isolation:workstream-focus-hook-absent",
         "isolation:release-readiness-app-subject-header",
         "isolation:chroma-regeneratable",
@@ -383,14 +436,3 @@ def test_repeated_runs_produce_identical_output(tmp_path: Path) -> None:
     a = run_isolation_checks(adopter, "dual-agent", product_root=product_root)
     b = run_isolation_checks(adopter, "dual-agent", product_root=product_root)
     assert [(c.name, c.status, c.message) for c in a] == [(c.name, c.status, c.message) for c in b]
-
-
-# ---------------------------------------------------------------------------
-# T-IPR-CVR: GOV-20 Phase 1 advisory pilot artifacts exist with ADR tag.
-# ---------------------------------------------------------------------------
-
-
-def _kb_path() -> Path:
-    here = Path(__file__).resolve()
-    # tests/test_doctor_isolation.py → groundtruth-kb/ → E:/GT-KB
-    return here.parents[2] / "groundtruth.db"

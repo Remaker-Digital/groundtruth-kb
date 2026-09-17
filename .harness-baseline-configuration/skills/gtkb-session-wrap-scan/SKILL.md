@@ -1,92 +1,38 @@
 ---
 name: gtkb-session-wrap-scan
-description: Run the wrap-up scanner suite (W0 transcript-snapshot precursor + W1 hygiene scan + W2 cross-artifact consistency check). Read-only; non-mutating. Owner reviews findings before invoking the mutating /kb-session-wrap procedure.
-disable-model-invocation: false
-argument-hint: [session-id]
+description: Inspect current assigned work and unresolved harvest conditions without producing a session snapshot or performing wrap mutations.
 allowed-tools: Bash, Read
 license: "Proprietary - (c) 2026 Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: session-management
-  owner-only: true
 ---
-# Session Wrap-Up Scan (Slice 1: W0 + W1 + W2)
+# Read-only wrap orientation
 
-Run the three Slice 1 wrap-up scanners and emit reports. **Non-mutating** —
-writes only to `.groundtruth/session/snapshots/<session-id>/` (gitignored).
+For the selected work, inspect current canonical state before deciding what
+an explicit close or wrap needs to harvest. This guidance is optional read-only
+orientation. It does not create a session snapshot, write a report, perform
+harvest or require a new owner override before an already authorized action.
 
-Per `bridge/gtkb-wrapup-enhancements-slice1-006.md` (GO), the unified
-`/wrap` flow is deferred to Slice 2 (W3/W4 continuation + synthesis). This
-skill ships the scan path standalone so it can be exercised before the
-unified flow lands.
+Use the actual native context identifier with `gt session show`. Read the
+assigned `gt context work-item` and exact `gt bridge show` result, then Git
+status/HEAD in the registered checkout. Do not infer a session ID, choose a
+queued target or substitute a cached scan for an unavailable canonical read.
+Preserve unrelated work and another context's claims.
 
-**Trigger**: `/wrap-scan <session-id>` (e.g., `/wrap-scan S310`).
+Use the [current harvest checks](../gtkb-session-wrap/references/audit-checklist.md)
+and [wrap procedure](../gtkb-session-wrap/SKILL.md) to distinguish facts already
+recorded from missing or failed canonical writes. Report useful observations,
+untested obligations and unresolved conditions inline. A suggestion neither
+dispatches work nor proves it completed.
 
-## Procedure
+An explicit close or wrap directs its scoped canonical harvest under
+DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001. A notification or this inspection does
+not. The immutable binding remains intact; any later successor obtains its own
+claim from current state without a persisted handoff or peer-harness contact.
 
-```bash
-set -euo pipefail
-
-SESSION_ID="${1:-${CURRENT_SESSION:-S000}}"
-SNAP_DIR=".groundtruth/session/snapshots/${SESSION_ID}"   # manifest-only (W0)
-# WI-4259: wrap-scan reports relocate OUT of the manifest-only snapshot dir so
-# check_snapshots_non_manifest does not flag them as snapshots_non_manifest errors.
-# The scanners' --write-report creates this dir atomically.
-REPORT_DIR=".groundtruth/session/wrap-scan-reports/${SESSION_ID}"
-
-# W0 — capture session manifest (git HEAD, branch, uncommitted, untracked)
-python scripts/wrap_capture_transcript.py --session-id "${SESSION_ID}"
-W0_RC=$?
-
-# W1 — hygiene scan (severity in JSON; exit 0=info+warn, 2=error)
-python scripts/wrap_scan_hygiene.py \
-    --report-format markdown \
-    --write-report "${REPORT_DIR}/wrap-scan-hygiene.md" || W1_RC=$?
-W1_RC="${W1_RC:-0}"
-
-# W2 — cross-artifact consistency scan (same exit-code contract)
-python scripts/wrap_scan_consistency.py \
-    --report-format markdown \
-    --write-report "${REPORT_DIR}/wrap-scan-consistency.md" || W2_RC=$?
-W2_RC="${W2_RC:-0}"
-
-# Echo reports inline
-cat "${REPORT_DIR}/wrap-scan-hygiene.md"
-cat "${REPORT_DIR}/wrap-scan-consistency.md"
-
-# Aggregate exit code: nonzero if any scanner reported error-severity
-if [ "${W0_RC}" -ne 0 ] || [ "${W1_RC}" -eq 2 ] || [ "${W2_RC}" -eq 2 ]; then
-    echo "Wrap-scan reported error-severity findings; review before invoking /kb-session-wrap" >&2
-    exit 2
-fi
-exit 0
-```
-
-## Exit-code contract
-
-Per `-005` simple contract:
-
-- **0**: clean, info-only, or warn findings present (advisory; CI does not fail).
-- **2**: at least one error-severity finding present (CI fails; mutating
-  `/kb-session-wrap` should not proceed without owner explicit override).
-
-Severity is reported in the markdown body. The exit code distinguishes only
-the pass/fail boundary, matching standard linter convention.
-
-## What this skill does NOT do
-
-- Does not run any mutating wrap-up step (KB inserts, MEMORY.md updates,
-  git commits/pushes, deployment).
-- Does not redact or copy transcript content (W0 is manifest-only per
-  Slice 1 scope; transcript handling deferred to WRAPUP-Slice-2A).
-- Does not block the existing `/kb-session-wrap` skill — owner decides
-  whether to proceed based on the report.
-
-## When to invoke
-
-Before invoking `/kb-session-wrap` to mutate state. Run scan first, review
-findings, then proceed with the mutating procedure.
-
-## (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Legacy snapshot and scanner scripts are not the ordinary wrap route. Their
+remaining readers, standalone diagnostic duties and behavioral qualification
+must be reconciled in their current work scope. This guidance does not retire
+broader hygiene or benchmark requirements, qualify the complete harvest workflow
+or establish actual-host lifecycle behavior.

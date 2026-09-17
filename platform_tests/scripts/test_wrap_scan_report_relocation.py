@@ -1,4 +1,10 @@
-"""WI-4259 — wrap-scan report relocation regression tests.
+"""WI-4259 — wrap-scan report relocation regression tests (gate cases only).
+
+Owner ruling D9 (2026-09-17): the two documentation-content cases that asserted the projected
+session-wrap skills write wrap-scan reports under the sibling reports directory and agree on
+those paths are retired - the neutral harness baseline (2026-09-08) and O-7 R23 (session
+snapshots retired) removed report writing from close/wrap, and the projected skills are byte
+projections of the baseline. The manifest-only snapshot gate below is unchanged.
 
 Covers the spec-derived verification plan from
 `bridge/gtkb-wrap-scan-report-relocation-slice-1-001.md` (GO at -002):
@@ -29,53 +35,6 @@ from wrap_scan_hygiene import (  # noqa: E402  (path inserted above)
     SEVERITY_ERROR,
     check_snapshots_non_manifest,
 )
-
-_WRAP_SKILLS = (
-    _REPO_ROOT / ".claude" / "skills" / "kb-session-wrap" / "SKILL.md",
-    _REPO_ROOT / ".claude" / "skills" / "kb-session-wrap-scan" / "SKILL.md",
-    _REPO_ROOT / ".codex" / "skills" / "kb-session-wrap" / "SKILL.md",
-    _REPO_ROOT / ".codex" / "skills" / "kb-session-wrap-scan" / "SKILL.md",
-)
-
-# Anti-patterns: a wrap-scan report path rooted in the manifest-only snapshot dir.
-_SNAPSHOT_REPORT_ANTIPATTERNS = (
-    "${SNAP_DIR}/wrap-scan",
-    "snapshots/<SESSION_ID>/wrap-scan",
-    "snapshots/${SESSION_ID}/wrap-scan",
-)
-
-
-# --------------------------------------------------------------------------
-# SKILL.md relocation (doc-content regression)
-# --------------------------------------------------------------------------
-
-
-def test_session_wrap_skills_write_reports_to_sibling_dir() -> None:
-    """All 4 SKILLs reference the sibling reports dir and no wrap-scan report
-    path under the manifest-only snapshot dir."""
-    for skill in _WRAP_SKILLS:
-        content = skill.read_text(encoding="utf-8")
-        assert "wrap-scan-reports" in content, f"{skill} missing relocated report dir"
-        for bad in _SNAPSHOT_REPORT_ANTIPATTERNS:
-            assert bad not in content, f"{skill} still writes a wrap-scan report under snapshots/: {bad!r}"
-
-
-def _report_path_lines(content: str) -> list[str]:
-    """Lines that reference a relocated wrap-scan report path."""
-    return sorted(line.strip() for line in content.splitlines() if "wrap-scan-reports" in line and "wrap-scan-" in line)
-
-
-def test_claude_codex_report_paths_parity() -> None:
-    """The relocated report-path lines match between each .claude SKILL and its
-    .codex mirror."""
-    for name in ("kb-session-wrap", "kb-session-wrap-scan"):
-        claude = (_REPO_ROOT / ".claude" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
-        codex = (_REPO_ROOT / ".codex" / "skills" / name / "SKILL.md").read_text(encoding="utf-8")
-        claude_lines = _report_path_lines(claude)
-        codex_lines = _report_path_lines(codex)
-        assert claude_lines, f"{name}: no relocated report-path lines found in .claude SKILL"
-        assert claude_lines == codex_lines, f"{name}: .claude/.codex report-path drift"
-
 
 # --------------------------------------------------------------------------
 # check_snapshots_non_manifest invariant (UNCHANGED by this slice)

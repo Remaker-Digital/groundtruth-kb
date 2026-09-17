@@ -29,8 +29,11 @@ _SETTINGS = _REPO_ROOT / ".claude" / "settings.json"
 # A hook command launches headless when its interpreter token is ``pythonw`` (the
 # no-console Windows Python). A bare ``python`` / ``python.exe`` interpreter is the
 # console-spawning reintroduction this guard forbids.
-_BARE_PYTHON_RE = re.compile(r"^\s*python(\.exe)?\s", re.IGNORECASE)
-_PYTHONW_RE = re.compile(r"^\s*pythonw(\.exe)?\s", re.IGNORECASE)
+# The projector writes the in-root interpreter path, quoted and anchored on $CLAUDE_PROJECT_DIR; a bare name is the
+# legacy form these checks also recognize.
+_INTERPRETER_PREFIX = r'^\s*"?(?:\$CLAUDE_PROJECT_DIR/groundtruth-kb/\.venv/Scripts/)?'
+_BARE_PYTHON_RE = re.compile(_INTERPRETER_PREFIX + r'python(\.exe)?"?\s', re.IGNORECASE)
+_PYTHONW_RE = re.compile(_INTERPRETER_PREFIX + r'pythonw(\.exe)?"?\s', re.IGNORECASE)
 
 
 def _hook_commands() -> list[str]:

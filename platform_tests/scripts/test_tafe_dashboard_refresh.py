@@ -1,276 +1,165 @@
-"""Tests for the WI-4506 TAFE observability projection in the dashboard SQLite.
+"""Retirement regression and current native dashboard observations.
 
-Bridge: bridge/gtkb-tafe-dashboard-observability-001.md (NEW),
-       bridge/gtkb-tafe-dashboard-observability-002.md (GO).
-PAUTH: TAFE-TRANCHE-3-PHASE-2-OBSERVABILITY-HYGIENE; allowed mutation classes
-       are source + test only; forbidden: cutover, dual_write, live dispatch,
-       authoritative generated view, kb_schema_change.
-
-Verifies:
-  - The TAFE projection schema migration is idempotent.
-  - `_refresh_tafe_projection` is read-only against `groundtruth.db` and
-    projects the canonical TAFE rows into the dashboard SQLite.
-  - Rerun is idempotent (counts unchanged).
-  - Absent `groundtruth.db` (fresh adopter) yields zero projected rows
-    without raising (graceful absence).
-  - Structural guard: the projection helper source contains no INSERT /
-    UPDATE / DELETE / DROP / CREATE statement targeting the canonical
-    `groundtruth.db` and no MemBase mutating API call.
+Preserve read-only observation, repeatability, isolation and useful failure
+visibility through current native routes without reviving retired coordination.
 """
 
 from __future__ import annotations
 
-import ast
+import json
 import sqlite3
-from pathlib import Path
+import subprocess
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-from scripts.gtkb_dashboard.refresh_dashboard_db import (  # noqa: E402
-    TAFE_PROJECTION_TABLE_NAMES,
-    _migrate_tafe_projection_schema,
-    _refresh_tafe_projection,
-    _refresh_tafe_projection_safe,
-)
-
-REFRESH_MODULE_PATH = REPO_ROOT / "scripts" / "gtkb_dashboard" / "refresh_dashboard_db.py"
+import pytest
+from groundtruth_kb import dashboard
 
 
-def _seed_tafe_kb(kb_path: Path) -> None:
-    """Build a tiny canonical groundtruth.db with the TAFE tables and seed rows.
-
-    Uses raw SQLite (the canonical schema is also raw SQLite); this avoids
-    pulling the full KnowledgeDB initialization path into the test. The
-    `_refresh_tafe_projection` helper reads via the `KnowledgeDB` API.
-    """
-    from groundtruth_kb.db import KnowledgeDB
-
-    kb = KnowledgeDB(kb_path)
-    try:
-        # Flow definition referenced by the flow_instance below (referential
-        # integrity guard inside insert_flow_instance).
-        kb.insert_flow_definition(
-            id="implementation",
-            flow_type="implementation",
-            title="Implementation flow (test seed)",
-            stage_sequence=["propose", "review", "implement", "verify"],
-            required_roles_by_stage={
-                "propose": "prime-builder",
-                "review": "loyal-opposition",
-                "implement": "prime-builder",
-                "verify": "loyal-opposition",
-            },
-            changed_by="test",
-            change_reason="seed for WI-4506 test",
-        )
-        # Capability snapshot.
-        kb.insert_agent_capability_snapshot(
-            id="cap-1",
-            harness_id="B",
-            role="prime-builder",
-            captured_at="2026-06-13T00:00:00Z",
-            health_status="healthy",
-            harness_name="claude",
-            subject_scope="gtkb",
-            reviewer_precedence=10,
-            workspace_availability="available",
-            model_identifier="claude-opus-4-8",
-            capabilities=["bash"],
-            source="test-seed",
-            changed_by="test",
-            change_reason="seed for WI-4506 test",
-        )
-        # Flow + stage + lease + telemetry.
-        kb.insert_flow_instance(
-            id="flow-1",
-            flow_definition_id="implementation",
-            subject_type="bridge_thread",
-            subject_id="gtkb-tafe-dashboard-observability",
-            flow_type="implementation",
-            status="active",
-            started_at="2026-06-13T00:00:00Z",
-            changed_by="test",
-            change_reason="seed",
-        )
-        kb.insert_stage_instance(
-            id="stage-1",
-            flow_instance_id="flow-1",
-            stage_id="implement",
-            stage_index=2,
-            required_role="prime-builder",
-            status="in_progress",
-            claim_status="claimed",
-            claimed_by_harness_id="B",
-            claimed_by_session_id="869ade5b",
-            started_at="2026-06-13T00:00:00Z",
-            changed_by="test",
-            change_reason="seed",
-        )
-        kb.insert_stage_lease(
-            id="lease-1",
-            stage_instance_id="stage-1",
-            holder_harness_id="B",
-            holder_session_id="869ade5b",
-            ttl_seconds=600,
-            acquired_at="2026-06-13T00:00:00Z",
-            expires_at="2026-06-13T00:10:00Z",
-            changed_by="test",
-            change_reason="seed",
-        )
-        kb.insert_stage_attempt_telemetry(
-            id="tel-1",
-            flow_instance_id="flow-1",
-            stage_instance_id="stage-1",
-            attempt_number=1,
-            agent_harness_id="B",
-            outcome="success",
-            verdict="GO",
-            started_at="2026-06-13T00:00:00Z",
-            completed_at="2026-06-13T00:05:00Z",
-            duration_ms=300000,
-            changed_by="test",
-            change_reason="seed",
-        )
-        kb.insert_stage_attempt_telemetry(
-            id="tel-2",
-            flow_instance_id="flow-1",
-            stage_instance_id="stage-1",
-            attempt_number=2,
-            agent_harness_id="B",
-            outcome="failure",
-            failure_class="timeout",
-            started_at="2026-06-13T00:06:00Z",
-            completed_at="2026-06-13T00:11:00Z",
-            duration_ms=300000,
-            changed_by="test",
-            change_reason="seed",
-        )
-    finally:
-        kb.close()
+def _ready():
+    return {"reachable": True, "ready": True, "schema_catalog_matches": True}
 
 
-def test_migration_creates_all_five_tafe_projection_tables(tmp_path: Path) -> None:
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-    _migrate_tafe_projection_schema(db_path)
-    with sqlite3.connect(db_path) as conn:
-        present = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert set(TAFE_PROJECTION_TABLE_NAMES) <= present
-    assert len(TAFE_PROJECTION_TABLE_NAMES) == 5
+def _report(*, claims=0, eligible=0, blocked=0):
+    return {
+        "active_claim_count": claims,
+        "queues": {
+            "pb": {"role": "pb", "eligible": [{}] * eligible, "blocked": [{}] * blocked},
+            "lo": {"role": "lo", "eligible": [], "blocked": []},
+        },
+    }
 
 
-def test_migration_is_idempotent(tmp_path: Path) -> None:
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-    _migrate_tafe_projection_schema(db_path)
-    _migrate_tafe_projection_schema(db_path)  # second call must not raise.
-    with sqlite3.connect(db_path) as conn:
-        present = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert set(TAFE_PROJECTION_TABLE_NAMES) <= present
+def _probes(monkeypatch, authority, report):
+    from groundtruth_kb.authority_client import AuthorityClient
+    from groundtruth_kb.config import GTConfig
 
+    calls = []
 
-def test_refresh_projects_canonical_rows(tmp_path: Path) -> None:
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-    kb_path = tmp_path / "groundtruth.db"
-    _migrate_tafe_projection_schema(db_path)
-    _seed_tafe_kb(kb_path)
+    def probe(root, args, timeout=20):
+        calls.append(args)
+        assert args[0] == "git"
+        return subprocess.CompletedProcess(args, 0, "## test\n", "")
 
-    counts = _refresh_tafe_projection(db_path, tmp_path)
-
-    assert counts["tafe_agent_capability_snapshots"] == 1
-    assert counts["tafe_flow_instances"] == 1
-    assert counts["tafe_stage_instances"] == 1
-    assert counts["tafe_stage_leases"] == 1
-    assert counts["tafe_stage_attempt_telemetry"] == 2  # success + failure
-
-    with sqlite3.connect(db_path) as conn:
-        outcomes = {row[0] for row in conn.execute("SELECT DISTINCT outcome FROM tafe_stage_attempt_telemetry")}
-        assert outcomes == {"success", "failure"}
-        failure_classes = {
-            row[0]
-            for row in conn.execute("SELECT failure_class FROM tafe_stage_attempt_telemetry WHERE outcome = 'failure'")
-        }
-        assert failure_classes == {"timeout"}
-
-
-def test_refresh_is_idempotent(tmp_path: Path) -> None:
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-    kb_path = tmp_path / "groundtruth.db"
-    _migrate_tafe_projection_schema(db_path)
-    _seed_tafe_kb(kb_path)
-
-    first = _refresh_tafe_projection(db_path, tmp_path)
-    second = _refresh_tafe_projection(db_path, tmp_path)
-    assert first == second
-
-
-def test_graceful_absence_when_groundtruth_db_missing(tmp_path: Path) -> None:
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-    _migrate_tafe_projection_schema(db_path)
-    # No groundtruth.db in tmp_path — fresh-adopter case.
-    counts = _refresh_tafe_projection(db_path, tmp_path)
-    assert all(v == 0 for v in counts.values())
-
-
-def test_refresh_safe_swallows_exceptions(tmp_path: Path, monkeypatch) -> None:
-    """The _safe wrapper must never propagate; the dashboard refresh continues."""
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-
-    def _boom(*_args, **_kwargs):
-        raise RuntimeError("simulated migration failure")
+    def read(self, method, route, **kwargs):
+        assert method == "GET" and not kwargs
+        calls.append([method, route])
+        assert route in ("/v1/status", "/v1/bridge/state-report")
+        return authority if route == "/v1/status" else report
 
     monkeypatch.setattr(
-        "scripts.gtkb_dashboard.refresh_dashboard_db._migrate_tafe_projection_schema",
-        _boom,
+        GTConfig,
+        "load",
+        lambda **kwargs: GTConfig(project_root=kwargs["config_path"].parent, authority_url="http://127.0.0.1:39899"),
     )
-    # Must not raise.
-    _refresh_tafe_projection_safe(db_path, tmp_path)
+    monkeypatch.setattr(AuthorityClient, "request", read)
+    monkeypatch.setattr(dashboard, "_run_release_probe", probe)
+    return calls
 
 
-def test_projection_helper_does_not_mutate_canonical_kb_source() -> None:
-    """Structural guard: the projection module must not contain INSERT/UPDATE/
-    DELETE statements targeting `groundtruth.db` and must not call MemBase
-    mutating helpers (`insert_*`, `update_*`, `replace_*`) on KnowledgeDB.
+def test_current_refresh_does_not_open_or_project_retired_state(tmp_path, monkeypatch):
+    sentinel = tmp_path / "groundtruth.db"
+    sentinel.write_bytes(b"Retired source must not be opened or changed.")
+    before = sentinel.read_bytes()
+    monkeypatch.setattr(dashboard, "_write_bridge_swimlane_safe", lambda *args: None)
+    model = {"generated_at": "2026-09-12T18:00:00+00:00", "metrics": {}, "dashboard_intelligence": {}}
+    path = tmp_path / "dashboard.sqlite"
+    for _ in range(2):
+        assert dashboard.refresh_database(path, tmp_path, model=model, history=[])["status"] == "completed"
+    assert sentinel.read_bytes() == before
+    with sqlite3.connect(path) as conn:
+        tables = {row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+        assert not any(name.startswith("tafe_") for name in tables)
+        assert conn.execute("SELECT COUNT(*) FROM refresh_runs WHERE status='completed'").fetchone()[0] == 2
+    assert not (tmp_path / "harness-state").exists()
+    assert not (tmp_path / ".claude").exists()
 
-    Per the proposal's no-mutation bound (SPEC-TAFE-R7): the dashboard
-    projection is read-only against the canonical store.
-    """
-    source = REFRESH_MODULE_PATH.read_text(encoding="utf-8")
-    tree = ast.parse(source)
 
-    # Locate the bodies of the TAFE projection functions only — the rest of
-    # the module legitimately writes to the dashboard SQLite.
-    tafe_fn_names = {
+@pytest.mark.parametrize(
+    "value,expected",
+    [
+        (_ready(), ("green", "ready")),
+        ({**_ready(), "ready": False}, ("red", "not_ready")),
+        ({**_ready(), "reachable": False}, ("red", "not_ready")),
+        ({**_ready(), "schema_catalog_matches": False}, ("red", "not_ready")),
+        ({**_ready(), "ready": "true"}, ("yellow", "live_state_unavailable")),
+        ({}, ("yellow", "live_state_unavailable")),
+        ([], ("yellow", "live_state_unavailable")),
+        (None, ("yellow", "live_state_unavailable")),
+        ({"_probe_error": "private service detail must not be relayed"}, ("yellow", "live_state_unavailable")),
+    ],
+)
+def test_native_authority_observations_are_typed_and_bounded(monkeypatch, tmp_path, value, expected):
+    calls = _probes(monkeypatch, value, _report())
+    result = dashboard._native_authority_live_status(tmp_path)
+    assert (result["health"], result["status"]) == expected
+    assert "private service detail" not in json.dumps(result)
+    assert calls == [["GET", "/v1/status"]]
+
+
+def test_current_observation_routes_are_read_only_and_repeatable(monkeypatch, tmp_path):
+    calls = _probes(monkeypatch, _ready(), _report())
+    first = dashboard._live_release_health_findings(tmp_path)
+    second = dashboard._live_release_health_findings(tmp_path)
+    assert first == second
+    assert (
+        calls
+        == [
+            ["git", "status", "--short", "--branch"],
+            ["GET", "/v1/status"],
+            ["GET", "/v1/bridge/state-report"],
+        ]
+        * 2
+    )
+    assert not dashboard._visible_release_findings(first)
+    assert not list(tmp_path.iterdir())
+
+
+@pytest.mark.parametrize("report", [None, [], {}, {"active_claim_count": True, "queues": {}}, _report(claims=-1)])
+def test_missing_or_malformed_bridge_observations_remain_visible(monkeypatch, tmp_path, report):
+    _probes(monkeypatch, _ready(), report)
+    findings = dashboard._live_release_health_findings(tmp_path)
+    visible = dashboard._visible_release_findings(findings)
+    assert len(visible) == 1 and visible[0]["source"] == "bridge"
+    assert visible[0]["severity"] == "yellow"
+    assert "unavailable" in visible[0]["message"] or "malformed" in visible[0]["message"]
+
+
+def test_queue_observation_does_not_dispatch_or_assign_thread_ownership(monkeypatch, tmp_path):
+    _probes(monkeypatch, _ready(), _report(claims=2, eligible=3, blocked=1))
+    findings = dashboard._live_release_health_findings(tmp_path)
+    bridge = next(row for row in findings if row["source"] == "bridge")
+    assert "2 active next-artifact claim(s), 3 eligible and 1 blocked action(s)" in bridge["message"]
+    assert "does not dispatch work or establish release readiness" in bridge["message"]
+    assert bridge["severity"] == "yellow" and bridge["release_visible"] is True
+    _probes(monkeypatch, _ready(), _report(eligible=3))
+    findings = dashboard._live_release_health_findings(tmp_path)
+    assert not dashboard._visible_release_findings(findings)
+
+
+def test_unknown_authority_metric_is_not_a_zero_or_healthy_result():
+    rows = {row[0]: row for row in dashboard._current_metric_rows({}, {}, [])}
+    assert rows["native_authority_findings"][2:4] == (None, "yellow")
+    assert "dispatcher_health_findings" not in rows
+
+
+def test_git_probe_uses_selected_root_without_shell(monkeypatch, tmp_path):
+    captured = {}
+
+    def run(args, **kwargs):
+        captured.update(args=args, kwargs=kwargs)
+        return subprocess.CompletedProcess(args, 0, "", "")
+
+    monkeypatch.setattr(dashboard.subprocess, "run", run)
+    dashboard._run_release_probe(tmp_path, ["git", "status", "--short"])
+    assert captured["args"] == ["git", "status", "--short"]
+    assert not captured["kwargs"].get("shell")
+    assert captured["kwargs"]["cwd"] == tmp_path
+
+
+def test_retired_projection_helpers_are_removed():
+    for name in (
         "_refresh_tafe_projection",
-        "_migrate_tafe_projection_schema",
         "_refresh_tafe_projection_safe",
-        "_project_tafe_row_subset",
-    }
-    forbidden_method_calls = {
-        "insert_flow_instance",
-        "insert_stage_instance",
-        "insert_stage_lease",
-        "insert_stage_attempt_telemetry",
-        "insert_agent_capability_snapshot",
-        "update_flow_instance",
-        "update_stage_instance",
-        "update_stage_lease",
-        "update_stage_attempt_telemetry",
-        "update_agent_capability_snapshot",
-    }
-    for node in ast.walk(tree):
-        if isinstance(node, ast.FunctionDef) and node.name in tafe_fn_names:
-            for sub in ast.walk(node):
-                if isinstance(sub, ast.Attribute) and sub.attr in forbidden_method_calls:
-                    raise AssertionError(
-                        f"TAFE projection helper '{node.name}' calls forbidden mutating method '.{sub.attr}'"
-                    )
-
-    # And no kb_path / canonical-store SQL writes anywhere in those helpers.
-    body_segments: list[str] = []
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name in tafe_fn_names:
-            body_segments.append(ast.unparse(node))
-    combined = "\n".join(body_segments).upper()
-    for forbidden_sql in ("INSERT INTO FLOW_", "UPDATE FLOW_", "DELETE FROM FLOW_", "DROP TABLE FLOW_"):
-        assert forbidden_sql not in combined, (
-            f"TAFE projection helpers contain forbidden canonical SQL: {forbidden_sql}"
-        )
+        "_migrate_tafe_projection_schema",
+        "_dispatcher_supervisor_live_status",
+    ):
+        assert not hasattr(dashboard, name)

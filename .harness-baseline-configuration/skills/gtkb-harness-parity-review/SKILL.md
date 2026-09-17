@@ -30,6 +30,19 @@ allowed operations and expected refusals through the installed entry points.
 Compare results with the current native services and exact reviewed artifact
 scope. Record failures and unavailable evidence directly.
 
+Use `gt harness diagnostic --harness-id <ID> --json` to read current installation
+metadata through the configured native service. Add `--native-context-id <ID>`
+only for an explicitly selected context. Its immutable binding establishes that
+context's role; it does not establish an association with the selected harness.
+No context is selected from environment hints, registry roles or recent files.
+
+The local report performs no provider request. A metadata fingerprint describes
+only the canonical installation fields. Unknown runtime identity, metrics, hooks,
+guard behavior and adapter health stay unavailable. A partial report with
+unqualified parity is useful diagnostic evidence, never a passing host test.
+The diagnostic contract is `SPEC-HARNESS-DIAGNOSTIC-MODE-001`; its remaining
+measurement and actual-host requirements need separate executed evidence.
+
 Harnesses are independent consumers. This session uses its own configuration
 and runtime. Shared baseline and projector tests may verify declared output
 contracts; do not inspect another harness's private directories, infer its role,

@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import json
-import os
 import re
 from pathlib import Path
-from typing import Any
 
 # Common patterns for parsing commands
 REDIRECTION_RE = re.compile(r"(?:>|>>|<|\|)\s*([^\s|&;]+)")
@@ -98,13 +95,12 @@ _DIRECT_GTKB_HELPER_SCRIPT_MARKERS = (
 )
 _PYTHON_COMMANDS = frozenset({"py", "python", "python3", "pythonw"})
 _DIRECT_HARNESS_DENIAL = (
-    "Direct harness-to-harness launch is prohibited by SPEC-INTAKE-21c5b3 / "
-    "DELIB-20260703-DIRECT-HARNESS-INVOKE-BAN; use bridge files, `gt bridge dispatch` "
-    "control-plane status/config surfaces, or independent owner/manual harness operation."
+    "Direct harness-to-harness launch is prohibited by SPEC-INTAKE-21c5b3; use the native CLI and bridge, "
+    "or independent owner/manual harness operation."
 )
 _DIRECT_HELPER_SCRIPT_DENIAL = (
-    "Direct GT-KB Python helper script execution is prohibited by SPEC-INTAKE-21c5b3 / "
-    "DELIB-20260703-DIRECT-HARNESS-INVOKE-BAN because Windows file association can launch "
+    "Direct GT-KB Python helper script execution is prohibited by SPEC-INTAKE-21c5b3 "
+    "because Windows file association can launch "
     "a GUI harness. Invoke helper scripts through an explicit Python executable or governed "
     "no-window wrapper instead."
 )
@@ -267,71 +263,21 @@ class DirectiveEnforcementError(ValueError):
     """Raised when a path or command violates directive enforcement rules."""
 
 
-def load_directives(project_root: Path) -> list[dict[str, Any]]:
-    registry_file = project_root / ".gtkb" / "directive-registry.json"
-    if not registry_file.is_file():
-        return []
-    try:
-        data = json.loads(registry_file.read_text(encoding="utf-8"))
-        if isinstance(data, dict):
-            directives = data.get("directives", [])
-            if isinstance(directives, list):
-                return [d for d in directives if isinstance(d, dict)]
-        return []
-    except Exception:  # intentional-catch: load directives default fallback
-        return []
-
-
 def check_path_boundary(path_str: str, project_root: Path) -> tuple[bool, str]:
-    """Check if the given path violates DIR-ROOT-BOUNDARY-001.
+    """Check containment in the supplied checkout; this grants no effect claim.
 
-    Returns (allowed, reason_if_blocked).
+    A local legacy policy file cannot redirect the checkout or exempt foreign
+    harness paths. Native effect checks separately enforce the current context,
+    artifact claim, protected paths and live canonical scope.
     """
-    directives = load_directives(project_root)
-    boundary = next((d for d in directives if d.get("id") == "DIR-ROOT-BOUNDARY-001"), None)
-    if not boundary:
-        # Fallback default boundary if registry file is missing/corrupt
-        allowed_root = str(project_root)
-        blocked_absolute = ["C:\\Users\\", "/etc/", "/home/"]
-    else:
-        patterns = boundary.get("patterns", {})
-        allowed_root = patterns.get("allowed_root", str(project_root))
-        blocked_absolute = patterns.get("blocked_absolute", [])
-
     try:
+        root = project_root.resolve()
         candidate = Path(path_str)
-        # If relative, resolve against project_root
-        candidate = (project_root / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
-    except Exception as exc:  # intentional-catch: path resolution fallback
-        return False, f"Path '{path_str}' could not be resolved: {exc}"
-
-    # Allow harness-specific paths (e.g. settings, plugins, logs)
-    if any(part.lower() in {".claude", ".codex", ".gemini", ".api-harness"} for part in candidate.parts):
-        return True, ""
-
-    candidate_norm = os.path.normpath(str(candidate)).lower()
-    allowed_norm = os.path.normpath(str(allowed_root)).lower()
-
-    # 1. Check blocked_absolute
-    for blocked in blocked_absolute:
-        blocked_norm = os.path.normpath(blocked).lower()
-        if candidate_norm.startswith(blocked_norm):
-            return False, f"Path '{path_str}' resolves to blocked location under '{blocked}'"
-        # Also check direct prefix match on raw path_str in case it's rooted-driveless on Windows
-        p_str_clean = path_str.lower().replace("\\", "/")
-        b_clean = blocked.lower().replace("\\", "/")
-        if p_str_clean.startswith(b_clean):
-            return False, f"Path '{path_str}' resolves to blocked location under '{blocked}'"
-
-    # 2. Check allowed_root
-    # Candidate must be exactly the allowed root or a child of it
-    if not (
-        candidate_norm == allowed_norm
-        or candidate_norm.startswith(allowed_norm + os.sep)
-        or candidate_norm.startswith(allowed_norm + "/")
-    ):
-        return False, f"Path '{path_str}' resolves outside allowed root '{allowed_root}'"
-
+        candidate = (root / candidate).resolve() if not candidate.is_absolute() else candidate.resolve()
+    except (OSError, ValueError, RuntimeError) as error:
+        return False, f"Path '{path_str}' could not be resolved: {error}"
+    if not candidate.is_relative_to(root):
+        return False, f"Path '{path_str}' resolves outside allowed root '{root}'"
     return True, ""
 
 

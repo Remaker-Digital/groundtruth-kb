@@ -14,16 +14,12 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
-import sys
 from copy import deepcopy
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-GTKB_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
-if str(GTKB_SRC) not in sys.path:
-    sys.path.insert(0, str(GTKB_SRC))
 
 from groundtruth_kb.assertions import run_all_assertions  # noqa: E402
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402

@@ -12,6 +12,7 @@ from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 
 from platform_tests.groundtruth_kb.cli.test_registry_current_mutation_cli import invoke, record
 from platform_tests.groundtruth_kb.cli.test_registry_current_mutation_cli import project as project
+from platform_tests.groundtruth_kb.test_native_authority_service import native as native
 
 
 def test_coverage_transition_preserves_files_and_remaining_membership(project):

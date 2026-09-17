@@ -29,10 +29,16 @@ from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
-from typing import TYPE_CHECKING, Any
+from typing import Any, Protocol
 
-if TYPE_CHECKING:
-    from groundtruth_kb.db import KnowledgeDB
+
+class SpecificationReader(Protocol):
+    """The existing read-only definition interface used during assertion observation."""
+
+    def get_spec(self, spec_id: str, /) -> dict[str, Any] | None: ...
+
+    def list_specs(self, *, status: str) -> list[dict[str, Any]]: ...
+
 
 _MAX_FILE_SIZE = 10 * 1024 * 1024  # 10 MB — skip binary/huge files
 _MAX_COMPOSITION_DEPTH = 3
@@ -737,7 +743,7 @@ def run_single_assertion(assertion: dict[str, Any], project_root: Path) -> dict[
 
 
 def run_spec_assertions(
-    db: KnowledgeDB,
+    db: SpecificationReader | None,
     spec: dict[str, Any],
     triggered_by: str,
     project_root: Path,
@@ -748,7 +754,7 @@ def run_spec_assertions(
       {spec_id, title, overall_passed, results: [...], assertion_count}
     """
     spec_id = spec["id"]
-    definitions = {}
+    definitions: dict[str, Any] = {}
     results = []
     for key, empty in (("assertions", []), ("constraints", {})):
         # SQLite retains the raw field alongside lossy parsed aliases; validate
@@ -797,7 +803,7 @@ def run_spec_assertions(
             "spec_version": spec["version"],
             "title": spec["title"],
             "overall_passed": False,
-            "evaluation_result": "NOT_APPLICABLE",
+            "evaluation_result": "UNASSESSED",
             "results": [],
             "assertion_count": 0,
             "skipped": True,
@@ -828,7 +834,7 @@ def run_spec_assertions(
 
 
 def run_all_assertions(
-    db: KnowledgeDB,
+    db: SpecificationReader,
     project_root: Path,
     triggered_by: str = "manual",
     spec_id: str | None = None,
@@ -868,22 +874,22 @@ def run_all_assertions(
             }
         else:
             result = run_spec_assertions(db, spec, triggered_by, project_root)
-            current = db.get_spec(spec["id"])
-            if current is None or (current["version"], current.get("status")) != (spec["version"], spec.get("status")):
-                result["results"].append(
-                    _skip(
-                        "source_changed",
-                        "Canonical definition changed during evaluation",
-                        "Read the current specification and evaluate it again; "
-                        "the previous observation cannot establish current conformance.",
-                    )
+        current = db.get_spec(spec["id"])
+        if current is None or (current["version"], current.get("status")) != (spec["version"], spec.get("status")):
+            result["results"].append(
+                _skip(
+                    "source_changed",
+                    "Canonical definition changed during evaluation",
+                    "Read the current specification and evaluate it again; "
+                    "the previous observation cannot establish current conformance.",
                 )
-                result.update(
-                    overall_passed=False,
-                    evaluation_result="UNASSESSED",
-                    skipped=True,
-                    assertion_count=len(result["results"]),
-                )
+            )
+            result.update(
+                overall_passed=False,
+                evaluation_result="UNASSESSED",
+                skipped=True,
+                assertion_count=len(result["results"]),
+            )
         details.append(result)
         evaluation_result = result.get("evaluation_result")
         if evaluation_result == "NOT_APPLICABLE":
@@ -906,12 +912,14 @@ def run_all_assertions(
         aggregate_result = "UNASSESSED"
     elif passed:
         aggregate_result = "PASS"
+    elif not details:
+        aggregate_result = "UNASSESSED"
     else:
         aggregate_result = "NOT_APPLICABLE"
 
     return {
         "total_specs": len(specs),
-        "specs_with_assertions": len(specs) - skipped,
+        "specs_with_assertions": sum(result["assertion_count"] > 0 for result in details),
         "passed": passed,
         "failed": failed,
         "skipped": skipped,
@@ -950,6 +958,8 @@ def format_summary(summary: dict[str, Any]) -> str:
         lines.append("NON-PASS OBSERVATIONS:\n")
         for f in failures:
             lines.append(f"  [{f['spec_id']}] {f['title']}")
+            if not f["results"]:
+                lines.append("    [UNASSESSED] No executable assertions are defined.")
             for r in f["results"]:
                 status = _result_status(r)
                 lines.append(f"    [{status}] {r['description']}: {r['detail']}")

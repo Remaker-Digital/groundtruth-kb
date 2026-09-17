@@ -24,7 +24,6 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sys
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -139,13 +138,8 @@ def paired_work_item(spec_id: str, work_items: list[dict[str, Any]]) -> str | No
 
 
 def _load_knowledge_db_cls(project_root: Path) -> Any:
-    try:
-        from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
-    except ImportError:
-        src = project_root / "groundtruth-kb" / "src"
-        if src.is_dir() and str(src) not in sys.path:
-            sys.path.insert(0, str(src))
-        from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
+    from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
+
     return KnowledgeDB
 
 

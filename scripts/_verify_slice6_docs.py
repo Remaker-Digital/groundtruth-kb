@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import re
 import pathlib
+import re
 import sys
 
 p = pathlib.Path("groundtruth-kb/docs/architecture/isolation.md")
@@ -28,7 +28,7 @@ checks = [
     "isolation:service-endpoint",
     "isolation:work-subject",
     "isolation:no-writable-product-paths",
-    "isolation:hooks-point-to-wrappers",
+    "isolation:hook-settings-structure",
     "isolation:workstream-focus-hook-absent",
     "isolation:work-list-no-product-entries",
     "isolation:release-readiness-app-subject-header",

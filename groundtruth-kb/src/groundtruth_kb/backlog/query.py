@@ -198,8 +198,8 @@ def _compare_values(field_name: str, left: object, right: object) -> int:
         right_rank = _PRIORITY_ORDER.get(str(right or "").upper(), 99)
         return (left_rank > right_rank) - (left_rank < right_rank)
     if field_name in {"implementation_order", "version"}:
-        left_num = left if isinstance(left, int) else int(left) if str(left or "").isdigit() else None
-        right_num = right if isinstance(right, int) else int(right) if str(right or "").isdigit() else None
+        left_num = left if isinstance(left, int) else int(str(left)) if str(left or "").isdigit() else None
+        right_num = right if isinstance(right, int) else int(str(right)) if str(right or "").isdigit() else None
         if left_num is None and right_num is None:
             return 0
         if left_num is None:
@@ -331,7 +331,7 @@ def sort_rows(
         if value is None:
             return (1, "")
         if field_name in {"implementation_order", "rank", "version"}:
-            normalized = value if isinstance(value, int) else int(value) if str(value).isdigit() else 10**9
+            normalized = value if isinstance(value, int) else int(str(value)) if str(value).isdigit() else 10**9
             return (0, -normalized if descending else normalized)
         if field_name == "priority":
             normalized = _PRIORITY_ORDER.get(str(value or "").upper(), 99)

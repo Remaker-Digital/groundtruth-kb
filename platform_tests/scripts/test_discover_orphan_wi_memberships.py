@@ -311,14 +311,6 @@ def test_root_cause_attribution_uses_version_1_creator(discover_module, tmp_path
     (advisory-router create -> Codex backfill -> Claude migration) and proves
     the corrected logic returns the creator, not either later author.
     """
-    import sys as _sys
-    from pathlib import Path as _Path
-
-    # Ensure groundtruth_kb is importable from the script's perspective.
-    _repo_root = _Path(__file__).resolve().parents[2]
-    _kb_src = _repo_root / "groundtruth-kb" / "src"
-    if str(_kb_src) not in _sys.path:
-        _sys.path.insert(0, str(_kb_src))
     from groundtruth_kb.db import KnowledgeDB
 
     db_path = tmp_path / "regression.db"

@@ -6,15 +6,17 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
+
+import pytest
 
 from scripts.check_harness_parity import _load_projector
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CURSOR_ADAPTER_PATH = PROJECT_ROOT / "scripts" / "cursor_hook_adapter.py"
-SESSION_SELF_INIT = PROJECT_ROOT / "scripts" / "session_self_initialization.py"
 
 
 def _cursor_registration() -> str:
@@ -62,7 +64,6 @@ def test_cursor_fail_closed_hooks_use_timeout_floor_and_write_matchers() -> None
     assert all(int(entry.get("timeout") or 0) >= 30 for entry in fail_closed)
 
     write_only = (
-        "spec-before-code.py",
         "kb-not-markdown.py",
         "destructive-gate.py",
         "credential-scan.py",
@@ -88,20 +89,13 @@ def test_cursor_hook_adapter_uses_create_no_window_for_inner_hooks() -> None:
     assert "subprocess.run([sys.executable, str(target), *sys.argv[2:]], **run_kwargs)" in source
 
 
-def test_session_self_initialization_command_output_is_headless() -> None:
-    source = SESSION_SELF_INIT.read_text(encoding="utf-8")
-
-    assert "from scripts.windows_subprocess import no_window_subprocess_kwargs" in source
-    assert "def _command_output" in source
-    command_output = source.split("def _command_output", 1)[1].split("\ndef ", 1)[0]
-    assert "**no_window_subprocess_kwargs()" in command_output
-
-
-def _run_adapter(target: Path, payload: dict, *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
+def _run_adapter(
+    target: Path, payload: dict, *, cwd: Path | None = None, adapter: Path = CURSOR_ADAPTER_PATH
+) -> subprocess.CompletedProcess[str]:
     env = os.environ.copy()
-    env["PYTHONPATH"] = str(PROJECT_ROOT)
+    env["PYTHONPATH"] = os.pathsep.join(filter(None, (env.get("PYTHONPATH"), str(PROJECT_ROOT))))
     return subprocess.run(
-        [sys.executable, str(CURSOR_ADAPTER_PATH), str(target)],
+        [sys.executable, str(adapter), str(target)],
         input=json.dumps(payload),
         cwd=str(cwd or PROJECT_ROOT),
         env=env,
@@ -193,15 +187,40 @@ def test_adapter_preserves_real_native_gate_refusal(tmp_path: Path, monkeypatch)
     assert not destination.exists()
 
 
-def test_adapter_resolves_relative_target_from_non_repo_cwd(tmp_path: Path) -> None:
-    relative = Path(".cursor") / "hooks" / "sot-read-discipline.py"
-    payload = {
-        "tool_name": "Read",
-        "tool_input": {"path": str(PROJECT_ROOT / "README.md")},
-    }
-    completed = _run_adapter(relative, payload, cwd=tmp_path)
-    last = json.loads(completed.stdout.strip().splitlines()[-1])
+@pytest.mark.timeout(300)
+def test_adapter_resolves_relative_target_from_non_repo_cwd(tmp_path: Path, generated_harness_root) -> None:
+    from platform_tests.scripts.test_sot_read_discipline_hook import SUBSTITUTE, registry
 
-    assert completed.returncode in {0, 2}
-    assert last["permission"] in {"allow", "deny"}
-    assert "Hook target not found" not in last.get("user_message", "")
+    root = tmp_path / "projected-copy"
+    shutil.copytree(generated_harness_root, root)
+    registry(root)
+    hook = Path(".cursor/hooks/sot-read-discipline.py")
+    adapter = root / "scripts/cursor_hook_adapter.py"
+    payload = {"tool_name": "Read", "cwd": str(root), "tool_input": {"path": str(root / SUBSTITUTE)}}
+    completed = _run_adapter(hook, payload, cwd=tmp_path, adapter=adapter)
+    result = json.loads(completed.stdout)
+    assert completed.returncode == 2 and result["permission"] == "deny", result
+    assert "fixture-work" in result["user_message"]
+    payload["tool_input"]["path"] = str(root / "README.md")
+    allowed = _run_adapter(hook, payload, cwd=tmp_path, adapter=adapter)
+    assert allowed.returncode == 0 and json.loads(allowed.stdout)["permission"] == "allow"
+
+
+@pytest.mark.timeout(300)
+def test_cursor_shell_adapter_preserves_event_cwd_for_registered_reads(tmp_path, generated_harness_root):
+    from platform_tests.scripts.test_sot_read_discipline_hook import registry
+
+    root = tmp_path / "projected-copy"
+    shutil.copytree(generated_harness_root, root)
+    registry(root)
+    (root / "derived").mkdir()
+    hook = Path(".cursor/hooks/sot-read-discipline.py")
+    adapter = root / "scripts/cursor_hook_adapter.py"
+    payload = {"tool_name": "Shell", "cwd": str(root / "derived"), "tool_input": {"command": "cat status.txt"}}
+    blocked = _run_adapter(hook, payload, cwd=tmp_path, adapter=adapter)
+    result = json.loads(blocked.stdout)
+    assert blocked.returncode == 2 and result["permission"] == "deny", result
+    assert "fixture-work" in result["user_message"]
+    payload["tool_input"]["command"] = "cat unrelated.txt"
+    allowed = _run_adapter(hook, payload, cwd=tmp_path, adapter=adapter)
+    assert allowed.returncode == 0 and json.loads(allowed.stdout)["permission"] == "allow"

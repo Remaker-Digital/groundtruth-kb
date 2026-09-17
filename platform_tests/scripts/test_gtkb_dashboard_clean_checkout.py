@@ -3,9 +3,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from scripts.gtkb_dashboard import refresh_dashboard_db
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
+from groundtruth_kb import dashboard as refresh_dashboard_db
 
 
 def _minimal_model() -> dict:
@@ -55,7 +53,7 @@ def test_dashboard_schema_is_self_contained_for_application_deployment_signals(t
 
     result = refresh_dashboard_db.refresh_database(
         db_path=db_path,
-        project_root=REPO_ROOT,
+        project_root=tmp_path,
         model=_minimal_model(),
         history=[],
     )

@@ -22,9 +22,9 @@ from groundtruth_kb.project.ownership import OwnershipResolver
 
 
 def test_classify_tracked_managed_hook_file() -> None:
-    """A managed hook file → gt-kb-managed / overwrite / warn."""
+    """A managed hook file → gt-kb-managed / overwrite / warn (destructive-gate; the assertion-check hook retired)."""
     resolver = OwnershipResolver()
-    rec = resolver.classify_path(".claude/hooks/assertion-check.py")
+    rec = resolver.classify_path(".claude/hooks/destructive-gate.py")
     assert rec.ownership == "gt-kb-managed"
     assert rec.upgrade_policy == "overwrite"
     assert rec.adopter_divergence_policy == "warn"
@@ -53,12 +53,12 @@ def test_classify_scaffolded_groundtruth_toml() -> None:
     assert rec.adopter_divergence_policy is None
 
 
-def test_classify_legacy_exception_groundtruth_db() -> None:
-    """groundtruth.db → legacy-exception / preserve / None."""
+def test_classify_retired_local_store_is_undeclared() -> None:
+    """groundtruth.db has no ownership row any more (O-7 R27): the retired local store is an undeclared fallback."""
     resolver = OwnershipResolver()
     rec = resolver.classify_path("groundtruth.db")
-    assert rec.ownership == "legacy-exception"
-    assert rec.upgrade_policy == "preserve"
+    assert rec.source_class == "__fallback__" and rec.id == "__fallback__:groundtruth.db"
+    assert rec.ownership == "adopter-owned" and rec.upgrade_policy == "preserve"
     assert rec.adopter_divergence_policy is None
 
 
@@ -242,7 +242,7 @@ def test_divergence_policy_forbidden_on_preserve() -> None:
 def test_classify_by_id_returns_settings_hook_record() -> None:
     """classify_by_id returns a settings-hook-registration record."""
     resolver = OwnershipResolver()
-    rec = resolver.classify_by_id("settings.hook.assertion-check.sessionstart")
+    rec = resolver.classify_by_id("settings.hook.destructive-gate.pretooluse")
     assert rec.source_class == "settings-hook-registration"
     assert rec.ownership == "gt-kb-managed"
     assert rec.upgrade_policy == "structured-merge"

@@ -242,24 +242,23 @@ def test_check_hooks_no_dir(tmp_path: Path) -> None:
 
 
 def test_check_hooks_all_required_present(tmp_path: Path) -> None:
-    """_check_hooks() with all required hooks → pass."""
-    hooks_dir = tmp_path / ".claude" / "hooks"
+    """Every currently required bridge-profile hook is present."""
+    hooks_dir = tmp_path / ".claude/hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    # local-only profile requires: assertion-check.py, spec-classifier.py
-    for name in ("assertion-check.py", "spec-classifier.py"):
+    for name in ("destructive-gate.py", "credential-scan.py", "_delib_common.py"):
         (hooks_dir / name).write_text("# hook", encoding="utf-8")
-    result = _check_hooks(tmp_path, "local-only")
+    result = _check_hooks(tmp_path, "dual-agent")
     assert result.status == "pass"
 
 
 def test_check_hooks_missing_required_is_warning(tmp_path: Path) -> None:
-    """_check_hooks() with missing required hooks → warning."""
-    hooks_dir = tmp_path / ".claude" / "hooks"
+    """Missing retained bridge-profile hooks still trigger a warning."""
+    hooks_dir = tmp_path / ".claude/hooks"
     hooks_dir.mkdir(parents=True, exist_ok=True)
-    # Only one hook present
-    (hooks_dir / "assertion-check.py").write_text("# hook", encoding="utf-8")
-    result = _check_hooks(tmp_path, "local-only")
+    (hooks_dir / "destructive-gate.py").write_text("# hook", encoding="utf-8")
+    result = _check_hooks(tmp_path, "dual-agent")
     assert result.status == "warning"
+    assert "credential-scan.py" in result.message
 
 
 # ---------------------------------------------------------------------------
@@ -474,21 +473,19 @@ def test_derive_paired_hook_id_strips_prefix_and_event_suffix() -> None:
         == "hook.gov09-capture"
     )
     assert (
-        _derive_paired_hook_id("settings.hook.spec-event-surfacer.posttooluse", "posttooluse")
-        == "hook.spec-event-surfacer"
+        _derive_paired_hook_id("settings.hook.scanner-safe-writer.pretooluse", "pretooluse")
+        == "hook.scanner-safe-writer"
     )
 
 
-def test_settings_hook_registration_owner_decision_present_and_registered_is_pass(
-    tmp_path: Path,
-) -> None:
-    """§B.4 case 3: PostToolUse record: file present, registered in correct event → ``pass``."""
-    reg = _get_registration("settings.hook.spec-event-surfacer.posttooluse")
+def test_settings_hook_registration_present_and_registered_is_pass(tmp_path: Path) -> None:
+    """A retained managed command in its declared event passes registration inspection."""
+    reg = _get_registration("settings.hook.scanner-safe-writer.pretooluse")
     _touch_hook_file(tmp_path, reg.hook_filename)
-    _write_settings_hooks(tmp_path, {"PostToolUse": [_hook_entry(reg.hook_filename)]})
+    _write_settings_hooks(tmp_path, {reg.event: [_hook_entry(reg.hook_filename)]})
     result = _check_settings_hook_registration_drift(tmp_path, "dual-agent", reg)
     assert result.status == "pass"
-    assert "PostToolUse" in result.message
+    assert reg.event in result.message
 
 
 def test_run_doctor_local_only_omits_new_settings_checks(tmp_path: Path) -> None:

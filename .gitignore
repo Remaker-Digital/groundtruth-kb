@@ -442,9 +442,10 @@ memory/grafana/
 # =============================================================================
 # Per bridge/gtkb-telemetry-churn-policy-2026-04-28-002.md (GO) and
 # bridge/session-hygiene-gitignore-extensions-2026-04-28-002.md (GO): these
-# four files regenerate via SessionStart/Stop hooks with timestamps + snapshot
-# content. Reproducible from scripts/session_self_initialization.py
-# `write_dashboard_and_report(...)` at session boundary; tracking creates noise.
+# files were high-churn snapshots written by the SQLite-era startup generator
+# at session boundaries. The generator was retired (2026-09); the entries stay
+# so a stale local copy is never tracked. The native dashboard writes under
+# .groundtruth/dashboard (SPEC-PROJECT-DASHBOARD-KPI-LINK-001).
 docs/gtkb-dashboard/dashboard-data.json
 memory/gtkb-dashboard-history.json
 docs/gtkb-dashboard/session-startup-report.md

@@ -1,6 +1,8 @@
-"""Consistent SQLite snapshot support for ``gt db snapshot``.
+"""Explicit offline SQLite snapshot: the migration input for ``gt db postgres export-current --sqlite-snapshot``.
 
-Snapshots are written to a staging directory first, verified with
+The live ``gt db snapshot`` command, its scheduled task and the doctor's freshness/allowlist checks are retired
+(O-7 R22): a SQLite snapshot is neither a health criterion nor a production fallback; PostgreSQL physical backup
+and WAL recovery carry the recovery duty. Snapshots are written to a staging directory first, verified with
 ``PRAGMA integrity_check``, then atomically published into the output
 directory with ``os.replace``.
 

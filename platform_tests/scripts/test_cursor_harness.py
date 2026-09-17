@@ -10,28 +10,25 @@ fail closed.
 
 from __future__ import annotations
 
-import importlib.util
 import subprocess
+import sys
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from groundtruth_kb import cursor_harness
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_HARNESS_PATH = _REPO_ROOT / "scripts" / "cursor_harness.py"
 
 
 def _load_harness():
-    spec = importlib.util.spec_from_file_location("cursor_harness_test", _HARNESS_PATH)
-    assert spec and spec.loader
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    return module
+    return cursor_harness
 
 
 @pytest.fixture
 def cursor_with_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     harness = _load_harness()
-    monkeypatch.setattr(harness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.chdir(tmp_path)
     for name in ("bridge", "proposal-review", "verify"):
         source = _REPO_ROOT / ".harness-baseline-configuration" / "skills" / f"gtkb-{name}" / "SKILL.md"
         target = tmp_path / ".cursor" / "skills" / name / "SKILL.md"
@@ -301,9 +298,9 @@ def test_bridge_review_main_preserves_requested_mode_and_agent_output(mode, monk
     harness = _load_harness()
     calls = []
     monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
-    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT")
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT")
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
@@ -332,7 +329,7 @@ def test_bridge_review_main_preserves_requested_mode_and_agent_output(mode, monk
     assert "SKILL CONTRACT" in command[-1]
     assert args[1] in command[-1]
     assert "GTKB_BRIDGE_VERDICT_ENVELOPE" not in command[-1]
-    assert kwargs["cwd"] == str(harness.PROJECT_ROOT)
+    assert kwargs["cwd"] == str(Path.cwd())
     assert kwargs["capture_output"] is True
     assert kwargs["timeout"] == 30.0
     assert capsys.readouterr().out == '{"message":"CLI delivery acknowledged"}\n'
@@ -344,7 +341,7 @@ def test_main_can_force_read_only_plan_mode(
     harness = _load_harness()
     calls = []
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda _skill: None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda _skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
@@ -366,7 +363,7 @@ def test_main_uses_no_window_creationflags_on_windows(monkeypatch: pytest.Monkey
     monkeypatch.setattr(harness.os, "name", "nt", raising=False)
     monkeypatch.setattr(harness.subprocess, "CREATE_NO_WINDOW", expected_flag, raising=False)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/cursor.cmd", "agent"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
@@ -383,7 +380,7 @@ def test_bridge_review_zero_output_success_fails_closed(
 ) -> None:
     harness = _load_harness()
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
         "run",
@@ -404,7 +401,7 @@ def test_verification_zero_output_success_fails_closed(
 ) -> None:
     harness = _load_harness()
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
         "run",
@@ -425,7 +422,7 @@ def test_non_bridge_zero_output_success_is_preserved(
 ) -> None:
     harness = _load_harness()
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: "SKILL CONTRACT" if skill else None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
         "run",
@@ -446,9 +443,9 @@ def test_timeout_returns_124_with_safe_context_and_partial_output(
     harness = _load_harness()
     prompt = "owner prompt must not appear in timeout diagnostic"
 
-    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         raise subprocess.TimeoutExpired(
@@ -498,9 +495,9 @@ def test_timeout_redacts_and_truncates_partial_output(
     secret_value = "S" * 24
 
     monkeypatch.setattr(harness, "_TIMEOUT_CAPTURE_LIMIT_BYTES", 64)
-    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         raise subprocess.TimeoutExpired(
@@ -521,146 +518,6 @@ def test_timeout_redacts_and_truncates_partial_output(
     assert "partial_stdout_bytes=" in captured.err
 
 
-def test_dispatch_timeout_records_new_cursor_agent_provenance(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    harness = _load_harness()
-    snapshots = [
-        {},
-        {
-            (21, 300.0): {
-                "pid": 21,
-                "ppid": 1,
-                "name": "cursor-agent.exe",
-                "create_time_epoch": 300.0,
-            }
-        },
-    ]
-    merged: list[dict] = []
-
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-123")
-    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
-    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
-    monkeypatch.setattr(harness.os, "getpid", lambda: 901)
-    monkeypatch.setattr(harness.time, "time", lambda: 250.0)
-    monkeypatch.setattr(harness, "_cursor_agent_snapshot", lambda _project_root: snapshots.pop(0))
-    monkeypatch.setattr(
-        harness, "_merge_cursor_agent_provenance", lambda _project_root, records: merged.extend(records)
-    )
-
-    def fake_run(command, **kwargs):
-        raise subprocess.TimeoutExpired(cmd=command, timeout=kwargs["timeout"])
-
-    monkeypatch.setattr(harness.subprocess, "run", fake_run)
-
-    assert harness.main(["--prompt", "dispatch prompt", "--timeout", "5"]) == 124
-
-    assert merged == [{"pid": 21, "create_time_epoch": 300.0, "dispatch_root_pid": 901}]
-    assert "Cursor Agent timed out" in capsys.readouterr().err
-
-
-def test_cursor_agent_provenance_records_only_new_processes() -> None:
-    harness = _load_harness()
-    before = {
-        (10, 100.0): {
-            "pid": 10,
-            "ppid": 1,
-            "name": "agent.exe",
-            "create_time_epoch": 100.0,
-        }
-    }
-    after = {
-        **before,
-        (11, 200.0): {
-            "pid": 11,
-            "ppid": 1,
-            "name": "cursor-agent.exe",
-            "create_time_epoch": 200.0,
-        },
-        (12, 90.0): {
-            "pid": 12,
-            "ppid": 1,
-            "name": "cursor-agent.exe",
-            "create_time_epoch": 90.0,
-        },
-    }
-
-    records = harness._cursor_agent_provenance_records(
-        before,
-        after,
-        dispatch_root_pid=900,
-        started_at_epoch=150.0,
-    )
-
-    assert records == [{"pid": 11, "create_time_epoch": 200.0, "dispatch_root_pid": 900}]
-
-
-def test_dispatch_main_records_new_cursor_agent_provenance(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    harness = _load_harness()
-    snapshots = [
-        {},
-        {
-            (21, 300.0): {
-                "pid": 21,
-                "ppid": 1,
-                "name": "cursor-agent.exe",
-                "create_time_epoch": 300.0,
-            }
-        },
-    ]
-    merged: list[dict] = []
-
-    monkeypatch.setenv("GTKB_BRIDGE_POLLER_RUN_ID", "dispatch-123")
-    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
-    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
-    monkeypatch.setattr(harness.os, "getpid", lambda: 901)
-    monkeypatch.setattr(harness.time, "time", lambda: 250.0)
-    monkeypatch.setattr(harness, "_cursor_agent_snapshot", lambda _project_root: snapshots.pop(0))
-    monkeypatch.setattr(
-        harness, "_merge_cursor_agent_provenance", lambda _project_root, records: merged.extend(records)
-    )
-    monkeypatch.setattr(
-        harness.subprocess,
-        "run",
-        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr=""),
-    )
-
-    assert harness.main(["--prompt", "dispatch prompt"]) == 0
-
-    assert merged == [{"pid": 21, "create_time_epoch": 300.0, "dispatch_root_pid": 901}]
-    assert capsys.readouterr().out == "ok\n"
-
-
-def test_interactive_main_does_not_record_cursor_agent_provenance(
-    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
-) -> None:
-    harness = _load_harness()
-    merged: list[dict] = []
-
-    monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
-    monkeypatch.delenv("GTKB_INHERITED_SESSION_ID", raising=False)
-    monkeypatch.setattr(harness, "_load_project_env_local", lambda: None)
-    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill: None)
-    monkeypatch.setattr(
-        harness, "_merge_cursor_agent_provenance", lambda _project_root, records: merged.extend(records)
-    )
-    monkeypatch.setattr(
-        harness.subprocess,
-        "run",
-        lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="ok\n", stderr=""),
-    )
-
-    assert harness.main(["--prompt", "ordinary prompt"]) == 0
-
-    assert merged == []
-    assert capsys.readouterr().out == "ok\n"
-
-
 @pytest.mark.parametrize("route", ["../.codex/skills/review", "../../peer", "/absolute", "C:/peer"])
 def test_skill_route_refuses_paths_outside_own_projection(route, cursor_with_skills):
     with pytest.raises(cursor_with_skills.CursorHarnessError, match="invalid skill route"):
@@ -669,10 +526,10 @@ def test_skill_route_refuses_paths_outside_own_projection(route, cursor_with_ski
 
 def test_missing_own_skill_never_falls_back_to_peer_projection(cursor_with_skills):
     harness = cursor_with_skills
-    own = harness.PROJECT_ROOT / ".cursor" / "skills" / "verify" / "SKILL.md"
+    own = Path.cwd() / ".cursor" / "skills" / "verify" / "SKILL.md"
     own.unlink()
     for peer in (".codex", ".claude"):
-        target = harness.PROJECT_ROOT / peer / "skills" / "verify" / "SKILL.md"
+        target = Path.cwd() / peer / "skills" / "verify" / "SKILL.md"
         target.parent.mkdir(parents=True)
         target.write_text("Peer-only instruction", encoding="utf-8")
     with pytest.raises(harness.CursorHarnessError, match="refresh this harness's projection"):
@@ -681,7 +538,7 @@ def test_missing_own_skill_never_falls_back_to_peer_projection(cursor_with_skill
 
 def test_own_skill_junction_cannot_load_another_harness(tmp_path, monkeypatch):
     harness = _load_harness()
-    monkeypatch.setattr(harness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.chdir(tmp_path)
     if harness.os.name != "nt":
         pytest.skip("Windows NTFS junction boundary")
     peer = tmp_path / ".codex" / "skills" / "verify"
@@ -697,3 +554,65 @@ def test_own_skill_junction_cannot_load_another_harness(tmp_path, monkeypatch):
         assert (peer / "SKILL.md").read_text(encoding="utf-8") == "Peer-only instruction"
     finally:
         link.rmdir()
+
+
+@pytest.mark.parametrize("identifier", [None, "GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_INHERITED_SESSION_ID"])
+@pytest.mark.parametrize("outcome,exit_code", [("success", 0), ("failure", 7), ("timeout", 124)])
+def test_main_never_infers_other_process_ownership(identifier, outcome, exit_code, monkeypatch, tmp_path, capsys):
+    harness = _load_harness()
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
+    monkeypatch.setattr(harness, "_cursor_agent_env", lambda **kwargs: {})
+    for key in ["GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_INHERITED_SESSION_ID"]:
+        monkeypatch.delenv(key, raising=False)
+    if identifier:
+        monkeypatch.setenv(identifier, "inherited-label-is-not-process-ownership")
+
+    def forbidden_process_enumeration(*args, **kwargs):
+        pytest.fail("The Cursor worker must not enumerate other processes")
+
+    monkeypatch.setitem(sys.modules, "psutil", SimpleNamespace(process_iter=forbidden_process_enumeration))
+    sentinel = tmp_path / "unrelated.txt"
+    sentinel.write_bytes(b"Unrelated bytes must survive the launch outcome.")
+    before = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    calls = []
+
+    def launch(command, **kwargs):
+        calls.append((command, kwargs))
+        if outcome == "timeout":
+            raise subprocess.TimeoutExpired(
+                command, kwargs["timeout"], output="partial stdout\n", stderr="partial stderr\n"
+            )
+        return subprocess.CompletedProcess(command, exit_code, stdout="agent stdout\n", stderr="agent stderr\n")
+
+    monkeypatch.setattr(harness.subprocess, "run", launch)
+    assert harness.main(["--prompt", "owner prompt", "--timeout", "5"]) == exit_code
+    assert len(calls) == 1
+    assert calls[0][1]["cwd"] == str(tmp_path)
+    assert calls[0][1]["timeout"] == 5
+    captured = capsys.readouterr()
+    if outcome == "timeout":
+        assert captured.out == "partial stdout\n"
+        assert captured.err.startswith("partial stderr\n")
+        assert "Cursor Agent timed out after 5s" in captured.err
+        assert "owner prompt" not in captured.err
+    else:
+        assert captured.out == "agent stdout\n"
+        assert captured.err == "agent stderr\n"
+    after = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert after == before
+
+
+@pytest.mark.parametrize("timeout", ["0", "-1", "inf", "nan"])
+def test_main_invalid_timeout_refuses_before_environment_or_launch(timeout, monkeypatch):
+    harness = _load_harness()
+
+    def forbidden(**kwargs):
+        pytest.fail("Invalid timeout must refuse before environment loading")
+
+    monkeypatch.setattr(harness, "_load_project_env_local", forbidden)
+    with pytest.raises(SystemExit) as error:
+        harness.main(["--prompt", "not launched", "--timeout", timeout])
+    assert error.value.code == 2

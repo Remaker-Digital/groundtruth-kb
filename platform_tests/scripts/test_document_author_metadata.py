@@ -18,7 +18,9 @@ from scripts.document_author_metadata import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 CLAUDE_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "document_author_provenance_gate.py"
-CODEX_HOOK = PROJECT_ROOT / ".codex" / "gtkb-hooks" / "document_author_provenance_gate.py"
+# Codex runs the projected copy of the neutral gate through scripts/codex_hook_adapter.py.
+CODEX_HOOK = PROJECT_ROOT / ".codex" / "hooks" / "document_author_provenance_gate.py"
+BASELINE_HOOK = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks" / "document_author_provenance_gate.py"
 CODEX_HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
 AUTHOR_METADATA = {
@@ -150,33 +152,45 @@ def test_hook_blocks_add_file_patch_without_metadata() -> None:
     assert "docs/new-contract.md" in json.loads(result.stdout)["reason"]
 
 
-def test_codex_wrapper_blocks_add_file_patch_without_metadata() -> None:
-    payload = {
+def _codex_apply_patch_payload(path: str) -> dict[str, object]:
+    """Codex's native apply_patch payload: the patch text is the tool's command (see
+    test_codex_native_hook_adapter.py); the legacy wrapper's `patch` key is not what the adapter forwards."""
+    return {
         "tool_name": "apply_patch",
         "cwd": str(PROJECT_ROOT),
-        "tool_input": {
-            "patch": "*** Begin Patch\n*** Add File: docs/new-codex-contract.md\n+# Missing provenance\n*** End Patch\n"
-        },
+        "tool_input": {"command": f"*** Begin Patch\n*** Add File: {path}\n+# Missing provenance\n*** End Patch\n"},
     }
 
-    result = _run_hook(CODEX_HOOK, payload)
+
+def test_baseline_gate_blocks_codex_add_file_patch_without_metadata() -> None:
+    """The neutral gate reads the patch from `tool_input.command`; before this it saw an apply_patch call, extracted
+    no patch text and allowed the governed document (fail-open on the native Codex path)."""
+    result = _run_hook(BASELINE_HOOK, _codex_apply_patch_payload("docs/new-codex-contract.md"))
+
+    assert result.returncode == 2
+    assert "docs/new-codex-contract.md" in json.loads(result.stdout)["reason"]
+
+
+def test_codex_projected_gate_blocks_add_file_patch_without_metadata() -> None:
+    result = _run_hook(CODEX_HOOK, _codex_apply_patch_payload("docs/new-codex-contract.md"))
 
     assert result.returncode == 2
     assert "docs/new-codex-contract.md" in json.loads(result.stdout)["reason"]
 
 
 def test_codex_apply_patch_registration_present() -> None:
+    """Codex registers the gate once for its file-write and shell-exec intents through the native adapter."""
     hooks = json.loads(CODEX_HOOKS_JSON.read_text(encoding="utf-8"))
     registrations = [
         entry
         for entry in hooks["hooks"]["PreToolUse"]
-        if entry.get("matcher") == "apply_patch"
+        if "apply_patch" in entry.get("matcher", "").split("|")
         for hook in entry.get("hooks", [])
-        if "pretooluse-apply-patch" in hook.get("command", "")
-        or "document_author_provenance_gate.py" in hook.get("command", "")
+        if "codex_hook_adapter.py" in hook.get("command", "")
+        and ".codex/hooks/document_author_provenance_gate.py" in hook.get("command", "")
     ]
 
-    assert registrations
+    assert len(registrations) == 1
 
 
 def test_hook_allows_existing_file_edits_without_metadata(tmp_path: Path) -> None:

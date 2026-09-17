@@ -7,11 +7,8 @@ from pathlib import Path
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-GTKB_SRC = PROJECT_ROOT / "groundtruth-kb" / "src"
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
-if str(GTKB_SRC) not in sys.path:
-    sys.path.insert(0, str(GTKB_SRC))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from scripts import (  # noqa: E402

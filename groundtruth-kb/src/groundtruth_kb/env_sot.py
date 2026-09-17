@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypedDict
 
 APP_ID = "agent-red"
 APP_DISPLAY_NAME = "Agent Red"
@@ -58,6 +58,11 @@ class EnvSotError(Exception):
 
 
 KeyClass = Literal["platform", "app", "ambiguous"]
+EnvAction = TypedDict(
+    "EnvAction",
+    {"action": str, "from": str, "to": str | list[str], "key_count": int, "view_count": int},
+    total=False,
+)
 
 
 @dataclass(frozen=True)
@@ -103,7 +108,7 @@ class EnvPlan:
     platform_key_count: int
     root_app_key_count: int
     ambiguous_root_keys: tuple[str, ...]
-    actions: tuple[dict[str, object], ...]
+    actions: tuple[EnvAction, ...]
     diagnostics: tuple[str, ...]
 
     @property
@@ -196,7 +201,7 @@ def build_plan(project_root: Path, *, app: str = APP_ID) -> EnvPlan:
         for path, lines in admin_lines.items()
     )
 
-    actions: list[dict[str, object]] = []
+    actions: list[EnvAction] = []
     if root_app_key_count:
         actions.append(
             {
@@ -269,7 +274,9 @@ def migrate(project_root: Path, *, app: str = APP_ID, apply: bool = False) -> En
     app_lines = _parse_dotenv(app_env_path)
     moved_entries = tuple(line for line in _entries(root_lines) if _classify_root_key(line.key or "") == "app")
     app_keys = {line.key for line in _entries(app_lines)}
-    duplicate_across_sources = sorted({line.key for line in moved_entries if line.key in app_keys})
+    duplicate_across_sources = sorted(
+        {line.key for line in moved_entries if line.key is not None and line.key in app_keys}
+    )
     if duplicate_across_sources:
         keys = ", ".join(duplicate_across_sources)
         raise EnvSotError(f"Env migration is not safe to apply; duplicate app keys already exist in app SoT: {keys}")
@@ -469,7 +476,7 @@ def _write_generated_view(admin_path: Path, app_entries: tuple[EnvLine, ...]) ->
     admin_path.write_text("".join(content), encoding="utf-8")
 
 
-def _render_action(action: dict[str, object]) -> str:
+def _render_action(action: EnvAction) -> str:
     kind = action.get("action")
     if kind == "move-root-app-keys":
         return f"move {action.get('key_count', 0)} app key(s) from {action.get('from')} to {action.get('to')}"

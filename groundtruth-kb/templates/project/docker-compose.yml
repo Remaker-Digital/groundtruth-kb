@@ -5,8 +5,7 @@
 #   docker compose logs -f app  # Follow application logs
 #   docker compose down         # Stop and remove containers
 #
-# Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
-# All rights reserved.
+# {{COPYRIGHT_NOTICE}}
 
 services:
   app:

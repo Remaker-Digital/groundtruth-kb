@@ -147,18 +147,21 @@ def test_report_carries_no_timestamp_so_runs_are_comparable(tmp_path: Path) -> N
 
 
 def test_live_inventory_covers_the_neutral_baseline_domain() -> None:
-    """A run reporting zero baseline-side references means the domain was not searched.
+    """The neutral source is searched, and it names no generated target.
 
-    The owner scope extension (`DELIB-20260813010684`, Q2) brought the neutral
-    source into the search domain. This asserts the domain is non-trivially
-    covered rather than silently skipped.
+    Coverage is proven by the files walked inside `.harness-baseline-configuration/`, not by references found there:
+    under GOV-HARNESS-NEUTRAL-BASELINE-001 the baseline carries no harness directory name, so its reference count is
+    zero on a correct tree while a zero file count would mean the domain was silently skipped.
     """
     if not (_ROOT / ".harness-baseline-configuration").is_dir():
         pytest.skip("neutral baseline not present in this checkout")
 
+    coverage = inventory.domain_coverage(_ROOT)
     report = inventory.build_report(inventory.scan(_ROOT))
 
-    assert report["baseline_side_references"] > 0, "neutral-baseline domain was not searched"
+    assert coverage["neutral_baseline_files"] > 0, "neutral-baseline domain was not searched"
+    assert coverage["other_files"] > 0
+    assert report["baseline_side_references"] == 0, "the neutral baseline names a generated harness target"
     assert report["total_references"] > 0
 
 

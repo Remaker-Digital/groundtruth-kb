@@ -1,6 +1,6 @@
 # Deterministic spec-coherence rules for Layer A (`gt validate spec-coherence`).
 # These rules emit review candidates only; they do not adjudicate final spec truth
-# or mutate MemBase.
+# or mutate the native authority. Input is one current active-corpus transaction.
 
 [[rules]]
 id = "surface-overlap-opposite-polarity"
@@ -34,6 +34,6 @@ remediation_hint = "Review the child-parent relationship and revise the lower-au
 [[rules]]
 id = "status-drift"
 class = "status_drift"
-description = "Detect implemented or verified child specs whose parent was amended after the child's verification timestamp."
+description = "Detect active child specs with a recorded implementation-verification timestamp predating their parent's amendment."
 classification = "verification_staleness"
-remediation_hint = "Re-run or re-open child verification after reviewing the parent amendment."
+remediation_hint = "Review the parent amendment and any affected verification; a candidate neither reopens committed work nor changes formal state."

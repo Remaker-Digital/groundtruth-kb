@@ -8,13 +8,20 @@ its resulting current-state/history changes commit together.
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from datetime import UTC, datetime
-from typing import Annotated, Any, Literal
+from pathlib import Path
+from typing import Annotated, Any, Literal, NoReturn
 from uuid import uuid4
 
 from psycopg import sql
 from pydantic import BaseModel, ConfigDict, Field
 
+from groundtruth_kb.isolation.registry_check import (
+    ApplicationRegistryError,
+    resolve_project_repository,
+    validate_application_scope,
+)
 from groundtruth_kb.postgres_kernel import (
     TABLE_SPECS,
     PostgresKernel,
@@ -29,7 +36,7 @@ from groundtruth_kb.project.sot_registry import registry_path_observations
 Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
 Text = Annotated[str, Field(min_length=1)]
 Version = Annotated[int, Field(ge=0, lt=2_147_483_647)]
-Scope = Literal["gtkb_platform", "agent_red_application"]
+Scope = Annotated[str, Field(pattern=r"^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$")]
 
 
 class Request(BaseModel):
@@ -47,7 +54,7 @@ class Mutation(Request):
 class SpecFields(Request):
     title: Text | None = None
     description: str | None = None
-    status: Text | None = None
+    status: Literal["active", "superseded", "retired"] = "active"
     type: Text | None = None
     priority: str | None = None
     scope: str | None = None
@@ -141,6 +148,7 @@ class HarnessMutation(Mutation):
 
 class ProjectFields(Request):
     name: Text | None = None
+    repository_ref: Annotated[str, Field(pattern=r"^(platform|application:[A-Za-z][A-Za-z0-9_-]*)$")] | None = None
     parent_project_id: Identifier | None = None
     rank: int | None = None
     purpose: str | None = None
@@ -223,22 +231,25 @@ DOMAINS = {
     "test-phases": "test_plan_phases",
     "project-dependencies": "project_dependencies",
     "project-formal-links": "project_artifact_links",
+    # Historical reasoning records: readable, never amended through this service (SPEC-2098 v2).
+    "deliberations": "deliberations",
 }
 FILTERS = {
     "harnesses": {"status"},
     "terms": {"scope", "authority_level", "lifecycle_status"},
-    "specifications": {"status", "type", "priority", "authority", "testability", "application_scope"},
+    "specifications": {"status", "type", "priority", "authority", "testability", "application_scope", "scope"},
     "tests": {"test_type", "spec_id", "application_scope"},
-    "projects": {"kind", "status", "parent_project_id"},
+    "projects": {"kind", "status", "parent_project_id", "repository_ref"},
     "work-items": {"resolution_status", "priority", "component", "source_spec_id"},
     "test-plans": {"status"},
     "test-phases": {"plan_id"},
     "project-dependencies": {"status", "dependent_project_id", "prerequisite_project_id", "affected_gate"},
     "project-formal-links": {"status", "project_id"},
+    "deliberations": {"source_type", "spec_id", "work_item_id"},
 }
 
 
-def _error(code: str, message: str, **details: Any) -> None:
+def _error(code: str, message: str, **details: Any) -> NoReturn:
     raise PostgresKernelError(code, message, details=details)
 
 
@@ -358,7 +369,7 @@ def _test_phases(tx: PostgresTransaction, test_id: str) -> list[dict[str, Any]]:
 
 
 def _work_evidence(tx: PostgresTransaction, state: dict[str, Any]) -> None:
-    """Recheck current executable evidence at intake and proposal publication."""
+    """Require current evidence at creation, link replacement and proposal publication."""
     for field, table in (("source_spec_id", "specifications"), ("source_test_id", "tests")):
         if not state.get(field):
             _error("work_evidence_required", "Implementation work requires a specification and executable test")
@@ -476,14 +487,18 @@ def _write(
         changed_at=datetime.now(UTC).isoformat(),
         change_reason=request.reason,
     )
-    return tx.mutate(
+    result = tx.mutate(
         table=table,
         identity={"id": record_id},
         expected_version=actual,
         new_state=state,
         actor=request.actor,
         reason=request.reason,
-    )["record"]
+    )
+    record = result.get("record")
+    if not isinstance(record, dict):
+        _error("mutation_readback_mismatch", "Native mutation did not return a current record")
+    return record
 
 
 class AuthorityService:
@@ -514,8 +529,14 @@ class AuthorityService:
             _error("invalid_query", "Unknown knowledge domain")
         with self.kernel.transaction(read_only=True) as tx:
             row = _required(tx, DOMAINS[domain], record_id)
-            if domain == "project-formal-links" and row["artifact_type"] != "spec":
-                _error("not_found", "The record is not a project formal-source relationship", id=record_id)
+            if domain == "project-formal-links" and row["artifact_type"] not in {
+                "spec",
+                "bridge_thread",
+                "completion_guard",
+            }:
+                _error(
+                    "not_found", "The record is not a formal source or an obsolete project relationship", id=record_id
+                )
             if domain == "projects":
                 return {
                     "project": row,
@@ -529,6 +550,32 @@ class AuthorityService:
             if domain == "work-items":
                 return {"work_item": row, **_membership_facts(tx, row)}
             return row
+
+    def history(self, domain: str, record_id: str) -> dict[str, Any]:
+        """The current record and its complete version chain; a missing record is not found, never empty history."""
+        if domain not in DOMAINS:
+            _error("invalid_query", "Unknown knowledge domain")
+        with self.kernel.transaction(read_only=True) as tx:
+            current = _required(tx, DOMAINS[domain], record_id)
+            rows = tx.history(DOMAINS[domain], {"id": record_id})
+        history = [
+            {
+                "version": row["new_version"],
+                "prior_version": row["prior_version"],
+                "actor": row["actor"],
+                "changed_at": row["changed_at"],
+                "reason": row["reason"],
+                "state": row["new_state"],
+            }
+            for row in rows
+        ]
+        return {"current": current, "history": history}
+
+    def specification_snapshot(self) -> dict[str, Any]:
+        """Read the whole active formal corpus in one repeatable-read transaction."""
+        with self.kernel.transaction(read_only=True) as tx:
+            records = _related(tx, "specifications", status="active")
+        return {"records": records, "consistency": "single_read_transaction"}
 
     @staticmethod
     def _term_source_issue(tx: PostgresTransaction, record: dict[str, Any]) -> dict[str, Any] | None:
@@ -635,9 +682,17 @@ class AuthorityService:
                         )
             return _write(tx, "harnesses", record_id, fields, request, defaults={"status": STATUS_REGISTERED})
 
-    def amend_specification(self, record_id: str, request: SpecMutation) -> dict[str, Any]:
+    def amend_specification(
+        self, record_id: str, request: SpecMutation, *, project_root: Path | None = None
+    ) -> dict[str, Any]:
         fields = request.fields.model_dump(exclude_unset=True)
         with self.kernel.transaction() as tx:
+            current = tx.get("specifications", {"id": record_id}, lock=True)
+            scope = fields.get("application_scope", current.get("application_scope") if current else None)
+            try:
+                validate_application_scope(project_root, scope)
+            except ApplicationRegistryError as error:
+                _error("invalid_application_scope", str(error), id=record_id, application_scope=scope)
             for reference in [
                 fields.get("parent"),
                 fields.get("provisional_until"),
@@ -648,11 +703,18 @@ class AuthorityService:
             # A retirement time is an observed event, not client-invented metadata.
             if fields.get("status") == "retired":
                 fields["retired_at"] = datetime.now(UTC).isoformat()
-            return _write(tx, "specifications", record_id, fields, request, defaults={"status": "specified"})
+            return _write(tx, "specifications", record_id, fields, request, defaults={"status": "active"})
 
-    def amend_test(self, record_id: str, request: TestMutation) -> dict[str, Any]:
+    def amend_test(self, record_id: str, request: TestMutation, *, project_root: Path | None = None) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
-            return _write(tx, "tests", record_id, request.fields.model_dump(exclude_unset=True), request)
+            fields = request.fields.model_dump(exclude_unset=True)
+            current = tx.get("tests", {"id": record_id}, lock=True)
+            scope = fields.get("application_scope", current.get("application_scope") if current else None)
+            try:
+                validate_application_scope(project_root, scope)
+            except ApplicationRegistryError as error:
+                _error("invalid_application_scope", str(error), id=record_id, application_scope=scope)
+            return _write(tx, "tests", record_id, fields, request)
 
     def amend_test_plan(self, record_id: str, request: TestPlanMutation) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
@@ -668,11 +730,18 @@ class AuthorityService:
     def amend_test_phase(self, record_id: str, request: TestPhaseMutation) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             fields = request.fields.model_dump(exclude_unset=True)
+            current = tx.get("test_plan_phases", {"id": record_id}, lock=True)
+            if current and "test_ids" in fields and set(fields["test_ids"] or []) != set(current["test_ids"] or []):
+                # Stored execution evidence belongs to the previous membership.
+                # Native amendments cannot supply a replacement execution result.
+                fields.update(last_result=None, last_executed_at=None, last_executed_on=None)
             for test_id in fields.get("test_ids") or []:
                 _required(tx, "tests", test_id)
             return _write(tx, "test_plan_phases", record_id, fields, request)
 
-    def amend_project(self, record_id: str, request: ProjectMutation) -> dict[str, Any]:
+    def amend_project(
+        self, record_id: str, request: ProjectMutation, *, project_root: Path | None = None
+    ) -> dict[str, Any]:
         fields = request.fields.model_dump(exclude_unset=True)
         with self.kernel.transaction() as tx:
             current = tx.get("projects", {"id": record_id}, lock=True)
@@ -684,6 +753,34 @@ class AuthorityService:
                 program = _required(tx, "projects", parent, lock=True)
                 if kind != "project" or program["kind"] != "program" or program["status"] != "active":
                     _error("invalid_program_parent", "An execution project may have one active program parent")
+            repository_ref = fields.get("repository_ref", current.get("repository_ref") if current else None)
+            if kind == "program":
+                if repository_ref is not None:
+                    _error("program_has_no_repository", "Programs sequence outcomes and do not select a Git repository")
+            else:
+                if repository_ref is None:
+                    _error("project_repository_required", "Set the execution project's explicit repository_ref")
+                if project_root is None:
+                    _error(
+                        "repository_host_required",
+                        "Project repository validation requires the configured platform host",
+                    )
+                try:
+                    resolve_project_repository(project_root, repository_ref)
+                except ApplicationRegistryError as error:
+                    _error("invalid_repository_ref", str(error), repository_ref=repository_ref)
+                if current and repository_ref != current.get("repository_ref"):
+                    tx.cursor.execute(
+                        sql.SQL(
+                            "SELECT 1 FROM {}.bridge_attempts WHERE project_id=%s AND disposition='active' LIMIT 1"
+                        ).format(sql.Identifier(tx.schema)),
+                        (record_id,),
+                    )
+                    if tx.cursor.fetchone() or _project_commit(tx, record_id):
+                        _error(
+                            "project_repository_frozen",
+                            "Repository reassignment cannot move active attempts or committed work",
+                        )
             fields["kind"] = kind
             defaults = {"status": "active", "authorization": None if kind == "program" else "authorized"}
             if record_id == "PROJECT-GTKB-NEW-WORK-INTAKE":
@@ -717,15 +814,25 @@ class AuthorityService:
             return _write(tx, "projects", record_id, {"authorization": request.authorization}, request)
 
     def amend_project_formal_link(self, record_id: str, request: ProjectFormalLinkMutation) -> dict[str, Any]:
-        """Amend a formal root without publishing evidence or changing authorization."""
+        """Amend formal roots or retire obsolete links without changing authorization."""
         with self.kernel.transaction() as tx:
             current = tx.get("project_artifact_links", {"id": record_id}, lock=True)
             actual = current["version"] if current else 0
             if actual != request.expected_version:
                 _error("cas_conflict", "Read the current formal link before changing it", actual=actual, id=record_id)
-            if current and current["artifact_type"] != "spec":
-                _error("invalid_formal_link", "This operation cannot amend other project artifact types")
             fields = request.fields.model_dump(exclude_unset=True)
+            if current and current["artifact_type"] != "spec":
+                # Imported bridge references and completion guards are obsolete
+                # relationships. Retire their status without rewriting identity,
+                # creating a substitute, or touching Git activation evidence.
+                if (
+                    current["artifact_type"] not in {"bridge_thread", "completion_guard"}
+                    or current["status"] != "active"
+                    or fields != {"status": "retired"}
+                ):
+                    _error("invalid_formal_link", "Only status-only retirement of an obsolete relationship is allowed")
+                _execution_project(tx, current["project_id"])
+                return _write(tx, "project_artifact_links", record_id, fields, request)
             candidate = {**(current or {"status": "active"}), **fields}
             if not candidate.get("project_id") or not candidate.get("artifact_ref"):
                 _error("formal_link_endpoint_required", "A formal link names an execution project and formal record")
@@ -842,7 +949,13 @@ class AuthorityService:
                     _error("project_required", "New work requires an existing execution project")
                 project = _execution_project(tx, request.project_id)
             state = {**(current or {}), **fields}
-            _work_evidence(tx, state)
+            # Planning amendments preserve visible evidence gaps in existing work.
+            # Creation and changed evidence links still require a complete pair;
+            # proposal publication independently rechecks the current evidence.
+            if current is None or any(
+                state.get(key) != current.get(key) for key in ("source_spec_id", "source_test_id")
+            ):
+                _work_evidence(tx, state)
             self._check_dependencies(tx, record_id, state.get("depends_on_work_items") or [])
             row = _write(
                 tx,
@@ -915,7 +1028,12 @@ class AuthorityService:
             )
             return {"work_item_id": record_id, "membership": updated}
 
-    def task_context(self, record_id: str, *, predecessor_readiness=None) -> dict[str, Any]:
+    def task_context(
+        self,
+        record_id: str,
+        *,
+        predecessor_readiness: Callable[[PostgresTransaction, str], dict[str, Any]] | None = None,
+    ) -> dict[str, Any]:
         """Load linked current facts without another context's memory or state."""
         with self.kernel.transaction(read_only=True) as tx:
             work = _required(tx, "work_items", record_id)

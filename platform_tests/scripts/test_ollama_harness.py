@@ -878,8 +878,8 @@ def test_write_edit_and_bash_enter_guards_before_side_effects(tmp_path: Path):
         )
         == "ok"
     )
-    assert events[:3] == ["guard", "guard", "guard"]
-    assert events[-1] == "command"
+    assert events[: len(oh.BASH_GUARDS)] == ["guard"] * len(oh.BASH_GUARDS), "every Bash guard runs first"
+    assert events[len(oh.BASH_GUARDS) :] == ["command"]
 
 
 def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):
@@ -927,7 +927,8 @@ def test_guard_denial_blocks_source_write_before_mutation(tmp_path: Path):
     assert records
 
 
-def test_narrative_write_without_packet_blocks_before_mutation(tmp_path: Path):
+def test_denied_write_guard_blocks_before_mutation(tmp_path: Path):
+    """A denial by a current Write guard blocks the file mutation; no packet gate is consulted."""
     root = make_root(tmp_path)
     records: list[tuple[str, dict, dict]] = []
     with pytest.raises(oh.OllamaHarnessError, match="guard denied"):
@@ -936,9 +937,10 @@ def test_narrative_write_without_packet_blocks_before_mutation(tmp_path: Path):
             {"path": ".claude/rules/new-rule.md", "content": "rule"},
             metadata(),
             root,
-            guard_runner=deny_runner(records, "narrative-artifact-approval-gate.py"),
+            guard_runner=deny_runner(records, "scanner-safe-writer.py"),
         )
     assert not (root / ".claude" / "rules" / "new-rule.md").exists()
+    assert all("approval-gate" not in path for path, _, _ in records)
 
 
 def test_destructive_bash_is_denied_before_subprocess(tmp_path: Path):
@@ -963,7 +965,8 @@ def test_destructive_bash_is_denied_before_subprocess(tmp_path: Path):
     assert command_called is False
 
 
-def test_formal_and_membase_bash_is_denied_before_subprocess(tmp_path: Path):
+def test_denied_bash_guard_blocks_a_formal_writing_command_before_subprocess(tmp_path: Path):
+    """A denial by a current Bash guard blocks a formal-writing command before any subprocess runs."""
     root = make_root(tmp_path)
     command_called = False
 
@@ -976,13 +979,14 @@ def test_formal_and_membase_bash_is_denied_before_subprocess(tmp_path: Path):
     with pytest.raises(oh.OllamaHarnessError, match="guard denied"):
         oh.dispatch_tool_call(
             "Bash",
-            {"command": "python -m groundtruth_kb deliberations add"},
+            {"command": "gt spec record --id SPEC-NEW --fields-file spec.json --actor worker --change-reason draft"},
             metadata(),
             root,
-            guard_runner=deny_runner(records, "formal-artifact-approval-gate.py"),
+            guard_runner=deny_runner(records, "implementation_start_gate.py"),
             command_runner=command_runner,
         )
     assert command_called is False
+    assert all("approval-gate" not in path for path, _, _ in records)
 
 
 def test_bridge_bash_file_write_is_denied_before_guards_or_subprocess(tmp_path: Path):

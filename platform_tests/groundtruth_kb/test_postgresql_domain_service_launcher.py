@@ -35,9 +35,9 @@ WINDOWS_ONLY = pytest.mark.skipif(os.name != "nt", reason="job containment is a 
 
 # A stand-in service that, once it runs, records that it ran and starts a real descendant.
 SPAWNER = (
-    "import pathlib, subprocess, sys, time\n"
+    "import os, pathlib, subprocess, sys, time\n"
     "marker, record = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])\n"
-    "marker.write_text('ran', encoding='utf-8')\n"
+    "marker.write_text(str(os.getpid()), encoding='utf-8')\n"
     "grandchild = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(300)'])\n"
     "record.write_text(str(grandchild.pid), encoding='utf-8')\n"
     "time.sleep(300)\n"
@@ -122,12 +122,52 @@ def _end_own_listener(port: int, operator_config: Path) -> str:
     return f"ended {pid}"
 
 
-def _children_of(pid: int) -> list[int]:
-    """Processes whose parent is the given process, re-identified through the OS."""
+def _creation_filetime(process: subprocess.Popen) -> int:
+    """Read the retained process handle, which still identifies this exited process."""
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    get_times = kernel32.GetProcessTimes
+    get_times.argtypes = [wintypes.HANDLE, *([ctypes.POINTER(wintypes.FILETIME)] * 4)]
+    get_times.restype = wintypes.BOOL
+    times = [wintypes.FILETIME() for _ in range(4)]
+    if not get_times(int(process._handle), *(ctypes.byref(value) for value in times)):
+        raise ctypes.WinError(ctypes.get_last_error())
+    return (times[0].dwHighDateTime << 32) | times[0].dwLowDateTime
+
+
+def _children_of(process: subprocess.Popen) -> list[int]:
+    """Exclude old processes whose parent's numeric PID has since been reused."""
+    created = _creation_filetime(process)
     out = _powershell(
-        f"Get-CimInstance Win32_Process -Filter 'ParentProcessId = {pid}' | ForEach-Object {{ $_.ProcessId }}"
+        "$ErrorActionPreference = 'Stop'; "
+        f"$children = @(Get-CimInstance Win32_Process -Filter 'ParentProcessId = {process.pid}' | "
+        "ForEach-Object { [pscustomobject]@{pid=$_.ProcessId; created=$_.CreationDate.ToFileTimeUtc()} }); "
+        "ConvertTo-Json -InputObject $children -Compress"
     )
-    return [int(token) for token in out.split()]
+    children = json.loads(out)
+    assert isinstance(children, list), "Child-process observation must be an explicit list"
+    # CIM dates have microsecond precision; floor the FILETIME to that precision.
+    return [int(row["pid"]) for row in children if int(row["created"]) >= created // 10 * 10]
+
+
+def test_child_probe_excludes_older_pid_associations_and_retains_current_children(monkeypatch):
+    monkeypatch.setitem(globals(), "_creation_filetime", lambda process: 100)
+    monkeypatch.setitem(
+        globals(),
+        "_powershell",
+        lambda command: '[{"pid":1,"created":90},{"pid":2,"created":100},{"pid":3,"created":110}]',
+    )
+    process = type("ObservedProcess", (), {"pid": 123})()
+    assert _children_of(process) == [2, 3]
+
+
+def test_child_probe_does_not_treat_a_failed_observation_as_no_children(monkeypatch):
+    monkeypatch.setitem(globals(), "_creation_filetime", lambda process: 100)
+    monkeypatch.setitem(globals(), "_powershell", lambda command: "")
+    process = type("ObservedProcess", (), {"pid": 123})()
+    with pytest.raises(json.JSONDecodeError):
+        _children_of(process)
 
 
 def _process_handle(pid: int, access: int) -> int | None:
@@ -302,7 +342,7 @@ def test_uncontainable_service_is_ended_before_it_can_run_or_spawn_a_descendant(
     assert started and started[0].poll() is not None, "the uncontainable service must be ended"
     assert not marker.exists(), "the service ran before containment was established"
     assert not record.exists(), "the service started a descendant"
-    assert _children_of(started[0].pid) == []
+    assert _children_of(started[0]) == []
     text = log.read_text(encoding="utf-8")
     assert "ended before it ran" in text
     assert "contained by a kill-on-close job" not in text
@@ -324,6 +364,11 @@ def test_contained_service_and_its_real_descendant_end_when_the_job_closes(tmp_p
         grandchild = int(record.read_text(encoding="utf-8"))
         assert process.poll() is None and _wait_pid_gone(grandchild, 0) is False
         assert _in_job(process.pid, job) and _in_job(grandchild, job), "the descendant was born outside the job"
+        service_pid = int(marker.read_text(encoding="utf-8"))
+        # Windows venv executables can introduce a redirector. Observe the
+        # real immediate child in either launch shape, without assuming it.
+        immediate_child = grandchild if service_pid == process.pid else service_pid
+        assert immediate_child in _children_of(process), "the process probe missed a real current child"
         ctypes.windll.kernel32.CloseHandle(job)
         job = None
         assert process.wait(timeout=15) is not None

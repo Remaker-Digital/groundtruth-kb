@@ -15,8 +15,8 @@ from __future__ import annotations
 
 import sqlite3
 
-from scripts.gtkb_dashboard.generate_grafana_dashboard import build_dashboard
-from scripts.gtkb_dashboard.refresh_dashboard_db import _dora_four_keys_metric_rows
+from groundtruth_kb.dashboard import _dora_four_keys_metric_rows
+from groundtruth_kb.dashboard_grafana import build_dashboard
 
 _DORA_KEYS = (
     "dora_deployment_frequency",

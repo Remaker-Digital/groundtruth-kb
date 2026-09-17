@@ -543,3 +543,58 @@ def test_postgresql_config_preserves_programmatic_missing_groundtruth_warning(tm
         cfg = GTConfig.load(config_path=toml_file)
 
     assert cfg.postgresql.service == "reviewed"
+
+
+@pytest.mark.parametrize("caller_file", ["valid", "malformed"])
+def test_disabled_discovery_never_loads_a_callers_configuration(tmp_path, monkeypatch, caller_file):
+    for key in ("GT_AUTHORITY_URL", "GT_PROJECT_ROOT", "GT_DB_PATH", "GT_APP_TITLE", "GT_POSTGRES_SERVICE"):
+        monkeypatch.delenv(key, raising=False)
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    config = caller / "groundtruth.toml"
+    content = (
+        '[groundtruth]\nauthority_url="http://127.0.0.1:1"\n'
+        'app_title="Unselected caller"\n[postgresql]\nservice="unselected"\n'
+        if caller_file == "valid"
+        else "[not valid TOML"
+    )
+    config.write_text(content, encoding="utf-8")
+    nested = caller / "nested"
+    nested.mkdir()
+    selected = tmp_path / "selected"
+    selected.mkdir()
+    monkeypatch.chdir(nested)
+    before = config.read_bytes()
+
+    result = GTConfig.load(discover=False, project_root=selected)
+
+    assert result.project_root == selected
+    assert result.authority_url is None
+    assert result.app_title == "GroundTruth KB"
+    assert result.postgresql.service == "gtkb"
+    assert config.read_bytes() == before and not list(selected.iterdir())
+
+
+def test_disabled_discovery_retains_explicit_configuration_and_layer_precedence(tmp_path, monkeypatch):
+    caller = tmp_path / "caller"
+    caller.mkdir()
+    (caller / "groundtruth.toml").write_text("[invalid caller TOML", encoding="utf-8")
+    selected = tmp_path / "selected"
+    selected.mkdir()
+    config = selected / "groundtruth.toml"
+    config.write_text(
+        '[groundtruth]\nauthority_url="http://127.0.0.1:11"\n'
+        'app_title="Selected file"\n[postgresql]\nservice="selected"\nlock_timeout_ms=701\n',
+        encoding="utf-8",
+    )
+    monkeypatch.chdir(caller)
+    monkeypatch.setenv("GT_AUTHORITY_URL", "http://127.0.0.1:12")
+    monkeypatch.setenv("GT_POSTGRES_SERVICE", "environment")
+    result = GTConfig.load(config_path=config, discover=False, authority_url="http://127.0.0.1:13")
+    assert result.authority_url == "http://127.0.0.1:13"
+    assert result.project_root == selected and result.app_title == "Selected file"
+    assert result.postgresql.service == "environment" and result.postgresql.lock_timeout_ms == 701
+    from_environment = GTConfig.load(discover=False, project_root=selected)
+    assert from_environment.authority_url == "http://127.0.0.1:12"
+    assert from_environment.postgresql.service == "environment"
+    assert from_environment.postgresql.lock_timeout_ms == 5000

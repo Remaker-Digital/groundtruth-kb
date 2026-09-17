@@ -8,25 +8,25 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
+# The neutral baseline rule is the authored carrier; the scaffold template is its byte-identical copy
+# (test_template_rules_follow_the_baseline.py) and the harness projections are generated from it.
 RULE_SURFACES = (
-    Path(".claude/rules/loyal-opposition.md"),
+    Path(".harness-baseline-configuration/rules/loyal-opposition.md"),
     Path("groundtruth-kb/templates/rules/loyal-opposition.md"),
 )
 
 METHODOLOGY_ANCHORS = (
-    "read-only repository inspection",
-    "scripts",
-    "tests",
-    "cli queries",
-    "membase or database reads",
-    "methodology trail",
-    "reproduce or exceed the review depth",
-    "proposal review",
-    "implementation verification",
+    "read source, inspect artifacts, run the required tests and use current cli queries or diagnostics",
+    "record the commands or inspections actually performed, their outcomes and what they establish",
+    "execute the full applicable plan",
+    "a narrow passing suite, source hash or earlier review does not prove completion",
+    "do not repair the implementation during its independent review",
+    "author go when the complete proposal is supported",
+    "author verified only after independently establishing the complete intended result",
 )
 
 IMPLEMENTATION_TARGETS = (
-    Path(".claude/rules/loyal-opposition.md"),
+    Path(".harness-baseline-configuration/rules/loyal-opposition.md"),
     Path("groundtruth-kb/templates/rules/loyal-opposition.md"),
     Path("platform_tests/scripts/test_lo_investigation_methodology.py"),
     Path(
@@ -43,7 +43,8 @@ FORBIDDEN_TARGET_FRAGMENTS = (
 
 
 def _rule_text(path: Path) -> str:
-    return (REPO_ROOT / path).read_text(encoding="utf-8").lower()
+    # The rule is wrapped prose; anchors are matched on whitespace-normalized lowercase text.
+    return " ".join((REPO_ROOT / path).read_text(encoding="utf-8").lower().split())
 
 
 @pytest.mark.parametrize("path", RULE_SURFACES)

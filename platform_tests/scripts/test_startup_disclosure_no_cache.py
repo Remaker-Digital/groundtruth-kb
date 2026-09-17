@@ -31,10 +31,7 @@ _CACHE_STEM = "last-user-visible" + "-startup"
 # ``project/artifact_membership_reconciliation.py`` -- but both only CLASSIFY
 # it as disposable runtime output. Neither reads nor writes a cache, and both
 # are needed to reclaim the stale artifacts, so they are correct as they stand.
-_PRODUCER_PATHS = (
-    "scripts/workstream_focus.py",
-    "scripts/session_self_initialization.py",
-)
+_PRODUCER_PATHS = ("scripts/workstream_focus.py",)
 
 
 def test_no_producer_names_the_disclosure_cache() -> None:

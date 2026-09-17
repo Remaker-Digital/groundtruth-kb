@@ -6,9 +6,9 @@ Specs: DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001,
 SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001,
 DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
 
-WI-3326 defect: session_self_initialization.py, workstream_focus.py, and
-_session_init_keyword.py cited three planned-but-never-created spec IDs in the
-SessionStart payload. This guard asserts:
+WI-3326 defect: the SQLite-era startup generator (retired 2026-09),
+workstream_focus.py, and _session_init_keyword.py cited three
+planned-but-never-created spec IDs in the SessionStart payload. This guard asserts:
   (a) None of the phantom IDs appear in any of the eight approved target paths.
   (b) Each real replacement ID is present in the appropriate source file.
   (c) The three real replacement IDs exist in live current_specifications (ensuring
@@ -39,20 +39,18 @@ _REAL_IDS = (
 
 # Source files whose SessionStart payload citation strings are guarded.
 _SOURCE_FILES = (
-    _ROOT / "scripts" / "session_self_initialization.py",
     _ROOT / "scripts" / "workstream_focus.py",
     _ROOT / "scripts" / "_session_init_keyword.py",
 )
 
 # The approved target paths from the GO'd bridge proposal that still exist
-# (test_workstream_focus_hook_parity.py was retired with the hook copies).
+# (test_workstream_focus_hook_parity.py was retired with the hook copies; the
+# startup generator and its suite were retired with the legacy startup batch).
 _ALL_TARGET_FILES = (
-    _ROOT / "scripts" / "session_self_initialization.py",
     _ROOT / "scripts" / "workstream_focus.py",
     _ROOT / "scripts" / "_session_init_keyword.py",
     _ROOT / "platform_tests" / "scripts" / "test_session_self_initialization_spec_citation_existence.py",
     _ROOT / "platform_tests" / "hooks" / "test_workstream_focus.py",
-    _ROOT / "platform_tests" / "scripts" / "test_session_self_initialization.py",
     _ROOT / "platform_tests" / "scripts" / "test_session_init_keyword_matching.py",
 )
 

@@ -14,8 +14,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-
-from scripts.implementation_start_gate import (
+from groundtruth_kb.bridge.effect_gate import (
     MUTATING_VERB_TABLE,
     _classify_command_verb,
     _extract_git_add,
@@ -269,7 +268,7 @@ def test_classify_empty_tokens() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Non-regression: protected-path filter via is_protected_path + ALLOWED_WRITE_PREFIXES
+# Non-regression: extract concrete paths independently of downstream claim checks
 # ---------------------------------------------------------------------------
 
 
@@ -347,7 +346,7 @@ def test_tokenization_failure_returns_empty(root: Path) -> None:
 
 def test_is_mutating_git_add_returns_true() -> None:
     """`git add` MUST trigger the mutating-command predicate (NO-GO -006 F1)."""
-    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import _is_mutating_command  # noqa: PLC0415
 
     assert _is_mutating_command("git add scripts/protected.py") is True
     assert _is_mutating_command("git add -A") is True
@@ -356,7 +355,7 @@ def test_is_mutating_git_add_returns_true() -> None:
 
 def test_is_mutating_git_rm_returns_true() -> None:
     """`git rm` MUST trigger the mutating-command predicate (NO-GO -006 F1)."""
-    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import _is_mutating_command  # noqa: PLC0415
 
     assert _is_mutating_command("git rm scripts/dead.py") is True
     assert _is_mutating_command("git rm --cached scripts/x.py") is True
@@ -364,7 +363,7 @@ def test_is_mutating_git_rm_returns_true() -> None:
 
 def test_is_mutating_git_restore_returns_true() -> None:
     """`git restore` (with or without --staged) MUST trigger the predicate."""
-    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import _is_mutating_command  # noqa: PLC0415
 
     assert _is_mutating_command("git restore --staged scripts/x.py") is True
     assert _is_mutating_command("git restore scripts/x.py") is True
@@ -372,7 +371,7 @@ def test_is_mutating_git_restore_returns_true() -> None:
 
 def test_is_mutating_git_status_remains_false() -> None:
     """`git status` MUST remain a safe read command (no-regression guard)."""
-    from scripts.implementation_start_gate import _is_mutating_command  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import _is_mutating_command  # noqa: PLC0415
 
     assert _is_mutating_command("git status") is False
     assert _is_mutating_command("git status --short") is False
@@ -398,7 +397,7 @@ def _no_auth_payload(tmp_path: Path, command: str) -> dict:
 
 def test_gate_decision_blocks_git_add_protected_path(tmp_path: Path) -> None:
     """`gate_decision` MUST return decision=block for `git add scripts/protected.py`."""
-    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import gate_decision  # noqa: PLC0415
 
     payload = _no_auth_payload(tmp_path, "git add scripts/protected.py")
     result = gate_decision(payload)
@@ -408,7 +407,7 @@ def test_gate_decision_blocks_git_add_protected_path(tmp_path: Path) -> None:
 
 def test_gate_decision_blocks_git_rm_protected_path(tmp_path: Path) -> None:
     """`gate_decision` MUST return decision=block for `git rm scripts/protected.py`."""
-    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import gate_decision  # noqa: PLC0415
 
     payload = _no_auth_payload(tmp_path, "git rm scripts/protected.py")
     result = gate_decision(payload)
@@ -418,7 +417,7 @@ def test_gate_decision_blocks_git_rm_protected_path(tmp_path: Path) -> None:
 
 def test_gate_decision_blocks_git_restore_staged_protected_path(tmp_path: Path) -> None:
     """`gate_decision` MUST block `git restore --staged scripts/protected.py`."""
-    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import gate_decision  # noqa: PLC0415
 
     payload = _no_auth_payload(tmp_path, "git restore --staged scripts/protected.py")
     result = gate_decision(payload)
@@ -428,7 +427,7 @@ def test_gate_decision_blocks_git_restore_staged_protected_path(tmp_path: Path) 
 
 def test_gate_decision_allows_git_status(tmp_path: Path) -> None:
     """`gate_decision` MUST allow `git status` (safe-read regression guard)."""
-    from scripts.implementation_start_gate import gate_decision  # noqa: PLC0415
+    from groundtruth_kb.bridge.effect_gate import gate_decision  # noqa: PLC0415
 
     payload = _no_auth_payload(tmp_path, "git status")
     result = gate_decision(payload)

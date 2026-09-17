@@ -94,12 +94,12 @@ future documentation pass.
 
 ## 5. Claude Design Integration
 
-GroundTruth-KB supports **local manual handoff import only**. The
-`gt design import <handoff>` command inspects a local Claude Design
+GroundTruth-KB supports **local manual handoff inspection only**. The
+`gt design inspect <handoff>` command inspects a local Claude Design
 handoff (`.zip` or directory), validates it against
-`SPEC-CD-HANDOFF-FORMAT-001`, and — with `--apply` — registers a
-metadata-only inspection record into the Deliberation Archive (raw design
-bytes are never inlined; see [Claude Design Intake](claude-design-intake.md)).
+`SPEC-CD-HANDOFF-FORMAT-001` and prints a metadata-only, redacted inspection
+record; it stores nothing (raw design bytes are never inlined; see
+[Claude Design Handoff Inspection](claude-design-intake.md)).
 
 What is **not** supported today: live Claude Design API
 ([claude.ai/design](https://claude.ai/design)) integration; treating

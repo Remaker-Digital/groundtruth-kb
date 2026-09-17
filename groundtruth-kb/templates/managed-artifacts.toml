@@ -2,7 +2,8 @@
 #
 # Managed Artifact Registry â€” single source of truth for scaffold, upgrade, and doctor.
 #
-# 62 records = 17 hooks + 12 rules + 12 skills + 4 files + 13 settings-hook-registrations + 4 gitignore-patterns.
+# Managed source records define scaffold, upgrade and doctor delivery.
+# Advisory counter and specification-event notification behavior is retired.
 #
 # Automatic SessionStart assertion evaluation and its registration are retired.
 #
@@ -71,29 +72,12 @@ id = "hook.bridge-compliance-gate"
 template_path = "hooks/bridge-compliance-gate.py"
 target_path = ".claude/hooks/bridge-compliance-gate.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
-notes = "PreToolUse Write/Edit gate enforcing bridge-protocol compliance; product-managed because protocol contracts are framework policy."
-
-[[artifacts]]
-# Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
-# Lifecycle axes match the paired settings-hook-registration below to satisfy
-# F1 fix from -004 NO-GO (avoid inert-hook risk where upgrade delivers
-# registration without paired hook file).
-class = "hook"
-id = "hook.spec-event-surfacer"
-template_path = "hooks/spec-event-surfacer.py"
-target_path = ".claude/hooks/spec-event-surfacer.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "PostToolUse spec-mutation event surfacer; product-managed framework observability policy."
+notes = "PreToolUse adapter to the installed native CLI effect checker; current artifact claims and checkout scope are enforced by the authority."
 
 [[artifacts]]
 class = "hook"
@@ -101,7 +85,7 @@ id = "hook.kb-not-markdown"
 template_path = "hooks/kb-not-markdown.py"
 target_path = ".claude/hooks/kb-not-markdown.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
+managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
@@ -123,24 +107,6 @@ notes = "Session-health monitoring hook; product-managed framework policy."
 
 [[artifacts]]
 class = "hook"
-id = "hook.spec-before-code"
-template_path = "hooks/spec-before-code.py"
-target_path = ".claude/hooks/spec-before-code.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-
-# Governance hooks (5 records â€” per gtkb-da-governance-completeness-implementation-015
-# Â§5.5-Â§5.9). Dual-agent-only. _delib_common is a shared helper module (no
-# settings-hook-registration). The other four are event hooks with matching
-# settings-hook-registration entries below.
-notes = "PreToolUse GOV-01 spec-first enforcement gate; product-managed framework governance policy."
-
-[[artifacts]]
-class = "hook"
 id = "hook.code-quality-baseline-proposal-check"
 template_path = "hooks/code-quality-baseline-proposal-check.py"
 target_path = ".claude/hooks/code-quality-baseline-proposal-check.py"
@@ -151,19 +117,6 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "PreToolUse proposal-time Code Quality Baseline table contract; product-managed governance policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook._delib_common"
-template_path = "hooks/_delib_common.py"
-target_path = ".claude/hooks/_delib_common.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Shared helper module for deliberation hooks; product-managed because the helper API is framework-defined."
 
 [[artifacts]]
 class = "rule"
@@ -431,37 +384,6 @@ notes = "bridge show-thread helper; product-managed because bridge thread status
 # =========================================================================
 
 [[artifacts]]
-# Per bridge gtkb-membase-effective-use-recovery-slice-a-event-surfacer-2026-04-29 GO at -006.
-# Lifecycle axes match the paired hook artifact above (managed_profiles +
-# doctor_required_profiles BOTH = bridge profiles) per F1+F2 fixes from -004 NO-GO.
-class = "settings-hook-registration"
-id = "settings.hook.spec-event-surfacer.posttooluse"
-event = "PostToolUse"
-hook_filename = "spec-event-surfacer.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers spec-event-surfacer on PostToolUse; product-managed framework registration."
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.spec-before-code.pretooluse"
-event = "PreToolUse"
-hook_filename = "spec-before-code.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers spec-before-code on PreToolUse; product-managed framework registration."
-
-[[artifacts]]
 class = "settings-hook-registration"
 id = "settings.hook.bridge-compliance-gate.pretooluse"
 event = "PreToolUse"
@@ -473,7 +395,7 @@ doctor_required_profiles = []
 ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
-notes = "Registers bridge-compliance-gate on PreToolUse; product-managed framework registration."
+notes = "Registers the native bridge effect adapter on PreToolUse; delivery validation remains in the native bridge CLI."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -620,15 +542,3 @@ doctor_required_profiles = []
 ownership = "adopter-owned"
 upgrade_policy = "preserve"
 notes = "Application-subject release-readiness banner per Phase 9 section 1 lines 123-125 (GTKB-ISOLATION-017 Slice 3); adopter populates with release evidence, platform does not overwrite."
-
-[[artifacts]]
-class = "file"
-id = "file.upgrade-rehearsal-recipe"
-template_path = "project/upgrade-rehearsal-recipe.md"
-target_path = "docs/upgrade-rehearsal-recipe.md"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-scaffolded"
-upgrade_policy = "preserve"
-notes = "Adopter-facing isolation-migration rehearsal recipe per GTKB-ISOLATION-017 Slice 4 (bridge -008 GO). Documents the out-of-band rehearsal recipe per DELIB-S328 decision 7 (out_of_band_recipe_only). Scaffolded once at init; adopter may customize after; upgrade does not overwrite."

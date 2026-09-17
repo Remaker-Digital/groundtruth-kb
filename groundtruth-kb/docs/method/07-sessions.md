@@ -1,143 +1,59 @@
-# 7. Session Discipline
+# 7. Ephemeral session contexts
 
-Work in GroundTruth is organized into numbered sessions. Session discipline prevents context loss, ensures continuity across conversations, and provides a natural rhythm for quality checks.
+A session context has one immutable canonical binding from its actual native
+context identifier to its GT-KB identifier, subject and role. Identity does not
+come from a sequence number, a memory file, the latest session or a harness role.
 
-## Session identity
+Use the exact owner- or dispatch-supplied marker with `gt session bind` and read
+back the binding with `gt session show`. An identical retry returns the same
+binding; conflicting subject or role fails without mutation. Ending a process,
+closing or wrapping does not delete the binding or allow it to change role.
 
-Each session has a monotonically increasing ID: `S1`, `S2`, ..., `S240`. The ID is derived by reading the most recent session from the project's state file and incrementing by one.
+## Start and work
 
-Session IDs serve as:
+Preserve the owner's first input and explicit selected task. An explicit
+`::open <activity>` selects one transient activity: ops, deliberation, build,
+test, spec or project. Repetition is idempotent; a different selection replaces
+it. No persistent activity record or default inferred from a queue is required.
 
-- **Correlation keys** for all artifacts created in that session (`changed_by: "S42"`)
-- **Commit message prefixes** for git history (`feat(S42): implement rate limiting`)
-- **Reference points** in state files and handoff notes
+Read `gt context session --native-context-id <actual-native-context-id> --json`
+for current startup sources and `gt context work-item <WI-ID> --json` for the
+assigned work. Read the exact dispatched bridge action through `gt bridge show`.
+Resolve additional applicable formal requirements; the stored relationship set
+alone does not prove complete applicability. Missing required input is a visible
+incomplete operation, not permission to reuse a cached summary.
 
-## Session structure
+Disclose what was actually loaded, the supplied role/activity and relevant
+limitations. Do not imply a host hook ran or a task was loaded merely because a
+command or generated file exists. Dashboard links and read-only suggestions are
+optional views, not current authority or task selection.
 
-Every session follows the same structure:
+## Close and wrap
 
-### 1. Start
+An explicit close directs activity-scoped canonical knowledge harvest; an
+explicit wrap directs context-wide harvest within authorized work. Correct facts
+and owner decisions directly through supported canonical writers and read back
+the result. Session logs retain the conversation. No session document, prompt
+object, decision archive or operational state file is required for continuity.
 
-State the objective clearly. Read the project's state file to understand:
-- What was done in the previous session
-- What was planned as "next"
-- Current status of key systems (versions, test counts, open work items)
+Close and wrap clear transient activity and preserve the immutable binding.
+They do not implicitly stage, commit, push, deploy, change authorization or
+activate automation. Read-only lifecycle guidance can be offered proactively;
+it does not perform harvest. Missing lifecycle-hook or harvest capability remains
+an explicit limitation with a recovery route.
 
-### 2. Execute
+Report actual work, tests, failed/unexecuted checks and unresolved choices. Finish
+or release this context's exact artifact action. A useful owner-copyable
+continuation may contain timestamped observations and canonical retrieval
+pointers, but remains ephemeral. It neither dispatches the next task nor carries
+a claim. Another fresh context reconstructs current work without that handoff,
+the original author, prior-session memory or direct contact with another harness.
 
-Work toward the stated objective. Along the way:
-- Record specifications, tests, and work items in MemBase (canonical knowledge and specifications; see ADR-0001: Three-Tier Memory Architecture).
-- Follow the spec-first workflow when encountering new requirements
-- Run assertions after making changes to catch regressions early
+Actual-host startup, close/wrap invocation, complete canonical harvest and fresh
+successor workflows require behavioral qualification. Projector parity and
+selected component tests do not establish that complete result.
 
-### 3. Wrap up
-
-Before ending the session:
-- **Update the state file** with: what was done, what changed, what's next
-- **Record a session document** in MemBase (category: `session_record`)
-- **Run assertions** one final time to confirm no regressions
-- **Commit** with a message that references the session ID
-
-## Generated Startup And Wrap-Up Cycle
-
-GroundTruth-KB provides package-level commands and scaffolds that adopter
-projects can use to make session lifecycle visible. The exact hook trigger is
-harness-specific, but the lifecycle contract is the same across Claude Code,
-Codex, Cursor, or another capable harness.
-
-### Startup disclosure
-
-At session start, the active harness should load role instructions, project
-state, top priorities, and bridge obligations before doing implementation work.
-The first user-visible response should disclose:
-
-- Active role and governance stance
-- Dashboard or project status link, when configured
-- Current project state and known blockers
-- Numbered focus choices or the explicit custom focus supplied by the owner
-- Top priority actions
-- Token or context reduction options for long projects
-- File bridge scan count
-
-If the owner already supplied a concrete task, map it to one focus choice or
-custom focus and proceed when the mapping is unambiguous.
-
-### Dashboard refresh
-
-The package dashboard is a local operations surface for this lifecycle:
-
-```powershell
-gt dashboard init
-gt dashboard refresh
-```
-
-The refresh command regenerates `.groundtruth/dashboard/gtkb-dashboard.sqlite`
-from MemBase and writes Grafana provisioning assets. Projects can call it at
-startup, wrap-up, or on a timer. The dashboard exposes current metrics, setup
-steps, third-party services, integration status, action center, risks, and data
-freshness.
-
-### Wrap-up trigger
-
-Wrap-up should happen only when the owner asks for it or when a configured
-project hook detects an explicit lifecycle command. A premature wrap-up prompt
-is a process defect: it interrupts owner input and should be renamed or narrowed
-so ordinary prompts are not treated as shutdown commands.
-
-The wrap-up checklist is:
-
-1. Refresh dashboard data with `gt dashboard refresh`.
-2. Run project checks such as `gt assert`, repo tests, and lint.
-3. Record completed work, changed files, decisions, blockers, and next action.
-4. Update MemBase and operational state files as appropriate.
-5. Commit and push only after the owner-approved gate is satisfied.
-
-## State management
-
-The GroundTruth method recommends two complementary state files that you create and maintain as part of your project (these are not generated by `gt init` — they are a method convention):
-
-### Rules file
-
-Contains **how to work**: procedures, governance rules, evaluation criteria, role definitions. Updated rarely — only when the rules of engagement change. The name and format are up to you (e.g., `CLAUDE.md`, `RULES.md`, or a section in your project README).
-
-### State file
-
-Contains **what has been done**: current status, recent sessions, quick reference values (URLs, version numbers, connection strings). Updated every session during wrap-up.
-
-### The boundary rule
-
-If it tells the agent *what to do*, it goes in the rules file. If it tells the agent *what has been done* or *how to access something*, it goes in the state file. All canonical project knowledge lives in MemBase — state files are the operational notepad, not the source of truth. MEMORY.md can coordinate work, but it cannot make anything true.
-
-## Audit sessions
-
-Every fifth session (S5, S10, S15, ...) is an **audit session** with additional hygiene steps:
-
-1. **Stale work item review**: identify open work items that haven't progressed
-2. **Spec coverage check**: verify that implemented specs have linked, passing tests
-3. **Assertion health**: confirm all assertions on implemented/verified specs pass
-4. **State file cleanup**: remove obsolete entries, update version numbers
-5. **Operational record pruning**: clean up old assertion runs and quality scores
-
-Audit sessions prevent gradual degradation — the slow accumulation of stale artifacts, orphaned work items, and failing assertions that nobody notices because each individual session's scope was too narrow to catch them.
-
-## Handoff continuity
-
-Sessions are designed so that a different agent (or a future instance of the same agent) can continue where the last session left off. This requires:
-
-- **Self-contained state**: the state file (MEMORY.md operational notepad) plus MemBase contain everything needed to understand the project's current position
-- **No implicit context**: decisions, trade-offs, and open questions are recorded, not assumed
-- **Clear "next" section**: every session wrap-up states what should happen next
-
-The test: if you delete the entire conversation history and start fresh with only the rules file, MEMORY.md operational notepad, and MemBase, you should be able to continue productive work within minutes.
-
-## Session documents
-
-Each session produces a document in MemBase (category: `session_record`) that captures:
-
-- Session ID and date
-- What was accomplished (summary)
-- Key decisions made
-- Artifacts created or modified (spec IDs, test counts, work item IDs)
-- What's next
-
-These documents form the project's operational history. Unlike state files (which are overwritten each session), session documents are append-only — every session's record is preserved.
+See [independent review](06-dual-agent.md) and [project completion](14-lifecycle.md).
+Formal retrieval: ADR-SESSION-MARKER-AND-ACTIVITY-RECORD-MODEL-001,
+DCL-ACTIVITY-CONTEXT-MANIFEST-001, DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001,
+PB-SESSION-WRAP-UP-PROACTIVE-001.

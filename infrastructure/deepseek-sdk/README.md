@@ -27,6 +27,13 @@ defaults to the bound context's own scratch directory,
 effect gate grants to that context and the commit gates never stage; `--home`
 overrides it.
 
+Binding returns a transient `status` of `init_requested` or
+`already_initialized_idempotent` together with the immutable `binding` object.
+The launcher requires one of those outcomes and its actual native context in
+the binding before starting a model turn. The status is not stored in the
+binding and grants no bridge action or activation. The launcher and service
+must use this same response contract.
+
 ```powershell
 # The private runtime-env interpreter alone carries the SDK; any other interpreter exits 2 with a report.
 infrastructure\deepseek-sdk\runtime-env\Scripts\python.exe infrastructure\deepseek-sdk\harness.py `

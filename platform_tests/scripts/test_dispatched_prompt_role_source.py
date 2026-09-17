@@ -37,6 +37,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
 DISPATCH_PROMPT_SOURCES = (
+    REPO_ROOT / "scripts" / "cloud_harness_base.py",
     REPO_ROOT / "scripts" / "openrouter_harness.py",
     REPO_ROOT / "scripts" / "ollama_harness.py",
 )
@@ -82,7 +83,12 @@ def test_dispatched_prompt_names_the_init_line_as_role_source(source: Path) -> N
     if not source.is_file():
         pytest.skip(f"dispatch surface not present: {source}")
     text = _source_without_comments(source)
-    assert "::init gtkb" in text, f"{source.name} states no canonical role source for the dispatched worker"
+    if "cloud_harness_base as base" in text:
+        # A shim that delegates its prompt to the shared base inherits the base's stated role source.
+        text = _source_without_comments(REPO_ROOT / "scripts" / "cloud_harness_base.py")
+    assert "exact init marker supplied in the task" in text and "gt session bind" in text, (
+        f"{source.name} states no canonical role source for the dispatched worker"
+    )
 
 
 @pytest.mark.parametrize("source", DISPATCH_PROMPT_SOURCES, ids=lambda p: p.name)

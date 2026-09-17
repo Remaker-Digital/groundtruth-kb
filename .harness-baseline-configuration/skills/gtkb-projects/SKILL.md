@@ -145,3 +145,15 @@ and generated projections. Related messages, a passing selected test or an
 edited status label cannot establish project completion.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+
+For an existing obsolete `bridge_thread` or `completion_guard` relationship,
+inspect its exact ID and version through `gt projects show <PROJECT-ID> --json`.
+The same record writer accepts only `{"status":"retired"}` for that row; it
+preserves identity and history and cannot rewrite or reactivate it. Read the
+exact retired row back with `gt projects formal-links show <LINK-ID> --json`.
+The project's `artifact_links` shows active links only, so the retired row must
+disappear there. Formal-link list remains limited to specifications; exact show
+also supports these obsolete relationships for correction readback and does not
+make them formal authority. Git activation evidence and closed projects cannot
+be retired through this correction route. No raw-table edit or replacement
+authorization carrier is involved.

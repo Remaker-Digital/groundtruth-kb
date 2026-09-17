@@ -31,11 +31,6 @@ def categorize_module() -> ModuleType:
     return _load_module("assertion_categorize_wi3354", PROJECT_ROOT / "scripts" / "assertion_categorize.py")
 
 
-@pytest.fixture(scope="module")
-def benchmarks_common_module() -> ModuleType:
-    return _load_module("benchmarks_common_wi3354", PROJECT_ROOT / "scripts" / "benchmarks" / "common.py")
-
-
 def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     if shutil.which("git") is None:
         pytest.skip("git not available on this system")
@@ -65,28 +60,20 @@ def _build_worktree_project(tmp_path: Path) -> tuple[Path, Path]:
     return canonical, worktree
 
 
-def _worktree_script_paths(worktree: Path) -> tuple[Path, Path]:
+def _worktree_script_paths(worktree: Path) -> Path:
     categorize = worktree / "scripts" / "assertion_categorize.py"
-    benchmarks = worktree / "scripts" / "benchmarks" / "common.py"
-    benchmarks.parent.mkdir(parents=True, exist_ok=True)
     categorize.parent.mkdir(parents=True, exist_ok=True)
-    for path in (categorize, benchmarks):
-        path.touch()
-    return categorize, benchmarks
+    categorize.touch()
+    return categorize
 
 
-def _assert_all_resolvers_return(
-    categorize_module: ModuleType,
-    benchmarks_common_module: ModuleType,
-    expected: Path,
-) -> None:
+def _assert_all_resolvers_return(categorize_module: ModuleType, expected: Path) -> None:
+    # The benchmarks resolver retired with scripts/benchmarks; the categorize resolver is the remaining consumer.
     assert categorize_module._resolve_project_root(None).resolve() == expected.resolve()
-    assert benchmarks_common_module._resolve_project_root(None).resolve() == expected.resolve()
 
 
 def test_resolvers_delegate_to_shared_paths_resolver(
     categorize_module: ModuleType,
-    benchmarks_common_module: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -97,17 +84,16 @@ def test_resolvers_delegate_to_shared_paths_resolver(
     monkeypatch.delenv("GTKB_PROJECT_ROOT", raising=False)
     monkeypatch.setattr(bridge_paths, "resolve_project_root", lambda: expected)
 
-    _assert_all_resolvers_return(categorize_module, benchmarks_common_module, expected)
+    _assert_all_resolvers_return(categorize_module, expected)
 
 
 def test_resolvers_fallback_is_worktree_aware_when_package_unimportable(
     categorize_module: ModuleType,
-    benchmarks_common_module: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     canonical, worktree = _build_worktree_project(tmp_path)
-    categorize_path, benchmarks_path = _worktree_script_paths(worktree)
+    categorize_path = _worktree_script_paths(worktree)
     original_import = builtins.__import__
 
     def fail_bridge_paths_import(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -121,14 +107,12 @@ def test_resolvers_fallback_is_worktree_aware_when_package_unimportable(
         monkeypatch.setenv("PATHEXT", "")
     monkeypatch.setattr(builtins, "__import__", fail_bridge_paths_import)
     monkeypatch.setattr(categorize_module, "__file__", str(categorize_path))
-    monkeypatch.setattr(benchmarks_common_module, "__file__", str(benchmarks_path))
 
-    _assert_all_resolvers_return(categorize_module, benchmarks_common_module, canonical)
+    _assert_all_resolvers_return(categorize_module, canonical)
 
 
 def test_resolvers_preserve_explicit_and_env_contract(
     categorize_module: ModuleType,
-    benchmarks_common_module: ModuleType,
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -140,7 +124,5 @@ def test_resolvers_preserve_explicit_and_env_contract(
     monkeypatch.setenv("GTKB_PROJECT_ROOT", str(env_root))
 
     assert categorize_module._resolve_project_root(str(explicit)).resolve() == explicit.resolve()
-    assert benchmarks_common_module._resolve_project_root(explicit).resolve() == explicit.resolve()
 
     assert categorize_module._resolve_project_root(None).resolve() == env_root.resolve()
-    assert benchmarks_common_module._resolve_project_root(None).resolve() == env_root.resolve()

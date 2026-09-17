@@ -17,8 +17,7 @@ import sys
 from pathlib import Path
 
 import pytest
-
-from scripts import implementation_start_gate as gate
+from groundtruth_kb.bridge import effect_gate as gate
 
 _WI3357_PARSER_CASES = [
     # (case_id, command, expected_span_count)

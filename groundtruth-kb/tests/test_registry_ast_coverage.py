@@ -154,6 +154,11 @@ def test_every_template_source_file_has_registry_coverage() -> None:
         rel = path.relative_to(templates_root).as_posix()
         if rel in _NON_SCAFFOLDED_TEMPLATE_FILES or path.name in _NON_SCAFFOLDED_TEMPLATE_FILES:
             continue
+        if rel.startswith("dashboard/"):
+            # Grafana dashboard assets: installed by `gt dashboard` into the operator's dashboard
+            # location (dashboard.py reads templates/dashboard directly); they have no application
+            # target path and are covered by the dashboard installer's own tests.
+            continue
         if rel in _OWNER_APPROVED_SLICE3_DEFERRAL:
             continue
         if rel not in registered_template_paths:

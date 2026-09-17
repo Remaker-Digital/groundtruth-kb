@@ -29,10 +29,9 @@ steps expressible as "compute X from Y" — it must:
    governance).
 
 This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` with an
-active-pursuit operational mandate. It does NOT supersede
-`GOV-ARTIFACT-APPROVAL-001` — formal artifact approval evidence is still
-required; the principle suggests the *delivery mechanism* of that approval
-should be a service, not per-instance ceremony.
+active-pursuit operational mandate. Existing owner direction takes effect through
+current canonical domain state. Deterministic plumbing does not invent owner
+choices or introduce an approval-evidence service.
 
 The principle is a bias, not an absolute. One-off intelligent decisions,
 operations that genuinely need session context unavailable to a service, and
@@ -66,9 +65,11 @@ rediscover it at full cost, and keeps that cost invisible to governance.
 
 This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Capture routes
 to the MemBase backlog per `GOV-STANDING-BACKLOG-001`; clause 4's after-action
-record follows `GOV-FILE-BRIDGE-AUTHORITY-001`. Neither clause displaces
-`GOV-ARTIFACT-APPROVAL-001` — approval evidence is still required before a
-captured item becomes implemented work.
+record follows the current bounded retention and independent-review contract.
+Capture is not a grant to implement: current project ordering, owner-directed
+scope, independent review, executable tests and artifact claims still apply.
+Do not introduce an approval packet or per-mutation permission ledger.
+
 
 ## Simplicity Principle
 
@@ -84,7 +85,7 @@ Operational mandate: when two designs satisfy the specification, the one with fe
 3. Not silently absorb the elaboration (which would make the cost invisible
    to governance).
 
-This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`. Capture routes to the MemBase backlog per `GOV-STANDING-BACKLOG-001`. It does NOT supersede `GOV-ARTIFACT-APPROVAL-001` — formal artifact approval evidence is still required; the principle does not authorize deleting protected behavior without owner approval.
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`. Capture routes to the MemBase backlog per `GOV-STANDING-BACKLOG-001`. The principle does not authorize deleting protected behavior or settling a material owner choice. Apply existing direction through the current canonical writer and preserve independent verification; an approval-evidence artifact is not required.
 
 ## Event-Oriented Naming Principle
 
@@ -133,35 +134,18 @@ artifact storage before cleanup. If new code or durable artifacts have been
 created as part of the work product of an implementation, those must be
 registered as formal artifacts (change controlled) before cleanup.
 
-## Session Self-Initialization Principle
+## Session startup and wrap-up
 
-Owner decision `DELIB-0840` and formal records
-`GOV-SESSION-SELF-INITIALIZATION-001` and
-`PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001` establish the required
-fresh-session self-initialization experience: at the start of a fresh
-GroundTruth-KB session, the active harness must present the role being
-assumed and the session governance stance, including the known active skills,
-plug-ins, directives, hooks, and role mapping that affect the session.
+Follow the canonical baseline `rules/session-bootstrap.md` for exact immutable
+context binding, explicit transient activity, current startup disclosure and
+proactive read-only wrap-up guidance. Preserve owner input. A harness has no
+role mapping, and a lifecycle notification does not authorize mutations.
 
-## Session Lifecycle Engagement And Wrap-Up Principle
-
-Owner decision `DELIB-0841` and formal records
-`GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001`,
-`PB-SESSION-WRAP-UP-PROACTIVE-001`, and
-`DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001` establish that session lifecycle
-management is proactive.
-
-The owner should not have to explicitly instruct the platform to initiate
-session wrap-up guidance. Each session should actively inform and engage the
-owner by drawing attention to priorities across all project dimensions and by
-simplifying owner input through concrete suggested actions and priority
-choices.
-
-Automatic session lifecycle hooks may generate startup reports, dashboard
-snapshots, proactive wrap-up reports, and suggested next actions. Mutating
-wrap-up work such as MemBase updates, Deliberation Archive insertion, commits,
-pushes, deployment, or external updates remains governed by the applicable
-approval, acknowledgement, or owner-authorized automation scope.
+Current formal requirements are `GOV-SESSION-SELF-INITIALIZATION-001`,
+`PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001`,
+`DCL-SESSION-STARTUP-TOKEN-BUDGET-001`, `PB-SESSION-WRAP-UP-PROACTIVE-001`,
+and `DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001`. Read their current records;
+superseded lifecycle requirements and historical deliberations are not authority.
 
 ## Release And Adoption Work-Queue Principle
 

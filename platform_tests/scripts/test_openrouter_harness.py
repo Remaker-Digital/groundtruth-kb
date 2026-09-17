@@ -929,3 +929,24 @@ def test_wi4817_openrouter_happy_path_single_attempt(monkeypatch: pytest.MonkeyP
     result = orh.call_openrouter_chat("https://openrouter.test", "key", {"model": "m"})
     assert result == {"ok": True}
     assert len(calls) == 1
+
+
+def test_tool_loop_sends_explicit_preset_identifier_in_model_field(tmp_path):
+    root = make_root(tmp_path)
+    model = orh.ModelRoute(
+        key="qualified-preset",
+        model_id="@preset/qualification",
+        model_version="qualification",
+        tool_calling_supported=True,
+        allowed_tools=("Read",),
+        omit_payload_model=False,
+    )
+    payloads = []
+
+    def chat(_endpoint, _key, payload, _timeout):
+        payloads.append(payload)
+        return {"model": "@preset/qualification", "choices": [{"message": {"content": "OK"}}]}
+
+    assert orh.run_tool_loop("say OK", model, "https://openrouter.test", "fixture-key", 1, root, chat_func=chat) == "OK"
+    assert len(payloads) == 1
+    assert payloads[0]["model"] == "@preset/qualification"

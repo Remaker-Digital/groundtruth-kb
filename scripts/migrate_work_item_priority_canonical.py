@@ -28,18 +28,13 @@ import argparse
 import json
 import sys
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
-# Add groundtruth-kb/src to import path before importing the DB module.
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-_KB_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
-if str(_KB_SRC) not in sys.path:
-    sys.path.insert(0, str(_KB_SRC))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
-
 
 CANONICAL_PRIORITIES = frozenset({"P0", "P1", "P2", "P3"})
 
@@ -244,7 +239,7 @@ def main(argv: list[str] | None = None) -> int:
 
     summary: dict[str, Any] = {
         "mode": "apply" if args.apply else "dry-run",
-        "started_at_utc": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "started_at_utc": datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ"),
         "db_path": str(args.db_path),
         "changed_by": args.changed_by,
         "pre_migration": {

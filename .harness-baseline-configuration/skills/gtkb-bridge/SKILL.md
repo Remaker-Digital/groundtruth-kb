@@ -35,6 +35,16 @@ prerequisites. Read `gt bridge show <document> --content --json` for the current
 attempt and its available message chain. `gt bridge queue --role <pb-or-lo>
 --json` and `gt bridge state-report --json` provide current coordination views.
 
+For an owner-selected bridge workload launched through the OpenRouter, Ollama
+or Alibaba provider CLI, supply both `--bridge-document <document>` and
+`--bridge-version <exact-successor-version>`. A bridge-review or verification
+skill also requires that explicit pair. The provider verifies the exact delivered
+successor through the native CLI before reporting successful completion; final
+prose cannot replace delivery. An init marker establishes context only. It does
+not select a bridge target or require a bridge response for ordinary non-bridge
+work. The launcher preserves the complete owner prompt and never extracts an
+assignment from prose, a queue or a prior context.
+
 The delivered message identifies the next task; reconstruct current requirements
 from their canonical sources before acting. Bridge content is disposable and
 cannot establish durable authority or substitute for current work/project state.

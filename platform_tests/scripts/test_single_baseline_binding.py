@@ -18,14 +18,14 @@ consumers and not others reproduces the original defect exactly, and (ii) is wha
 turns that into a red test instead of a silently inert tree.
 
 WHAT COUNTS AS A BINDING. Not every ``.agents`` token is a baseline reference,
-and conflating them would make this guard both noisy and wrong. Two classes of
-legitimate, unrelated use exist in-tree and are deliberately excluded:
+and conflating them would make this guard both noisy and wrong. One class of
+legitimate, unrelated use exists in-tree and is deliberately excluded:
 
   - ``src.agents.containers.*`` — Python module paths for Agent Red's agent
     containers. Dotted module names, not filesystem baseline paths.
-  - ``Path.home() / ".agents"`` — an opt-in user-home extension-discovery path in
-    ``session_self_initialization.py``. A user-level directory outside the
-    project root, unrelated to the in-root baseline.
+
+(A second class, the opt-in ``Path.home() / ".agents"`` extension-discovery path
+of the SQLite-era startup generator, left the tree with that generator in 2026-09.)
 
 The detector therefore matches the retired name only where it is used as a
 project-relative *path* into baseline content, which is the shape that actually
@@ -73,9 +73,6 @@ _BINDING_RE = re.compile(
 # Files permitted to mention a retired baseline for reasons other than binding.
 # Each entry is a deliberate, documented exception rather than a suppression.
 ALLOWED_FILES = {
-    # Opt-in user-home extension discovery: `Path.home() / ".agents" / "skills"`.
-    # A user-level directory outside the project root, not the in-root baseline.
-    "scripts/session_self_initialization.py",
     # This guard names the retired baseline in order to detect it.
     "platform_tests/scripts/test_single_baseline_binding.py",
     # Governance classification rule `pattern = ".agents/**"`, which assigns a

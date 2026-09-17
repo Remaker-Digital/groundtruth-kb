@@ -7,8 +7,8 @@
 This file inventories the control surfaces that govern agent coordination,
 bridge behavior, and recurring automation.
 
-> **GT-KB host note (2026-06-15):** In the GT-KB host after the TAFE/dispatcher
-> cutover, dispatcher/TAFE bridge state is canonical. The retired bridge-index
+> **GT-KB host note (2026-06-15):** In the GT-KB host after the dispatcher
+> cutover, the dispatcher's bridge state is canonical. The retired bridge-index
 > artifact is not canonical bridge-state or dispatcher authority.
 
 ## Roles and ownership
@@ -40,7 +40,7 @@ If this project uses the file bridge pattern, capture the exact status rules.
 | Loyal Opposition -> Prime Builder | GO, NO-GO | NEW, REVISED | VERIFIED |
 
 Notes:
-- TAFE/dispatcher bridge state is the authoritative queue when the bridge is
+- Dispatcher bridge state is the authoritative queue when the bridge is
   active. Do not use or recreate retired bridge-index artifacts for live
   bridge state.
 - Entries are newest-first. Only the latest status for each document entry is

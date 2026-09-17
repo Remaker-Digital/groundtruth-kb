@@ -69,7 +69,10 @@ Author each metadata key exactly once: `bridge_kind`, Document, Version, Date,
 context for authored session attribution. A native runtime identifier is not
 that canonical binding.
 
-Implementation messages identify Project and Work Item. A NEW or REVISED
+NEW, REVISED and BLOCKED identify Project and Work Item with plain canonical
+metadata lines. Other lifecycle messages inherit the exact claimed relationship;
+if they repeat those identifiers, the values must match. An unscoped ADVISORY
+does not acquire work-item membership by citing work in prose. A NEW or REVISED
 proposal carries its exact `target_paths`, `test_artifact_targets`, observed
 `work_item_version` and `spec_versions`. Use the current CLI context to obtain
 these versions. State the intended result, governing requirements, affected
@@ -83,6 +86,22 @@ Read back the result. The service validates and stores authored content without
 filling provenance, rewriting headers, allocating a different authored version,
 appending disclosures or changing the message body. Correct a refused message
 from current facts and retry through the CLI. Do not write raw bridge storage.
+
+## Canonical bridge kinds
+
+| Authored status | Required bridge_kind |
+|---|---|
+| NEW, REVISED | implementation_proposal |
+| GO, NO-GO, NOT-READY, VERIFIED, SUPERSEDED | lo_verdict |
+| READY | implementation_report |
+| ADVISORY | governance_advisory |
+| VERDICT-REJECTED | governance_review |
+| BLOCKED, WITHDRAWN | operational_state_change |
+
+The native taxonomy maps each current status to one kind. Retired aliases and
+index reconciliation cannot be authored as a current kind. A kind does not
+change role, routing, authorization, claim or lifecycle rules. Historical text
+remains inert; do not rewrite it or infer a successor from an obsolete kind.
 
 ## Statuses and review
 
@@ -100,7 +119,8 @@ from current facts and retry through the CLI. Do not write raw bridge storage.
 The ordinary chain is NEW proposal, GO, implementation, READY report, independent
 verification and VERIFIED. NO-GO rejects a proposal and requires REVISED.
 NOT-READY rejects a report and requires corrected READY. READY carries
-`bridge_kind: implementation_report`; verdicts use `lo_verdict`.
+`bridge_kind: implementation_report`; verdicts use `lo_verdict`. NEW is never an
+implementation report.
 
 VERDICT-REJECTED addresses a governance defect in a PB-addressed GO, NO-GO or
 NOT-READY. It is not a way to reject a terminal or non-dispatchable message.
@@ -110,8 +130,8 @@ work; it is not verification. BLOCKED is the headless initial refusal when the
 parent is not authorized. In an interactive session, ask the owner instead.
 ADVISORY is informational and never supplies execution authority.
 
-Historical nonconforming messages are readable only with their actual status
-and disposition. Obsolete statuses do not become current aliases or grant
+Historical nonconforming messages, including NO-ACTION and DEFERRED, are readable
+only with their actual status and disposition. Obsolete statuses do not become current aliases or grant
 claims, implementation readiness or completion. Never fabricate a transition or
 repair another author's provenance to keep an obsolete chain running.
 
@@ -122,6 +142,31 @@ observed results and limitations honestly. A passing narrow suite is not proof
 of a complete proposal. For operations, the verifier must not perform the
 operation it verifies. An evidence anchor or asserted test result is not proof
 that the cited behavior was inspected or executed.
+
+## Lawful successors
+
+Use this relation with current claim, role, scope and review checks. A listed
+successor does not waive those checks. The active
+SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 defines the contract; the package vocabulary
+is its single implementation relation.
+
+| Current status | Permitted next status |
+|---|---|
+| start | NEW, BLOCKED, ADVISORY |
+| BLOCKED | NEW, WITHDRAWN |
+| NEW, REVISED | GO, NO-GO, WITHDRAWN, SUPERSEDED |
+| NO-GO | REVISED, WITHDRAWN, VERDICT-REJECTED, SUPERSEDED |
+| GO | READY, VERDICT-REJECTED, SUPERSEDED |
+| READY | VERIFIED, NOT-READY, SUPERSEDED |
+| NOT-READY | READY, VERDICT-REJECTED, SUPERSEDED |
+| VERDICT-REJECTED | GO, NO-GO, NOT-READY, SUPERSEDED |
+| VERIFIED | VERIFIED |
+| ADVISORY | ADVISORY |
+| WITHDRAWN, SUPERSEDED | None |
+
+VERIFIED to VERIFIED requires canonical fresh-verification work after changed
+reviewed bytes or a failed project commit. It grants no proposal or implementation
+permission for new formal intent. ADVISORY remains an advisory-only chain.
 
 ## Verification precedes the project commit
 
@@ -143,8 +188,12 @@ Changed reviewed bytes require fresh review of the affected work. A failed
 project commit is typed canonical finalization state, not a Dispatcher verdict.
 After an uncertain acknowledgement, inspect Git and use the CLI to confirm the
 same commit. Never reset history, manufacture a second commit or reuse stale GO.
-Material changes to formal intent after VERIFIED remain an owner-resolution
-condition until the canonical recovery contract is settled.
+Material formal-intent change after VERIFIED and before commit requires a fresh
+proposal, independent proposal review, implementation and verification attempt on
+the same uncommitted work item, preserving its membership and existing artifact
+bytes. Close the obsolete attempt through the canonical CLI and start NEW from
+current formal requirements. Do not reuse the old GO, fabricate WITHDRAWN or
+create a replacement work item. Committed work remains terminal.
 
 Terminal cleanup purges bridge payloads and retains only the minimum identity,
 disposition, commit identity and time required to prevent replay. Out-of-band

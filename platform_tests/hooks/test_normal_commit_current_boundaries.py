@@ -166,7 +166,7 @@ def test_staged_scan_refuses_unavailable_index_without_outputting_raw_git_diagno
     [
         "scripts/scan_secrets.py",
         "groundtruth-kb/tests/test_credential_patterns.py",
-        "groundtruth-kb/tests/test_intake.py",
+        "groundtruth-kb/tests/test_spec_intake_native.py",
     ],
 )
 def test_scanner_source_and_synthetic_fixtures_pass_without_line_exemptions(repo, name):

@@ -23,7 +23,7 @@ per ADR).
 
 ## Bridge essentials
 
-TAFE-backed bridge state is the canonical workflow state for proposals reviewed
+Dispatcher-backed bridge state is the canonical workflow state for proposals reviewed
 through the bridge. Retired bridge-index artifacts are not live bridge state.
 The bridge protocol is described in `.claude/rules/bridge-essential.md`; never
 delete bridge files (they form the audit trail).

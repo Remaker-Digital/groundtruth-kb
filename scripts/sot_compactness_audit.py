@@ -198,22 +198,16 @@ def default_registry() -> tuple[SurfaceRecord, ...]:
             notes="wrap_capture_transcript.py is manifest-only; full transcript content is deferred outside routine reads.",
         ),
         SurfaceRecord(
-            surface_id="advisory-router-output",
-            title="Advisory router scan output",
-            sot_class="Bridge numbered ADVISORY chain",
-            routine_command=(
-                "groundtruth-kb/.venv/Scripts/python.exe scripts/advisory_backlog_router.py "
-                "--dry-run --source bridge --compact"
-            ),
-            read_mode=READ_MODE_COMPACT_FLAG,
-            expected_default="Routine advisory scans should return counts and errors without full staged/skipped lists.",
-            coverage_refs=("scripts/advisory_backlog_router.py",),
-            governing_specs=("GOV-STANDING-BACKLOG-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            archival_command=(
-                "groundtruth-kb/.venv/Scripts/python.exe scripts/advisory_backlog_router.py --dry-run --source bridge"
-            ),
-            follow_on_disposition="No new work for this slice; keep --compact in routine advisory-router guidance.",
-            notes="The router has an explicit compact JSON mode and numbered bridge is the sole advisory input.",
+            surface_id="advisory-state-report",
+            title="Informational advisory state",
+            sot_class="Native bridge coordination",
+            routine_command="gt bridge state-report --json",
+            read_mode=READ_MODE_COMPACT_DEFAULT,
+            expected_default="Current advisory status counts are separate from both eligible role queues.",
+            coverage_refs=("groundtruth-kb/src/groundtruth_kb/bridge/native.py",),
+            governing_specs=("DCL-ADVISORY-ROUTING-001", "GOV-STANDING-BACKLOG-001"),
+            follow_on_disposition="Read current native state; the owner selects any advisory follow-up.",
+            notes="No candidate ledger, file-bridge scan, automatic promotion or disposition inference.",
         ),
         SurfaceRecord(
             surface_id="envelope-sharding-surface",

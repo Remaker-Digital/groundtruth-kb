@@ -115,7 +115,7 @@ MARKER_CONTINUITY_ORDER: tuple[str, ...] = (
 # module is the single home for the per-session path + sanitizer so the writer
 # (scripts/workstream_focus.py), the WI-4534 guard reader
 # (scripts/bridge_work_intent_registry.py), the resolver
-# (scripts/session_role_resolution.py), and the SessionStart sweeper
+# (the former role resolver is retired), and the SessionStart sweeper
 # (scripts/session_start_dispatch_core.py) cannot drift apart. Parity tests
 # bind every consumer to these helpers.
 #

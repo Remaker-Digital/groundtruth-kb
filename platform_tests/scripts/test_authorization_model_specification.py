@@ -1,135 +1,116 @@
-"""The authorization model states a project-record field, not an authorization instrument.
+"""Fitness of current project-authorization canon, read from explicit native authority.
 
-WI-7673 amended ``GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`` from "exact-project PAUTH is the
-sole bounded implementation grant" to the simplified model: authorization is a field on the project
-row, and no authorization instrument is normative.
-
-Each test maps to one of the seven amendment clauses in the approved proposal at
-``bridge/gtkb-wi7673-authorization-specification-amendment-003.md`` (GO at ``-004``).
-
-The tests read the live specification row rather than a fixture. The amendment's value is that the
-canonical row says this; a fixture would prove only that the fixture says it.
+These content checks accompany native behavioral tests for authorization,
+single-parent membership, program boundaries and NEW-only bridge checks. A
+positive content check does not replace execution or independent review.
 """
 
 from __future__ import annotations
 
 import pytest
-from groundtruth_kb.db import KnowledgeDB
+
+from platform_tests.groundtruth_kb.specs.conftest import formal_record as formal_record
 
 SPEC_ID = "GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001"
+pytestmark = pytest.mark.integration
 
 
 @pytest.fixture(scope="module")
-def spec() -> dict:
-    row = KnowledgeDB().get_spec(SPEC_ID)
-    assert row is not None, f"{SPEC_ID} is absent from MemBase"
-    return row
+def spec(formal_record) -> dict:
+    return formal_record(SPEC_ID)
 
 
 @pytest.fixture(scope="module")
 def body(spec: dict) -> str:
-    """Whitespace-normalized description.
-
-    Assertions target what the specification *says*, not where its lines happen to
-    wrap, so runs of whitespace collapse to a single space before matching.
-    """
-    return " ".join((spec.get("description") or "").split()).lower()
+    return " ".join(spec["description"].split()).lower()
 
 
 def test_specification_is_active_governance(spec: dict) -> None:
-    """The amendment is a new version of a live governance record, not a draft."""
-    assert spec["status"] == "active"
-    assert spec["type"] == "governance"
-    assert spec["version"] >= 5, "the amended version is v5 or later"
-
-
-# --- clause 1: authorization is a field on the project row ------------------------
+    assert spec["status"] == "active" and spec["type"] == "governance"
+    assert isinstance(spec["version"], int) and spec["version"] > 0
+    assert {
+        "groundtruth-kb/src/groundtruth_kb/native_authority.py",
+        "groundtruth-kb/src/groundtruth_kb/cli_authority.py",
+        "groundtruth-kb/src/groundtruth_kb/bridge/native.py",
+    } <= set(spec["source_paths"])
+    assert "groundtruth-kb/src/groundtruth_kb/db.py" not in spec["source_paths"]
 
 
 def test_clause_1_authorization_is_a_project_row_field(body: str) -> None:
-    assert "field on the project row" in body
-    assert "`authorized` or `not authorized`" in body
-    assert "new projects are created `authorized`" in body
+    assert "one authorization field named authorization" in body
+    assert "value authorized or not authorized" in body
+    assert "new execution projects default to authorized" in body
+    assert "project-gtkb-new-work-intake, which is permanently not authorized" in body
+    assert "programs have no authorization value" in body
 
 
 def test_clause_1_only_owner_direction_sets_it(body: str) -> None:
-    assert "owner direction sets it and nothing else does" in body
-
-
-# --- clause 2: no authorization instrument ---------------------------------------
+    assert "owner direction sets it" in body
+    assert "agent-initiated membership change cannot set authorization" in body
 
 
 def test_clause_2_no_authorization_instrument_exists(body: str) -> None:
-    """The abolished vocabulary is named as absent, not merely omitted."""
-    for noun in ("instrument", "record", "envelope", "packet", "receipt", "token", "identifier"):
-        assert noun in body, f"clause 2 must name {noun!r} among the abolished forms"
-    assert "none is created or referenced" in body
+    assert "no separate authorization artifact, identifier, packet, receipt, token, or decision ledger exists" in body
 
 
 def test_clause_2_the_title_no_longer_names_an_instrument_as_the_grant(spec: dict) -> None:
-    """The prior title made the instrument the sole grant; that is the claim being retired."""
-    title = (spec.get("title") or "").lower()
+    title = spec["title"].lower()
+    assert "authorization" in title and "work ordering" in title and "one current field" in title
     assert "sole bounded implementation grant" not in title
-    assert "field on the project row" in title
-
-
-# --- clause 3: authorization carries no scope ------------------------------------
 
 
 def test_clause_3_authorization_carries_no_scope_semantics(body: str) -> None:
-    assert "no scope, expiry, mutation-class, or forbidden-operation semantics" in body
+    assert (
+        "no change scope, expiry, mutation classes, forbidden operations, credentials, or per-action permissions"
+        in body
+    )
 
 
 def test_clause_3_scope_lives_on_membership_and_target_paths(body: str) -> None:
-    assert "work-item scope is project membership" in body
-    assert "target_paths" in body
-
-
-# --- clause 4: purpose is work ordering ------------------------------------------
+    assert "each work item belongs to exactly one execution project" in body
+    assert "change scope is the proposal's target_paths together with its applicable current formal authority" in body
 
 
 def test_clause_4_purpose_is_work_ordering_not_permission(body: str) -> None:
-    assert "work ordering" in body
-    assert "not a permission system" in body
-    assert "not yet, not forbidden" in body
-
-
-# --- clause 5: dispatch is complete proof ----------------------------------------
+    assert "whether new work may be dispatched now" in body
+    assert "distinct from activation, verification, concurrency, independent review, and completion" in body
+    assert "no change scope" in body and "per-action permissions" in body
 
 
 def test_clause_5_dispatch_is_itself_complete_proof(body: str) -> None:
-    assert "dispatch is itself" in body and "complete proof" in body
-    assert "does not re-derive" in body
+    assert "a dispatch is sufficient direction" in body
+    assert "check is confined to a new proposal" in body
+    assert "later authorization change does not invalidate an already initiated bridge chain" in body
 
 
-def test_clause_5_dispatchable_when_any_project_is_authorized(body: str) -> None:
-    assert "dispatchable when any project it belongs to is `authorized`" in body
-
-
-# --- clause 6: legacy records grant and deny nothing ------------------------------
+def test_clause_5_dispatch_uses_exactly_one_current_parent(body: str) -> None:
+    assert "derives this ordering condition from that current parent" in body
+    assert "program sequences projects and cannot directly contain executable work items" in body
+    assert "unattached or multiply attached items require reconciliation to one parent" in body
+    assert (
+        "move must atomically replace the current parent, retain history, and return the new membership on readback"
+        in body
+    )
+    assert "membership of a commit-terminal work item is immutable" in body
 
 
 def test_clause_6_legacy_records_grant_and_deny_nothing(body: str) -> None:
-    assert "grant and deny nothing" in body
-    assert "no live gate may derive authorization" in body
-
-
-# --- clause 7: readiness controls retained, and are not authorization -------------
+    assert "labels and historical membership-role fields confer no alternative membership or authority" in body
+    assert "no separate authorization artifact" in body
+    assert "legacy resolution label alone is not proof of that terminal state" in body
 
 
 def test_clause_7_readiness_controls_are_retained(body: str) -> None:
-    """All five controls survive the amendment; only their characterization changes."""
-    for control in (
-        "specification-linked implementation proposal",
-        "independent loyal opposition review",
-        "linked executable test",
-        "live work-intent claim",
-        "applicable active formal authority",
+    for requirement in (
+        "applicable current formal specification",
+        "specification-linked proposal",
+        "independent loyal opposition go",
+        "linked executable test and test-plan phase",
+        "matching claim for the next bridge action",
     ):
-        assert control in body, f"readiness control {control!r} must be retained"
+        assert requirement in body
+    assert "claiming an action does not give an agent ownership of its work item or chain" in body
 
 
 def test_clause_7_readiness_controls_are_not_authorization(body: str) -> None:
-    """The distinction is the point: passing a review gate is not being authorized."""
-    assert "they are not authorization" in body
-    assert "passing them does not make them authorization" in body
+    assert "review, evidence, and concurrency controls, not additional authorization carriers" in body

@@ -60,25 +60,29 @@ Owner deliberation `DELIB-S347-AGENT-RED-REFERENCE-ADOPTER-FRAMING-RESTORATION`
 explicitly describes the "reference adopter" framing for Agent Red and authorizes
 this narrative edit.
 
-## Formal Artifact Approval And Audit Principle
+## Owner direction and native specification authority
 
-Owner deliberation `DELIB-0835` and formal records
-`GOV-ARTIFACT-APPROVAL-001`, `PB-ARTIFACT-APPROVAL-001`,
-`ADR-ARTIFACT-FORMALIZATION-GATE-001`, and
-`DCL-ARTIFACT-APPROVAL-HOOK-001` establish a strict default for formal artifact
-management.
+Read current formal requirements through `gt spec show`. The owner directs
+formal substance; an assigned scope already supported by owner direction does
+not need a second per-artifact approval. Ask only a material unresolved choice.
+Drafting text does not create a canonical requirement. Apply directed changes
+through `gt spec record` with the freshly read version, actual attribution and
+a concrete change reason, then compare a separate canonical readback.
 
-When user input is inferred to require a Deliberation Archive entry, GOV, SPEC,
-PB, ADR, or DCL, the proposed artifact must be presented in native review format
-with full content and metadata before it is treated as canonical project truth.
+GOV-ARTIFACT-APPROVAL-001, PB-ARTIFACT-APPROVAL-001,
+ADR-ARTIFACT-FORMALIZATION-GATE-001 and DCL-ARTIFACT-APPROVAL-HOOK-001
+describe the native writer and current authority contract under
+GOV-ARTIFACT-AUTHORITY-HIERARCHY-001. There is no intrinsic approval envelope,
+packet, receipt, digest, scoped auto-approval registry or transcript registration
+to create or validate. The actor string supplies attribution, not permission.
+Session logs retain the conversation without becoming an execution dependency.
 
-Canonical insertion, promotion, or mutation requires explicit user approval or
-acknowledgement unless the owner has activated a scoped auto-approval state for
-that exact artifact class.
-
-Auto-approval does not remove the display or audit requirement. When
-auto-approval is active, the explicit proposed change request must still be
-presented to the user and captured in the session transcript.
+The native writer checks typed fields and expected versions and atomically
+records the changed row and history. Current requirement status is distinct
+from implementation verification. A stale write requires fresh reconciliation.
+Project formal relationships use their own native route and preserve project
+authorization. These operations do not replace independent review, exact
+artifact claims, tests or the project commit lifecycle.
 
 ## Release And Adoption Governance Principle
 
@@ -116,36 +120,18 @@ to GOV, SPEC, PB, ADR, DCL, or another formal artifact type.
 Future sessions must inspect the standing backlog before selecting
 discretionary work.
 
-## Session Self-Initialization Principle
+## Session startup and wrap-up
 
-Owner decision `DELIB-0840` and formal records
-`GOV-SESSION-SELF-INITIALIZATION-001`,
-`PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001` establish the required fresh-session
-self-initialization experience.
+Follow the canonical baseline `rules/session-bootstrap.md` for exact immutable
+context binding, explicit transient activity, current startup disclosure and
+proactive read-only wrap-up guidance. Preserve owner input. A harness has no
+role mapping, and a lifecycle notification does not authorize mutations.
 
-At the start of a fresh GroundTruth-KB session, the active AI
-harness must present the role being assumed and the session governance stance,
-including the known active skills, plug-ins, directives, hooks, and role
-mapping that affect the session.
-
-## Session Lifecycle Engagement And Wrap-Up Principle
-
-Owner decision `DELIB-0841` and formal records
-`GOV-SESSION-LIFECYCLE-PROACTIVE-ENGAGEMENT-001`,
-`PB-SESSION-WRAP-UP-PROACTIVE-001`, and
-`DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001` establish that session lifecycle
-management is proactive.
-
-The owner should not have to explicitly instruct GroundTruth-KB to initiate
-session wrap-up guidance. Each session should actively inform and engage the
-owner by drawing attention to priorities across all project dimensions and by
-simplifying owner input through concrete suggested actions and priority choices.
-
-Automatic session lifecycle hooks may generate startup reports, dashboard
-snapshots, proactive wrap-up reports, and suggested next actions. Mutating
-wrap-up work such as MemBase updates, Deliberation Archive insertion, commits,
-pushes, deployment, or external updates remains governed by the applicable
-approval, acknowledgement, or owner-authorized automation scope.
+Current formal requirements are `GOV-SESSION-SELF-INITIALIZATION-001`,
+`PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001`,
+`DCL-SESSION-STARTUP-TOKEN-BUDGET-001`, `PB-SESSION-WRAP-UP-PROACTIVE-001`,
+and `DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001`. Read their current records;
+superseded lifecycle requirements and historical deliberations are not authority.
 
 ## Deterministic Services Principle
 
@@ -172,11 +158,10 @@ must:
 3. Not silently absorb the friction (which would make the cost
    invisible to governance).
 
-This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`
-(`DELIB-0874`) with an active-pursuit operational mandate. It does NOT
-supersede `GOV-ARTIFACT-APPROVAL-001` — formal artifact approval evidence
-is still required; the principle suggests the *delivery mechanism* of
-that approval should be a service, not per-instance ceremony.
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` with an
+active-pursuit operational mandate. Apply existing owner direction through the
+current domain writer. Automation does not invent owner decisions or weaken
+review and effect boundaries; it does not require an approval-evidence service.
 
 The principle is a bias, not an absolute. One-off intelligent decisions,
 operations that genuinely need session context unavailable to a service,

@@ -234,8 +234,8 @@ checks should pass at this point.
 
 See the [Bootstrap Guide](bootstrap.md) for the full 10-step technical
 walkthrough (seed data, first spec, first test, first assertion, Web UI,
-CI). See [Desktop Setup](desktop-setup.md) for the same-day prototype
-path (`gt bootstrap-desktop`).
+CI). See [Desktop Setup](desktop-setup.md) for the same-day application
+setup path (`gt application register` then `gt project init`).
 
 ## 5. PowerShell Primer
 
@@ -387,7 +387,7 @@ Once this page makes sense, walk through these in order:
 |------|---------|
 | Install | `pip install groundtruth-kb` |
 | Scaffold a project | `gt project init my-project --profile <profile>` |
-| Same-day prototype | `gt bootstrap-desktop my-project` |
+| Same-day application setup | `gt application register my-project --host-root <host>` then `gt project init my-project --project-id <PROJECT> --host-root <host> --owner <owner>` |
 | Check workstation | `gt project doctor` |
 | View summary | `gt summary` |
 | Run assertions | `gt assert` |

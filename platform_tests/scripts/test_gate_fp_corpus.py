@@ -9,16 +9,12 @@ SPEC-AUQ-POLICY-ENGINE-001 / DCL-CROSS-HARNESS-ENFORCEMENT-001).
 
 from __future__ import annotations
 
-import sys
 import tomllib
 from pathlib import Path
 
 import pytest
 
 _ROOT = Path(__file__).resolve().parents[2]
-_SRC = _ROOT / "groundtruth-kb" / "src"
-if _SRC.is_dir() and str(_SRC) not in sys.path:
-    sys.path.insert(0, str(_SRC))
 
 from groundtruth_kb.enforcement import check_bash_command, check_path_boundary  # noqa: E402
 
@@ -26,21 +22,26 @@ _CORPUS_PATH = _ROOT / "config" / "governance" / "gate-fp-corpus.toml"
 _CORPUS = tomllib.loads(_CORPUS_PATH.read_text(encoding="utf-8"))
 
 
+def _command(case: dict) -> str:
+    # `{ROOT}` stands for the checkout the parser is given, so in-root absolute paths are measured anywhere.
+    return case["command"].replace("{ROOT}", str(_ROOT))
+
+
 @pytest.mark.parametrize("case", _CORPUS.get("bash_parser_pass", []), ids=lambda c: c["command"][:48])
 def test_bash_parser_allows_false_positive_cases(case):
-    allowed, reason = check_bash_command(case["command"], _ROOT)
+    allowed, reason = check_bash_command(_command(case), _ROOT)
     assert allowed, f"FP regression: {case['command']!r} falsely blocked: {reason} ({case.get('note')})"
 
 
 @pytest.mark.parametrize("case", _CORPUS.get("bash_parser_block", []), ids=lambda c: c["command"][:48])
 def test_bash_parser_blocks_genuine_violations(case):
-    allowed, _reason = check_bash_command(case["command"], _ROOT)
+    allowed, _reason = check_bash_command(_command(case), _ROOT)
     assert not allowed, f"True-negative: {case['command']!r} should still be blocked ({case.get('note')})"
 
 
 @pytest.mark.parametrize("case", _CORPUS.get("powershell_parser_pass", []), ids=lambda c: c["command"][:48])
 def test_powershell_parser_allows_false_positive_cases(case):
-    allowed, reason = check_bash_command(case["command"], _ROOT)
+    allowed, reason = check_bash_command(_command(case), _ROOT)
     assert allowed, f"PowerShell FP regression: {case['command']!r} falsely blocked: {reason} ({case.get('note')})"
 
 

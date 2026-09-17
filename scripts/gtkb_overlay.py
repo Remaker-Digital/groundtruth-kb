@@ -52,7 +52,7 @@ DEFAULT_OVERLAY_TTL = timedelta(hours=12)
 # non-authoritative — kept here only so session startup can surface a
 # stale-aware context view without re-reading large artifacts.
 ALLOWLIST: tuple[tuple[str, str], ...] = (
-    ("docs/gtkb-dashboard/dashboard-data.json", "dashboard-data.json"),
+    (".groundtruth/dashboard/dashboard-data.json", "dashboard-data.json"),
     ("docs/gtkb-dashboard/session-startup-report.md", "session-startup-report.md"),
     ("docs/gtkb-dashboard/session-wrapup-report.md", "session-wrapup-report.md"),
     ("memory/gtkb-dashboard-history.json", "gtkb-dashboard-history.json"),
@@ -197,7 +197,7 @@ def _assert_not_forbidden(source_uri: str) -> None:
 
 
 def _validate_allowlist_source(source_uri: str) -> str:
-    normalized = source_uri.replace("\\", "/").lstrip("./")
+    normalized = source_uri.replace("\\", "/").removeprefix("./")
     for allowed_uri, overlay_path in ALLOWLIST:
         if normalized == allowed_uri:
             _assert_not_forbidden(normalized)

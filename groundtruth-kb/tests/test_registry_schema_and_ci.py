@@ -1,5 +1,5 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""GTKB-ISOLATION-017 Slice 2: schema-lock + CI-wiring meta-tests + GOV-20.
+"""GTKB-ISOLATION-017 Slice 2: schema-lock + CI-wiring meta-tests.
 
 T-SCHEMA documents that scoping `-003` line 83 acceptance ("`owner` and
 `upgrade_policy` fields") is satisfied by the existing
@@ -8,9 +8,6 @@ T-SCHEMA documents that scoping `-003` line 83 acceptance ("`owner` and
 T-CI is a meta-test asserting the new Slice 2 test files live under
 ``tests/`` and are therefore pytest-collected by the existing ``test-base``
 CI lane (`groundtruth-kb/.github/workflows/ci.yml`).
-
-T-IPR-CVR (GOV-20 Phase 1) asserts the IPR + CVR documents exist in KB
-with the ADR tag.
 
 Bridge authority: ``bridge/gtkb-isolation-017-slice2-registry-isolation-004.md`` GO.
 """
@@ -61,9 +58,3 @@ def test_slice2_test_files_live_under_tests_directory() -> None:
     )
     for name in expected_files:
         assert (tests_dir / name).is_file(), f"Slice 2 test file missing: {name}"
-
-
-def _kb_path() -> Path:
-    here = Path(__file__).resolve()
-    # tests/test_registry_schema_and_ci.py -> groundtruth-kb/ -> E:/GT-KB
-    return here.parents[2] / "groundtruth.db"

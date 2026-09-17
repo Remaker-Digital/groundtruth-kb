@@ -136,3 +136,20 @@ def test_explicit_empty_volatile_set_preserves_all_fields():
 def test_missing_field_and_explicit_null_are_distinct_inventory_states():
     assert checker.inventory_diff_summary({}, {"installation": None}) == ["installation"]
     assert checker.inventory_diff_summary({"installation": None}, {}) == ["installation"]
+
+
+def test_native_collection_failure_is_typed_and_preserves_recorded_inventory(tmp_path, monkeypatch, capsys):
+    from scripts import collect_dev_environment_inventory as collector
+
+    _, inventory = setup_inventory(tmp_path, payload())
+    before = inventory.read_bytes()
+
+    def unavailable(*_args, **_kwargs):
+        raise collector.InventoryError("native_harness_authority_unavailable")
+
+    monkeypatch.setattr(collector, "collect_inventory", unavailable)
+    assert checker.main(["--project-root", str(tmp_path), "--json"]) == 1
+    result = json.loads(capsys.readouterr().out)
+    assert result["outcome"] == "checker_error"
+    assert result["error"] == "native_harness_authority_unavailable"
+    assert inventory.read_bytes() == before

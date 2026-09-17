@@ -36,7 +36,9 @@ def test_loader_reads_both_files_and_all_record_ids_unique() -> None:
     assert len(ids) == len(set(ids)), f"duplicate ids: {[x for x in ids if ids.count(x) > 1]}"
     # Sibling file contributes ownership-glob records.
     glob_rows = [r for r in records if isinstance(r, OwnershipGlobArtifact)]
-    assert len(glob_rows) >= 6, "sibling file must contribute at least 6 ownership-glob rows"
+    # Five rows since the three legacy-exception rows retired (O-7 R27): groundtruth.toml, bridge, memory,
+    # webapp and the upgrade staging area.
+    assert len(glob_rows) == 5, "sibling file must contribute exactly the five current ownership-glob rows"
 
 
 def test_loader_rejects_ownership_glob_with_file_class_keys() -> None:
@@ -203,11 +205,11 @@ def test_resolver_classify_path_matches_registry_target_path() -> None:
 
 def test_resolver_registry_row_wins_over_glob_on_exact_match() -> None:
     """FILE-class target_path wins over any ownership-glob that would also match."""
-    # .claude/hooks/assertion-check.py is a registry row; we verify it wins
-    # even though any hypothetical glob like ".claude/**" could also match.
+    # .claude/hooks/destructive-gate.py is a registry row (the assertion-check hook retired with the SQLite
+    # assertion runner); it wins even though a hypothetical glob like ".claude/**" could also match.
     resolver = OwnershipResolver()
-    rec = resolver.classify_path(".claude/hooks/assertion-check.py")
-    assert rec.id == "hook.assertion-check"
+    rec = resolver.classify_path(".claude/hooks/destructive-gate.py")
+    assert rec.id == "hook.destructive-gate"
     assert rec.source_class == "file"
 
 
@@ -234,23 +236,17 @@ def test_resolver_path_classification_excludes_settings_and_gitignore() -> None:
 def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     """With scaffold-ownership.toml present, artifacts_for_scaffold excludes ownership-glob rows.
 
-    Post-governance-completeness + Slice 1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL
-    + Slices 3+4 GTKB-ISOLATION-017:
-    - local-only scaffolds 20 = 13 hooks + 4 rules (incl. canonical-terminology-policy)
-      + 3 file-class records (Slice 3 README + release-readiness + Slice 4
-      upgrade-rehearsal-recipe).
-    - dual-agent scaffolds 61 = 18 hooks + 11 rules + 11 skills + 3 files
-      + 14 settings + 4 gitignore.
+    Current registry (after the retirements of the SQLite-era hooks, the packet gate, the rehearsal recipe and
+    the Codex adapters): local-only scaffolds 14 = 6 hooks + 5 rules + 2 files + 1 skill; dual-agent scaffolds
+    37 = 7 hooks + 12 rules + 7 skills + 2 files + 5 settings registrations + 4 gitignore patterns.
 
     The sibling file contains only ownership-glob records which are filtered
     out by the helper — the ownership-glob exclusion invariant is preserved.
     """
-    # local-only post-Slice-1+3+4: 20 (13 hooks + 4 rules + 3 file-class)
     ids = {a.id for a in artifacts_for_scaffold("local-only")}
-    assert len(ids) == 20
-    # dual-agent scaffold: 61 rows post-Slice-1+3+4 after retired hook cleanup.
+    assert len(ids) == 14
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 61
+    assert len(ids_da) == 37
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 

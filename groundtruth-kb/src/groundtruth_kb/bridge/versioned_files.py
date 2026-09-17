@@ -143,7 +143,7 @@ def status_from_bridge_text(text: str) -> str | None:
     return parse_bridge_header_block(text).status
 
 
-def test_parser_reads_every_canonical_status():
+def test_parser_reads_every_canonical_status() -> None:
     for status in CANONICAL_STATUSES:
         assert _line_status_token(status) == status
 

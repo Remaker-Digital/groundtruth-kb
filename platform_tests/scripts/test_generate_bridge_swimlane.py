@@ -1,244 +1,222 @@
-"""Tests for ``scripts/gtkb_dashboard/generate_bridge_swimlane.py``.
-
-Slice 2.1 of GTKB-DASHBOARD-002 — see
-``bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-005.md``.
-
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""
+"""Native bridge observations for the dashboard; no lifecycle authority."""
 
 from __future__ import annotations
 
-import os
-import subprocess
-import sys
-import time
-from pathlib import Path
+import copy
+import json
 
 import pytest
+from groundtruth_kb import dashboard_swimlane as gbs
+from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-# E402: import intentionally follows the sys.path.insert above so the test
-# can resolve scripts.gtkb_dashboard from REPO_ROOT regardless of CWD.
-from scripts.gtkb_dashboard import generate_bridge_swimlane as gbs  # noqa: E402
-
-# ----------------------------- helpers -----------------------------
+NOW = "2026-09-12T20:00:00+00:00"
+HEAD = "2026-09-12T19:50:00+00:00"
 
 
-def _seed_bridge_file(project_root: Path, name: str, content: str = "NEW\n") -> Path:
-    path = project_root / "bridge" / name
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(content, encoding="utf-8")
-    return path
-
-
-def _git(args: list[str], cwd: Path) -> str:
-    completed = subprocess.run(
-        ["git", *args],
-        cwd=str(cwd),
-        check=True,
-        capture_output=True,
-        text=True,
-        env={
-            **os.environ,
-            "GIT_AUTHOR_NAME": "Test",
-            "GIT_AUTHOR_EMAIL": "t@t",
-            "GIT_COMMITTER_NAME": "Test",
-            "GIT_COMMITTER_EMAIL": "t@t",
-        },
-    )
-    return completed.stdout.strip()
-
-
-def _init_repo(project_root: Path) -> None:
-    _git(["init", "-q"], project_root)
-    _git(["config", "user.email", "t@t"], project_root)
-    _git(["config", "user.name", "Test"], project_root)
-    _git(["config", "commit.gpgsign", "false"], project_root)
-
-
-def _commit_all(project_root: Path, *, message: str, when: str | None = None) -> str:
-    _git(["add", "-A"], project_root)
-    env = {
-        **os.environ,
-        "GIT_AUTHOR_NAME": "Test",
-        "GIT_AUTHOR_EMAIL": "t@t",
-        "GIT_COMMITTER_NAME": "Test",
-        "GIT_COMMITTER_EMAIL": "t@t",
+def attempt(identity="example", status="NEW", *, disposition="active", claim=None):
+    return {
+        "id": identity,
+        "work_item_id": "WI-1",
+        "project_id": "PROJECT-1",
+        "head_version": 1 if status else 0,
+        "head_status": status,
+        "disposition": disposition,
+        "created_at": HEAD,
+        "closed_at": None if disposition == "active" else NOW,
+        "terminal_commit": "a" * 40 if disposition == "committed" else None,
+        "head_created_at": HEAD if disposition == "active" and status else None,
+        "next_artifact_claim": claim,
     }
-    if when:
-        env["GIT_AUTHOR_DATE"] = when
-        env["GIT_COMMITTER_DATE"] = when
-    completed = subprocess.run(
-        ["git", "commit", "--quiet", "-m", message],
-        cwd=str(project_root),
-        check=True,
-        capture_output=True,
-        text=True,
-        env=env,
-    )
-    return completed.stdout
 
 
-# ----------------------------- tests -----------------------------
-
-
-def test_generate_swimlane_empty_index(tmp_path: Path) -> None:
-    snapshot = gbs.generate_swimlane(tmp_path)
-    assert snapshot["threads"] == []
-    assert snapshot["summary"]["thread_count"] == 0
-    assert snapshot["summary"]["open_count"] == 0
-    assert snapshot["summary"]["oldest_open_minutes"] is None
-
-
-def test_generate_swimlane_single_thread(tmp_path: Path) -> None:
-    _seed_bridge_file(tmp_path, "foo-bar-001.md", "NEW\n")
-    snapshot = gbs.generate_swimlane(tmp_path)
-    assert len(snapshot["threads"]) == 1
-    thread = snapshot["threads"][0]
-    assert thread["document"] == "foo-bar"
-    assert thread["latest_status"] == "NEW"
-    assert thread["latest_filename"] == "foo-bar-001.md"
-    assert thread["latest_version"] == 1
-    assert thread["version_count"] == 1
-    assert thread["is_terminal"] is False
-    assert thread["awaiting_lo"] is True
-    assert thread["awaiting_prime"] is False
-
-
-def test_generate_swimlane_multi_version(tmp_path: Path) -> None:
-    version_statuses = {
-        1: "NO-GO",
-        2: "REVISED",
-        3: "GO",
-        4: "NEW",
-        5: "VERIFIED",
+def observation(rows=(), *, eligible=(), blocked=()):
+    counts = {}
+    mix = {}
+    for row in rows:
+        counts[row["disposition"]] = counts.get(row["disposition"], 0) + 1
+        if row["disposition"] == "active" and row["head_status"]:
+            mix[row["head_status"]] = mix.get(row["head_status"], 0) + 1
+    queues = {role: {"role": role, "eligible": [], "blocked": []} for role in ("pb", "lo")}
+    for key, entries in (("eligible", eligible), ("blocked", blocked)):
+        for identity, role in entries:
+            queues[role][key].append({"id": identity, "payload": "PRIVATE-QUEUE-PAYLOAD"})
+    return {
+        "observed_at": NOW,
+        "attempts": list(rows),
+        "attempt_counts": counts,
+        "active_status_mix": [{"status": key, "count": value} for key, value in sorted(mix.items())],
+        "unfiled_attempt_count": sum(r["disposition"] == "active" and r["head_status"] is None for r in rows),
+        "active_claim_count": sum(r["next_artifact_claim"] is not None for r in rows),
+        "queues": queues,
     }
-    for version, status in version_statuses.items():
-        _seed_bridge_file(tmp_path, f"alpha-{version:03d}.md", f"{status}\n")
-    snapshot = gbs.generate_swimlane(tmp_path)
-    thread = snapshot["threads"][0]
-    assert thread["latest_status"] == "VERIFIED"
-    assert thread["latest_version"] == 5
-    assert thread["version_count"] == 5
-    assert thread["is_terminal"] is True
 
 
-def test_generate_swimlane_terminality(tmp_path: Path) -> None:
-    for name, status in (
-        ("aa-001.md", "VERIFIED"),
-        ("bb-001.md", "NO-GO"),
-        ("cc-001.md", "GO"),
-        ("dd-001.md", "NEW"),
-        ("ee-001.md", "REVISED"),
-    ):
-        _seed_bridge_file(tmp_path, name, f"{status}\n")
-    snapshot = gbs.generate_swimlane(tmp_path)
-    by_doc = {t["document"]: t for t in snapshot["threads"]}
-    assert by_doc["aa"]["is_terminal"] is True and by_doc["aa"]["awaiting_prime"] is False
-    assert by_doc["bb"]["awaiting_prime"] is True and by_doc["bb"]["awaiting_lo"] is False
-    assert by_doc["cc"]["awaiting_prime"] is True and by_doc["cc"]["is_terminal"] is False
-    assert by_doc["dd"]["awaiting_lo"] is True and by_doc["dd"]["awaiting_prime"] is False
-    assert by_doc["ee"]["awaiting_lo"] is True
-
-
-def test_generate_swimlane_summary_counts(tmp_path: Path) -> None:
-    statuses = ["VERIFIED", "VERIFIED", "VERIFIED", "VERIFIED", "NO-GO", "GO", "NEW", "NEW", "REVISED", "REVISED"]
-    for idx, status in enumerate(statuses, start=1):
-        _seed_bridge_file(tmp_path, f"thread-{idx:02d}-001.md", f"{status}\n")
-    snapshot = gbs.generate_swimlane(tmp_path)
-    summary = snapshot["summary"]
-    assert summary["thread_count"] == 10
-    assert summary["terminal_count"] == 4
-    assert summary["open_count"] == 6
-    assert summary["awaiting_prime_count"] == 2  # NO-GO + GO
-    assert summary["awaiting_lo_count"] == 4  # 2 NEW + 2 REVISED
-
-
-def test_generate_swimlane_age_from_git(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("GTKB_BRIDGE_SWIMLANE_USE_GIT_TIMESTAMPS", "1")
-    _init_repo(tmp_path)
-    _seed_bridge_file(tmp_path, "zz-001.md", "NEW\n")
-    # Commit with controlled timestamp 10 minutes ago.
-    when = "2026-04-24T15:00:00+0000"
-    _commit_all(tmp_path, message="seed", when=when)
-    snapshot = gbs.generate_swimlane(tmp_path)
-    thread = snapshot["threads"][0]
-    parsed_updated = gbs._parse_iso(thread["last_updated_at"])
-    assert parsed_updated is not None
-    assert parsed_updated.isoformat() == "2026-04-24T15:00:00+00:00"
-    # Age computed from now → at least many minutes since 2026-04-24.
-    # We just assert it's an integer ≥ 0 and last_updated_at parses.
-    assert thread["age_in_state_minutes"] is not None
-    assert thread["age_in_state_minutes"] >= 0
-    # Check git committer ISO format roundtrip.
-    parsed = gbs._parse_iso(thread["last_updated_at"])
-    assert parsed is not None
-
-
-def test_generate_swimlane_age_fallback_to_mtime(tmp_path: Path) -> None:
-    bridge_file = _seed_bridge_file(tmp_path, "yy-001.md", "NEW\n")
-    # No git repo initialized → git log returns nothing → fall back to mtime.
-    # Force mtime to a known recent value.
-    past = time.time() - 600  # 10 minutes ago
-    os.utime(bridge_file, (past, past))
-    snapshot = gbs.generate_swimlane(tmp_path)
-    thread = snapshot["threads"][0]
-    assert thread["last_updated_at"] is not None
-    age = thread["age_in_state_minutes"]
-    assert age is not None and age >= 8
-
-
-def test_generate_swimlane_state_sha(tmp_path: Path) -> None:
-    _seed_bridge_file(tmp_path, "hh-001.md", "NEW\n")
-    snapshot = gbs.generate_swimlane(tmp_path)
-    expected = gbs._state_sha256(
-        [
-            {
-                "document": "hh",
-                "latest_status": "NEW",
-                "latest_file": "hh-001.md",
-                "latest_version": 1,
-                "version_count": 1,
-            }
-        ]
+@pytest.fixture
+def native_observation(monkeypatch, tmp_path):
+    (tmp_path / "groundtruth.toml").write_text(
+        '[groundtruth]\nauthority_url="http://127.0.0.1:8765"\n', encoding="utf-8"
     )
-    assert snapshot["source_state_sha"] == expected
-    assert "source_index_sha" not in snapshot
+    current = {"report": observation(), "calls": []}
+
+    def request(self, method, path, **kwargs):
+        current["calls"].append((method, path, kwargs))
+        assert (method, path, kwargs) == ("GET", "/v1/bridge/state-report", {})
+        if isinstance(current["report"], Exception):
+            raise current["report"]
+        return copy.deepcopy(current["report"])
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    return current
 
 
-def test_write_swimlane_atomic(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    _seed_bridge_file(tmp_path, "ii-001.md", "NEW\n")
-    out = tmp_path / "out" / "bridge-swimlane.json"
-    # First, write it once successfully.
+def test_generate_swimlane_empty_observation_is_distinct_from_unavailable(tmp_path, native_observation):
+    result = gbs.generate_swimlane(tmp_path)
+    assert result["status"] == "observed" and result["observed_at"] == NOW
+    assert result["threads"] == [] and result["summary"]["thread_count"] == 0
+    (tmp_path / "groundtruth.toml").unlink()
+    missing = gbs.generate_swimlane(tmp_path)
+    assert missing["status"] == "unavailable" and missing["summary"] is None
+    assert missing["observed_at"] is None and len(native_observation["calls"]) == 1
+
+
+def test_native_queue_and_disposition_determine_lanes_without_status_ownership(tmp_path, native_observation):
+    rows = [
+        attempt("advice", "ADVISORY"),
+        attempt("reviewed", "VERIFIED"),
+        attempt("recheck", "VERIFIED"),
+        attempt("pb", "NOT-READY"),
+        attempt("blocked", "READY"),
+        attempt("closed", "VERIFIED", disposition="committed"),
+        attempt("unfiled", None),
+    ]
+    native_observation["report"] = observation(
+        rows, eligible=[("recheck", "lo"), ("pb", "pb")], blocked=[("blocked", "lo")]
+    )
+    result = gbs.generate_swimlane(tmp_path)
+    by_id = {r["document"]: r for r in result["threads"]}
+    assert by_id["advice"]["queue"] is None
+    assert by_id["reviewed"]["disposition"] == "active" and by_id["reviewed"]["queue"] is None
+    assert by_id["recheck"]["queue"] == {"role": "lo", "state": "eligible"}
+    assert by_id["blocked"]["queue"] == {"role": "lo", "state": "blocked"}
+    assert by_id["closed"]["disposition"] == "committed" and by_id["closed"]["terminal_commit"] == "a" * 40
+    assert result["summary"] == {
+        "thread_count": 7,
+        "active_count": 6,
+        "closed_count": 1,
+        "eligible_pb_count": 1,
+        "eligible_lo_count": 1,
+        "blocked_count": 1,
+        "active_claim_count": 0,
+        "unfiled_count": 1,
+    }
+    assert not {
+        "advisory_count",
+        "no_go_count",
+        "actionable_count_for_prime",
+        "actionable_count_for_lo",
+        "advisory_disposition_count",
+        "failed_proposal_count",
+    }.intersection(result["summary"])
+    assert "PRIVATE-QUEUE-PAYLOAD" not in json.dumps(result)
+    assert all("is_terminal" not in row and "awaiting_prime_dialogue" not in row for row in result["threads"])
+
+
+def test_claim_is_only_the_next_artifact_slot(tmp_path, native_observation):
+    claim = {
+        "next_version": 2,
+        "intended_status": "GO",
+        "expires_at": "2026-09-12T20:10:00+00:00",
+        "claimant": "PRIVATE-CLAIMANT",
+    }
+    native_observation["report"] = observation([attempt(claim=claim)])
+    result = gbs.generate_swimlane(tmp_path)
+    assert result["summary"]["active_claim_count"] == 1
+    assert result["threads"][0]["queue"] is None
+    assert result["threads"][0]["next_artifact_claim"] == {k: v for k, v in claim.items() if k != "claimant"}
+    assert "PRIVATE-CLAIMANT" not in json.dumps(result)
+
+
+def test_swimlane_uses_database_head_time_and_keeps_purged_time_unknown(tmp_path, native_observation):
+    poison = tmp_path / "bridge/obsolete-099.md"
+    poison.parent.mkdir()
+    poison.write_text("VERIFIED\n")
+    native_observation["report"] = observation([attempt(), attempt("withdrawn", "WITHDRAWN", disposition="withdrawn")])
+    result = gbs.generate_swimlane(tmp_path)
+    by_id = {r["document"]: r for r in result["threads"]}
+    assert by_id["example"]["age_in_state_minutes"] == 10
+    assert by_id["withdrawn"]["age_in_state_minutes"] is None and by_id["withdrawn"]["head_created_at"] is None
+    poison.write_text("NEW\n")
+    assert gbs.generate_swimlane(tmp_path) == result
+    assert all("latest_filename" not in r and "version_count" not in r for r in result["threads"])
+
+
+@pytest.mark.parametrize(
+    "change",
+    [
+        lambda r: r.pop("observed_at"),
+        lambda r: r.update(observed_at="2026-09-12T20:00:00"),
+        lambda r: r.update(active_claim_count=True),
+        lambda r: r.update(unfiled_attempt_count=1),
+        lambda r: r["attempts"].append(copy.deepcopy(r["attempts"][0])),
+        lambda r: r["attempts"][0].update(head_version=True),
+        lambda r: r["attempts"][0].update(head_created_at="malformed"),
+        lambda r: r["attempts"][0].update(disposition="unknown"),
+        lambda r: r["attempt_counts"].update(active=2),
+        lambda r: r["queues"]["lo"]["eligible"].append({"id": "missing"}),
+        lambda r: r["queues"]["lo"].update(role="pb"),
+        lambda r: r["queues"]["pb"]["eligible"].append({"id": "example"}),
+        lambda r: r["queues"]["lo"]["eligible"].extend([{"id": "example"}, {"id": "example"}]),
+    ],
+)
+def test_malformed_native_observations_are_unavailable_not_complete_zero(tmp_path, native_observation, change):
+    report = observation([attempt()])
+    change(report)
+    native_observation["report"] = report
+    result = gbs.generate_swimlane(tmp_path)
+    assert result["status"] == "unavailable" and result["summary"] is None
+    assert result["threads"] == [] and result["code"] == "invalid_native_bridge_observation"
+
+
+def test_unavailable_read_replaces_prior_observation_without_retaining_error_details(tmp_path, native_observation):
+    native_observation["report"] = observation([attempt()])
+    out = tmp_path / "out.json"
+    assert gbs.write_swimlane(tmp_path, out)["status"] == "observed"
+    native_observation["report"] = AuthorityClientError("authority_unavailable", "PRIVATE-SERVICE-DETAIL")
+    result = gbs.write_swimlane(tmp_path, out)
+    assert json.loads(out.read_text()) == result
+    assert result["status"] == "unavailable" and result["summary"] is None
+    assert "PRIVATE-SERVICE-DETAIL" not in out.read_text()
+    native_observation["report"] = AuthorityClientError("invalid_response", "PRIVATE-SERVICE-DETAIL")
+    malformed = gbs.write_swimlane(tmp_path, out)
+    assert malformed["code"] == "invalid_native_bridge_observation" and malformed["summary"] is None
+    assert "PRIVATE-SERVICE-DETAIL" not in out.read_text()
+
+
+def test_write_swimlane_atomic(tmp_path, native_observation, monkeypatch):
+    out = tmp_path / "out.json"
     gbs.write_swimlane(tmp_path, out)
-    original = out.read_text(encoding="utf-8")
-    assert "ii" in original
+    before = out.read_bytes()
 
-    def _boom(_src: str, _dst: str) -> None:
-        raise OSError("simulated atomic-write crash")
+    def boom(*args):
+        raise OSError("simulated atomic write failure")
 
-    monkeypatch.setattr(gbs.os, "replace", _boom)
+    monkeypatch.setattr(gbs.os, "replace", boom)
     with pytest.raises(OSError):
         gbs.write_swimlane(tmp_path, out)
-    # Original target file is intact.
-    assert out.read_text(encoding="utf-8") == original
+    assert out.read_bytes() == before
 
 
-def test_generate_swimlane_handles_malformed_index(tmp_path: Path) -> None:
-    _seed_bridge_file(tmp_path, "good-001.md", "NEW\n")
-    _seed_bridge_file(tmp_path, "malformed-001.md", "garbage line that is not a valid status\n")
-    _seed_bridge_file(tmp_path, "also-good-001.md", "NEW\n")
-    snapshot = gbs.generate_swimlane(tmp_path)
-    docs = sorted(t["document"] for t in snapshot["threads"])
-    assert docs == ["also-good", "good"]
+def test_installed_refresh_publishes_unavailable_bridge_observation(tmp_path, monkeypatch):
+    from click.testing import CliRunner
+    from groundtruth_kb.cli import main
 
-    # Sanity: even a totally-binary numbered bridge file doesn't crash.
-    binary_root = tmp_path / "binary-case"
-    binary_file = binary_root / "bridge" / "binary-001.md"
-    binary_file.parent.mkdir(parents=True, exist_ok=True)
-    binary_file.write_bytes(b"\x00\x01\x02not utf at all\xff")
-    snapshot2 = gbs.generate_swimlane(binary_root)
-    assert snapshot2["threads"] == []
+    selected = tmp_path / "chosen.toml"
+    selected.write_text("[groundtruth]\n", encoding="utf-8")
+    result = CliRunner().invoke(main, ["--config", str(selected), "dashboard", "refresh", "--json"])
+    assert result.exit_code == 0, result.output
+    # A completed refresh is distinct from unavailable native observations.
+    assert json.loads(result.output)["status"] == "completed"
+    observed = json.loads((tmp_path / ".groundtruth/dashboard/bridge-swimlane.json").read_text())
+    assert observed["status"] == "unavailable" and observed["summary"] is None
+    assert observed["code"] == "native_authority_not_configured"
+    assert observed["threads"] == []

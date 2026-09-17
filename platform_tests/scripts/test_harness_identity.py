@@ -1,15 +1,11 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-_PACKAGE_SRC = _REPO_ROOT / "groundtruth-kb" / "src"
-if str(_PACKAGE_SRC) not in sys.path:
-    sys.path.insert(0, str(_PACKAGE_SRC))
 
 from groundtruth_kb.db import KnowledgeDB  # noqa: E402
 from groundtruth_kb.harness_projection import (  # noqa: E402

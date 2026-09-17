@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -16,7 +17,7 @@ def make_root(tmp_path: Path, routing_text: str) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".api-harness").mkdir()
+    (root / oh.ROUTING_CONFIG_PATH).parent.mkdir(parents=True)
     (root / oh.ROUTING_CONFIG_PATH).write_text(routing_text.strip() + "\n", encoding="utf-8")
     return root
 
@@ -163,13 +164,20 @@ def test_call_ollama_tags_extracts_advertised_model_names(monkeypatch: pytest.Mo
     assert requests == ["http://ollama.test/api/tags"]
 
 
-def test_repository_routing_config_has_skill_overrides() -> None:
-    repo_root = Path(__file__).resolve().parents[2]
-    raw_config = oh.load_routing_config(repo_root)
-    advertised = [route.model_id for route in raw_config.models.values()]
-    config = oh.load_routing_config(repo_root, advertised_model_ids=advertised)
+@pytest.mark.timeout(300)
+def test_generated_routing_config_preserves_baseline_skill_overrides(generated_harness_root: Path) -> None:
+    """Derivation/selection only; configured IDs are not a live model inventory."""
+    repo_root = generated_harness_root
+    baseline = tomllib.loads((repo_root / ".harness-baseline-configuration/routing.toml").read_text(encoding="utf-8"))
+    config = oh.load_routing_config(repo_root)
 
-    assert config.default_model in config.models
+    assert config.default_model == baseline["routing"]["ollama"]["default_model"]
+    assert config.skill_routes == baseline["routing"]["ollama"]["skills"]
+    expected = {key: row for key, row in baseline["models"].items() if row.get("provider") == "ollama"}
+    assert set(config.models) == set(expected)
+    assert {key: row.model_id for key, row in config.models.items()} == {
+        key: row["model_id"] for key, row in expected.items()
+    }
     for skill in ("bridge-review", "verification", "implementation"):
         assert config.skill_routes[skill] in config.models
     assert config.skill_routes["verification"] == config.skill_routes["bridge-review"]
@@ -177,4 +185,4 @@ def test_repository_routing_config_has_skill_overrides() -> None:
     assert selected.key == config.skill_routes["bridge-review"]
     assert selected.allowed_tools == FULL_TOOL_SET
     assert selected.model_version == oh.infer_model_version(selected.model_id)
-    assert "model_version" not in (repo_root / ".api-harness" / "routing.toml").read_text(encoding="utf-8")
+    assert "model_version" not in (repo_root / oh.ROUTING_CONFIG_PATH).read_text(encoding="utf-8")

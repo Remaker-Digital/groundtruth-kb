@@ -1,281 +1,210 @@
-"""Tests for dashboard work-subject selector + writer/snapshot field contract.
+"""Native landing-page observations replace the retired startup work-subject projection.
 
-Slice 2.1 of GTKB-DASHBOARD-002 — see
-``bridge/gtkb-dashboard-industry-alignment-slice2a-visibility-005.md``.
-
-The contract under test:
-
-* The model object returned by ``build_startup_model()`` carries
-  ``current_work_subject`` at the top level (paired with the structured
-  ``model["metrics"]["work_subject"]`` source-of-truth record).
-* ``_snapshot_from_model()`` projects ``current_work_subject`` onto every
-  history-row snapshot.
-* ``write_dashboard_and_report()`` is the page-facing
-  ``dashboard-data.json`` writer; ``refresh_dashboard_db.py`` is not.
-* The landing page IIFE reads ``latest.current_work_subject`` (uniform
-  writer-side contract — no page-side branch on payload shape).
-* Both ``selectLatest()`` branches expose the field, so the empty-history
-  fallback still renders the canonical subject.
-
-© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Browser qualification runs the authored JavaScript; these tests exercise the
+real refresh/publisher and its failure boundaries without duplicating that JS.
 """
 
 from __future__ import annotations
 
 import json
-import re
-import sys
-import urllib.request
+import sqlite3
 from pathlib import Path
-from typing import Any
 
 import pytest
+from groundtruth_kb import dashboard, get_templates_dir
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(REPO_ROOT))
-
-
-from scripts import session_self_initialization as ssi  # noqa: E402
-from scripts.gtkb_dashboard import refresh_dashboard_db as rdb  # noqa: E402
-
-INDEX_HTML = REPO_ROOT / "docs" / "gtkb-dashboard" / "index.html"
+INDEX_HTML = get_templates_dir() / "dashboard/index.html"
 
 
 @pytest.fixture(autouse=True)
-def mock_network_reachability(monkeypatch):
-    def fake_urlopen(*args, **kwargs):
-        raise OSError("Offline by test mock")
-
-    monkeypatch.setattr(urllib.request, "urlopen", fake_urlopen)
+def isolate_unrelated_optional_consumers(monkeypatch):
+    monkeypatch.setattr(dashboard, "_write_bridge_swimlane_safe", lambda *args: None)
 
 
-EXPECTED_SCOPE_KEYS = {
-    "regression_release_blocker_count",
-    "backlog_active_items",
-    "membase_open_work_items",
-    "deliberation_archive_current_total",
-    "specification_current_total",
-    "drift_changed_path_count",
-    "pytest_file_count",
-    "contention_actionable_bridge_count",
-    "skill_template_count",
-}
-
-
-def _fake_model(*, subject: str | None, present: bool) -> dict[str, Any]:
-    """Build the minimal ``model`` shape ``_snapshot_from_model`` needs."""
+def _model(value=7):
     return {
-        "generated_at": "2026-04-24T10:00:00+00:00",
+        "generated_at": "2026-09-12T12:00:05+00:00",
+        "current_work_subject": "private legacy selection",
+        "role": {"assumed_role": "private legacy role"},
         "metrics": {
-            "backlog": {"active_item_count": 5},
-            "membase": {"open_work_items": 0},
-            "deliberation_archive": {"current_total": 700},
-            "tests": {"pytest_file_count": 100},
-            "templates": {"skill_template_count": 30},
-            "specifications": {"current_total": 2100},
-            "drift": {"changed_path_count": 4},
-            "regression": {"release_blocker_count": 0},
-            "contention": {"actionable_count": 1},
-            "tokens": {"tokens_consumed_before_user_input": None, "measurement_status": "n/a"},
-            "work_subject": {
-                "current_subject": subject,
-                "source_path": ".claude/session/work-subject.json",
-                "present": present,
+            "backlog": {"active_item_count": value},
+            "membase": {"open_work_items": value},
+            "contention": {"actionable_count": 0},
+            "work_subject": {"current_subject": "private legacy selection"},
+        },
+        "dashboard_intelligence": {
+            "data_freshness": {
+                "started_at": "2026-09-12T12:00:00+00:00",
+                "sources": ["private observation details must not be exported"],
             },
         },
-        "current_work_subject": subject,
     }
 
 
-def _seed_canonical_state(project_root: Path, subject: str) -> Path:
-    target = project_root / ".claude" / "session" / "work-subject.json"
-    target.parent.mkdir(parents=True, exist_ok=True)
-    payload = {
-        "schema_version": 1,
-        "current_subject": subject,
-        "updated_at": "2026-04-24T09:00:00+00:00",
-        "updated_by": "test-fixture",
-        "source": "pytest seeded",
-        "project_root": str(project_root),
-        "gtkb_root": None,
-        "role_slot": "shared",
-        "topology_mode": "single_harness",
-    }
-    target.write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
-    return target
+def _page_data(root):
+    return root / ".groundtruth/dashboard/dashboard-data.json"
 
 
-# ----------------------------- 1-3: unit ---------------------------------
+def test_refresh_publishes_current_allowlisted_values_and_matches_sql(tmp_path):
+    db = tmp_path / "dashboard.sqlite"
+    model = _model()
+    assert dashboard.refresh_database(db, tmp_path, model=model)["status"] == "completed"
+    payload = json.loads(_page_data(tmp_path).read_text(encoding="utf-8"))
+    assert set(payload) == {"status", "started_at", "generated_at", "metrics"}
+    assert payload["status"] == "partial"
+    assert payload["metrics"]["backlog_active_items"] == 7
+    assert payload["metrics"]["contention_actionable_bridge_count"] == 0
+    assert payload["metrics"]["regression_release_blocker_count"] is None
+    with sqlite3.connect(db) as conn:
+        assert payload["metrics"] == dict(conn.execute("SELECT metric_key,value FROM kpi_snapshots"))
+    assert "private" not in json.dumps(payload)
+    assert "current_work_subject" not in payload
 
 
-def test_snapshot_row_carries_current_work_subject() -> None:
-    model = _fake_model(subject="application", present=True)
-    snapshot = ssi._snapshot_from_model(model)
-    assert snapshot["current_work_subject"] == "application"
+def test_refresh_does_not_select_a_prior_or_future_history_row(tmp_path):
+    model = _model()
+    history = [{"generated_at": "2099-01-01T00:00:00+00:00", "backlog_active_items": 999}]
+    dashboard.refresh_database(tmp_path / "dashboard.sqlite", tmp_path, model=model, history=history)
+    payload = json.loads(_page_data(tmp_path).read_text())
+    assert payload["generated_at"] == model["generated_at"]
+    assert payload["metrics"]["backlog_active_items"] == 7
+    assert "history" not in payload
 
 
-def test_snapshot_row_subject_none_when_absent() -> None:
-    model = _fake_model(subject=None, present=False)
-    snapshot = ssi._snapshot_from_model(model)
-    assert snapshot["current_work_subject"] is None
+def test_missing_native_sources_replace_old_page_values_without_startup_fallback(tmp_path, monkeypatch):
+    dashboard._write_landing_snapshot(tmp_path, _model())
+    (tmp_path / "memory").mkdir()
+    (tmp_path / "memory/gtkb-dashboard-history.json").write_text('[{"backlog_active_items":999}]')
+    monkeypatch.setattr(dashboard, "_run_release_probe", lambda *a, **kw: None)
+    dashboard.refresh_database(tmp_path / "dashboard.sqlite", tmp_path)
+    payload = json.loads(_page_data(tmp_path).read_text())
+    assert payload["status"] == "unavailable"
+    assert all(value is None for value in payload["metrics"].values())
+    assert payload["generated_at"] is not None
 
 
-def test_model_object_carries_current_work_subject(tmp_path: Path) -> None:
-    """Pin writer-side parity that the page-fallback branch depends on (-004 F1)."""
-    _seed_canonical_state(tmp_path, "gtkb_infrastructure")
-    record = ssi._collect_work_subject(tmp_path)
-    assert record["current_subject"] == "gtkb_infrastructure"
-    assert record["present"] is True
-    # And the fake-model parity matches.
-    model = _fake_model(subject=record["current_subject"], present=record["present"])
-    assert model["current_work_subject"] == model["metrics"]["work_subject"]["current_subject"]
+@pytest.mark.parametrize("value", [True, -1, "0", float("nan"), float("inf"), {}, []])
+def test_invalid_numeric_telemetry_remains_unavailable(value):
+    payload = dashboard._landing_snapshot_from_model(_model(value))
+    assert payload["metrics"]["backlog_active_items"] is None
+    assert payload["metrics"]["membase_open_work_items"] is None
+    assert payload["metrics"]["contention_actionable_bridge_count"] == 0
+    json.dumps(payload, allow_nan=False)
 
 
-# --------------------- 4: end-to-end writer integration -------------------
+@pytest.mark.parametrize(
+    "start,end",
+    [
+        (None, None),
+        ("bad", "bad"),
+        ("2026-09-12T12:00:00", "2026-09-12T12:00:05"),
+        ("2026-09-12T12:00:06Z", "2026-09-12T12:00:05Z"),
+    ],
+)
+def test_missing_or_invalid_collection_interval_cannot_establish_fresh_values(start, end):
+    model = _model()
+    model["generated_at"] = end
+    model["dashboard_intelligence"]["data_freshness"]["started_at"] = start
+    payload = dashboard._landing_snapshot_from_model(model)
+    assert payload["status"] == "unavailable"
+    assert payload["started_at"] is None and payload["generated_at"] is None
+    assert all(value is None for value in payload["metrics"].values())
 
 
-# The end-to-end writer runs the real startup preflight. WI-4808 keeps the
-# bridge in-flight scan bounded to latest version files, so this field-contract
-# test should fit comfortably inside the normal local-test timeout envelope.
-@pytest.mark.timeout(30)
-def test_dashboard_data_json_carries_work_subject(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """``write_dashboard_and_report()`` writes the field at all three locations."""
-    monkeypatch.setattr(
-        ssi,
-        "_collect_work_subject",
-        lambda _root: {
-            "current_subject": "application",
-            "source_path": ".claude/session/work-subject.json",
-            "present": True,
-        },
-    )
-    dashboard_dir = tmp_path / "dashboard"
-    history_path = tmp_path / "history.json"
-    result = ssi.write_dashboard_and_report(
-        REPO_ROOT,
-        dashboard_dir,
-        history_path,
-        generate_pdf=False,
-        seed_historical_backfill=False,
-        role_profile="prime-builder",
-    )
-    payload = json.loads(Path(result["data_path"]).read_text(encoding="utf-8"))
-    # Three locations (uniform top-level key on snapshot row + model;
-    # structured source-of-truth on metrics).
-    assert payload["model"]["current_work_subject"] == "application"
-    assert payload["model"]["metrics"]["work_subject"]["current_subject"] == "application"
-    assert payload["history"][-1]["current_work_subject"] == "application"
+def test_atomic_publisher_failure_preserves_old_file_and_removes_temporary(tmp_path, monkeypatch):
+    dashboard._write_landing_snapshot(tmp_path, _model())
+    before = _page_data(tmp_path).read_bytes()
+
+    def refuse_replace(source, target):
+        assert source.parent == target.parent
+        raise OSError("fixture publication failure")
+
+    monkeypatch.setattr(dashboard.os, "replace", refuse_replace)
+    with pytest.raises(OSError, match="fixture publication failure"):
+        dashboard._write_landing_snapshot(tmp_path, _model(8))
+    assert _page_data(tmp_path).read_bytes() == before
+    assert list(_page_data(tmp_path).parent.glob("*.tmp")) == []
 
 
-# ---------- 5: producer boundary (refresh_dashboard_db.py is NOT writer) -
+def test_failed_database_refresh_does_not_publish_new_page_values(tmp_path, monkeypatch):
+    dashboard._write_landing_snapshot(tmp_path, _model())
+    before = _page_data(tmp_path).read_bytes()
+
+    def fail_db(*a, **kw):
+        raise RuntimeError("fixture database failure")
+
+    monkeypatch.setattr(dashboard, "_write_model_to_db", fail_db)
+    db = tmp_path / "dashboard.sqlite"
+    with pytest.raises(RuntimeError, match="fixture database failure"):
+        dashboard.refresh_database(db, tmp_path, model=_model(8))
+    assert _page_data(tmp_path).read_bytes() == before
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT status FROM refresh_runs").fetchone()[0] == "failed"
 
 
-def test_refresh_dashboard_db_does_not_write_subject(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """``refresh_database()`` must not write ``dashboard-data.json`` at all."""
-    # Force the swimlane out_path away from the real docs/ tree to keep this
-    # test hermetic — refresh_database now writes the swimlane, but it is not
-    # the page-data writer.
-    monkeypatch.setattr(rdb, "_write_bridge_swimlane_safe", lambda _root: None)
+def test_failed_page_publication_marks_refresh_failed_after_database_update(tmp_path, monkeypatch):
+    def fail_page(*a, **kw):
+        raise OSError("fixture page failure")
 
-    db_path = tmp_path / "gtkb-dashboard.sqlite"
-    docs_dir = tmp_path / "docs" / "gtkb-dashboard"
-    docs_dir.mkdir(parents=True, exist_ok=True)
-    sentinel_data_json = docs_dir / "dashboard-data.json"
-    sentinel_data_json.write_text('{"sentinel":"untouched"}', encoding="utf-8")
-
-    fake_model = _fake_model(subject="application", present=True)
-    fake_history = [ssi._snapshot_from_model(fake_model)]
-    rdb.refresh_database(db_path=db_path, project_root=REPO_ROOT, model=fake_model, history=fake_history)
-
-    # The sentinel was never overwritten by refresh_database.
-    assert json.loads(sentinel_data_json.read_text(encoding="utf-8")) == {"sentinel": "untouched"}
+    monkeypatch.setattr(dashboard, "_write_landing_snapshot", fail_page)
+    db = tmp_path / "dashboard.sqlite"
+    with pytest.raises(OSError, match="fixture page failure"):
+        dashboard.refresh_database(db, tmp_path, model=_model())
+    with sqlite3.connect(db) as conn:
+        assert conn.execute("SELECT status FROM refresh_runs").fetchone()[0] == "failed"
+        assert conn.execute("SELECT count(*) FROM kpi_snapshots").fetchone()[0] > 0
+    assert not _page_data(tmp_path).exists()
 
 
-# ---------- 6-9: static asserts on landing page ---------------------------
+@pytest.mark.parametrize("entry", ["cli-explicit-db", "cli-default-db", "function-default-db", "cli-init"])
+def test_refresh_cli_writes_page_only_under_explicit_project_root(tmp_path, monkeypatch, entry):
+    from click.testing import CliRunner
+    from groundtruth_kb.cli import main
+
+    child = tmp_path / "requested"
+    child.mkdir()
+    selected = child / "chosen.toml"
+    selected.write_text("[groundtruth]\n", encoding="utf-8")
+    monkeypatch.setattr(dashboard, "_build_dashboard_model", lambda root, config=None: _model())
+    expected_db = child / ".groundtruth/dashboard/gtkb-dashboard.sqlite"
+    paths = []
+    original = dashboard.initialize_database
+
+    def initialize(path):
+        assert path.is_relative_to(child), "No test may initialize the production database"
+        paths.append(path)
+        original(path)
+
+    monkeypatch.setattr(dashboard, "initialize_database", initialize)
+    if entry == "function-default-db":
+        assert dashboard.refresh_database(project_root=child)["status"] == "completed"
+    else:
+        args = ["--config", str(selected), "dashboard", "init" if entry == "cli-init" else "refresh", "--json"]
+        if entry == "cli-explicit-db":
+            expected_db = child / "dashboard.sqlite"
+            args += ["--db-path", str(expected_db)]
+        result = CliRunner().invoke(main, args)
+        assert result.exit_code == 0, result.output
+        output = json.loads(result.output)
+        assert output["status"] == "completed" and output["project_root"] == str(child)
+        assert (child / ".groundtruth/dashboard/index.html").is_file()
+    assert paths == [expected_db]
+    assert expected_db.is_file() and _page_data(child).exists()
+    assert not _page_data(tmp_path).exists()
 
 
-def test_landing_page_has_subject_toolbar() -> None:
-    text = INDEX_HTML.read_text(encoding="utf-8")
-    assert 'id="subject-toolbar"' in text
-    assert text.count('class="filter-btn') >= 3
-    for filter_value in ("all", "application", "gtkb_infrastructure"):
-        assert f'data-filter="{filter_value}"' in text
+def test_landing_page_uses_native_metrics_without_subject_or_history_inference():
+    page = INDEX_HTML.read_text(encoding="utf-8")
+    assert 'fetch("dashboard-data.json", { cache: "no-store" })' in page
+    assert "validKpiSnapshot" in page
+    for obsolete in ("current_work_subject", "Canonical subject", "subject-toolbar", "selectLatest", "SCOPE_BY_METRIC"):
+        assert obsolete not in page
+    for key, *_ in dashboard.KPI_DEFINITIONS:
+        assert key in page
 
 
-def test_landing_page_reads_latest_current_work_subject() -> None:
-    text = INDEX_HTML.read_text(encoding="utf-8")
-    assert "latest.current_work_subject" in text
-    # Explicit guardrail against the rejected page-side branch.
-    assert "payload.current_work_subject" not in text
-    assert "payload.model.current_work_subject" not in text
-
-
-def test_landing_page_kpi_scope_constants() -> None:
-    text = INDEX_HTML.read_text(encoding="utf-8")
-    assert "SCOPE_BY_METRIC" in text
-    for key in EXPECTED_SCOPE_KEYS:
-        # Each key must appear as a property of SCOPE_BY_METRIC.
-        assert re.search(rf"\b{re.escape(key)}\s*:", text), f"missing scope mapping for {key}"
-
-
-def test_landing_page_swimlane_section() -> None:
-    text = INDEX_HTML.read_text(encoding="utf-8")
-    assert 'id="swimlane-heading"' in text
-    assert 'id="swimlane-table"' in text
-
-
-# ---------- 10-11: branch coverage via Python re-implementation -----------
-
-
-def _select_latest(payload: dict[str, Any] | list[Any] | None) -> Any:
-    """Mirror the four-branch ``selectLatest`` rule in ``index.html``."""
-    if not payload:
-        return None
-    if isinstance(payload, list):
-        return payload[-1] if payload else None
-    history = payload.get("history") if isinstance(payload, dict) else None
-    if isinstance(history, list) and history:
-        return history[-1]
-    if isinstance(payload, dict) and payload.get("model"):
-        return payload["model"]
-    return payload
-
-
-def _read_subject(latest: Any) -> str:
-    if isinstance(latest, dict):
-        value = latest.get("current_work_subject")
-        if value:
-            return value
-    return "all"
-
-
-def test_landing_page_fallback_to_model_branch_carries_subject() -> None:
-    """Empty-history fallback: page reads ``model.current_work_subject``.
-
-    Pinned via Python re-implementation of ``selectLatest`` mirroring the
-    four-branch rule in ``index.html``. Avoids a hard ``js2py`` test
-    dependency while pinning the contract end-to-end (-004 F1).
-    """
-    payload = {
-        "model": {
-            "current_work_subject": "gtkb_infrastructure",
-            "metrics": {"work_subject": {"current_subject": "gtkb_infrastructure"}},
-        },
-        "history": [],
-    }
-    latest = _select_latest(payload)
-    assert latest is payload["model"]
-    assert _read_subject(latest) == "gtkb_infrastructure"
-    # And the literal access path the IIFE uses is in the file.
-    assert "latest.current_work_subject" in INDEX_HTML.read_text(encoding="utf-8")
-
-
-def test_older_history_row_without_subject_defaults_to_all() -> None:
-    payload = {
-        "model": {"current_work_subject": "application"},
-        "history": [{"generated_at": "2026-04-23T00:00:00+00:00"}],  # no subject field
-    }
-    latest = _select_latest(payload)
-    assert latest is payload["history"][-1]
-    assert _read_subject(latest) == "all"
+def test_landing_page_swimlane_section():
+    page = INDEX_HTML.read_text(encoding="utf-8")
+    assert 'id="swimlane-heading"' in page
+    assert 'id="swimlane-table"' in page

@@ -13,9 +13,7 @@ _OVERVIEW = _METHOD / "01-overview.md"
 _README = _METHOD / "README.md"
 
 _STAGES = (
-    "deliberate",
     "plan",
-    "specify",
     "propose",
     "GO",
     "implement",
@@ -35,7 +33,7 @@ def test_reference_exists_and_covers_all_stages() -> None:
 def test_overview_links_reference_and_bookends() -> None:
     text = _OVERVIEW.read_text(encoding="utf-8")
     assert "14-lifecycle.md" in text
-    assert "deliberate" in text.lower()
+    assert "current intent" in text.lower()
     assert "commit" in text.lower()
 
 

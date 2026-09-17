@@ -49,14 +49,6 @@ def _finding(check: str, severity: str, message: str, **details: Any) -> dict:
     return {"check": check, "severity": severity, "message": message, **details}
 
 
-def _ensure_bridge_helpers_importable(project_root: Path) -> None:
-    gt_src = project_root / "groundtruth-kb" / "src"
-    if gt_src.exists():
-        src_text = str(gt_src)
-        if src_text not in sys.path:
-            sys.path.insert(0, src_text)
-
-
 def _git_head_bridge_files(project_root: Path) -> set[str] | None:
     """Return paths of bridge numbered files present at HEAD, or None when git is unavailable."""
     try:
@@ -89,7 +81,6 @@ def check_bridge_numbered_files_have_status(
     bridge_dir = project_root / "bridge"
     if not bridge_dir.is_dir():
         return []
-    _ensure_bridge_helpers_importable(project_root)
     from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
     if head_resolver is None:

@@ -1,34 +1,14 @@
-"""Local Claude Design handoff import / inspection for GroundTruth-KB.
+"""Local Claude Design handoff inspection for GroundTruth-KB (O-7 R21).
 
-Productizes the metadata-only handoff inspection, validation, content-formatting,
-and Deliberation Archive archival pipeline that previously lived only in
-``scripts/archive_claude_design_handoff.py`` (PROC-CD-DA-ARCHIVAL-001). The
-reusable logic now lives here as a package module so it can back the
-package-facing ``gt design import`` command, while the original script remains a
-thin Agent Red-scoped compatibility wrapper.
+``gt design inspect`` reads a local ``.zip`` archive or a directory handoff and reports its file list with sizes,
+the archive ``sha256`` (zips only), the ``SPEC-CD-HANDOFF-FORMAT-001`` D1 format warnings and a deterministic,
+redacted inspection record with its content hash. Raw HTML / JSX / CSS / PNG bytes are never read into the record.
+The inspection publishes nothing: the former automatic publication of the record into the retired deliberation
+archive is retired, no database is opened and no archive attribution exists. A missing path is a usage error; a path
+that is neither a ``.zip`` file nor a directory is refused.
 
-Scope: local ``.zip`` or directory handoffs only. The pipeline inspects a handoff
-(file list + sizes + an archive ``sha256``, never raw bytes), validates it
-against ``SPEC-CD-HANDOFF-FORMAT-001``'s D1 structural assertions, formats a
-deterministic inspection record, and (only with ``apply=True``) archives that
-record as one content-hash-idempotent ``report`` Deliberation Archive row.
-
-Out of scope for this slice and explicitly requiring a separate proposal: live
-Claude Design API integration, production-code adoption, context-pack
-generation, visual verification, dashboards, and adopter application UI changes.
-Imported handoffs remain design intent and evidence (``GOV-CD-PRESERVATION``),
-never production code or a bridge bypass: raw HTML/JSX/CSS/PNG bytes are never
-inlined into Deliberation Archive content.
-
-Design notes (carried forward from the original script's GO'd bridge binding
-condition #5 — reuse existing DA harvest patterns):
-
-* **Redaction**: delegates to ``KnowledgeDB.redact_content`` — identical to
-  ``scripts/harvest_session_deliberations.py``.
-* **Idempotence**: pre-checks ``current_deliberations`` for
-  ``(source_ref, content_hash)`` before insert.
-* **Binary safety**: handoff archive/dir is inspected for a file list + metadata
-  + observations; raw bytes are never inlined.
+Imported handoffs remain design intent and evidence (``GOV-CD-PRESERVATION``), never production code or a bridge
+bypass. Live Claude Design API integration, context-pack generation and visual verification remain out of scope.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -42,49 +22,18 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from groundtruth_kb.governance.credential_patterns import db_pattern_list
+
 __all__ = [
     "HandoffEntry",
     "HandoffInspection",
-    "ArchiveResult",
-    "inspect_handoff",
-    "validate_handoff_format",
+    "InspectionReport",
+    "build_inspection_report",
     "format_inspection_content",
-    "archive",
+    "inspect_handoff",
+    "redact_inspection_content",
+    "validate_handoff_format",
 ]
-
-# Default Deliberation Archive attribution for archived handoff inspection rows.
-# The handoff intake pipeline originated as an Agent Red-specific path; these
-# defaults preserve that provenance. Callers (the compatibility script, the
-# package CLI) override ``changed_by`` to record the surface that performed the
-# import.
-_DEFAULT_ORIGIN_PROJECT = "agent-red"
-_DEFAULT_ORIGIN_REPO = "Remaker-Digital/agent-red-customer-engagement"
-_DEFAULT_CHANGED_BY = "groundtruth_kb.design_import"
-
-
-# ---------------------------------------------------------------------------
-# KB + redaction glue (identical pattern to harvest_session_deliberations.py)
-# ---------------------------------------------------------------------------
-
-
-def _load_kb() -> Any:
-    """Open the package-native MemBase (root ``groundtruth.db``).
-
-    This default is used only when no ``db`` is injected into :func:`archive`
-    and ``apply=True`` is requested. Tests inject a temporary KnowledgeDB, and
-    the Agent Red compatibility wrapper injects the AR-scoped KnowledgeDB, so
-    neither path relies on this default.
-    """
-    from groundtruth_kb.db import KnowledgeDB
-
-    return KnowledgeDB()
-
-
-def _redact(content: str) -> tuple[str, str | None]:
-    """Delegate to the KB's redaction classmethod (same as the harvest script)."""
-    from groundtruth_kb.db import KnowledgeDB as _GT
-
-    return _GT.redact_content(content)
 
 
 # ---------------------------------------------------------------------------
@@ -122,15 +71,9 @@ def _list_zip_entries(zip_path: Path) -> tuple[tuple[HandoffEntry, ...], int]:
 
 
 def _list_dir_entries(dir_path: Path) -> tuple[tuple[HandoffEntry, ...], int]:
-    entries: list[HandoffEntry] = []
-    total = 0
-    for p in sorted(dir_path.rglob("*")):
-        if p.is_file():
-            rel = p.relative_to(dir_path).as_posix()
-            size = p.stat().st_size
-            entries.append(HandoffEntry(path=rel, size_bytes=size))
-            total += size
-    return tuple(entries), total
+    files = sorted((p.relative_to(dir_path).as_posix(), p) for p in dir_path.rglob("*") if p.is_file())
+    entries = tuple(HandoffEntry(path=rel, size_bytes=p.stat().st_size) for rel, p in files)
+    return entries, sum(e.size_bytes for e in entries)
 
 
 def _sha256_of_file(path: Path) -> str:
@@ -175,9 +118,6 @@ def validate_handoff_format(inspection: HandoffInspection) -> list[str]:
     warnings: list[str] = []
     paths = {entry.path.lower().replace("\\", "/") for entry in inspection.entries}
 
-    def _contains(stem: str) -> bool:
-        return any(p.endswith(stem) or f"/{stem}" in p for p in paths)
-
     if not any(p.endswith("readme.md") for p in paths):
         warnings.append("Missing README.md (D1 mandatory).")
     if not any("project/index.html" in p for p in paths):
@@ -186,7 +126,6 @@ def validate_handoff_format(inspection: HandoffInspection) -> list[str]:
         warnings.append("Missing project/*.css design-token source (D1 mandatory).")
     if not any((p.endswith(".jsx") or p.endswith(".tsx")) and "project/" in p for p in paths):
         warnings.append("Missing at least one project/*.{jsx,tsx} component file (D1 mandatory).")
-    _ = _contains  # reserved for future optional checks
     return warnings
 
 
@@ -199,7 +138,7 @@ def format_inspection_content(
     *,
     inspection: HandoffInspection,
     date: str,
-    session_id: str,
+    session_id: str | None,
     owner_decision: str | None,
     notes: str | None,
     warnings: Iterable[str],
@@ -214,7 +153,8 @@ def format_inspection_content(
     lines.append("# Claude Design Handoff Inspection")
     lines.append("")
     lines.append(f"Handoff date: {date}")
-    lines.append(f"Session: {session_id}")
+    if session_id:
+        lines.append(f"Session: {session_id}")
     lines.append(f"Source: {inspection.source_path}")
     lines.append(f"Source kind: {inspection.source_kind}")
     if inspection.sha256:
@@ -251,47 +191,65 @@ def format_inspection_content(
     return "\n".join(lines)
 
 
+def redact_inspection_content(content: str) -> tuple[str, str | None]:
+    """Replace credential and PII matches from the canonical pattern catalog with ``[REDACTED:<name>]`` markers.
+
+    Returns the redacted text and a note naming each matched pattern with its occurrence count, or ``None`` when
+    nothing matched. The catalog is the shared cross-consumer source; no database is involved.
+    """
+    notes: list[str] = []
+    result = content
+    for name, pattern in db_pattern_list():
+        count = len(pattern.findall(result))
+        if count:
+            result = pattern.sub(f"[REDACTED:{name}]", result)
+            notes.append(f"{name}: {count} occurrence(s)")
+    return result, "; ".join(notes) if notes else None
+
+
 # ---------------------------------------------------------------------------
-# DA insertion (content-hash idempotent)
+# The complete local report — computed, shown, never stored by the platform
 # ---------------------------------------------------------------------------
 
 
-@dataclass
-class ArchiveResult:
-    action: str  # "created", "would_create", "skipped"
-    source_ref: str
+@dataclass(frozen=True)
+class InspectionReport:
+    inspection: HandoffInspection
+    warnings: tuple[str, ...]
+    content: str
     content_hash: str
-    delib_id: Any | None
-    redaction_reason: str | None
-    warnings: list[str]
+    redaction_notes: str | None
+
+    def to_json_dict(self) -> dict[str, Any]:
+        return {
+            "source_path": self.inspection.source_path,
+            "source_kind": self.inspection.source_kind,
+            "sha256": self.inspection.sha256,
+            "total_bytes": self.inspection.total_bytes,
+            "file_count": len(self.inspection.entries),
+            "entries": [{"path": e.path, "size_bytes": e.size_bytes} for e in self.inspection.entries],
+            "warnings": list(self.warnings),
+            "content": self.content,
+            "content_hash": self.content_hash,
+            "redaction_notes": self.redaction_notes,
+        }
 
 
-def archive(
-    *,
+def build_inspection_report(
     handoff_path: Path,
+    *,
     date: str,
-    session_id: str,
+    session_id: str | None = None,
     owner_decision: str | None = None,
     notes: str | None = None,
-    source_ref: str | None = None,
-    apply: bool = False,
-    db: Any | None = None,
-    origin_project: str = _DEFAULT_ORIGIN_PROJECT,
-    origin_repo: str = _DEFAULT_ORIGIN_REPO,
-    changed_by: str = _DEFAULT_CHANGED_BY,
-) -> ArchiveResult:
-    """Archive one handoff as one ``report`` DA row.
+) -> InspectionReport:
+    """Inspect, validate, format and redact one local handoff.
 
-    The function is a pure pipeline: inspect → format → redact → hash →
-    pre-check → insert. Every step returns metadata that the caller surfaces.
-    With ``apply=False`` (the default) it computes the would-be record without
-    any database access. ``db`` may be injected (tests, the Agent Red
-    compatibility wrapper, the package CLI) to target a specific KnowledgeDB;
-    when omitted and ``apply=True`` the package-native MemBase is opened.
+    A pure pipeline: it reads the handoff's metadata and writes nothing. Identical inputs reproduce the same
+    ``content_hash``; the caller decides what, if anything, to do with the report.
     """
     inspection = inspect_handoff(handoff_path)
     warnings = validate_handoff_format(inspection)
-
     content = format_inspection_content(
         inspection=inspection,
         date=date,
@@ -300,63 +258,11 @@ def archive(
         notes=notes,
         warnings=warnings,
     )
-    redacted, redaction_reason = _redact(content)
-    content_hash = hashlib.sha256(redacted.encode()).hexdigest()
-
-    ref = source_ref or f"claude-design-handoff:{date}:{handoff_path.name}"
-    title = f"Claude Design handoff inspection ({date})"
-    summary = (
-        f"Inspection of {inspection.source_kind} at "
-        f"{handoff_path.name}; {len(inspection.entries)} files; "
-        f"{inspection.total_bytes} bytes."
-    )
-
-    if not apply:
-        return ArchiveResult(
-            action="would_create",
-            source_ref=ref,
-            content_hash=content_hash,
-            delib_id=None,
-            redaction_reason=redaction_reason,
-            warnings=warnings,
-        )
-
-    if db is None:
-        db = _load_kb()
-
-    conn = db._get_conn()
-    exists = conn.execute(
-        "SELECT id FROM current_deliberations WHERE source_ref = ? AND content_hash = ?",
-        (ref, content_hash),
-    ).fetchone()
-    if exists:
-        return ArchiveResult(
-            action="skipped",
-            source_ref=ref,
-            content_hash=content_hash,
-            delib_id=exists[0],
-            redaction_reason=redaction_reason,
-            warnings=warnings,
-        )
-
-    delib = db.upsert_deliberation_source(
-        source_type="report",
-        source_ref=ref,
+    redacted, redaction_notes = redact_inspection_content(content)
+    return InspectionReport(
+        inspection=inspection,
+        warnings=tuple(warnings),
         content=redacted,
-        title=title,
-        summary=summary,
-        outcome="informational",
-        session_id=session_id,
-        origin_project=origin_project,
-        origin_repo=origin_repo,
-        changed_by=changed_by,
-        change_reason=("PROC-CD-DA-ARCHIVAL-001 (gt design import) — Claude Design handoff inspection archive."),
-    )
-    return ArchiveResult(
-        action="created",
-        source_ref=ref,
-        content_hash=content_hash,
-        delib_id=delib["id"] if delib else None,
-        redaction_reason=redaction_reason,
-        warnings=warnings,
+        content_hash=hashlib.sha256(redacted.encode("utf-8")).hexdigest(),
+        redaction_notes=redaction_notes,
     )

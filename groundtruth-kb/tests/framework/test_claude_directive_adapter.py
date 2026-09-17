@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "directive-enforcement-claude-adapter.py"
+HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "directive-enforcement-adapter.py"
 
 
 def test_pre_tool_use_allow() -> None:
@@ -20,7 +20,7 @@ def test_pre_tool_use_allow() -> None:
     }
 
     proc = subprocess.run(
-        [sys.executable, str(HOOK_PATH)], input=json.dumps(payload), text=True, capture_output=True, check=True
+        [sys.executable, "-P", str(HOOK_PATH)], input=json.dumps(payload), text=True, capture_output=True, check=True
     )
     assert proc.returncode == 0
     res = json.loads(proc.stdout)
@@ -35,7 +35,9 @@ def test_pre_tool_use_block_violation() -> None:
         "cwd": str(REPO_ROOT),
     }
 
-    proc = subprocess.run([sys.executable, str(HOOK_PATH)], input=json.dumps(payload), text=True, capture_output=True)
+    proc = subprocess.run(
+        [sys.executable, "-P", str(HOOK_PATH)], input=json.dumps(payload), text=True, capture_output=True
+    )
     # The hook script exits with 0 but outputs a JSON structure containing 'permissionDecision': 'deny'
     assert proc.returncode == 0
     res = json.loads(proc.stdout)
@@ -61,7 +63,11 @@ def test_pre_tool_use_allow_sed_and_grep_pattern_expressions() -> None:
             "cwd": str(REPO_ROOT),
         }
         proc = subprocess.run(
-            [sys.executable, str(HOOK_PATH)], input=json.dumps(payload), text=True, capture_output=True, check=True
+            [sys.executable, "-P", str(HOOK_PATH)],
+            input=json.dumps(payload),
+            text=True,
+            capture_output=True,
+            check=True,
         )
         assert proc.returncode == 0
         res = json.loads(proc.stdout)

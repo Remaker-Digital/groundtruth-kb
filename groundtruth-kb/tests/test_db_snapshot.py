@@ -9,9 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
-from click.testing import CliRunner
 
-from groundtruth_kb.cli import main
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.db_snapshot import SnapshotError, create_snapshot, default_output_dir, rotate_snapshots
 
@@ -236,58 +234,3 @@ def test_rotation_preserves_schema_versions(tmp_path: Path) -> None:
         "groundtruth-20260502T000000Z.db",
         "groundtruth-20260503T000000Z.db",
     ]
-
-
-def test_gt_db_snapshot_cli_success_json(runner: CliRunner, project_dir: Path, tmp_path: Path) -> None:
-    _create_source_db(project_dir / "groundtruth.db")
-
-    result = runner.invoke(
-        main,
-        [
-            "--config",
-            str(project_dir / "groundtruth.toml"),
-            "db",
-            "snapshot",
-            "--output-dir",
-            str(tmp_path / "out"),
-            "--staging-dir",
-            str(tmp_path / "stage"),
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 0
-    payload = json.loads(result.output)
-    assert payload["status"] == "ok"
-    assert Path(payload["final_path"]).exists()
-    assert payload["integrity_result"] == "ok"
-
-
-def test_gt_db_snapshot_cli_include_chroma_fails_closed(
-    runner: CliRunner,
-    project_dir: Path,
-    tmp_path: Path,
-) -> None:
-    _create_source_db(project_dir / "groundtruth.db")
-
-    result = runner.invoke(
-        main,
-        [
-            "--config",
-            str(project_dir / "groundtruth.toml"),
-            "db",
-            "snapshot",
-            "--output-dir",
-            str(tmp_path / "out"),
-            "--staging-dir",
-            str(tmp_path / "stage"),
-            "--include-chroma",
-            "--json",
-        ],
-    )
-
-    assert result.exit_code == 2
-    payload = json.loads(result.output)
-    assert payload["status"] == "error"
-    assert "not implemented" in payload["message"]
-    assert not (tmp_path / "out").exists()

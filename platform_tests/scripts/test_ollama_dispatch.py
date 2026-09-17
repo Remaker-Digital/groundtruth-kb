@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts import ollama_harness
 from scripts import verify_ollama_dispatch as verify
 
 OLLAMA_MODEL_ID = "fixture-review:current"
@@ -20,15 +21,6 @@ OLLAMA_SURFACES = {
         ]
     }
 }
-
-
-def _write_registry(root: Path, records: list[dict]) -> None:
-    state = root / "harness-state"
-    state.mkdir(parents=True, exist_ok=True)
-    (state / "harness-registry.json").write_text(
-        json.dumps({"schema_version": 1, "harnesses": records}),
-        encoding="utf-8",
-    )
 
 
 def _ollama_record(
@@ -52,9 +44,9 @@ def _ollama_record(
 def _write_routing(root: Path, *, allowed_tools: list[str] | None = None) -> None:
     if allowed_tools is None:
         allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
-    (root / ".api-harness").mkdir(parents=True, exist_ok=True)
+    (root / ollama_harness.ROUTING_CONFIG_PATH.parent).mkdir(parents=True, exist_ok=True)
     tools_literal = json.dumps(allowed_tools)
-    (root / ".api-harness" / "routing.toml").write_text(
+    (root / ollama_harness.ROUTING_CONFIG_PATH).write_text(
         "schema_version = 1\n"
         "\n"
         "[models.review-route]\n"
@@ -71,26 +63,30 @@ def _write_routing(root: Path, *, allowed_tools: list[str] | None = None) -> Non
     )
 
 
-def _write_project(root: Path, *, allowed_tools: list[str] | None = None) -> Path:
+def _write_project(root: Path, native_harness_record, *, allowed_tools: list[str] | None = None) -> Path:
     (root / "groundtruth.toml").write_text('[project]\nproject_name = "fixture"\n', encoding="utf-8")
     (root / "scripts").mkdir(parents=True, exist_ok=True)
     (root / "scripts" / "ollama_harness.py").write_text("# fixture shim\n", encoding="utf-8")
-    _write_registry(root, [_ollama_record()])
+    native_harness_record(root, _ollama_record())
     _write_routing(root, allowed_tools=allowed_tools)
     return root
 
 
-def test_readiness_passes_with_mocked_tags(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = _write_project(tmp_path)
+def test_readiness_passes_with_mocked_tags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, native_harness_record
+) -> None:
+    root = _write_project(tmp_path, native_harness_record)
     monkeypatch.setattr(verify, "call_ollama_tags", lambda endpoint, timeout: {OLLAMA_MODEL_ID})
     monkeypatch.setattr(verify, "evaluate_ollama_autostart", lambda **_kwargs: {"checked": True, "configured": True})
-    result = verify.evaluate_dispatch_readiness(root)
-    assert result["ready"] is True
+    result = verify.evaluate_readiness(root)
+    assert result["probe_passed"] is True
     assert result["route_key"] == "review-route"
 
 
-def test_readiness_fails_closed_when_daemon_unavailable(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    root = _write_project(tmp_path)
+def test_readiness_fails_closed_when_daemon_unavailable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, native_harness_record
+) -> None:
+    root = _write_project(tmp_path, native_harness_record)
     monkeypatch.setattr(
         verify,
         "evaluate_ollama_autostart",
@@ -101,16 +97,16 @@ def test_readiness_fails_closed_when_daemon_unavailable(tmp_path: Path, monkeypa
         raise verify.OllamaHarnessError("Ollama /api/tags unavailable")
 
     monkeypatch.setattr(verify, "call_ollama_tags", _raise_unavailable)
-    result = verify.evaluate_dispatch_readiness(root)
-    assert result["ready"] is False
+    result = verify.evaluate_readiness(root)
+    assert result["probe_passed"] is False
     assert result["checks"][-1]["name"] == "ollama /api/tags"
     assert result["checks"][-1]["passed"] is False
 
 
 def test_readiness_warns_when_autostart_missing_but_daemon_ready(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, native_harness_record
 ) -> None:
-    root = _write_project(tmp_path)
+    root = _write_project(tmp_path, native_harness_record)
     monkeypatch.setattr(verify, "call_ollama_tags", lambda endpoint, timeout: {OLLAMA_MODEL_ID})
     monkeypatch.setattr(
         verify,
@@ -122,9 +118,9 @@ def test_readiness_warns_when_autostart_missing_but_daemon_ready(
         },
     )
 
-    result = verify.evaluate_dispatch_readiness(root)
+    result = verify.evaluate_readiness(root)
 
-    assert result["ready"] is True
+    assert result["probe_passed"] is True
     assert result["autostart"]["configured"] is False
     assert result["warnings"] == [
         {
@@ -134,10 +130,59 @@ def test_readiness_warns_when_autostart_missing_but_daemon_ready(
     ]
 
 
-def test_readiness_fails_when_required_review_tool_missing(tmp_path: Path) -> None:
-    root = _write_project(tmp_path, allowed_tools=["Read", "Glob"])
-    result = verify.evaluate_dispatch_readiness(root, require_daemon=False)
-    assert result["ready"] is False
+def test_readiness_fails_when_required_review_tool_missing(tmp_path: Path, native_harness_record) -> None:
+    root = _write_project(tmp_path, native_harness_record, allowed_tools=["Read", "Glob"])
+    result = verify.evaluate_readiness(root, require_daemon=False)
+    assert result["probe_passed"] is False
     detail = result["checks"][-1]["detail"]
     for tool in ("Bash", "Edit", "Grep", "Write"):
         assert tool in detail
+
+
+@pytest.mark.parametrize(
+    "requested,advertised,expected",
+    [
+        ("fixture", {"fixture:latest"}, True),
+        ("fixture:latest", {"fixture"}, True),
+        ("fixture", {"fixture:other"}, False),
+        ("fixture:cloud", {"fixture:cloud"}, True),
+        ("fixture:cloud", {"fixture:cloud:extra"}, False),
+        ("namespace/fixture", {"namespace/fixture:latest"}, True),
+        ("fixture", set(), False),
+    ],
+)
+def test_advertised_model_matches_exact_tag_or_default_latest(requested, advertised, expected):
+    assert verify._model_advertised(requested, advertised) is expected
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        [],
+        ["fixture", None],
+        ["fixture", ""],
+        ["python", "foreign/scripts/ollama_harness.py", "--skill", "bridge-review"],
+        ["python", "scripts/ollama_harness.py", "--skill", "unrelated", "bridge-review"],
+    ],
+)
+def test_malformed_launch_record_prevents_host_and_provider_checks(tmp_path, monkeypatch, native_harness_record, argv):
+    root = _write_project(tmp_path, native_harness_record)
+    native_harness_record(root, _ollama_record(surfaces={"headless": {"argv": argv}}))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Invalid launch metadata must not start host/provider checks")
+
+    monkeypatch.setattr(verify, "call_ollama_tags", forbidden)
+    monkeypatch.setattr(verify, "evaluate_ollama_autostart", forbidden)
+    assert verify.evaluate_readiness(root)["probe_passed"] is False
+
+
+def test_omitted_daemon_check_is_explicitly_unqualified(tmp_path, monkeypatch, native_harness_record):
+    root = _write_project(tmp_path, native_harness_record)
+    monkeypatch.setattr(verify, "evaluate_ollama_autostart", lambda **kwargs: {"checked": False, "configured": None})
+    report = verify.evaluate_readiness(root, require_daemon=False)
+    assert report["probe_passed"] is True
+    assert report["probe_scope"] == "installation_and_routing"
+    assert report["model_execution"] == report["harness_qualification"] == "unqualified"
+    assert "argv" not in report and "ready" not in report
+    assert not any(c["name"] == "ollama /api/tags" for c in report["checks"])

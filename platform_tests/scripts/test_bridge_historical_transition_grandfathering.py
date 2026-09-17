@@ -24,7 +24,6 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "groundtruth-kb" / "src"))
 
 from groundtruth_kb.bridge.vocabulary import (  # noqa: E402
     CANONICAL_STATUSES,

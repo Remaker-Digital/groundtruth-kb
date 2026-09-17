@@ -15,7 +15,7 @@
 
 The active bridge dispatch automation is the **dispatcher daemon** at
 `scripts/gtkb_dispatcher_daemon.py`, kept alive by the headless dispatcher
-supervisor path. On each daemon cycle it inspects dispatcher/TAFE state and
+supervisor path. On each daemon cycle it inspects dispatcher bridge state and
 dispatches the appropriate counterpart harness if a recipient's actionable
 queue signature has changed.
 

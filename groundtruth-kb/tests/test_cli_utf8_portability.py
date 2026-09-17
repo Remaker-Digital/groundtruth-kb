@@ -19,10 +19,8 @@ stubbed; no live `groundtruth.db` read or write.
 from __future__ import annotations
 
 import io
-import types
 
 import pytest
-from click.testing import CliRunner
 
 from groundtruth_kb import cli
 
@@ -112,32 +110,3 @@ def test_module_entrypoint_routes_to_cli() -> None:
 # --------------------------------------------------------------------------
 # End-to-end: the deliberations-search path that triggered Defect 1
 # --------------------------------------------------------------------------
-
-
-def test_deliberations_search_handles_bom_title(monkeypatch: pytest.MonkeyPatch) -> None:
-    """`deliberations search` formats a BOM-prefixed title without error."""
-
-    class _FakeDB:
-        def __init__(self, *_a: object, **_k: object) -> None:
-            pass
-
-        def search_deliberations(self, _query: str, *, limit: int = 5) -> list[dict[str, object]]:
-            return [
-                {
-                    "id": "DELIB-9999",
-                    "version": 1,
-                    "title": _BOM + "BOM Title",
-                    "summary": "a summary",
-                    "search_method": "semantic",
-                    "score": 0.9,
-                }
-            ]
-
-    fake_cfg = types.SimpleNamespace(db_path=":memory:", chroma_path=None)
-    monkeypatch.setattr(cli, "_resolve_config", lambda _ctx: fake_cfg)
-    monkeypatch.setattr(cli, "KnowledgeDB", _FakeDB)
-
-    result = CliRunner().invoke(cli.main, ["deliberations", "search", "anything"])
-
-    assert result.exit_code == 0, result.output
-    assert "BOM Title" in result.output

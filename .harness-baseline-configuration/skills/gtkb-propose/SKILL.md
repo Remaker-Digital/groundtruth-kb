@@ -1,91 +1,113 @@
 ---
 name: gtkb-propose
-description: Scaffold a structurally compliant bridge proposal body (status token, project-linkage metadata, inline-JSON target_paths, seeded Prior Deliberations, spec-derived verification heading, required sections) and run a self-review checklist BEFORE filing, then hand off to gtkb-bridge-propose for the write. Use when starting a NEW bridge implementation proposal and you want it to clear the bridge-compliance gates on the first review instead of in a revise loop.
+description: Compose a complete NEW or REVISED implementation proposal from the assigned work and current native context, then deliver the agent-authored message through the exact next-artifact claim.
 metadata:
   project: groundtruth-kb
   category: implementation and planning
 ---
-This skill is the **composer** front-end to the `gtkb-bridge-propose`
-**writer**. It produces a gate-compliant draft; `gtkb-bridge-propose` performs
-the credential-scanned no-index bridge write and dispatcher/TAFE state
-publication. This skill never writes to `bridge/` or MemBase itself.
 
-After the 2026-06-15 TAFE/dispatcher cutover, the bridge writer must publish
-versioned bridge files and dispatcher/TAFE state without creating or requiring
-aggregate queue artifacts.
+# Compose an implementation proposal
 
-# /gtkb-propose
+Use this skill to explain the intended change for work explicitly assigned to
+this Prime Builder context. Use `gtkb-bridge-propose` for the full native delivery
+procedure and `file-bridge-protocol` for lifecycle and independent review duties.
+Load those sources from this harness's generated configuration. The agent writes
+the proposal; no helper selects scope, seeds authority, authors decisions or
+repairs the header.
 
-## What this skill does
+## Read current inputs
 
-Operationalizes `PROJECT-GTKB-GOV-PROPOSAL-STANDARDS` (Slices 1-3 enforce
-proposal structure mechanically; this Slice 4 surface helps authors *produce*
-that structure). The agent authors the complete proposal itself in its own
-scratch directory and delivers it with `gt bridge deliver`; no scaffold helper
-or preflight script exists.
+Use the actual native context identifier and its exact supplied role/activity.
+Read `gt session show --native-context-id <context-id> --json` and bind only the
+literal supplied init marker if necessary. Read
+`gt context work-item <WI-ID> --json` for the work item, its single parent project,
+prerequisites, applicable current formal sources, executable test and test plan.
+For an existing attempt, also read `gt bridge show <document> --content --json`.
 
-## When to invoke
+NEW starts a fresh implementation attempt; REVISED follows NO-GO on its existing
+attempt. Before NEW, the parent project must be authorized. An interactive
+context asks the owner to resolve a missing authorization; headless work follows
+the native BLOCKED route. Do not change authorization to make a proposal pass.
+A later authorization change does not cancel an initiated chain. Missing scope,
+current formal input or executable test must be resolved before proceeding.
 
-Use when drafting a **NEW** bridge implementation proposal. Not for REVISED
-versions of an existing thread, verdict files, or advisory entries.
+## Explain the complete change
 
-## Inputs to collect from the author
+Write the intended before/after behavior, governing requirements and rationale;
+exact source and test artifact paths; implementation approach and affected
+interfaces; removal/supersession effects; dependencies and concurrency; complete
+verification commands, expected results and failure/recovery checks; operational
+effects and their containment; and justified exclusions. Reconcile any material
+unanswered owner choice explicitly. A reference list or structural check is not
+substantive review or behavioral evidence.
 
-- `slug` — kebab-case thread name (e.g. `gtkb-widget-refactor`).
-- `work_item` — the governing WI id (`WI-NNNN` / `GTKB-*`).
-- `project` — the `PROJECT-*` id grouping the work.
-- optional `slice` number, `bridge_kind` (default `prime_proposal`),
-  and one or more `target_path` globs the implementation will touch.
+Use exact relative artifact paths, without glob patterns, generated harness
+paths, bridge payloads or temporary state. Read and include the current work-item
+version and all applicable formal versions. Do not silently bind a newer version
+than the one used to write the proposal. Incorporate needed information directly;
+prior deliberations, handoffs and old bridge messages are not current authority.
 
-## Procedure
+## Authored header example
 
-1. **Emit the scaffold draft:**
+Replace every dollar placeholder from the current reads and actual attribution.
+Use NEW or REVISED as appropriate, with the next claimed positive version. These
+placeholders are explanatory text; the CLI never fills them or invents provenance.
+Keep the metadata together before the blank line introducing the complete body.
 
-   Author the proposal body by hand from the current `gt context work-item <WI> --json`
-   output: exact `target_paths`, `test_artifact_targets`, observed `work_item_version`
-   and `spec_versions`, the intended result, governing requirements, affected
-   artifacts, implementation approach, complete verification plan and justified
-   exclusions (see the `file-bridge-protocol` rule).
+```text
+::init gtkb lo
+::open build
+$status
+bridge_kind: implementation_proposal
+Document: $document
+Version: $next_version
+Date: $date
+author_identity: $author_identity
+author_harness_id: $harness_id
+author_session_context_id: $bound_session_id
+author_model: $model
+recipient_role: loyal-opposition
+Project: $project_id
+Work Item: $work_item_id
+work_item_version: $work_item_version
+target_paths: $target_paths_json
+test_artifact_targets: $test_targets_json
+spec_versions: $spec_versions_json
 
-   The helper validates the slug (kebab-case and safe bridge-file name),
-   validates the work-item/project relationship and the project's current
-   `activation-status` read-only against MemBase, seeds `## Prior Deliberations` from a Deliberation Archive search,
-   pre-lists the always-applicable governing specs in `## Specification Links`,
-   and writes the draft to `.gtkb-state/propose-drafts/<slug>-001.md`. It prints
-   a self-review checklist.
+$complete_body
+```
 
-2. **Fill the `TODO:` placeholders** in the draft with real content: the title,
-   author/model metadata, summary, the operative `Requirement Sufficiency`
-   state, the spec-to-test mapping under the verification heading, risk/rollback,
-   and the recommended commit type. Prune the seeded Prior-Deliberations and
-   Specification-Links candidates to the genuinely relevant ones.
+Project and Work Item are the current canonical identifiers, never permission
+carriers. The native service resolves and checks their relationship against the
+claim. The envelope addresses the next responder; authored session attribution
+uses the returned bound session identifier, not an invented harness role.
 
-3. **Run the self-review checklist** the helper printed — at minimum the two
-   mandatory preflights, the phantom-spec sweep (confirm every cited id exists in
-   the live `specifications` table), the inline-JSON `target_paths` parse check,
-   and the verification-heading-token check. Fix any failure and re-check.
+## Claim, deliver and read back
 
-4. **Hand off to the writer.** When the checklist is green, file the completed
-   body via the `gtkb-bridge-propose` skill, which credential-scans the body,
-   writes `bridge/<slug>-001.md`, and publishes the bridge state through the
-   no-index dispatcher/TAFE path. Do **not** write `bridge/` from this skill.
+Reserve one exact next artifact using the observed head version, intended status
+and a unique request ID. Reuse the ID only for the identical retry:
 
-## Boundaries
+```text
+gt bridge claim <document> --work-item-id <WI-ID> --native-context-id <context-id> --expected-version <head-version> --status <NEW-or-REVISED> --request-id <unique-request-id> --json
+```
 
-- Read-only against MemBase; writes only the draft under `.gtkb-state/`.
-- Does not replace Loyal Opposition review, a live work-intent claim, or explicit
-  owner approval where formal mutation requires it; it only reduces the
-  structural-revise-loop friction before review. Do not create a separate
-  approval or authorization carrier.
-- The scaffold is a starting point, not a substitute for substantive authoring:
-  every `TODO:` must be replaced before filing.
+Save the complete UTF-8 message only in `scratchpad/<bound-session-id>` and use
+the returned fence. The claim reserves this next artifact, not the work item or
+thread. Deliver without modifying another context's files:
 
-## Source
+```text
+gt bridge deliver <document> --native-context-id <context-id> --fence <returned-fence> --content-file <authored-message-file> --json
+gt bridge show <document> --content --json
+```
 
-`PROJECT-GTKB-GOV-PROPOSAL-STANDARDS` Slice 4;
-owner decision `DELIB-S382-PROPOSAL-STANDARDS-COMPLETION-SCOPE`;
-GO at `bridge/gtkb-proposal-standards-propose-scaffold-skill-002.md`.
-The former scaffold helper and its tests are retired; delivery validation lives in
-the native bridge service (`gt bridge deliver`).
+Compare exact readback with the authored bytes. A refused header, stale scope or
+unavailable authority is not permission to write raw bridge storage. Reconcile
+current facts; keep an uncertain acknowledgement distinct from a failed write.
+Retry the exact bytes/fence only when current state permits it. Release an
+unfinished live claim through the CLI. Independent GO and the next claim are
+required before implementation; filing a proposal does not commit or activate it.
 
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Current requirements: DCL-BRIDGE-KIND-TAXONOMY-ENUM-001 and
+DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001. Implementation validation is in
+the native bridge service; source bindings and a passing parser are only part of
+the complete verification duty. The former scaffold and file writer are retired.

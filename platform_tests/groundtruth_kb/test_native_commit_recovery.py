@@ -162,7 +162,7 @@ def test_killed_authority_after_git_commit_recovers_once_in_a_fresh_context(comm
             deadline = time.monotonic() + 40
             while not marker.exists() and worker.poll() is None and time.monotonic() < deadline:
                 time.sleep(0.05)
-            assert marker.exists(), worker.communicate(timeout=5)
+            assert marker.exists(), "stdout: {}\nstderr: {}".format(*worker.communicate(timeout=5))
             candidate = base(checkout)
             assert candidate != parent and base(main) == parent
             kill_child_tree(service)
@@ -175,7 +175,8 @@ def test_killed_authority_after_git_commit_recovers_once_in_a_fresh_context(comm
             bound = cli(
                 "session", "bind", "--native-context-id", "fresh-recovery", "--init-keyword", "::init gtkb lo", "--json"
             )
-            fresh_path = main / ".worktrees" / bound["session_context_id"]
+            assert bound["status"] == "init_requested"
+            fresh_path = main / ".worktrees" / bound["binding"]["session_context_id"]
             assert not fresh_path.exists()
             arguments = ["PROJECT-1", "--native-context-id", "fresh-recovery", "--expected-version", "1"]
             prepared = cli("projects", "prepare-commit", *arguments, "--json")

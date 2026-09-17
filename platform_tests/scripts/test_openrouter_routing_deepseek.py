@@ -1,24 +1,20 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for WI-4476: OpenRouter routing re-pointed to cost-optimized DeepSeek models.
+"""Provider routing isolation and complete baseline-derived configuration.
 
-Spec-derived from ``bridge/gtkb-openrouter-routing-deepseek-cost-optimization-001.md``
-(GO at -002). The ``provider="openrouter"`` rows in ``.api-harness/routing.toml`` must
-point at account-eligible providers (deepseek/qwen/moonshotai) rather than the
-account-ineligible ``google/`` / ``openai/`` slugs that returned HTTP 404
-"No allowed providers". Structural loader behavior is exercised against a fixture; the
-live-config invariant guards against a regression back to ineligible slugs.
+Synthetic inputs cover loader selection. The supported projector supplies the
+baseline integration fixture. Neither model-name prefixes nor configured IDs
+establish current account eligibility; that requires a separate provider check.
 """
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
+
+import pytest
 
 from scripts import ollama_harness as oh_o
 from scripts import openrouter_harness as oh_r
-
-REPO_ROOT = Path(__file__).resolve().parents[2]
-ELIGIBLE_PROVIDER_PREFIXES = ("deepseek/", "qwen/", "moonshotai/")
-INELIGIBLE_PROVIDER_PREFIXES = ("google/", "openai/", "azure/", "anthropic/")
 
 DEEPSEEK_ROUTING = """
 schema_version = 1
@@ -52,12 +48,12 @@ bridge-review = "deepseek-v4-pro"
 """
 
 
-def _fixture_root(tmp_path: Path, routing_text: str) -> Path:
+def _fixture_root(tmp_path: Path, routing_text: str, config_path: Path = oh_r.ROUTING_CONFIG_PATH) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
-    (root / ".api-harness").mkdir()
-    (root / oh_r.ROUTING_CONFIG_PATH).write_text(routing_text.strip() + "\n", encoding="utf-8")
+    (root / config_path).parent.mkdir(parents=True)
+    (root / config_path).write_text(routing_text.strip() + "\n", encoding="utf-8")
     return root
 
 
@@ -85,28 +81,38 @@ def test_openrouter_skill_route_resolves(tmp_path: Path) -> None:
 
 def test_ollama_loader_ignores_openrouter_rows(tmp_path: Path) -> None:
     # Cross-provider isolation: the ollama loader (WI-4473 filter) loads only its own rows.
-    config = oh_o.load_routing_config(_fixture_root(tmp_path, DEEPSEEK_ROUTING))
+    config = oh_o.load_routing_config(_fixture_root(tmp_path, DEEPSEEK_ROUTING, oh_o.ROUTING_CONFIG_PATH))
     assert set(config.models.keys()) == {"ollama-keep"}
 
 
-# --- live-config invariant (WI-4476 regression guard) ---
+# --- complete generated-configuration invariants ---
 
 
-def test_live_openrouter_models_are_account_eligible() -> None:
-    config = oh_r.load_routing_config(REPO_ROOT)
-    assert config.models, "expected at least one openrouter model in the live routing.toml"
-    for route in config.models.values():
-        mid = route.model_id
-        assert not mid.startswith(INELIGIBLE_PROVIDER_PREFIXES), (
-            f"openrouter model {mid!r} uses an account-ineligible provider (the 404 root cause)"
-        )
-        assert mid.startswith(ELIGIBLE_PROVIDER_PREFIXES), (
-            f"openrouter model {mid!r} should use an account-eligible provider"
-        )
+@pytest.mark.timeout(300)
+def test_generated_openrouter_models_preserve_only_the_provider_baseline(generated_harness_root: Path) -> None:
+    config = oh_r.load_routing_config(generated_harness_root)
+    baseline = tomllib.loads(
+        (generated_harness_root / ".harness-baseline-configuration/routing.toml").read_text(encoding="utf-8")
+    )
+    expected = {key: row for key, row in baseline["models"].items() if row.get("provider") == "openrouter"}
+    assert expected and set(config.models) == set(expected)
+    for key, route in config.models.items():
+        assert route.model_id == expected[key]["model_id"]
+        assert route.allowed_tools == tuple(expected[key]["allowed_tools"])
+        assert route.omit_payload_model == expected[key].get("omit_payload_model", False)
 
 
-def test_live_openrouter_default_resolves() -> None:
-    config = oh_r.load_routing_config(REPO_ROOT)
+@pytest.mark.timeout(300)
+def test_generated_openrouter_default_and_skill_routes_resolve(generated_harness_root: Path) -> None:
+    config = oh_r.load_routing_config(generated_harness_root)
+    baseline = tomllib.loads(
+        (generated_harness_root / ".harness-baseline-configuration/routing.toml").read_text(encoding="utf-8")
+    )
+    expected = baseline["routing"]["openrouter"]
+    assert config.default_model == expected["default_model"]
+    assert config.skill_routes == expected["skills"]
     route = oh_r.resolve_model(config, None)
-    assert route.model_id.startswith(ELIGIBLE_PROVIDER_PREFIXES)
+    assert route.key == expected["default_model"]
     assert route.tool_calling_supported is True
+    for skill, key in expected["skills"].items():
+        assert oh_r.resolve_model(config, None, skill=skill).key == key

@@ -8,9 +8,12 @@ skips.  Every test uses and permanently removes a unique PostgreSQL schema.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
+import subprocess
+import sys
 import threading
 import time
 import uuid
@@ -23,9 +26,12 @@ import groundtruth_kb.postgres_kernel as kernel_module
 import psycopg
 import pytest
 from click.testing import CliRunner
+from fastapi.testclient import TestClient
+from groundtruth_kb.authority_api import create_authority_app
 from groundtruth_kb.cli import main
 from groundtruth_kb.config import GTConfig, PostgreSQLConfig
 from groundtruth_kb.db_snapshot import create_snapshot
+from groundtruth_kb.native_authority import AuthorityService
 from groundtruth_kb.postgres_kernel import (
     ALL_TABLES,
     COORDINATION_TABLES,
@@ -46,6 +52,8 @@ from groundtruth_kb.postgres_kernel import (
     parse_json_bytes,
 )
 from psycopg import sql
+
+from platform_tests.groundtruth_kb.test_native_authority_service import put
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
@@ -502,7 +510,8 @@ def test_migrated_bindings_roundtrip_without_history_and_keep_the_original_role(
     )
     bridge = NativeBridgeService(kernel, tmp_path)
     binding = bridge.bind(BindSession(native_context_id="original-native", init_command="::init gtkb pb"))
-    assert binding["session_context_id"] == original["session_context_id"]
+    assert binding["status"] == "already_initialized_idempotent"
+    assert binding["binding"] == original
     with pytest.raises(PostgresKernelError):
         bridge.bind(BindSession(native_context_id="original-native", init_command="::init gtkb lo"))
     assert (
@@ -1439,3 +1448,262 @@ class TestPublicSchemaCommentInitialization:
         with psycopg.connect(service=service, autocommit=True) as connection:
             present = connection.execute("SELECT 1 FROM pg_database WHERE datname=%s", (database_name,)).fetchone()
         assert present is not None, "the disposable database must exist before teardown drops it"
+
+
+# Explicit transition from the installed repository/scope predecessor.
+PREDECESSOR = "2f25071544591b01b44e0da491a19bd9adee509627114a4dad528205a8f6e2ca"
+
+
+def predecessor_sql():
+    """Reconstruct the exact measured predecessor; the hash prevents a moving fixture."""
+    current = kernel_module.schema_sql_bytes()
+    new_scope = (
+        b"application_scope TEXT CHECK (application_scope ~ '^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$')"
+    )
+    old_scope = b"application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application'))"
+    assert current.count(new_scope) == 2
+    current = current.replace(new_scope, old_scope)
+    lines = current.splitlines(keepends=True)
+    assert sum(line.startswith(b"    repository_ref TEXT CHECK") for line in lines) == 1
+    current = b"".join(line for line in lines if not line.startswith(b"    repository_ref TEXT CHECK"))
+    assert current.count(b" AND repository_ref IS NULL") == 1
+    current = current.replace(b" AND repository_ref IS NULL", b"")
+    assert hashlib.sha256(current).hexdigest() == PREDECESSOR
+    return current
+
+
+@pytest.fixture
+def predecessor(isolated_postgres, monkeypatch):
+    service, schema = isolated_postgres
+    kernel = PostgresKernel(PostgreSQLConfig(service=service))
+    old_sql = predecessor_sql()
+    with monkeypatch.context() as patch:
+        patch.setattr(kernel_module, "schema_sql_bytes", lambda: old_sql)
+        patch.setattr(kernel_module, "schema_sql_sha256", lambda: PREDECESSOR)
+        kernel.initialize()
+    with psycopg.connect(service=service) as connection:
+        connection.execute(
+            'INSERT INTO projects(id,version,name,kind,"authorization",changed_by,changed_at,change_reason) '
+            "VALUES ('PROGRAM-EXISTING',3,'Existing program','program',NULL,'fixture',now(),'Existing state'),"
+            "('PROJECT-EXISTING',7,'Existing project','project','authorized','fixture',now(),'Existing state')"
+        )
+        connection.execute(
+            "INSERT INTO specifications(id,version,title,status,application_scope,changed_by,changed_at,change_reason) "
+            "VALUES ('SPEC-EXISTING',4,'Existing requirement','active',NULL,'fixture',now(),'Existing state')"
+        )
+        connection.execute(
+            "INSERT INTO record_history(record_type,record_id,prior_version,new_version,prior_state,new_state,"
+            "actor,changed_at,reason) SELECT 'projects',jsonb_build_object('id',id),version-1,version,"
+            "jsonb_build_object('id',id,'version',version-1),to_jsonb(p),'fixture',now(),'Preserve historical payload' "
+            "FROM projects p"
+        )
+    return kernel, service, schema
+
+
+def snapshot(service):
+    with psycopg.connect(service=service) as connection:
+        rows = {}
+        for table in ALL_TABLES:
+            rows[table] = connection.execute(
+                sql.SQL("SELECT to_jsonb(t) FROM {} t ORDER BY to_jsonb(t)::text").format(sql.Identifier(table))
+            ).fetchall()
+        comment = connection.execute("SELECT obj_description(current_schema()::regnamespace,'pg_namespace')").fetchone()
+        columns = connection.execute(
+            "SELECT table_name,column_name,ordinal_position FROM information_schema.columns "
+            "WHERE table_schema=current_schema() ORDER BY table_name,ordinal_position"
+        ).fetchall()
+        return {"rows": rows, "comment": comment, "columns": columns}
+
+
+def test_ordinary_initialization_still_refuses_the_supported_predecessor(predecessor):
+    kernel, service, _ = predecessor
+    before = snapshot(service)
+    with pytest.raises(PostgresKernelError) as error:
+        kernel.initialize()
+    assert error.value.code == "schema_drift"
+    assert snapshot(service) == before
+
+
+def test_explicit_transition_preserves_versions_history_and_unresolved_repository(predecessor):
+    kernel, service, _ = predecessor
+    before = snapshot(service)
+    result = kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    assert result["status"] == "upgraded"
+    assert result["unresolved_project_repositories"] == 1
+    assert result["schema_sha256"] == kernel_module.schema_sql_sha256()
+    after = snapshot(service)
+    for row in after["rows"]["projects"]:
+        assert row[0].pop("repository_ref") is None
+    assert after["rows"] == before["rows"]
+    assert kernel.status()["ready"] is True
+    assert kernel.initialize()["status"] == "already_current"
+    settled = snapshot(service)
+    assert kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)["status"] == "already_current"
+    assert snapshot(service) == settled
+    with TestClient(create_authority_app(AuthorityService(kernel))) as client:
+        project = client.get("/v1/projects/PROJECT-EXISTING")
+        assert project.status_code == 200
+        assert project.json()["project"]["repository_ref"] is None and project.json()["project"]["version"] == 7
+
+
+@pytest.mark.parametrize("domain", ["specifications", "tests"])
+@pytest.mark.parametrize("name", ["Alpha", "Beta"])
+def test_upgraded_schema_accepts_native_catalog_scopes_with_existing_history(predecessor, tmp_path, domain, name):
+    kernel, service, _ = predecessor
+    history = snapshot(service)["rows"]["record_history"]
+    kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    host = tmp_path / "host"
+    (host / "applications").mkdir(parents=True)
+    (host / "applications/registry.toml").write_text(
+        '[applications]\nAlpha={slot="Alpha"}\nBeta={slot="Beta"}\n', encoding="utf-8"
+    )
+    with TestClient(create_authority_app(AuthorityService(kernel), project_root=host)) as client:
+        fields = {"title": "Current scoped record", "application_scope": "application:" + name}
+        if domain == "tests":
+            fields.update(spec_id="SPEC-EXISTING", test_type="integration", expected_outcome="Current contract")
+        response = put(client, domain, "CURRENT-" + name, fields)
+        assert response.status_code == 200, response.text
+        assert response.json()["application_scope"] == "application:" + name
+        before = snapshot(service)
+        refused = put(client, domain, "RETIRED-MARKER", {**fields, "application_scope": "agent_red_application"})
+        assert refused.status_code == 422
+        assert snapshot(service) == before
+    current_history = snapshot(service)["rows"]["record_history"]
+    assert all(row in current_history for row in history)
+
+
+@pytest.mark.parametrize("record_id,reference", [("PROGRAM-EXISTING", "platform"), ("PROJECT-EXISTING", "../outside")])
+def test_upgraded_program_and_repository_constraints_reject_invalid_rows(predecessor, record_id, reference):
+    kernel, service, _ = predecessor
+    kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    before = snapshot(service)
+    with pytest.raises(psycopg.errors.CheckViolation), psycopg.connect(service=service) as connection:
+        connection.execute("UPDATE projects SET repository_ref=%s WHERE id=%s", (reference, record_id))
+    assert snapshot(service) == before
+
+
+def test_current_schema_and_empty_schema_use_their_declared_initialization_paths(isolated_postgres):
+    service, _ = isolated_postgres
+    kernel = PostgresKernel(PostgreSQLConfig(service=service))
+    with pytest.raises(PostgresKernelError) as error:
+        kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    assert error.value.code == "schema_upgrade_preimage_mismatch"
+    assert kernel.initialize()["status"] == "initialized"
+    before = snapshot(service)
+    assert kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)["status"] == "already_current"
+    assert snapshot(service) == before
+
+
+@pytest.mark.parametrize("change", ["column", "metadata", "metadata-shape"])
+def test_unknown_or_drifted_catalog_is_refused_without_repair(predecessor, change):
+    kernel, service, schema = predecessor
+    with psycopg.connect(service=service) as connection:
+        if change == "column":
+            connection.execute("ALTER TABLE projects ADD COLUMN unreviewed TEXT")
+        else:
+            metadata = json.loads(
+                connection.execute("SELECT obj_description(current_schema()::regnamespace,'pg_namespace')").fetchone()[
+                    0
+                ]
+            )
+            if change == "metadata":
+                metadata["schema_sha256"] = "f" * 64
+            else:
+                metadata["extra"] = "unrecognized"
+            connection.execute(
+                sql.SQL("COMMENT ON SCHEMA {} IS {}").format(sql.Identifier(schema), sql.Literal(json.dumps(metadata)))
+            )
+    before = snapshot(service)
+    with pytest.raises(PostgresKernelError) as error:
+        kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    assert error.value.code == "schema_upgrade_preimage_mismatch"
+    assert snapshot(service) == before
+
+
+def test_unknown_requested_predecessor_never_opens_a_connection(monkeypatch):
+    def forbidden(*args, **kwargs):
+        pytest.fail("Unsupported upgrade attempted a database connection")
+
+    monkeypatch.setattr(PostgresKernel, "_connect", forbidden)
+    with pytest.raises(PostgresKernelError) as error:
+        PostgresKernel(PostgreSQLConfig(service="unused")).upgrade_schema(expected_schema_sha256="0" * 64)
+    assert error.value.code == "unsupported_schema_upgrade"
+
+
+def test_legacy_scope_requires_explicit_record_reconciliation_before_ddl(predecessor):
+    kernel, service, _ = predecessor
+    with psycopg.connect(service=service) as connection:
+        connection.execute(
+            "UPDATE specifications SET application_scope='agent_red_application' WHERE id='SPEC-EXISTING'"
+        )
+    before = snapshot(service)
+    with pytest.raises(PostgresKernelError) as error:
+        kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    assert error.value.code == "application_scope_reconciliation_required"
+    assert error.value.details == {"specifications": ["SPEC-EXISTING"], "tests": []}
+    assert snapshot(service) == before
+
+
+def test_failure_after_ddl_rolls_back_columns_constraints_metadata_and_rows(predecessor, monkeypatch):
+    kernel, service, _ = predecessor
+    before = snapshot(service)
+
+    def refuse(*args, **kwargs):
+        raise PostgresKernelError("qualification_injected", "Refuse final schema readback")
+
+    monkeypatch.setattr(PostgresKernel, "_require_exact_schema", refuse)
+    with pytest.raises(PostgresKernelError) as error:
+        kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+    assert error.value.code == "qualification_injected"
+    assert snapshot(service) == before
+
+
+def test_held_write_lock_refuses_boundedly_without_partial_ddl(predecessor):
+    _, service, _ = predecessor
+    kernel = PostgresKernel(PostgreSQLConfig(service=service, lock_timeout_ms=100))
+    before = snapshot(service)
+    with psycopg.connect(service=service) as blocker:
+        blocker.execute("LOCK TABLE projects IN ROW EXCLUSIVE MODE")
+        with pytest.raises(PostgresKernelError) as error:
+            kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
+        assert error.value.code == "retryable_conflict"
+    assert snapshot(service) == before
+
+
+def test_concurrent_explicit_transitions_have_one_effect_and_idempotent_readback(predecessor):
+    kernel, service, _ = predecessor
+    history = snapshot(service)["rows"]["record_history"]
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR), range(2)))
+    assert sorted(row["status"] for row in results) == ["already_current", "upgraded"]
+    assert snapshot(service)["rows"]["record_history"] == history
+    assert kernel.status()["ready"] is True
+
+
+def test_ordinary_cli_process_uses_explicit_predecessor_and_reports_unresolved_rows(predecessor, tmp_path):
+    _, service, _ = predecessor
+    config = tmp_path / "selected.toml"
+    config.write_text(f'[postgresql]\nservice="{service}"\n', encoding="utf-8")
+    run = subprocess.run(
+        [
+            sys.executable,
+            "-P",
+            "-m",
+            "groundtruth_kb",
+            "--config",
+            str(config),
+            "db",
+            "postgres",
+            "init",
+            "--upgrade-from",
+            PREDECESSOR,
+        ],
+        env=os.environ.copy(),
+        capture_output=True,
+        text=True,
+        timeout=40,
+    )
+    assert run.returncode == 0, run.stdout + run.stderr
+    result = json.loads(run.stdout)
+    assert result["status"] == "upgraded" and result["unresolved_project_repositories"] == 1
+    assert run.stdout == canonical_json_bytes(result).decode("utf-8")

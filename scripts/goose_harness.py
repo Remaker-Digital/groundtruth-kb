@@ -60,8 +60,8 @@ def resolve_project_root(start: Path | None = None) -> Path:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Goose harness shim (Alibaba DeepSeek V4 Pro).")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Goose.")
-    parser.add_argument("--model", help="Routing model key from .api-harness/routing.toml.")
-    parser.add_argument("--skill", help="Skill or task route key from .api-harness/routing.toml.")
+    parser.add_argument("--model", help="Model identifier passed directly to Goose.")
+    parser.add_argument("--skill", help="Task key selecting this shim's additional system instructions.")
     parser.add_argument(
         "--max-turns",
         type=int,

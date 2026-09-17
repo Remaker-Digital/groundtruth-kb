@@ -3,12 +3,9 @@
 from __future__ import annotations
 
 import json
-import sys
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(REPO_ROOT / "groundtruth-kb" / "src"))
-
+import pytest
 from groundtruth_kb.governance.preflight_evidence import (  # noqa: E402
     CheckOutcome,
     CheckSeverity,
@@ -143,3 +140,26 @@ def test_text_and_markdown_summaries_include_evidence_path() -> None:
     assert "Evidence path: artifacts/windows/preflight.json" in text
     assert "- Evidence path: `artifacts/windows/preflight.json`" in markdown
     assert "| `bridge-authority` | `passed` | `hard` | no | authorized |" in markdown
+
+
+@pytest.mark.parametrize("outcome", list(CheckOutcome))
+@pytest.mark.parametrize("severity", list(CheckSeverity))
+def test_string_and_enum_preflight_inputs_have_identical_rendering(outcome, severity):
+    from dataclasses import FrozenInstanceError
+
+    import pytest
+
+    arguments = {"name": "bounded-check", "summary": "Unicode \u03bb and newline\nremain", "evidence": {"count": 2}}
+    enumerated = PreflightCheck(outcome=outcome, severity=severity, **arguments)
+    strings = PreflightCheck(outcome=str(outcome), severity=str(severity), **arguments)
+    assert strings.outcome is outcome and strings.severity is severity
+    reports = [PreflightEvidence.from_checks([check], generated_at=GENERATED_AT) for check in [enumerated, strings]]
+    for render in ["to_dict", "to_json", "to_text_summary", "to_markdown"]:
+        assert getattr(reports[0], render)() == getattr(reports[1], render)()
+    assert strings.blocks_release == (severity == CheckSeverity.HARD and outcome != CheckOutcome.PASSED)
+    with pytest.raises(ValueError):
+        PreflightCheck(outcome="unknown", severity=severity, **arguments)
+    with pytest.raises(ValueError):
+        PreflightCheck(outcome=outcome, severity="unknown", **arguments)
+    with pytest.raises(FrozenInstanceError):
+        strings.outcome = "passed"

@@ -24,8 +24,7 @@ from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from groundtruth_kb.authority_client import AuthorityClient
-from groundtruth_kb.config import GTConfig
-from groundtruth_kb.db import KnowledgeDB
+from groundtruth_kb.config import GTConfig, GTConfigError
 from groundtruth_kb.inventory.string_scan import registered_artifact_inventory
 from groundtruth_kb.project.registry_control_plane import (
     RegistryCoverageError,
@@ -35,7 +34,7 @@ from groundtruth_kb.project.registry_control_plane import (
     load_registry_snapshot,
     registry_identity_state,
 )
-from groundtruth_kb.project.sot_registry import SoTArtifact
+from groundtruth_kb.project.sot_registry import BackupPolicy, Domain, RestoreAction, SoTArtifact, VersioningPolicy
 
 ObserverClass = Literal[
     "capability_inventory",
@@ -177,7 +176,7 @@ def _tracked_inventory(project_root: Path) -> frozenset[str]:
             timeout=20,
         )
     except (OSError, subprocess.TimeoutExpired):
-        inventory = frozenset()
+        inventory: frozenset[str] = frozenset()
     else:
         inventory = (
             frozenset(item for item in result.stdout.decode("utf-8").split("\0") if item)
@@ -553,16 +552,11 @@ def observe_governed_knowledge(
                 if config_path.is_file()
                 else GTConfig.load(discover=False, project_root=project_root, db_path=db_path)
             )
-        if selected.authority_url:
-            rows = AuthorityClient(selected.authority_url).request("GET", "/v1/registry/path-observations")
-            if not isinstance(rows, list):
-                raise ValueError("Authority path inventory must be a list")
-        else:
-            db = KnowledgeDB(db_path=selected.db_path, read_only=True)
-            try:
-                rows = db.list_registry_path_observations()
-            finally:
-                db.close()
+        if not selected.authority_url:
+            raise GTConfigError("No authority_url is configured for the selected project")
+        rows = AuthorityClient(selected.authority_url).request("GET", "/v1/registry/path-observations")
+        if not isinstance(rows, list):
+            raise ValueError("Authority path inventory must be a list")
         observations: list[ArtifactObservation] = []
         diagnostics: list[str] = []
         for row in rows:
@@ -724,8 +718,8 @@ def observe_registered_dependency_closure(
             if record.lifecycle == "archive":
                 continue
             for dependency in record.depends_on:
-                target = records_by_id.get(dependency)
-                raw = target.storage_path if target is not None else dependency
+                target_record = records_by_id.get(dependency)
+                raw = target_record.storage_path if target_record is not None else dependency
                 paths, _ = _normalize_present_paths(project_root, raw)
                 for relative in paths:
                     observations.append(
@@ -739,14 +733,14 @@ def observe_registered_dependency_closure(
 
         source_files: dict[str, Path] = {}
         for expansion in expansions:
-            record = records_by_id.get(expansion.artifact.id)
+            source_record = records_by_id.get(expansion.artifact.id)
             if (
-                record is None
-                or record.lifecycle != "active"
-                or record.domain in {"runtime_state", "operational_notepad"}
+                source_record is None
+                or source_record.lifecycle != "active"
+                or source_record.domain in {"runtime_state", "operational_notepad"}
             ):
                 continue
-            if _is_skipped_dependency_source(record.storage_path):
+            if _is_skipped_dependency_source(source_record.storage_path):
                 continue
             for path in expansion.files:
                 if path.suffix.casefold() in _TEXT_SUFFIXES:
@@ -1161,7 +1155,7 @@ def _candidate_id(relative: str) -> str:
     return f"wi5441-member-{stem[:48]}-{suffix}"
 
 
-def _candidate_domain(relative: str) -> str:
+def _candidate_domain(relative: str) -> Domain:
     folded = relative.casefold()
     if folded.startswith("bridge/"):
         return "bridge_protocol"
@@ -1173,9 +1167,9 @@ def _candidate_domain(relative: str) -> str:
 
 
 def _candidate_record(relative: str, *, object_kind: str, git_managed: bool, observers: Sequence[str]) -> SoTArtifact:
-    versioning = "git_tracked" if git_managed else "overwrite_single_writer"
-    backup = "git_tracked" if git_managed else "gitignored_runtime"
-    restore = "git_restore" if git_managed else "regenerate_from_source"
+    versioning: VersioningPolicy = "git_tracked" if git_managed else "overwrite_single_writer"
+    backup: BackupPolicy = "git_tracked" if git_managed else "gitignored_runtime"
+    restore: RestoreAction = "git_restore" if git_managed else "regenerate_from_source"
     return SoTArtifact(
         id=_candidate_id(relative),
         domain=_candidate_domain(relative),

@@ -2077,7 +2077,7 @@ def run_tool_loop(
     enforcement, no-progress dedup, and session-timeout are shared across dialects.
     """
     try:
-        completion_target = bridge_completion_target(prompt, skill, bridge_document, bridge_version)
+        completion_target = bridge_completion_target(skill, bridge_document, bridge_version)
     except BridgeDeliveryIncomplete as exc:
         raise CloudHarnessIncomplete(str(exc)) from exc
     if max_turns < 1:
@@ -2109,7 +2109,11 @@ def run_tool_loop(
     identity = (
         f"Native context identifier: {metadata.native_context_id}. "
         "Bind only the exact init marker supplied in the task through gt session bind. "
-        "Use its returned canonical session binding for authored provenance."
+        "The response has an initialization status and an immutable binding object. "
+        "Use the binding object for authored provenance; initialization status grants no bridge action. "
+        "After resolving the binding, read gt context session --native-context-id "
+        f"{metadata.native_context_id} --json for bounded current startup sources. "
+        "Report unavailable host observations truthfully; this read does not select an activity or work."
     )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": "\n\n".join(part for part in (identity, system_prompt) if part)}

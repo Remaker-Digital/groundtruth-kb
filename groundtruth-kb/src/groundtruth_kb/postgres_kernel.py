@@ -39,9 +39,13 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from groundtruth_kb.config import PostgreSQLConfig
+from groundtruth_kb.isolation.registry_check import ApplicationRegistryError, validate_application_scope
 
 SCHEMA_VERSION = 1
 SCHEMA_FORMAT = "gtkb.postgresql.schema.v1"
+# Exact installed predecessor for the approved repository/scope transition.
+# This is an explicit administration precondition, never a startup/read alias.
+REPOSITORY_SCOPE_PREDECESSOR_SHA256 = "2f25071544591b01b44e0da491a19bd9adee509627114a4dad528205a8f6e2ca"
 # PostgreSQL ships this exact comment on the stock ``public`` schema of a freshly created
 # database. It is the absence of kernel metadata, not drift from it, so a table-free ``public``
 # schema carrying exactly this string is an uninitialized target (WI-7690). The match is exact:
@@ -483,6 +487,7 @@ TABLE_SPECS: dict[str, TableSpec] = {
             "kind",
             "status",
             "authorization",
+            "repository_ref",
             "rank",
             "parent_project_id",
             "purpose",
@@ -1161,7 +1166,8 @@ def dependency_shape(record: Mapping[str, Any]) -> bool:
 
 def validate_project_dependencies(records: list[dict[str, Any]], projects: dict[str, dict[str, Any]]) -> None:
     """Validate the same current graph for native writes and migration input."""
-    edges, semantic = {}, set()
+    edges: dict[str, set[str]] = {}
+    semantic: set[tuple[str, str, str]] = set()
     for record in records:
         if record["status"] != "active":
             continue
@@ -1378,12 +1384,13 @@ def _normalize_manifest_row(
             raise PostgresKernelError(
                 "invalid_manifest", f"{table_name} must supply either {timestamp} or {calendar_date}, not both"
             )
-    if table_name in {"specifications", "tests"} and row["application_scope"] not in (
-        None,
-        "gtkb_platform",
-        "agent_red_application",
-    ):
-        raise PostgresKernelError("invalid_manifest", f"Invalid {table_name}.application_scope")
+    if table_name in {"specifications", "tests"} and row["application_scope"] is not None:
+        scope = row["application_scope"]
+        if (
+            not isinstance(scope, str)
+            or re.fullmatch(r"gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*", scope) is None
+        ):
+            raise PostgresKernelError("invalid_manifest", f"Invalid {table_name}.application_scope")
     if table_name == "work_items":
         # Predecessor shape and graph diagnostics stay with their domain validator.
         for column in spec.json_columns - {"depends_on_work_items"}:
@@ -1399,6 +1406,14 @@ def _normalize_manifest_row(
     if table_name == "projects":
         if row.get("kind") not in {"program", "project"}:
             raise PostgresKernelError("invalid_manifest", "Invalid projects.kind")
+        repository_ref = row.get("repository_ref")
+        if repository_ref is not None and (
+            not isinstance(repository_ref, str)
+            or re.fullmatch(r"platform|application:[A-Za-z][A-Za-z0-9_-]*", repository_ref) is None
+        ):
+            raise PostgresKernelError("invalid_manifest", "Invalid projects.repository_ref")
+        if row["kind"] == "program" and repository_ref is not None:
+            raise PostgresKernelError("invalid_manifest", "Programs have no repository association")
         if row["kind"] == "program" and row.get("authorization") is not None:
             raise PostgresKernelError("invalid_manifest", "Programs have no authorization")
         if row["kind"] == "project" and row.get("authorization") not in {"authorized", "not authorized"}:
@@ -2124,6 +2139,139 @@ class PostgresKernel:
         except Exception as exc:  # intentional-catch: driver failures surface as PostgresKernelError
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL initialization failed") from exc
 
+    def upgrade_schema(self, *, expected_schema_sha256: str) -> dict[str, Any]:
+        """Apply the supported repository/scope DDL without rewriting domain history.
+
+        The operator selects the exact predecessor explicitly. Ordinary startup
+        still refuses drift. All checks, table changes and the existing schema
+        metadata update share one transaction; no row is assigned a repository
+        or application scope by this structural transition.
+        """
+        if expected_schema_sha256 != REPOSITORY_SCOPE_PREDECESSOR_SHA256:
+            raise PostgresKernelError(
+                "unsupported_schema_upgrade",
+                "The requested PostgreSQL predecessor has no supported transition",
+                details={"supported_schema_sha256": REPOSITORY_SCOPE_PREDECESSOR_SHA256},
+            )
+        connection = self._connect()
+        try:
+            with connection, connection.transaction():
+                cursor = connection.cursor()
+                cursor.execute("SET TRANSACTION ISOLATION LEVEL READ COMMITTED")
+                self._configure_transaction(cursor)
+                schema_name = self._current_schema(cursor)
+                if self._table_names(cursor, schema_name) != set(ALL_TABLES):
+                    raise PostgresKernelError(
+                        "schema_upgrade_preimage_mismatch",
+                        "Transition requires the complete supported predecessor; initialize an empty schema normally",
+                    )
+                # Re-read metadata after acquiring the existing database locks.
+                # A concurrent transition may have completed while this waited.
+                cursor.execute(
+                    sql.SQL("LOCK TABLE {} IN ACCESS EXCLUSIVE MODE").format(
+                        sql.SQL(",").join(
+                            sql.SQL("{}.{}").format(sql.Identifier(schema_name), sql.Identifier(table))
+                            for table in ALL_TABLES
+                        )
+                    )
+                )
+                try:
+                    metadata = self._decode_schema_comment(self._schema_comment(cursor, schema_name))
+                except PostgresKernelError as exc:
+                    raise PostgresKernelError(
+                        "schema_upgrade_preimage_mismatch", "The predecessor schema metadata is invalid"
+                    ) from exc
+                if metadata is not None and metadata["schema_sha256"] == schema_sql_sha256():
+                    self._require_exact_schema(cursor, schema_name)
+                    return {
+                        "status": "already_current",
+                        "schema_sha256": schema_sql_sha256(),
+                        "schema_version": SCHEMA_VERSION,
+                        "table_count": len(ALL_TABLES),
+                    }
+                if (
+                    metadata is None
+                    or metadata["schema_sha256"] != expected_schema_sha256
+                    or metadata["catalog_sha256"] != self._catalog_sha256(cursor, schema_name)
+                    or self._table_names(cursor, schema_name) != set(ALL_TABLES)
+                ):
+                    raise PostgresKernelError(
+                        "schema_upgrade_preimage_mismatch",
+                        "The PostgreSQL catalog does not match the exact supported predecessor; inspect the drift",
+                    )
+                scope_pattern = r"^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$"
+                unresolved = {}
+                for table in ("specifications", "tests"):
+                    cursor.execute(
+                        sql.SQL(
+                            "SELECT id FROM {}.{} WHERE application_scope IS NOT NULL "
+                            "AND application_scope !~ %s ORDER BY id"
+                        ).format(sql.Identifier(schema_name), sql.Identifier(table)),
+                        (scope_pattern,),
+                    )
+                    unresolved[table] = [row["id"] for row in cursor.fetchall()]
+                if any(unresolved.values()):
+                    raise PostgresKernelError(
+                        "application_scope_reconciliation_required",
+                        "Reconcile these current record scopes through the existing writer before transition; "
+                        "repository or application associations are never inferred",
+                        details=unresolved,
+                    )
+                cursor.execute(
+                    sql.SQL(
+                        "ALTER TABLE {}.projects ADD COLUMN repository_ref TEXT CHECK ("
+                        "repository_ref IS NULL OR repository_ref = 'platform' OR "
+                        "repository_ref ~ '^application:[A-Za-z][A-Za-z0-9_-]*$'), "
+                        "DROP CONSTRAINT projects_check, ADD CONSTRAINT projects_check CHECK (("
+                        "kind = 'program' AND \"authorization\" IS NULL AND parent_project_id IS NULL "
+                        "AND repository_ref IS NULL) OR (kind = 'project' AND \"authorization\" IS NOT NULL "
+                        "AND \"authorization\" IN ('authorized', 'not authorized')))"
+                    ).format(sql.Identifier(schema_name))
+                )
+                for table in ("specifications", "tests"):
+                    constraint = sql.Identifier(table + "_application_scope_check")
+                    cursor.execute(
+                        sql.SQL(
+                            "ALTER TABLE {}.{} DROP CONSTRAINT {}, ADD CONSTRAINT {} CHECK (application_scope ~ {})"
+                        ).format(
+                            sql.Identifier(schema_name),
+                            sql.Identifier(table),
+                            constraint,
+                            constraint,
+                            sql.Literal(scope_pattern),
+                        )
+                    )
+                current_metadata = _schema_metadata(catalog_sha256=self._catalog_sha256(cursor, schema_name))
+                cursor.execute(
+                    sql.SQL("COMMENT ON SCHEMA {} IS {}").format(
+                        sql.Identifier(schema_name),
+                        sql.Literal(canonical_json_bytes(current_metadata).decode("utf-8").removesuffix("\n")),
+                    )
+                )
+                self._require_exact_schema(cursor, schema_name)
+                cursor.execute(
+                    sql.SQL(
+                        "SELECT count(*) AS count FROM {}.projects WHERE kind='project' AND repository_ref IS NULL"
+                    ).format(sql.Identifier(schema_name))
+                )
+                return {
+                    "status": "upgraded",
+                    "upgraded_from": expected_schema_sha256,
+                    "schema_sha256": schema_sql_sha256(),
+                    "schema_version": SCHEMA_VERSION,
+                    "table_count": len(ALL_TABLES),
+                    "unresolved_project_repositories": int(cursor.fetchone()["count"]),
+                }
+        except PostgresKernelError:
+            raise
+        except (LockNotAvailable, DeadlockDetected, SerializationFailure) as exc:
+            raise PostgresKernelError(
+                "retryable_conflict",
+                "PostgreSQL schema transition conflicted with another transaction; retry after it completes",
+            ) from exc
+        except Exception as exc:  # intentional-catch: native driver failures get a non-sensitive diagnostic
+            raise PostgresKernelError("postgres_operation_failed", "PostgreSQL schema transition failed") from exc
+
     def status(self) -> dict[str, Any]:
         connection = self._connect()
         try:
@@ -2460,7 +2608,9 @@ class PostgresKernel:
             observed.add(key)
         return observed == set(expected)
 
-    def import_current(self, *, input_path: Path, actor: str, reason: str) -> dict[str, Any]:
+    def import_current(
+        self, *, input_path: Path, actor: str, reason: str, project_root: Path | None = None
+    ) -> dict[str, Any]:
         _opaque_id(actor, label="actor")
         _opaque_id(reason, label="reason")
         try:
@@ -2471,6 +2621,18 @@ class PostgresKernel:
         canonical = canonical_json_bytes(manifest)
         if raw != canonical:
             raise PostgresKernelError("manifest_not_canonical", "Migration manifest bytes are not canonical")
+        # Import is a write boundary. Pure normalization/readback never depends
+        # on today's catalog, so historical observation remains possible.
+        for table in ("specifications", "tests"):
+            for row in manifest["tables"][table]:
+                try:
+                    validate_application_scope(project_root, row["application_scope"])
+                except ApplicationRegistryError as error:
+                    raise PostgresKernelError(
+                        "invalid_application_scope",
+                        str(error),
+                        details={"table": table, "id": row["id"], "application_scope": row["application_scope"]},
+                    ) from error
 
         connection = self._connect()
         try:
@@ -2871,7 +3033,8 @@ class PostgresTransaction:
         spec = TABLE_SPECS[table]
         if spec.identity_columns != ("id",) or not 1 <= limit <= 1000:
             raise PostgresKernelError("invalid_query", "This query requires an id domain and a limit from 1 to 1000")
-        terms, values = [], []
+        terms: list[sql.Composable] = []
+        values = []
         for column, value in (filters or {}).items():
             if column not in spec.columns or column in spec.json_columns:
                 raise PostgresKernelError("invalid_query", "Unsupported domain filter")
@@ -2910,3 +3073,27 @@ class PostgresTransaction:
 
     def mutate(self, **request: Any) -> dict[str, Any]:
         return self.kernel._mutate_with_cursor(self.cursor, self.schema, **request)
+
+    def history(self, table: str, identity: Mapping[str, str]) -> Sequence[dict[str, Any]]:
+        """Every recorded change of one identity in commit order (version chain with actor, time and reason)."""
+        spec = TABLE_SPECS[table]
+        if set(identity) != set(spec.identity_columns):
+            raise PostgresKernelError("invalid_identity", "Record identity does not match its domain")
+        normalized = {
+            column: _opaque_id(identity[column], label=f"{table}.{column}") for column in spec.identity_columns
+        }
+        self.cursor.execute(
+            sql.SQL(
+                "SELECT history_id,prior_version,new_version,new_state::text AS new_state,actor,"
+                "changed_at,reason FROM {}.record_history WHERE record_type=%s AND record_id=%s ORDER BY history_id"
+            ).format(sql.Identifier(self.schema)),
+            (table, Jsonb(normalized, dumps=_postgres_json_dumps)),
+        )
+        rows = []
+        for row in self.cursor.fetchall():
+            entry = dict(row)
+            entry["new_state"] = _decode_pg_json(entry["new_state"], label="record_history.new_state")
+            changed_at = entry["changed_at"]
+            entry["changed_at"] = changed_at.isoformat() if hasattr(changed_at, "isoformat") else changed_at
+            rows.append(entry)
+        return rows

@@ -3,12 +3,16 @@
 
 from __future__ import annotations
 
+import dataclasses
 import inspect
 import json
 from pathlib import Path
 
 import groundtruth_kb.project.doctor as doctor_mod
+import groundtruth_kb.project.sot_audit as sot_audit
+import pytest
 from groundtruth_kb.project.doctor import _check_sot_duplicate_guard
+from groundtruth_kb.project.sot_audit import run_duplicate_sot_audit
 
 
 def _registry_record(record_id: str, storage_path: str, *, domain: str = "control_surface") -> str:
@@ -67,15 +71,44 @@ dispatch_quality = 95
     )
 
 
-def test_duplicate_guard_passes_with_complete_clean_baseline(tmp_path: Path) -> None:
+def _violations(root: Path) -> dict[str, sot_audit.AuditCandidate]:
+    report = run_duplicate_sot_audit(root)
+    return {c.candidate_id: c for c in report.candidates if c.classification != "registered_sot"}
+
+
+def _guard_with_complete_membership(root: Path, monkeypatch: pytest.MonkeyPatch):
+    """The doctor's translation of the engine's report once registry membership is complete.
+
+    Membership completeness needs a whole project (baseline root, authority, Git inventory); the engine's
+    classification of these fixtures is measured directly above, and here the same report is handed to the doctor
+    with membership declared complete so its pass/fail translation is exercised.
+    """
+    report = dataclasses.replace(run_duplicate_sot_audit(root), registry_membership_complete=True)
+    monkeypatch.setattr(sot_audit, "run_duplicate_sot_audit", lambda target: report)
+    return _check_sot_duplicate_guard(root)
+
+
+def test_duplicate_guard_passes_with_complete_clean_baseline(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _write_registry(tmp_path, _registry_record("authority-json", "authority.json"))
+    (tmp_path / "authority.json").write_text('{"answer": 42}\n', encoding="utf-8")
+
+    assert _violations(tmp_path) == {}
+    result = _guard_with_complete_membership(tmp_path, monkeypatch)
+
+    assert result.status == "pass", result.message
+    assert "coverage complete" in result.message
+    assert "no duplicate-SoT violations" in result.message
+
+
+def test_duplicate_guard_reports_incomplete_membership_before_any_verdict(tmp_path: Path) -> None:
+    """A minimal fixture has no complete registry membership; the guard says so instead of judging duplicates."""
     _write_registry(tmp_path, _registry_record("authority-json", "authority.json"))
     (tmp_path / "authority.json").write_text('{"answer": 42}\n', encoding="utf-8")
 
     result = _check_sot_duplicate_guard(tmp_path)
 
-    assert result.status == "pass", result.message
-    assert "coverage complete" in result.message
-    assert "no duplicate-SoT violations" in result.message
+    assert result.status == "fail" and result.required is True
+    assert "baseline incomplete" in result.message and "registered_file_count=" in result.message
 
 
 def test_duplicate_guard_fails_when_baseline_is_unavailable(tmp_path: Path) -> None:
@@ -86,7 +119,9 @@ def test_duplicate_guard_fails_when_baseline_is_unavailable(tmp_path: Path) -> N
     assert "baseline unavailable" in result.message
 
 
-def test_duplicate_guard_accepts_machine_checkable_derived_cache(tmp_path: Path) -> None:
+def test_duplicate_guard_accepts_machine_checkable_derived_cache(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write_registry(tmp_path, _registry_record("authority-json", "authority.json"))
     (tmp_path / "authority.json").write_text('{"answer": 42}\n', encoding="utf-8")
     (tmp_path / "cache.json").write_text(
@@ -109,12 +144,13 @@ def test_duplicate_guard_accepts_machine_checkable_derived_cache(tmp_path: Path)
         encoding="utf-8",
     )
 
-    result = _check_sot_duplicate_guard(tmp_path)
+    assert _violations(tmp_path)["permitted-derived-cache:cache.json"].classification == "permitted_derived_cache"
+    result = _guard_with_complete_membership(tmp_path, monkeypatch)
 
     assert result.status == "pass", result.message
 
 
-def test_duplicate_guard_fails_uncovered_invalid_derived_cache(tmp_path: Path) -> None:
+def test_duplicate_guard_fails_uncovered_invalid_derived_cache(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     _write_registry(tmp_path, _registry_record("authority-json", "authority.json"))
     (tmp_path / "authority.json").write_text('{"answer": 42}\n', encoding="utf-8")
     (tmp_path / "cache.json").write_text(
@@ -135,7 +171,9 @@ def test_duplicate_guard_fails_uncovered_invalid_derived_cache(tmp_path: Path) -
         encoding="utf-8",
     )
 
-    result = _check_sot_duplicate_guard(tmp_path)
+    violation = _violations(tmp_path)["invalid-derived-cache:cache.json"]
+    assert violation.classification == "duplicate_sot_violation" and "read_only" in violation.duplicated_fields
+    result = _guard_with_complete_membership(tmp_path, monkeypatch)
 
     assert result.status == "fail"
     assert "persistent duplicate-SoT violation" in result.message
@@ -143,14 +181,19 @@ def test_duplicate_guard_fails_uncovered_invalid_derived_cache(tmp_path: Path) -
     assert "read_only" in result.message
 
 
-def test_duplicate_guard_fails_on_known_covered_dispatch_duplicate(tmp_path: Path) -> None:
+def test_duplicate_guard_fails_on_known_covered_dispatch_duplicate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _write_registry(
         tmp_path,
         _registry_record("harness-registry", "harness-state/harness-registry.json", domain="harness_state"),
     )
     _write_dispatch_duplicate(tmp_path)
 
-    result = _check_sot_duplicate_guard(tmp_path)
+    violation = _violations(tmp_path)["duplicate-dispatch-harness-fields"]
+    assert violation.classification == "duplicate_sot_violation"
+    assert set(violation.paths) == {"config/dispatcher/rules.toml", "harness-state/harness-registry.json"}
+    result = _guard_with_complete_membership(tmp_path, monkeypatch)
 
     assert result.status == "fail"
     assert result.required is True
