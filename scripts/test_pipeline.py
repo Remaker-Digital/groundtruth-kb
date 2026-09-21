@@ -24,7 +24,7 @@ rendered UI against real backend). No mocked APIs, stubs, or code inspection.
     Phase 16  : Widget Embed (live widget bundle/config/CORS checks)
     Phase 17  : API Fuzzing (Schemathesis OpenAPI fuzz testing, SPEC-1839)
     Phase 18  : Property Tests (Hypothesis property-based testing, SPEC-1843)
-    Summary   : Print table, create DEFECTs, write log, update KB phases
+    Summary   : Print table, record DEFECT work items on the native authority, write log
 
 Removed phases (SPEC-1649 — mocked/inspection tests excluded from PLAN-001):
     Phase  4  : External URL Reachability (MOCKED_UNIT → consolidated into Phase 1)
@@ -51,26 +51,30 @@ from __future__ import annotations
 
 import argparse
 import io
-import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 
-# Force UTF-8 on Windows
-if sys.platform == "win32":
+# Force UTF-8 on Windows (only when run as main, not when imported by pytest: re-wrapping the streams
+# at import time closes the test runner's capture buffers)
+if sys.platform == "win32" and __name__ == "__main__":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
     sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
 
 from scripts._subprocess_stream import stream_subprocess  # noqa: E402
+
+# Evidence pair of the DEFECT work items this pipeline records (WI-7860, owner ruling D17): the governing
+# specification and this pipeline's own executable test; the native writer refuses creation without both.
+DEFECT_SOURCE_SPEC_ID = "SPEC-1616"
+DEFECT_SOURCE_TEST_ID = "TEST-8253"
+DEFECT_ACTOR = "test-pipeline"
 
 
 # ---------------------------------------------------------------------------
@@ -295,27 +299,6 @@ def _run_pytest(
     return passed, failed, errors, xfailed, dt, r.stdout
 
 
-def _record_phase_result(phase_num: int, result: str, detail: str) -> None:
-    """Update the PLAN-001 phase record in the Knowledge Database."""
-    try:
-        from db import KnowledgeDB
-
-        kdb = KnowledgeDB()
-        try:
-            phase_id = f"PHASE-{phase_num:03d}"
-            kdb.update_test_plan_phase(
-                id=phase_id,
-                changed_by="test-pipeline",
-                change_reason=f"Automated execution: {detail[:200]}",
-                last_result=result,
-                last_executed_at=datetime.now(timezone.utc).isoformat(),
-            )
-        finally:
-            kdb.close()
-    except Exception as e:
-        log("WARN", f"  KB phase update failed: {e}")
-
-
 # ---------------------------------------------------------------------------
 # Pre-check — Validate Environment (not a numbered phase)
 # ---------------------------------------------------------------------------
@@ -325,7 +308,7 @@ def precheck_validate_environment(args: argparse.Namespace) -> PhaseResult:
     failures = []
 
     # Python version >= 3.12
-    if sys.version_info < (3, 12):
+    if sys.version_info < (3, 12):  # noqa: UP036 - the pre-check reports an older interpreter
         failures.append(f"Python {sys.version} < 3.12")
     else:
         log("INFO", f"  Python: {sys.version.split()[0]}")
@@ -678,7 +661,6 @@ def phase_3_live_e2e(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_5_tenant_isolation(args: argparse.Namespace) -> PhaseResult:
     """Run live tenant isolation verification."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_tenant_isolation_live.py consumes PROD_URL, API_KEY,
     # WIDGET_KEY, TENANT_B_API_KEY, TENANT_B_WIDGET_KEY.
@@ -711,7 +693,6 @@ def phase_5_tenant_isolation(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_6_security_penetration(args: argparse.Namespace) -> PhaseResult:
     """Run live API security and penetration tests."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_live_penetration.py consumes PROD_URL, API_KEY, WIDGET_KEY.
     skip = _check_required_env_vars(
@@ -779,7 +760,6 @@ def phase_7_rate_limiting(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_8_data_integrity(args: argparse.Namespace) -> PhaseResult:
     """Run live data integrity and consistency checks."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_data_integrity_live.py consumes PROD_URL, API_KEY, TENANT_B_API_KEY.
     # PREVIEW_WIDGET_KEY is declared but NOT consumed by any test.
@@ -809,7 +789,6 @@ def phase_8_data_integrity(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_9_resilience(args: argparse.Namespace) -> PhaseResult:
     """Run live resilience and graceful degradation tests."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_resilience_live.py consumes PROD_URL, API_KEY, WIDGET_KEY.
     skip = _check_required_env_vars(
@@ -905,7 +884,6 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
     # Locust prints: "Aggregated ... | NN  | NN  | NN | NN | ..."
     # and "X% (N) ... Aggregated" for failure percentage
     fail_match = re.search(r"(\d+)\s+failures?", r.stdout, re.IGNORECASE)
-    req_match = re.search(r"Aggregated\s+\d+\s+(\d+)", r.stdout)
     fail_count = int(fail_match.group(1)) if fail_match else 0
 
     # Check for SLA violations in output
@@ -932,7 +910,6 @@ def phase_10_load_testing(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_11_conversation_quality(args: argparse.Namespace) -> PhaseResult:
     """Run live conversation quality tests via widget API (SPEC-1649)."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_conversation_quality_live.py consumes PREVIEW_WIDGET_KEY + PROD_URL
     # (via live_api/conftest.py fixtures). SUPERADMIN_PREVIEW_API_KEY is a secondary
@@ -973,7 +950,6 @@ def phase_13_config_pipeline(args: argparse.Namespace) -> PhaseResult:
     SPEC-1649: KB assertion checks (SOURCE_INSPECTION) removed from PLAN-001.
     KB assertions remain a development-time tool (run via assertion-check.py hook).
     """
-    t0 = time.time()
 
     # Pass environment-specific variables (S132 lesson: env-aware config tests)
     env_vars = _get_env_vars(args)
@@ -1060,7 +1036,6 @@ def phase_14_upgrade_verification(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_15_external_verification(args: argparse.Namespace) -> PhaseResult:
     """Run live external URL verification tests (SPEC-1649)."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     skip = _check_required_env_vars(env_vars, ["PROD_URL"], 15, "External Verification")
     if skip:
@@ -1083,7 +1058,6 @@ def phase_15_external_verification(args: argparse.Namespace) -> PhaseResult:
 
 def phase_16_widget_embed(args: argparse.Namespace) -> PhaseResult:
     """Run live widget embed verification + Active→Visible gate (SPEC-1649, S257)."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     # Audit: test_widget_embed_live.py consumes PREVIEW_WIDGET_KEY + PROD_URL
     # (via live_api/conftest.py fixtures).
@@ -1132,7 +1106,6 @@ def phase_17_api_fuzzing(args: argparse.Namespace) -> PhaseResult:
     Generates random valid inputs for every endpoint and checks for 500 errors
     and schema mismatches.
     """
-    t0 = time.time()
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/fuzzing/",
         timeout=600,
@@ -1158,7 +1131,6 @@ def phase_18_property_tests(args: argparse.Namespace) -> PhaseResult:
     These tests verify algebraic properties (transitivity, monotonicity,
     idempotency) of core business logic using random input generation.
     """
-    t0 = time.time()
     passed, failed, errors, xfailed, dt, _ = _run_pytest(
         "tests/property/",
         timeout=120,
@@ -1181,7 +1153,6 @@ def phase_18_property_tests(args: argparse.Namespace) -> PhaseResult:
 # ---------------------------------------------------------------------------
 def phase_19_widget_transport(args: argparse.Namespace) -> PhaseResult:
     """Run live widget transport tests (P1-1b: unconditional widget gate)."""
-    t0 = time.time()
     env_vars = _get_env_vars(args)
     skip = _check_required_env_vars(
         env_vars,
@@ -1208,13 +1179,19 @@ def phase_19_widget_transport(args: argparse.Namespace) -> PhaseResult:
 
 
 # ---------------------------------------------------------------------------
-# Summary — create DEFECTs, write log, update KB
+# Summary — record DEFECT work items, write log
 # ---------------------------------------------------------------------------
 def run_summary(results: list[PhaseResult], args: argparse.Namespace, start_time: float, log_path: Path) -> PhaseResult:
-    """Print summary, create DEFECT WIs, write log file, update KB phases."""
+    """Print summary, record DEFECT work items on the native authority, write log file.
+
+    Each failed numbered phase becomes one DEFECT work item (WI-7860, owner ruling D17). A refused or
+    unreachable authority raises ``DefectReportError`` out of this function: nothing is warned past.
+    PLAN-001 phase execution results are no longer written anywhere (the native authority has no
+    execution-result route; the writer was retired under WI-7860's second clause).
+    """
     t0 = time.time()
 
-    # Create DEFECT WIs for failed phases (SPEC-1617)
+    # Record DEFECT work items for failed phases through the native authority
     from scripts._defect_reporter import create_defect
 
     defect_wis = []
@@ -1228,18 +1205,17 @@ def run_summary(results: list[PhaseResult], args: argparse.Namespace, start_time
                     f"Version: {args.version}\n"
                     f"Phase {r.phase} ({r.name}): {r.detail}"
                 ),
-                source_spec_id="SPEC-1616",
+                source_spec_id=DEFECT_SOURCE_SPEC_ID,
+                source_test_id=DEFECT_SOURCE_TEST_ID,
+                actor=DEFECT_ACTOR,
+                reason=(
+                    f"Automated test pipeline (PLAN-001, {DEFECT_SOURCE_SPEC_ID}) failed Phase {r.phase} "
+                    f"({r.name}) for {args.env} v{args.version}"
+                ),
                 component="infrastructure_automation",
-                changed_by="test-pipeline",
             )
-            if wi_id:
-                defect_wis.append(wi_id)
-                log("INFO", f"  Created DEFECT: {wi_id} (Phase {r.phase})")
-
-    # Update KB phase records
-    for r in results:
-        if r.phase > 0:  # Only numbered phases (not pre-check)
-            _record_phase_result(r.phase, r.status, f"{r.name}: {r.detail}" if r.detail else r.name)
+            defect_wis.append(wi_id)
+            log("INFO", f"  Created DEFECT: {wi_id} (Phase {r.phase})")
 
     # Write log file
     try:
@@ -1340,7 +1316,7 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
     log("INFO", "--- Self-provisioning: Creating ephemeral test tenants (WI-1107) ---")
 
     try:
-        from scripts._self_provision import provision_test_tenant, ProvisionedTenant
+        from scripts._self_provision import provision_test_tenant
         from scripts.upgrade_verification import ENVIRONMENTS, TENANTS
     except ImportError as e:
         log("FAIL", f"  Self-provisioning import failed: {e}")
@@ -1385,10 +1361,10 @@ def _self_provision_tenants(args: argparse.Namespace) -> list:
         # Inject into os.environ for direct-reading scripts
         os.environ["SUPERADMIN_PREVIEW_API_KEY"] = primary.user_api_key
         os.environ["PREVIEW_WIDGET_KEY"] = primary.widget_key
-        os.environ[f"STAGING_REMAKER_TENANT_KEY"] = primary.user_api_key
-        os.environ[f"STAGING_REMAKER_WIDGET_KEY"] = primary.widget_key
-        os.environ[f"STAGING_REMAKER_USER_KEY"] = primary.user_api_key
-        os.environ[f"STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY"] = primary.user_api_key
+        os.environ["STAGING_REMAKER_TENANT_KEY"] = primary.user_api_key
+        os.environ["STAGING_REMAKER_WIDGET_KEY"] = primary.widget_key
+        os.environ["STAGING_REMAKER_USER_KEY"] = primary.user_api_key
+        os.environ["STAGING_REMAKER_DIGITAL_001_SUPERADMIN_KEY"] = primary.user_api_key
         # S183: Set LIVE_TENANT_ID so Playwright conftest picks up the
         # self-provisioned tenant instead of the default remaker-digital-001.
         os.environ["LIVE_TENANT_ID"] = primary.tenant_id

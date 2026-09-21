@@ -14,7 +14,7 @@ GroundTruth is designed as **upstream infrastructure** that downstream projects 
 groundtruth-kb (upstream)
     │
     ├── Method documentation
-    ├── KB engine + CLI + web UI
+    ├── KB engine + CLI
     ├── Governance gates (built-in + plugin)
     ├── Project scaffolding       ← gt project init (profiles, doctor, upgrade)
     └── Bridge runtime            ← groundtruth_kb.bridge module
@@ -41,7 +41,7 @@ These files originate from GroundTruth and are updated when you pull a new upstr
 
 | File/directory | Purpose |
 |----------------|---------|
-| `groundtruth_kb/` (installed package) | KB engine, CLI, web UI, gates |
+| `groundtruth_kb/` (installed package) | KB engine, CLI, gates |
 | Built-in governance gates | ADRDCLAssertionGate, OwnerApprovalGate |
 
 ### Project-owned files (you control)
@@ -66,7 +66,7 @@ Not every improvement discovered in a downstream project belongs upstream. Use t
 
 **Promote upstream** when the change:
 
-- Fixes a bug in the KB engine, CLI, web UI, or built-in gates
+- Fixes a bug in the KB engine, CLI, or built-in gates
 - Adds a governance gate that would benefit any GroundTruth project (not just yours)
 - Improves a method document with a correction or clarification
 - Adds a reusable pattern (e.g., a governance gate, a seed data set) that would benefit any GroundTruth project
@@ -106,7 +106,7 @@ When a new GroundTruth release is available:
    gt assert
    ```
 4. **Check for new features.** Review any new governance gates, seed data, or CLI commands. Evaluate whether they apply to your project.
-5. **Test the web UI and CLI.** Verify that `gt serve` and `gt summary` still work with your database.
+5. **Check the CLI against the authority.** Verify that `gt status` reports the `authority` and `project` components as PASS and that `gt project doctor --project-id <PROJECT> --host-root <host>` exits 0 (no failing check).
 6. **Run your project's test suite.** Ensure no regressions in code that interacts with the KB.
 
 ### Breaking changes

@@ -3,8 +3,7 @@
 
 The canonical source is ``config/registry/sot-artifacts.toml``. Public reads
 validate record fields, explicit lifecycle/coverage, locators and ambiguity.
-Read-only historical projection diagnostics remain for migration inspection;
-projections never supply current membership or gate a canonical read.
+Projections never supply current membership or gate a canonical read.
 """
 
 from __future__ import annotations
@@ -423,38 +422,6 @@ def _records_to_dict(records: list[SoTArtifact]) -> dict[str, SoTArtifact]:
     return {r.id: r for r in records}
 
 
-def _infer_restore_action(
-    *,
-    record_id: str,
-    lifecycle: str,
-    storage_path: str,
-    versioning_policy: str,
-    backup_policy: str,
-    owner_role: str,
-) -> RestoreAction:
-    """Infer restore metadata for legacy projections that predate the column."""
-
-    if lifecycle == "archive":
-        return "noop"
-    if backup_policy == "membase_export":
-        return "membase_export_restore"
-    if backup_policy == "regenerable_from_source" or versioning_policy == "regenerated_from_source":
-        return "regenerate_from_source"
-    if backup_policy == "gitignored_runtime":
-        if "dispatch-state" in storage_path or "dispatcher" in record_id:
-            return "ensure_alive"
-        if "work-intent" in storage_path:
-            return "noop"
-        if owner_role == "owner_only":
-            return "visibility_only"
-        return "noop"
-    if owner_role == "owner_only":
-        return "manual"
-    if backup_policy == "git_tracked":
-        return "git_restore"
-    return _DEFAULT_RESTORE_ACTION
-
-
 def validate_projection_parity(
     toml_records: list[SoTArtifact],
     projection_records: list[SoTArtifact],
@@ -490,81 +457,3 @@ def validate_projection_parity(
         missing_in_toml=missing_in_toml,
         field_divergences=tuple(divergences),
     )
-
-
-# ---------------------------------------------------------------------------
-# MemBase projection (DB read/write)
-# ---------------------------------------------------------------------------
-
-
-def _load_projection_from_connection(
-    conn: Any,
-    *,
-    allow_missing_coverage: bool = False,
-) -> list[SoTArtifact]:
-    """Load projection rows from the caller's exact SQLite read snapshot."""
-    import json
-    import sqlite3
-
-    cur = conn.cursor()
-    cur.execute("PRAGMA table_info(sot_artifacts)")
-    columns = {row[1] for row in cur.fetchall()}
-    restore_expr = "restore_action" if "restore_action" in columns else "NULL"
-    coverage_expr = "coverage_mode" if "coverage_mode" in columns else "NULL"
-    # Tolerate fresh DBs where the view doesn't yet exist.
-    try:
-        cur.execute(
-            "SELECT id, domain, lifecycle, storage_path, authority_spec_id, "
-            "mutation_api, versioning_policy, backup_policy, "
-            f"health_check_function, owner_role, {restore_expr}, depends_on, "
-            f"forbidden_substitutes, notes, {coverage_expr} "
-            "FROM current_sot_artifacts ORDER BY id"
-        )
-    except sqlite3.OperationalError:
-        return []
-    rows = cur.fetchall()
-    records: list[SoTArtifact] = []
-    for row in rows:
-        depends_on = tuple(json.loads(row[11])) if row[11] else ()
-        forbidden = tuple(json.loads(row[12])) if row[12] else ()
-        coverage_mode = row[14]
-        if coverage_mode is None and not allow_missing_coverage:
-            raise InvalidSoTRecord(f"projection record {row[0]!r}: coverage_mode is required")
-        if coverage_mode is not None and coverage_mode not in _VALID_COVERAGE_MODES:
-            raise InvalidSoTRecord(f"projection record {row[0]!r}: invalid coverage_mode {coverage_mode!r}")
-        records.append(
-            SoTArtifact(
-                id=row[0],
-                domain=row[1],
-                lifecycle=row[2],
-                storage_path=row[3],
-                authority_spec_id=row[4],
-                mutation_api=row[5],
-                versioning_policy=row[6],
-                backup_policy=row[7],
-                health_check_function=row[8],
-                owner_role=row[9],
-                restore_action=row[10]
-                or _infer_restore_action(
-                    record_id=row[0],
-                    lifecycle=row[2],
-                    storage_path=row[3],
-                    versioning_policy=row[6],
-                    backup_policy=row[7],
-                    owner_role=row[9],
-                ),
-                depends_on=depends_on,
-                forbidden_substitutes=forbidden,
-                notes=row[13] or "",
-                coverage_mode=coverage_mode,
-            )
-        )
-    return records
-
-
-def load_projection(db_path: Path | str) -> list[SoTArtifact]:
-    """Inspect a historical SQLite projection without granting membership authority."""
-    from groundtruth_kb.project.registry_control_plane import _open_registry_read_only_connection
-
-    with _open_registry_read_only_connection(Path(db_path)) as conn:
-        return _load_projection_from_connection(conn)

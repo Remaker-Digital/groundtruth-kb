@@ -40,4 +40,4 @@ ignore_paths = [
     "CHANGELOG.md",
 ]
 # Projected primer that teaches the native retrieval route.
-primer_path = "{{HARNESS_RULES_DIR}}/canonical-terminology.md"
+primer_path = ".harness-baseline-configuration/rules/canonical-terminology.md"

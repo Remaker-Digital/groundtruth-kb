@@ -13,6 +13,7 @@ schema_version = 1
 # root (the directory containing `groundtruth.toml`).
 [roots]
 harness_baseline = ".harness-baseline-configuration"
+shared_skills = ".agents/skills"
 config = "config"
 scripts = "scripts"
 groundtruth_kb_src = "groundtruth-kb/src/groundtruth_kb"
@@ -165,10 +166,6 @@ reason = "Governance configuration declares the projection prefixes and disposab
 [[declared_references.declarations]]
 path = "scripts/*.py"
 reason = "Platform automation resolves per-harness surfaces for inventory, parity, startup and hygiene work; the target name is an input to those operations."
-
-[[declared_references.declarations]]
-path = "config/agent-control/**"
-reason = "RATCHETED EXCEPTION, NOT AN ENDORSEMENT. config/agent-control is forbidden drift and must not remain an authority, compatibility baseline, or runtime dependency; its purge is tracked as WI-6962. It is declared only so the certification is adoptable before that purge lands, and it is the largest single contributor at 776 occurrences. Removing this declaration is the expected outcome of WI-6962, not a regression."
 
 [[declared_references.declarations]]
 path = "config/hooks/**"

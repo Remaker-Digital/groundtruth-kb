@@ -54,7 +54,7 @@ def test_no_declared_scope_warns_and_passes(tmp_path: Path) -> None:
     code, msg = check_staged_scope(tmp_path, explicit_paths=None, staged_paths_override=staged)
     assert code == 0
     assert "WARN staged-path scope" in msg
-    assert "allowing undeclared commit" in msg
+    assert "comparison not performed" in msg
 
 
 def test_empty_staged_passes(tmp_path: Path) -> None:
@@ -63,7 +63,7 @@ def test_empty_staged_passes(tmp_path: Path) -> None:
     assert "no files staged in git index" in msg
 
 
-def test_reads_active_packet_scope(tmp_path: Path) -> None:
+def test_retired_packets_cannot_supply_comparison_scope(tmp_path: Path) -> None:
     state_dir = tmp_path / ".gtkb-state" / "implementation-authorizations"
     state_dir.mkdir(parents=True, exist_ok=True)
     packet_file = state_dir / "current.json"
@@ -76,5 +76,9 @@ def test_reads_active_packet_scope(tmp_path: Path) -> None:
     staged = ["scripts/alpha.py"]
     code, msg = check_staged_scope(tmp_path, explicit_paths=None, staged_paths_override=staged)
     assert code == 0
-    assert "valid subset" in msg
-    assert "gtkb-sample-thread" in msg
+    assert "comparison not performed" in msg
+    assert "gtkb-sample-thread" not in msg
+    code, msg = check_staged_scope(tmp_path, explicit_paths=["other/file.py"], staged_paths_override=staged)
+    assert code == 1
+    assert "scripts/alpha.py" in msg
+    assert "gtkb-sample-thread" not in msg

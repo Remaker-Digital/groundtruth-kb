@@ -20,19 +20,23 @@ Usage:
 """
 
 import os
+from pathlib import Path
 
-import pytest
 import httpx
+import pytest
 
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-
 # ---------------------------------------------------------------------------
 # Auto-load .env.local (transient credentials must never be hardcoded —
 # see REPEATABLE-PROCEDURES.md Section 7: No Hardcoded Transient Values)
 # ---------------------------------------------------------------------------
-# Load .env.local (shared loader — R7 refactoring)
+# Load the application's own .env.local (shared loader — R7 refactoring). The loader's
+# default is the platform checkout; rollback runs this suite from the application root,
+# so the file is selected explicitly. Inherited environment values keep precedence.
 from scripts._env import load_env_local
-load_env_local()
+
+APPLICATION_ROOT = Path(__file__).resolve().parents[2]
+load_env_local(env_file=APPLICATION_ROOT / ".env.local")
 
 # Production URL — default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
 PROD_URL = os.environ.get(
@@ -212,6 +216,7 @@ def credential_status():
     stale = _check_credentials_valid() if PROD_URL else {}
     if stale:
         import warnings
+
         summary = "; ".join(f"{k}: {v}" for k, v in stale.items())
         warnings.warn(
             f"Stale test credentials detected (WI-1642): {summary}. "

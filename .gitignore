@@ -203,13 +203,6 @@ groundtruth (*).db*
 * ([0-9]).*
 * ([0-9][0-9]).*
 .groundtruth-chroma/
-# WI-6218: the deterministic text projection of the governed MemBase subset,
-# written by scripts/membase_dump.py. This is the tracked counterpart to the
-# ignored database above — the database stays runtime state, the projection is
-# what a clone can reconstruct governed content from. Negated explicitly so a
-# future broad pattern in this section cannot silently un-track it.
-!membase-dump/
-!membase-dump/**
 
 # =============================================================================
 # Docker
@@ -285,54 +278,31 @@ stripe.exe
 stripe
 
 # =============================================================================
-# AI Assistant
+# Harness projection roots (generated output; owner ruling D14, 2026-09-17)
 # =============================================================================
-# NOTE: we deliberately ignore the CONTENTS of .claude/ (with /*), not the
-# directory itself. This is required so that !-negations below can re-include
-# specific files. A blanket ".claude/" ignore would shadow all negations.
-# Do not collapse these patterns without reading .claude/rules/bridge-essential.md.
-#
-# Per S307 hardcoded-path directive: workstation-local config such as
-# .claude/settings.local.json (Claude permission entries with //e/... paths)
-# is intentionally NOT tracked here. The blanket .claude/* ignore covers it
-# without needing a separate name-specific rule. Each workstation regenerates
-# its own settings.local.json; do not migrate it across machines.
-# Provider configurations are generated independently; never commit their output.
+# Every harness configuration root at the repository top level is rendered from
+# .harness-baseline-configuration by scripts/harness_projection/project_harness.py
+# (one run per profile in scripts/harness_projection/profiles.toml; the native
+# verb is `gt harness project <profile>`). The rendered roots are ignored
+# wholesale and are not tracked (WI-6691 acceptance alternative b): a checkout
+# carries no projections, so the projector runs for every profile after a
+# checkout or install before any harness works. The pre-commit hook
+# (scripts/check_commit_pathspec_safety.py) refuses any postimage under these
+# roots, so the ignore rule and the refusal agree; deletions of the historical
+# tracked copies pass through the hook's own route. Workstation-local files such
+# as .claude/settings.local.json fall under the same rule and need no pattern
+# of their own. Change the baseline and re-project; never hand-edit a rendered
+# root. The patterns are anchored: a hosted application's own .claude/ or
+# .codex/ tree (applications/<name>/...) and adopter test fixtures stay tracked.
+# The same ruling keeps derived files out of config/governance/: the timer
+# inventory derives to .groundtruth/derived/, ignored below with the rest of the
+# KB working directory.
 /.api-harness/
-
-# Harness projection roots are rendered from .harness-baseline-configuration by
-# scripts/harness_projection/project_harness.py (one run per profile in
-# scripts/harness_projection/profiles.toml). The renders stay tracked until a
-# projector slice can render every harness's hook registration; untracking
-# them is WI-6691 and waits for its own governed change (owner decision,
-# 2026-09-07).
-.claude/*
-!.claude/settings.json
-!.claude/hooks/
-.claude/hooks/*
-!.claude/hooks/poller-freshness.py
-!.claude/hooks/credential-scan.py
-!.claude/hooks/*.py
-!.claude/rules/
-.claude/rules/*
-!.claude/rules/bridge-essential.md
-!.claude/rules/*.md
-# Dogfood install of canonical-terminology config for GT-KB self-doctor per
-# GTKB-GOV-TERM-PRIMER-STARTUP Slice 1 (S327, bridge -015 VERIFIED).
-!.claude/rules/canonical-terminology.toml
-!.claude/skills/
-.claude/skills/*
-!.claude/skills/*/
-!.claude/skills/*/SKILL.md
-!.claude/skills/*/references/
-!.claude/skills/*/references/*.md
-!.claude/skills/*/scripts/
-!.claude/skills/*/scripts/*.py
-!.claude/skills/*/helpers/
-!.claude/skills/*/helpers/*.py
-!.claude/commands/
-.claude/commands/*
-!.claude/commands/registry.json
+/.agent/
+/.claude/
+/.codex/
+/.cursor/
+/.goose/
 
 .kiro/
 cookies.txt
@@ -563,9 +533,6 @@ memory/MEMORY.md.backup-*
 # would duplicate KB state and create per-session diff noise.
 .groundtruth/formal-artifact-approvals/
 
-# Append pattern: .claude/hooks/*.log (Operational hook logs)
-.claude/hooks/*.log
-
 # Append pattern: .groundtruth/ (KB working directory (chroma + cache))
 .groundtruth/
 # The dev-environment inventory is tracked on purpose: the pre-commit drift
@@ -738,3 +705,18 @@ groundtruth.db.pre-*
 /chroma_db/
 /groundtruth.db.*.lock
 /.pytest-tmp/
+
+# Generated load-test results (D33 hygiene; keep source tests/configuration)
+/applications/Agent_Red/tests/performance/container-load-results/
+/applications/Agent_Red/tests/performance/load-test-*.html
+/applications/Agent_Red/tests/performance/load-test-*.csv
+/applications/Agent_Red/tests/performance/load-test-*.json
+/applications/Agent_Red/tests/performance/staging-*.html
+/applications/Agent_Red/tests/performance/staging-*.csv
+/applications/Agent_Red/tests/performance/staging-*.json
+/applications/Agent_Red/tests/performance/ramp-to-overload-*.html
+/applications/Agent_Red/tests/performance/ramp-to-overload-*.csv
+/applications/Agent_Red/tests/performance/ramp-to-overload-*.json
+
+# Generated local/CI quality reports are disposable outputs.
+.quality/

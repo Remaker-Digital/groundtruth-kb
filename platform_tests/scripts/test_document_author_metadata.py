@@ -7,6 +7,8 @@ import subprocess
 import sys
 from pathlib import Path
 
+import pytest
+
 from scripts.check_document_author_metadata import audit_paths, load_config
 from scripts.document_author_metadata import (
     REQUIRED_AUTHOR_FIELDS,
@@ -17,9 +19,9 @@ from scripts.document_author_metadata import (
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-CLAUDE_HOOK = PROJECT_ROOT / ".claude" / "hooks" / "document_author_provenance_gate.py"
-# Codex runs the projected copy of the neutral gate through scripts/codex_hook_adapter.py.
-CODEX_HOOK = PROJECT_ROOT / ".codex" / "hooks" / "document_author_provenance_gate.py"
+CLAUDE_HOOK = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks" / "document_author_provenance_gate.py"
+# Both native registrations run the authored gate through their native adapters.
+CODEX_HOOK = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks" / "document_author_provenance_gate.py"
 BASELINE_HOOK = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks" / "document_author_provenance_gate.py"
 CODEX_HOOKS_JSON = PROJECT_ROOT / ".codex" / "hooks.json"
 
@@ -39,7 +41,7 @@ def _metadata_content() -> str:
 
 def _run_hook(hook: Path, payload: dict[str, object]) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [sys.executable, str(hook)],
+        [sys.executable, "-B", str(hook)],
         cwd=PROJECT_ROOT,
         input=json.dumps(payload),
         text=True,
@@ -65,21 +67,53 @@ def test_placeholder_author_metadata_is_rejected() -> None:
     assert result.invalid_fields == ("author_model (placeholder/invalid)",)
 
 
-def test_governance_waiver_is_accepted() -> None:
-    result = validate_author_metadata("document_author_provenance_waiver: DELIB-1234 - approved exception\n")
+@pytest.mark.parametrize(
+    "identifier",
+    ["GOV-EXAMPLE-001", "SPEC-EXAMPLE-001", "DCL-EXAMPLE-001", "DELIB-1234", "bridge/example.md", "PAUTH-1234"],
+)
+@pytest.mark.parametrize("metadata", ["missing", "placeholder"])
+def test_waiver_cannot_bypass_required_metadata(identifier: str, metadata: str) -> None:
+    content = (
+        "" if metadata == "missing" else _metadata_content().replace("author_model: GPT-5 Codex", "author_model: TBD")
+    )
+    content += f"document_author_provenance_waiver: {identifier} - claimed exception\n"
 
+    result = validate_author_metadata(content)
+
+    assert not result.is_valid
+    if metadata == "missing":
+        assert result.missing_fields == REQUIRED_AUTHOR_FIELDS
+    else:
+        assert result.invalid_fields == ("author_model (placeholder/invalid)",)
+
+
+@pytest.mark.parametrize(
+    "identifier",
+    ["GOV-EXAMPLE-001", "SPEC-EXAMPLE-001", "DCL-EXAMPLE-001", "DELIB-1234", "bridge/example.md", "PAUTH-1234"],
+)
+def test_stray_waiver_does_not_change_valid_metadata(identifier: str) -> None:
+    original = validate_author_metadata(_metadata_content())
+    result = validate_author_metadata(
+        _metadata_content() + f"document_author_provenance_waiver: {identifier} - ignored\n"
+    )
+
+    assert result == original
     assert result.is_valid
-    assert result.waiver == "DELIB-1234 - approved exception"
 
 
 def test_governed_document_surface_matching() -> None:
     config = DocumentAuthorConfig(
-        governed_surfaces=("bridge/**/*.md", ".claude/rules/**/*.md"),
+        governed_surfaces=(
+            "bridge/**/*.md",
+            ".harness-baseline-configuration/rules/**/*.md",
+            "independent-progress-assessments/**/*.md",
+        ),
         exclusions=(".claude/worktrees/**",),
     )
 
     assert is_governed_document_path("bridge/example-001.md", config)
-    assert is_governed_document_path(".claude/rules/example.md", config)
+    assert is_governed_document_path(".harness-baseline-configuration/rules/example.md", config)
+    assert is_governed_document_path("independent-progress-assessments/example.md", config)
     assert not is_governed_document_path(".claude/worktrees/example/bridge/item.md", config)
     assert not is_governed_document_path("scripts/example.py", config)
 
@@ -102,6 +136,8 @@ def test_config_loads_live_contract() -> None:
     config = load_config(PROJECT_ROOT)
 
     assert "bridge/**/*.md" in config.governed_surfaces
+    assert ".harness-baseline-configuration/rules/**/*.md" in config.governed_surfaces
+    assert "independent-progress-assessments/**/*.md" in config.governed_surfaces
     assert ".claude/worktrees/**" in config.exclusions
 
 
@@ -171,7 +207,7 @@ def test_baseline_gate_blocks_codex_add_file_patch_without_metadata() -> None:
     assert "docs/new-codex-contract.md" in json.loads(result.stdout)["reason"]
 
 
-def test_codex_projected_gate_blocks_add_file_patch_without_metadata() -> None:
+def test_codex_authored_gate_blocks_add_file_patch_without_metadata() -> None:
     result = _run_hook(CODEX_HOOK, _codex_apply_patch_payload("docs/new-codex-contract.md"))
 
     assert result.returncode == 2
@@ -187,7 +223,7 @@ def test_codex_apply_patch_registration_present() -> None:
         if "apply_patch" in entry.get("matcher", "").split("|")
         for hook in entry.get("hooks", [])
         if "codex_hook_adapter.py" in hook.get("command", "")
-        and ".codex/hooks/document_author_provenance_gate.py" in hook.get("command", "")
+        and ".harness-baseline-configuration/hooks/document_author_provenance_gate.py" in hook.get("command", "")
     ]
 
     assert len(registrations) == 1
@@ -199,7 +235,7 @@ def test_hook_allows_existing_file_edits_without_metadata(tmp_path: Path) -> Non
     existing.write_text("# Existing grandfathered file\n", encoding="utf-8")
     payload = {
         "tool_name": "Write",
-        "cwd": str(PROJECT_ROOT),
+        "cwd": str(tmp_path),
         "tool_input": {"file_path": str(existing), "content": "# Still grandfathered\n"},
     }
 
@@ -207,3 +243,63 @@ def test_hook_allows_existing_file_edits_without_metadata(tmp_path: Path) -> Non
 
     assert result.returncode == 0
     assert json.loads(result.stdout) == {}
+
+
+@pytest.mark.parametrize("with_metadata", [False, True])
+@pytest.mark.parametrize(
+    "surface", ["docs", "independent-progress-assessments", ".harness-baseline-configuration/rules"]
+)
+def test_checker_cli_applies_provenance_without_waivers(tmp_path: Path, with_metadata: bool, surface: str) -> None:
+    document = tmp_path / surface / "new.md"
+    document.parent.mkdir(parents=True)
+    content = _metadata_content() if with_metadata else "# Missing metadata\n"
+    document.write_text(content + "document_author_provenance_waiver: DELIB-1234 - ignored\n", encoding="utf-8")
+
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-B",
+            str(PROJECT_ROOT / "scripts/check_document_author_metadata.py"),
+            "--project-root",
+            str(tmp_path),
+            "--config",
+            str(PROJECT_ROOT / "config/governance/document-author-provenance.toml"),
+            "--json",
+        ],
+        cwd=PROJECT_ROOT,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
+
+    assert result.returncode == (0 if with_metadata else 1), result.stderr
+    report = json.loads(result.stdout)
+    assert report["finding_count"] == (0 if with_metadata else 1)
+    if not with_metadata:
+        assert report["findings"][0]["path"] == f"{surface}/new.md"
+        assert report["findings"][0]["missing_fields"] == list(REQUIRED_AUTHOR_FIELDS)
+
+
+@pytest.mark.parametrize("with_metadata", [False, True])
+def test_real_hook_ignores_document_waiver(tmp_path: Path, with_metadata: bool) -> None:
+    content = _metadata_content() if with_metadata else "# Missing metadata\n"
+    payload = {
+        "tool_name": "Write",
+        "cwd": str(tmp_path),
+        "tool_input": {
+            "file_path": "docs/new.md",
+            "content": content + "document_author_provenance_waiver: DELIB-1234 - ignored\n",
+        },
+    }
+
+    result = _run_hook(BASELINE_HOOK, payload)
+
+    assert result.returncode == (0 if with_metadata else 2), result.stderr
+    reply = json.loads(result.stdout)
+    if with_metadata:
+        assert reply == {}
+    else:
+        assert reply["decision"] == "block"
+        assert "docs/new.md" in reply["reason"]
+        assert "Use document_author_provenance_waiver" not in reply["reason"]
+    assert not (tmp_path / "docs/new.md").exists()

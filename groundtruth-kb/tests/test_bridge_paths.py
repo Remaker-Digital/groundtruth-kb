@@ -1,14 +1,7 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for groundtruth_kb.bridge.paths.
+"""Strict-marker, environment and linked-worktree project-root resolution.
 
-Per ``bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-007.md``
-section 1.2, these tests verify strict-marker root resolution and fail-closed
-state-directory semantics. No production-code bypass is exercised; tests that
-need temporary state use a synthetic in-root GT-KB project under pytest
-``tmp_path``.
-
-Bridge imports are lazy per tests/test_bridge_import_hygiene.py rule (no
-top-level imports of groundtruth_kb.bridge.* allowed in test_bridge_*.py).
+Bridge imports stay lazy to preserve the bridge import-hygiene contract.
 """
 
 from __future__ import annotations
@@ -27,20 +20,14 @@ def _paths() -> SimpleNamespace:
     from groundtruth_kb.bridge.paths import (
         GROUNDTRUTH_MARKER,
         PROJECT_ROOT_ENV_VAR,
-        STATE_DIR_ENV_VAR,
         ProjectRootNotFoundError,
-        StateDirOutOfRootError,
-        get_state_dir,
         resolve_project_root,
     )
 
     return SimpleNamespace(
         GROUNDTRUTH_MARKER=GROUNDTRUTH_MARKER,
         PROJECT_ROOT_ENV_VAR=PROJECT_ROOT_ENV_VAR,
-        STATE_DIR_ENV_VAR=STATE_DIR_ENV_VAR,
         ProjectRootNotFoundError=ProjectRootNotFoundError,
-        StateDirOutOfRootError=StateDirOutOfRootError,
-        get_state_dir=get_state_dir,
         resolve_project_root=resolve_project_root,
     )
 
@@ -69,7 +56,6 @@ def synthetic_gtkb_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     synth.mkdir()
     (synth / p.GROUNDTRUTH_MARKER).write_text("# synthetic GT-KB root for tests\n")
     monkeypatch.setenv(p.PROJECT_ROOT_ENV_VAR, str(synth))
-    monkeypatch.delenv(p.STATE_DIR_ENV_VAR, raising=False)
     return synth
 
 
@@ -141,50 +127,6 @@ def test_resolve_project_root_via_env_var_validates_marker_presence(
     with pytest.raises(p.ProjectRootNotFoundError) as excinfo:
         p.resolve_project_root()
     assert p.GROUNDTRUTH_MARKER in str(excinfo.value)
-
-
-def test_get_state_dir_default_under_synthetic_root(
-    synthetic_gtkb_root: Path,
-) -> None:
-    p = _paths()
-    state = p.get_state_dir()
-    expected = synthetic_gtkb_root / ".gtkb-state" / "bridge-poller"
-    assert state.resolve() == expected.resolve()
-    assert state.is_relative_to(synthetic_gtkb_root)
-    assert state.is_dir()
-
-
-def test_get_state_dir_env_override_inside_synthetic_root(
-    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    p = _paths()
-    custom_state = synthetic_gtkb_root / "custom" / "state"
-    monkeypatch.setenv(p.STATE_DIR_ENV_VAR, str(custom_state))
-    state = p.get_state_dir()
-    assert state.resolve() == custom_state.resolve()
-    assert state.is_relative_to(synthetic_gtkb_root)
-
-
-def test_get_state_dir_env_override_outside_synthetic_root_raises(
-    synthetic_gtkb_root: Path,
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    p = _paths()
-    out_of_root = tmp_path / "outside" / "state"
-    monkeypatch.setenv(p.STATE_DIR_ENV_VAR, str(out_of_root))
-    with pytest.raises(p.StateDirOutOfRootError):
-        p.get_state_dir()
-
-
-def test_get_state_dir_env_override_at_home_dir_raises(
-    synthetic_gtkb_root: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    p = _paths()
-    home_state = Path.home() / ".gtkb-state-test-leak"
-    monkeypatch.setenv(p.STATE_DIR_ENV_VAR, str(home_state))
-    with pytest.raises(p.StateDirOutOfRootError):
-        p.get_state_dir()
 
 
 def test_resolve_project_root_from_inside_groundtruth_kb_returns_parent_root(

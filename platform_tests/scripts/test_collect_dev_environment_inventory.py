@@ -37,7 +37,7 @@ def _make_project(root: Path) -> None:
         encoding="utf-8",
     )
     for skill in ["zeta", "alpha"]:
-        folder = root / ".harness-baseline-configuration/skills" / skill
+        folder = root / ".agents/skills" / skill
         folder.mkdir(parents=True)
         (folder / "SKILL.md").write_text(f"# {skill}\n", encoding="utf-8")
     for path in ("rules/canonical-terminology.md", "hooks/credential-scan.py", "commands/check.md"):
@@ -95,8 +95,8 @@ def test_collector_writes_public_and_local_inventory(tmp_path, monkeypatch) -> N
     assert local_path.is_file()
     assert public["project"]["groundtruth_kb_package_version"] == "0.7.0rc1"
     assert public["repo_configured_surfaces"]["skills"]["items"] == [
-        ".harness-baseline-configuration/skills/alpha/SKILL.md",
-        ".harness-baseline-configuration/skills/zeta/SKILL.md",
+        ".agents/skills/alpha/SKILL.md",
+        ".agents/skills/zeta/SKILL.md",
     ]
     assert not module.validate_public_inventory_payload(
         public,
@@ -150,8 +150,8 @@ def test_collector_output_is_deterministically_sorted(tmp_path, monkeypatch) -> 
 
     assert json.dumps(first, sort_keys=True) == json.dumps(second, sort_keys=True)
     assert first["repo_configured_surfaces"]["skills"]["items"] == [
-        ".harness-baseline-configuration/skills/alpha/SKILL.md",
-        ".harness-baseline-configuration/skills/zeta/SKILL.md",
+        ".agents/skills/alpha/SKILL.md",
+        ".agents/skills/zeta/SKILL.md",
     ]
 
 

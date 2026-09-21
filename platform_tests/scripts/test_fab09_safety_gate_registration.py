@@ -10,7 +10,6 @@ Tests:
 
 from __future__ import annotations
 
-import ast
 import json
 from pathlib import Path
 
@@ -20,7 +19,7 @@ _SOURCE_ROOT = Path(__file__).resolve().parents[2]
 _ROOT = _SOURCE_ROOT
 _CLAUDE_SETTINGS = _ROOT / ".claude" / "settings.json"
 _CODEX_HOOKS = _ROOT / ".codex" / "hooks.json"
-_HOOKS_DIR = _ROOT / ".claude" / "hooks"
+_HOOKS_DIR = _SOURCE_ROOT / ".harness-baseline-configuration" / "hooks"
 _TEMPLATES_DIR = _ROOT / "groundtruth-kb" / "templates" / "hooks"
 
 
@@ -42,7 +41,7 @@ def current_projection(tmp_path_factory):
     _ROOT = target
     _CLAUDE_SETTINGS = target / ".claude/settings.json"
     _CODEX_HOOKS = target / ".codex/hooks.json"
-    _HOOKS_DIR = target / ".claude/hooks"
+    _HOOKS_DIR = _SOURCE_ROOT / ".harness-baseline-configuration/hooks"
     yield
     _ROOT = _SOURCE_ROOT
 
@@ -127,7 +126,7 @@ def test_schedule_md_absent():
 
 
 def test_claude_md_no_session_scheduler_claim():
-    claude_md = (_SOURCE_ROOT / ".harness-baseline-configuration/AGENTS.md").read_text(encoding="utf-8")
+    claude_md = (_SOURCE_ROOT / "AGENTS.md").read_text(encoding="utf-8")
     assert "Session Scheduler" not in claude_md, "CLAUDE.md must not claim a Session Scheduler (HYG-045: retired)"
 
 
@@ -152,14 +151,6 @@ def test_delib_preflight_gate_template_absent():
 
 
 # --- Template parity: active hooks match template twins ---
-
-
-def _template_parity(hook_name: str) -> None:
-    active = (_HOOKS_DIR / hook_name).read_text(encoding="utf-8")
-    template = (_TEMPLATES_DIR / hook_name).read_text(encoding="utf-8")
-    assert ast.dump(ast.parse(active)) == ast.dump(ast.parse(template)), (
-        f"{hook_name}: projected and packaged hook behavior differs"
-    )
 
 
 def test_retired_deliberation_archive_helper_is_absent():
@@ -196,9 +187,11 @@ def test_doctor_safety_gate_registration_detects_missing(tmp_path):
     assert "credential-scan.py" in result.message
 
 
-def test_projected_terminology_directs_canonical_cli_retrieval():
+def test_authored_terminology_directs_canonical_cli_retrieval():
     """Terminology retrieval uses the current service, without a copied glossary."""
-    ct = (_ROOT / ".claude" / "rules" / "canonical-terminology.md").read_text(encoding="utf-8")
+    ct = (_SOURCE_ROOT / ".harness-baseline-configuration" / "rules" / "canonical-terminology.md").read_text(
+        encoding="utf-8"
+    )
     assert "gt terms show <id>" in ct
     assert 'gt authority resolve "<term>" --scope <scope>' in ct
     assert "second glossary" in ct

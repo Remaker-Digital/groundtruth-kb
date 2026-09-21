@@ -69,9 +69,9 @@ Writes the 45-file tree under the current directory (or use
 ## Adopter workflow
 
 1. Scaffold the tree: `gt scaffold iac --profile azure-enterprise --apply`.
-2. Complete the ADR-Azure-* instances via `gt scaffold adrs --profile
-   azure-enterprise` (D2): answer the `<<ADOPTER-ANSWER-REQUIRED>>`
-   placeholders for Decision, Rationale, and Rejected alternatives.
+2. Record the applicable Azure architecture choices in current canonical ADRs,
+   including the decision, rationale and rejected alternatives. Match each
+   module to its ADR handle before enabling resources.
 3. Copy `iac/azure/terraform.tfvars.example` to `iac/azure/terraform.tfvars`
    and fill in `<YOUR-SUBSCRIPTION-ID>` and `<YOUR-TENANT-ID>` placeholders.
 4. Configure the Terraform backend in `iac/azure/providers.tf` (TODO marker
@@ -82,8 +82,8 @@ Writes the 45-file tree under the current directory (or use
    - Uncomment matching outputs in `modules/<name>/outputs.tf`.
    - Uncomment the `module "X"` call in the top-level `main.tf` and wire inputs.
 6. Validate locally: `terraform init && terraform plan`.
-7. Commit the customized tree + terraform.tfvars (never commit
-   terraform.tfvars — contains subscription IDs; use .gitignore).
+7. Commit the customized templates. Keep local `terraform.tfvars` out of Git
+   and use the example file to document required inputs.
 
 ## Validation
 
@@ -97,19 +97,11 @@ After scaffolding:
 both succeed. Once you uncomment resources, `terraform plan` will show
 what will be created against your configured subscription.
 
-## Relationship to other tracks
+## Related supported scaffold
 
-- **D1 spec scaffold** (`gt scaffold specs --profile azure-enterprise`):
-  13 category specs + ADR template spec + verification-plan spec. The
-  IaC modules here pair one-to-one with those category specs.
-- **D2 ADR instance scaffold** (`gt scaffold adrs --profile
-  azure-enterprise`): 13 ADR skeletons with the 9-section template.
-  Each IaC module references its ADR handle via `TODO: adopter` marker.
-- **D4 CI/CD templates** (future): GitHub Actions workflows that run
-  `terraform validate`/`plan`/`apply` against this tree with OIDC
-  federation + environment approval gates + drift detection.
-- **D5 doctor** (future): offline + live verification checks against
-  this Terraform configuration and the deployed Azure resources.
+[Azure CI/CD templates](azure-cicd-templates.md), produced by
+`gt scaffold cicd --profile azure-enterprise`, provide GitHub Actions workflows
+for this Terraform tree, using OIDC and configured GitHub environments.
 
 ## Non-scope
 
@@ -125,5 +117,4 @@ what will be created against your configured subscription.
 - Template catalog: `src/groundtruth_kb/_azure_iac_templates.py`
 - Scaffold orchestrator: `src/groundtruth_kb/iac_scaffold.py`
 - CLI command: `src/groundtruth_kb/cli.py::scaffold_iac_cmd`
-- Tests: `tests/test_azure_iac_scaffold.py` (16 tests)
-- Bridge: `bridge/gtkb-azure-iac-skeleton-004.md` (GO) and `-003.md` (REVISED-1)
+- Tests: `tests/test_azure_iac_scaffold.py`

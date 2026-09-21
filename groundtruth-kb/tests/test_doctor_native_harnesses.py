@@ -23,8 +23,6 @@ def installation(tmp_path, monkeypatch):
         pytest.fail("Installation diagnostics cannot use SQLite, legacy readers or launch an agent")
 
     monkeypatch.setattr("sqlite3.connect", refuse)
-    monkeypatch.setattr("groundtruth_kb.harness_projection.read_roles", refuse)
-    monkeypatch.setattr("groundtruth_kb.harness_projection.read_identity", refuse)
     monkeypatch.setattr("subprocess.run", refuse)
     yield tmp_path
     assert sentinel.read_bytes() == b"Never opened by an installation diagnostic"

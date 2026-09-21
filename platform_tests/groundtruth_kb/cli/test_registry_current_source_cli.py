@@ -16,9 +16,9 @@ from groundtruth_kb.project.artifact_membership_reconciliation import observe_go
 from groundtruth_kb.project.registry_control_plane import load_registry_snapshot, validate_registry
 from groundtruth_kb.project.sot_registry import load_toml
 
-from platform_tests.groundtruth_kb.cli.test_registry_current_mutation_cli import _control_fixture
-from platform_tests.groundtruth_kb.cli.test_registry_current_mutation_cli import project as project
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.cli.registry_cli_fixtures import _control_fixture
+from platform_tests.groundtruth_kb.cli.registry_cli_fixtures import project as project
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 
 def test_registry_read_requires_an_explicit_project_or_declaration(tmp_path, monkeypatch):

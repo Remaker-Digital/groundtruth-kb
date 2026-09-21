@@ -50,8 +50,8 @@ def _write(root: Path, rel: str, text: str) -> None:
             id="required-projector-names-its-own-output",
         ),
         pytest.param(
-            ".harness-baseline-configuration/.projection-manifest.json",
-            '"target": ".goose/hooks/bridge-compliance-gate.py"',
+            "scripts/harness_projection/profiles.toml",
+            'hooks_json_path = ".goose/plugins/gtkb/hooks/hooks.json"',
             inventory.REQUIRED,
             id="required-typed-target-profile",
         ),
@@ -73,6 +73,13 @@ def _write(root: Path, rel: str, text: str) -> None:
             "python .claude/skills/gtkb-verify/helpers/write_verdict.py --slug <doc>",
             inventory.RESIDUAL_CONSUMER,
             id="residual-prose-that-executes-a-generated-target",
+        ),
+        pytest.param(
+            "docs/reference/some-doc.md",
+            "python .claude/skills/gtkb-spec-intake/helpers/spec_intake.py "
+            "was copied from scripts/skill-helpers/gtkb-spec-intake/spec_intake.py",
+            inventory.RESIDUAL_CONSUMER,
+            id="residual-retired-helper-tree-is-not-a-canonical-carrier",
         ),
         pytest.param(
             "scripts/some_tool.py",
@@ -153,8 +160,8 @@ def test_live_inventory_covers_the_neutral_baseline_domain() -> None:
     under GOV-HARNESS-NEUTRAL-BASELINE-001 the baseline carries no harness directory name, so its reference count is
     zero on a correct tree while a zero file count would mean the domain was silently skipped.
     """
-    if not (_ROOT / ".harness-baseline-configuration").is_dir():
-        pytest.skip("neutral baseline not present in this checkout")
+    assert (_ROOT / ".harness-baseline-configuration").is_dir()
+    assert (_ROOT / ".agents/skills").is_dir()
 
     coverage = inventory.domain_coverage(_ROOT)
     report = inventory.build_report(inventory.scan(_ROOT))
@@ -174,3 +181,29 @@ def test_live_inventory_is_read_only_for_source(tmp_path: Path) -> None:
 
     after = {p: p.stat().st_mtime_ns for p in sorted(tmp_path.rglob("*")) if p.is_file()}
     assert before == after
+
+
+def test_shared_skill_is_a_consumer_not_a_projector_exemption():
+    source = ".agents/skills/example/SKILL.md"
+    target = ".claude/skills/example/helpers/retired.py"
+    assert (
+        inventory.classify_reference(source_path=source, line="python " + target, target=target)
+        == inventory.RESIDUAL_CONSUMER
+    )
+
+
+def test_shared_skill_source_is_counted_and_timer_inventory_is_never_read(tmp_path, monkeypatch):
+    _write(tmp_path, ".agents/skills/example/SKILL.md", "python .claude/hooks/retired.py")
+    excluded = "config/governance/timer-inventory.toml"
+    _write(tmp_path, excluded, "excluded fixture")
+    original = Path.read_text
+
+    def guarded(path, *args, **kwargs):
+        assert path != tmp_path / excluded
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded)
+    assert inventory.domain_coverage(tmp_path)["neutral_baseline_files"] == 1
+    refs = inventory.scan(tmp_path)
+    assert len(refs) == 1 and refs[0].classification == inventory.RESIDUAL_CONSUMER
+    assert inventory.build_report(refs)["baseline_side_references"] == 1

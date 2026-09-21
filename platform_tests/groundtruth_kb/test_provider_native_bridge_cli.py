@@ -22,18 +22,17 @@ from pathlib import Path
 import pytest
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_session_context import seed_startup_sources
-from platform_tests.scripts.test_provider_native_cli_delivery import (
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, seed_startup_sources
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+from platform_tests.scripts.provider_fixtures import (
     PROVIDERS,
     _response,
     create_provider_guard_fixtures,
     native_id_from_payload,
-    ollama,
 )
+from scripts import ollama_harness as ollama
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

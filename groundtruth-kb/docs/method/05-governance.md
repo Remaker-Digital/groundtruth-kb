@@ -8,12 +8,12 @@ Governance rules are themselves specifications, prefixed with `GOV-`. This is in
 
 - Are stored in MemBase like any other spec
 - Carry machine-verifiable assertions
-- Move through the same lifecycle (specified → implemented → verified)
+- Use the current formal lifecycle: active, superseded or retired
 - Can be proposed, reviewed, and refined like any requirement
 
 ### Core governance rules
 
-A GroundTruth project typically starts with these foundational rules (seeded by `gt seed`):
+Examples of governance concerns include the following. Retrieve each applicable current formal record before relying on its wording; this table does not seed or activate rules:
 
 | Rule | Name | Principle |
 |------|------|-----------|
@@ -25,72 +25,27 @@ A GroundTruth project typically starts with these foundational rules (seeded by 
 
 Projects can add their own governance specs. The only requirement is that each carries testable assertions — governance without enforcement is just documentation.
 
-## Governance gates
+## Governance checks
 
-Gates are enforcement hooks that run at artifact lifecycle transitions. They are the mechanism by which governance rules become more than suggestions.
+The native domain services validate the requested operation against current
+canonical state. A record amendment supplies its expected version, actor and
+change reason; stale versions refuse instead of overwriting another change.
+Read back the resulting record and verify the intended effect.
 
-```mermaid
-sequenceDiagram
-    participant Agent
-    participant KB as Knowledge DB
-    participant Gate as Governance Gate
+Project authorization, proposal review, claims, test evidence and Git
+finalization have distinct roles. Authorization is the owner's value on the
+project row. A work item has one project membership; it does not carry an
+independent authorization record. Verification concerns the exact reviewed
+work product and does not change a specification's lifecycle to `verified`.
 
-    Agent->>KB: promote spec to "implemented"
-    KB->>Gate: pre_promote(spec, status)
-    alt gate passes
-        Gate-->>KB: OK
-        KB-->>Agent: promotion complete
-    else gate fails
-        Gate-->>KB: GovernanceGateError
-        KB-->>Agent: transition blocked
-    end
-```
+The former package `pre_promote`, `pre_resolve_work_item` and `pre_test_pass`
+plugin interfaces do not describe the native amendment route. Do not configure
+those callbacks or `owner_approved` fields as a way to enforce or satisfy
+native operations. Use the supported CLI and the current formal contract for
+the operation, including its typed refusal and recovery path.
 
-### Built-in gates
-
-GroundTruth ships with two gates:
-
-**ADR/DCL Assertion Gate**: Architecture decision and design constraint specifications must have non-empty assertions before promotion to "implemented". This prevents architecture decisions from being marked as implemented without evidence of compliance checking.
-
-**Owner Approval Gate**: Defect and regression work items require explicit owner approval (`owner_approved=True`) before resolution. This ensures that defect fixes are reviewed, not just committed.
-
-### Custom gates
-
-Projects add domain-specific enforcement by writing gate plugins. A gate is a Python class that implements the `GovernanceGate` interface:
-
-```python
-from groundtruth_kb.gates import GovernanceGate, GovernanceGateError
-
-class MyCustomGate(GovernanceGate):
-    def name(self) -> str:
-        return "My Custom Gate"
-
-    def pre_promote(self, spec_id, current_status, target_status, spec_data):
-        if target_status == "verified" and not some_condition(spec_data):
-            raise GovernanceGateError(f"Cannot verify {spec_id}: condition not met")
-```
-
-Gates are registered via `groundtruth.toml`:
-
-```toml
-[gates]
-plugins = ["my_project.gates:MyCustomGate"]
-
-[gates.config.MyCustomGate]
-# Gate-specific configuration here
-```
-
-### Gate hooks
-
-Gates can implement three hooks:
-
-| Hook | When it runs | Use case |
-|------|-------------|----------|
-| `pre_promote` | Before a spec status promotion | Enforce evidence requirements for verification |
-| `pre_resolve_work_item` | Before a work item is resolved | Require approvals for certain work item types |
-| `pre_test_pass` | Before a test is marked as "pass" | Require executable test files for certain specs |
-
-Each hook can block the transition by raising `GovernanceGateError`. Hooks that return without raising are treated as passing.
+An assertion pass is evidence for the behavior it checks. It does not supply
+authorization, independent review or a missing completion result.
 
 ## Assertions
 
@@ -113,17 +68,22 @@ For full field reference and examples, see [Assertion Language Reference](../ref
 
 ### When assertions run
 
-- **On demand**: `gt assert` from the CLI or from scripts via the Python API
+- **On demand**: `gt assert` from the CLI; scripts and CI run the same command with `--json` (machine-readable summary) and `--triggered-by <label>`
 - **At project-configured checkpoints**: projects can configure hooks to run assertions at session start, before builds, or at other lifecycle points — these are project-specific automation, not built into the package
 
 ### Interpreting results
 
-- **Passing assertion on "specified" spec**: expected — the spec is not yet implemented
-- **Failing assertion on "specified" spec**: expected — implementation doesn't exist yet
-- **Passing assertion on "implemented" spec**: good — implementation matches the spec
-- **Failing assertion on "implemented" or "verified" spec**: **regression** — something that was working has broken
+- **Pass:** the evaluated assertion is satisfied by the measured inputs.
+- **Failure:** its required condition is not satisfied; investigate the exact
+  diagnostic and preserve the failed evidence before correcting the cause.
+- **Skipped or unevaluated:** the run has not established that condition.
+  Record the reason and the required coverage instead of counting it as a pass.
 
-Regressions are the critical signal. They mean the codebase has drifted from the agreed specifications and need immediate investigation.
+Evaluate assertions of current active records. Specification lifecycle status
+does not classify a failure as an expected implementation gap or a regression;
+use the requirement, prior evidence and exact changed inputs to determine that.
+Superseding or retiring a record preserves its history and requires the proper
+canonical disposition; it is not a way to waive a failed assertion.
 
 ## Protected behaviors
 

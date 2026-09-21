@@ -10,7 +10,6 @@ evidence.
 from __future__ import annotations
 
 import json
-import tomllib
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,14 +26,6 @@ Classification = Literal[
     "duplicate_sot_violation",
 ]
 
-_DISPATCH_DUPLICATE_FIELDS = (
-    "can_fire_events",
-    "can_receive_dispatch",
-    "dispatch_availability",
-    "dispatch_cost",
-    "dispatch_quality",
-)
-
 _SKIP_DIRS = frozenset(
     {
         ".git",
@@ -46,8 +37,6 @@ _SKIP_DIRS = frozenset(
         "node_modules",
     }
 )
-
-_SKIP_RELATIVE_PREFIXES = ((".gtkb-state", "sot-singleton-audit"),)
 
 
 @dataclass(frozen=True)
@@ -96,7 +85,6 @@ class DuplicateSoTAuditReport:
             "registry_path_resolution",
             "whole_project_persistent_file_closure",
             "machine_checkable_derived_cache_probe",
-            "known_duplicate_fieldset_probe",
             "remediation_disposition_check",
         )
     )
@@ -115,7 +103,7 @@ class DuplicateSoTAuditReport:
 
     @property
     def coverage_complete(self) -> bool:
-        return self.registry_membership_complete
+        return self.registry_membership_complete and not self.missing_registry_artifacts
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -163,7 +151,7 @@ def _resolve_artifact_files(artifact: SoTArtifact, project_root: Path) -> tuple[
             matches = [candidate]
         else:
             matches = []
-    return [path for path in matches if path.is_file()], bool(matches) or storage.startswith(".gtkb-state/")
+    return [path for path in matches if path.is_file()], bool(matches)
 
 
 def _registry_file_index(
@@ -192,8 +180,6 @@ def _iter_persistent_files(project_root: Path) -> tuple[str, ...]:
     for path in project_root.rglob("*"):
         relative_parts = path.relative_to(project_root).parts
         if any(part in _SKIP_DIRS for part in relative_parts):
-            continue
-        if any(relative_parts[: len(prefix)] == prefix for prefix in _SKIP_RELATIVE_PREFIXES):
             continue
         if path.is_file():
             files.append(_rel(path, project_root))
@@ -276,62 +262,6 @@ def _derived_cache_candidates(project_root: Path, persistent_files: tuple[str, .
     return candidates
 
 
-def _load_toml_dict(path: Path) -> dict[str, Any]:
-    try:
-        return tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError):
-        return {}
-
-
-def _load_json_dict(path: Path) -> dict[str, Any]:
-    try:
-        payload = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return {}
-    return payload if isinstance(payload, dict) else {}
-
-
-def _json_contains_all_fields(value: Any, fields: tuple[str, ...]) -> bool:
-    if isinstance(value, dict):
-        if all(field in value for field in fields):
-            return True
-        return any(_json_contains_all_fields(child, fields) for child in value.values())
-    if isinstance(value, list):
-        return any(_json_contains_all_fields(child, fields) for child in value)
-    return False
-
-
-def _dispatch_duplicate_candidate(project_root: Path) -> AuditCandidate | None:
-    rules_path = project_root / "config" / "dispatcher" / "rules.toml"
-    harness_path = project_root / "harness-state" / "harness-registry.json"
-    if not rules_path.is_file() or not harness_path.is_file():
-        return None
-    rules = _load_toml_dict(rules_path)
-    harness = _load_json_dict(harness_path)
-    harnesses = rules.get("harnesses")
-    rule_harnesses = harnesses if isinstance(harnesses, dict) else {}
-    rules_has_fields = any(
-        isinstance(record, dict) and all(field in record for field in _DISPATCH_DUPLICATE_FIELDS)
-        for record in rule_harnesses.values()
-    )
-    harness_has_fields = _json_contains_all_fields(harness, _DISPATCH_DUPLICATE_FIELDS)
-    if not rules_has_fields or not harness_has_fields:
-        return None
-    return AuditCandidate(
-        candidate_id="duplicate-dispatch-harness-fields",
-        classification="duplicate_sot_violation",
-        paths=("config/dispatcher/rules.toml", "harness-state/harness-registry.json"),
-        reason=(
-            "Both persistent artifacts carry the same dispatch capability/cost/quality fields; "
-            "dispatch-specific remediation is already scoped to WI-5012."
-        ),
-        registry_ids=("harness-registry",),
-        remediation_work_item_id="WI-5012",
-        remediation_status="existing_covering_work_item",
-        duplicated_fields=_DISPATCH_DUPLICATE_FIELDS,
-    )
-
-
 def run_duplicate_sot_audit(project_root: Path, *, registry_path: Path | None = None) -> DuplicateSoTAuditReport:
     """Run the registry-plus-closure duplicate-SoT audit."""
     root = project_root.resolve()
@@ -352,9 +282,6 @@ def run_duplicate_sot_audit(project_root: Path, *, registry_path: Path | None = 
             )
         )
     candidates.extend(_derived_cache_candidates(root, persistent_files))
-    dispatch_duplicate = _dispatch_duplicate_candidate(root)
-    if dispatch_duplicate is not None:
-        candidates.append(dispatch_duplicate)
     membership = reconcile_artifact_membership(root)
 
     return DuplicateSoTAuditReport(

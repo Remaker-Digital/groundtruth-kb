@@ -113,8 +113,6 @@ SUITE_CONFIGS: dict[str, SuiteConfig] = {
         "Operations and Resilience",
         [
             "tests/ops/",
-            # Hook source is intentionally absent from application containers.
-            "--ignore=tests/ops/test_hooks_specs.py",
             "--timeout=60",
             "-q",
         ],

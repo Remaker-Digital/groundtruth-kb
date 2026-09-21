@@ -15,8 +15,9 @@ Run specific tiers:
 """
 
 import time
-import pytest
+
 import httpx
+import pytest
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # TIER 0: Blocking — must pass for every deployment
@@ -30,54 +31,57 @@ class TestTier0Health:
 
     @pytest.mark.tier0
     def test_t0_01_health_endpoint_returns_200(self, client):
-        """Liveness probe — process is running and serving HTTP."""
+        """Liveness probe — process is running, serving HTTP and naming its version."""
         r = client.get("/health")
         assert r.status_code == 200
         data = r.json()
         assert data["status"] == "healthy"
-        assert "version" in data
+        assert data.get("version"), "health.version must name the running API version"
 
     @pytest.mark.tier0
     def test_t0_02_ready_endpoint_returns_200(self, client):
-        """Readiness probe — dependencies are connected.
+        """Readiness probe — the deployment can accept traffic.
 
-        SPEC-1780: /ready returns 503 when NATS transport is not active
-        in deployed environments (fail-loud enforcement). Both 200 and
-        503 are valid — 503 means the endpoint works but NATS isn't connected.
+        /ready is 200 only when the AGNTCY transport is active and Cosmos DB
+        answered its readiness probe; a 503 is a deployment that is not ready
+        and is never accepted as a working system. The retired SPEC-1780 no
+        longer excuses it. No particular transport tier is required.
         """
         r = client.get("/ready")
-        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
+        assert r.status_code == 200, f"/ready returned {r.status_code}: {r.text[:300]}"
         data = r.json()
-        if r.status_code == 200:
-            assert data["status"] == "ready"
+        assert data["status"] == "ready"
+        assert data["agntcy_sdk"]["transport_active"] is True, "AGNTCY transport is not active"
+        assert data["cosmos_db"]["status"] in ("healthy", "healthy_fallback"), (
+            f"Cosmos DB not ready: {data['cosmos_db']}"
+        )
 
     @pytest.mark.tier0
     def test_t0_03_circuit_breakers_not_open(self, client):
-        """All circuit breakers should be CLOSED or HALF_OPEN, never OPEN."""
+        """Every registered circuit breaker is closed or half-open, never open."""
         r = client.get("/ready")
-        assert r.status_code in (200, 503), f"/ready returned {r.status_code}"
-        data = r.json()
-        if "circuit_breakers" in data:
-            for name, state in data["circuit_breakers"].items():
-                assert state != "OPEN", f"Circuit breaker {name} is OPEN — service degraded"
+        assert r.status_code == 200, f"/ready returned {r.status_code}: {r.text[:300]}"
+        breakers = r.json()["circuit_breakers"]
+        assert breakers["any_open"] is False, "A circuit breaker is open — service degraded"
+        assert breakers["services"], "No circuit breakers are registered"
+        for name, status in breakers["services"].items():
+            assert status["state"] in ("closed", "half_open"), f"Circuit breaker {name} is {status['state']}"
 
     @pytest.mark.tier0
     def test_t0_04_api_version_header(self, client):
-        """API version header should be present on responses."""
+        """ApiVersionMiddleware names the API version on every response."""
         r = client.get("/health")
-        # ApiVersionMiddleware adds X-API-Version header
-        r.headers.get("X-API-Version", r.headers.get("x-api-version"))
-        # Version header may or may not be present depending on middleware ordering
-        # but health should always work
         assert r.status_code == 200
+        version = r.headers.get("X-API-Version", "")
+        assert version, "X-API-Version header is missing"
+        assert version == r.json()["version"], "X-API-Version disagrees with health.version"
 
     @pytest.mark.tier0
     def test_t0_05_security_headers_present(self, client):
         """Security headers should be set by SecurityHeadersMiddleware."""
         r = client.get("/health")
-        # Check OWASP security headers
+        assert r.status_code == 200
         headers = {k.lower(): v for k, v in r.headers.items()}
-        # X-Content-Type-Options should be nosniff
         assert headers.get("x-content-type-options") == "nosniff", "Missing X-Content-Type-Options: nosniff"
 
 
@@ -95,58 +99,51 @@ class TestTier0Auth:
         ]
         for path in protected:
             r = client.get(path)
-            assert r.status_code in (401, 403), \
-                f"{path} returned {r.status_code} — auth not enforced"
+            assert r.status_code in (401, 403), f"{path} returned {r.status_code} — auth not enforced"
 
     @pytest.mark.tier0
     def test_t0_07_public_endpoints_accessible(self, client):
-        """Public endpoints should be accessible without auth."""
-        public = [
-            ("/health", 200),
-            ("/ready", (200, 503)),  # SPEC-1780: 503 when NATS not active
-        ]
-        for path, expected in public:
-            r = client.get(path)
-            if isinstance(expected, tuple):
-                assert r.status_code in expected, \
-                    f"{path} returned {r.status_code}, expected one of {expected}"
-            else:
-                assert r.status_code == expected, \
-                    f"{path} returned {r.status_code}, expected {expected}"
+        """Public probes answer without credentials and report a ready deployment."""
+        health = client.get("/health")
+        assert health.status_code == 200, f"/health returned {health.status_code}"
+        ready = client.get("/ready")
+        assert ready.status_code == 200, f"/ready returned {ready.status_code}: {ready.text[:300]}"
+        data = ready.json()
+        assert data["status"] == "ready"
+        assert data["agntcy_sdk"]["transport_active"] is True, "AGNTCY transport is not active"
+        assert data["cosmos_db"]["status"] in ("healthy", "healthy_fallback"), (
+            f"Cosmos DB not ready: {data['cosmos_db']}"
+        )
 
     @pytest.mark.tier0
     def test_t0_08_widget_key_auth_works(self, client, widget_headers):
-        """Widget key should authenticate for chat endpoints."""
-        # Start a conversation with widget key — should get 200 or 201
-        r = client.post(
-            "/api/chat/conversations",
-            headers=widget_headers,
-            json={}
-        )
-        # 200/201 = success, 503 = services not init (acceptable)
-        # 401 = auth broken (FAIL)
-        assert r.status_code != 401, "Widget key authentication is broken"
+        """A widget key creates a conversation; any other outcome is a broken storefront path."""
+        r = client.post("/api/chat/conversations", headers=widget_headers, json={})
+        assert r.status_code == 201, f"Conversation creation returned {r.status_code}: {r.text[:300]}"
+        data = r.json()
+        for field in ("conversation_id", "stream_url", "ws_url", "created_at"):
+            assert data.get(field), f"conversation response lacks {field}"
 
     @pytest.mark.tier0
     def test_t0_09_invalid_auth_rejected(self, client):
         """Invalid credentials should be rejected."""
-        r = client.get(
-            "/api/dashboard/usage",
-            headers={"X-API-Key": "invalid_key_12345"}
-        )
+        r = client.get("/api/dashboard/usage", headers={"X-API-Key": "invalid_key_12345"})
         assert r.status_code in (401, 403)
 
     @pytest.mark.tier0
     def test_t0_10_webhook_endpoint_reachable(self, client):
-        """Stripe webhook endpoint should be reachable (returns 400 without valid payload)."""
-        r = client.post(
-            "/api/webhooks/stripe",
-            content=b"{}",
-            headers={"Content-Type": "application/json"}
-        )
-        # 400 (bad request) or 401 (no signature) — not 404 or 500
-        assert r.status_code in (400, 401, 500), \
-            f"Webhook endpoint returned unexpected {r.status_code}"
+        """The Stripe webhook route refuses an unsigned payload with its native negative response.
+
+        This proves the route is reachable and refuses, not that Stripe
+        processing is healthy. An absent-configuration 500 is a failure.
+        """
+        r = client.post("/api/webhooks/stripe", content=b"{}", headers={"Content-Type": "application/json"})
+        accepted = {
+            400: {"Invalid signature.", "Invalid payload."},
+            403: {"Webhook source IP not in allowlist."},
+        }
+        assert r.status_code in accepted, f"Webhook endpoint returned {r.status_code}: {r.text[:300]}"
+        assert r.json().get("detail") in accepted[r.status_code], f"Unexpected refusal: {r.text[:300]}"
 
 
 class TestTier0StaticAssets:
@@ -154,20 +151,23 @@ class TestTier0StaticAssets:
 
     @pytest.mark.tier0
     def test_t0_11_widget_js_served(self, client):
-        """Widget JavaScript bundle should be served publicly."""
+        """Widget JavaScript bundle should be served publicly as JavaScript."""
         r = client.get("/widget.js")
-        # 200 = serving, 404 = file missing (FAIL for storefront)
         assert r.status_code == 200, "widget.js not being served — storefront widget will break"
+        media_type = r.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        assert media_type == "application/javascript", f"widget.js served as {media_type!r}, not JavaScript"
         assert len(r.content) > 1000, "widget.js is suspiciously small — may be an error page"
+        assert not r.content.lstrip().lower().startswith((b"<!doctype", b"<html")), "widget.js is an HTML page"
 
     @pytest.mark.tier0
     def test_t0_12_standalone_admin_login_page(self, client):
-        """Standalone admin should serve the login page."""
+        """Standalone admin should serve its sign-in page or the admin SPA."""
         r = client.get("/admin/standalone/")
         assert r.status_code == 200
-        # Should be HTML (either login form or SPA)
         content_type = r.headers.get("content-type", "")
         assert "text/html" in content_type, f"Expected HTML, got {content_type}"
+        titles = ("<title>Agent Red — Sign In</title>", "<title>Agent Red — Admin</title>")
+        assert any(title in r.text for title in titles), "standalone admin did not serve its sign-in or admin page"
 
     @pytest.mark.tier0
     def test_t0_13_shopify_admin_served(self, client):
@@ -176,6 +176,7 @@ class TestTier0StaticAssets:
         assert r.status_code == 200
         content_type = r.headers.get("content-type", "")
         assert "text/html" in content_type
+        assert "<title>Agent Red — Admin</title>" in r.text, "Shopify admin did not serve its admin page"
 
     @pytest.mark.tier0
     def test_t0_13b_provider_admin_served(self, client):
@@ -184,16 +185,22 @@ class TestTier0StaticAssets:
         assert r.status_code == 200
         content_type = r.headers.get("content-type", "")
         assert "text/html" in content_type
+        assert "<title>Agent Red — Service Provider Console</title>" in r.text, (
+            "provider admin did not serve the service provider console"
+        )
 
     @pytest.mark.tier0
     def test_t0_14_openapi_schema_accessible(self, client):
-        """OpenAPI schema should always be accessible (/openapi.json).
+        """OpenAPI schema should always be accessible (/openapi.json) and describe the application.
 
         Note: /docs and /redoc are disabled in production (ENVIRONMENT=production)
         but /openapi.json is always available.
         """
         r = client.get("/openapi.json")
         assert r.status_code == 200
+        schema = r.json()
+        assert schema.get("openapi") and schema.get("info"), "OpenAPI document lacks its version or info"
+        assert "/health" in schema.get("paths", {}), "OpenAPI paths do not include the application routes"
 
 
 class TestTier0TenantLookup:
@@ -201,29 +208,32 @@ class TestTier0TenantLookup:
 
     @pytest.mark.tier0
     def test_t0_15_tenant_lookup_endpoint(self, client):
-        """Tenant lookup should be accessible (public billing endpoint)."""
+        """Tenant lookup answers 200 with a boolean found; an unknown shop is found=false, never 404."""
         r = client.get("/api/tenants/lookup", params={"shop": "blanco-9939.myshopify.com"})
-        # 200 = found, 404 = not found (both acceptable — endpoint is working)
-        assert r.status_code in (200, 404), \
-            f"Tenant lookup returned {r.status_code} — endpoint broken"
+        assert r.status_code == 200, f"Tenant lookup returned {r.status_code} — endpoint broken"
+        data = r.json()
+        assert isinstance(data.get("found"), bool), f"lookup response lacks a boolean found: {data}"
+        if data["found"]:
+            assert data.get("tenant_id"), "a found tenant must name its tenant_id"
 
     @pytest.mark.tier0
     def test_t0_16_tenant_lookup_returns_json(self, client):
-        """Tenant lookup should return valid JSON."""
+        """Tenant lookup should return the JSON lookup shape, whatever the answer."""
         r = client.get("/api/tenants/lookup", params={"shop": "blanco-9939.myshopify.com"})
-        if r.status_code == 200:
-            data = r.json()
-            assert "tenant_id" in data or "found" in data
+        assert r.status_code == 200, f"Tenant lookup returned {r.status_code} — endpoint broken"
+        assert r.headers.get("content-type", "").split(";", 1)[0].strip() == "application/json"
+        data = r.json()
+        assert isinstance(data.get("found"), bool), f"lookup response lacks a boolean found: {data}"
+        if data["found"]:
+            assert data.get("tenant_id"), "a found tenant must name its tenant_id"
 
     @pytest.mark.tier0
     def test_t0_17_checkout_endpoint_reachable(self, client):
-        """Checkout session creation endpoint should be reachable."""
-        r = client.post(
-            "/api/checkout/session",
-            json={"tier": "starter", "interval": "month"}
-        )
-        # 400/422 = validation error (endpoint works), 500 = broken
-        assert r.status_code != 404, "Checkout endpoint not found"
+        """Checkout validates its body: a deliberately invalid request is refused, never turned into a session."""
+        r = client.post("/api/checkout/session", json={})
+        assert r.status_code == 422, f"Checkout validation returned {r.status_code}: {r.text[:300]}"
+        missing = {tuple(item.get("loc", [])) for item in r.json().get("detail", []) if item.get("type") == "missing"}
+        assert {("body", "tier"), ("body", "interval")} <= missing, f"Unexpected validation detail: {r.text[:300]}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -238,11 +248,7 @@ class TestTier1ChatPipeline:
     @pytest.mark.tier1
     def test_t1_01_start_conversation(self, client, widget_headers):
         """Start a new conversation via widget key."""
-        r = client.post(
-            "/api/chat/conversations",
-            headers=widget_headers,
-            json={}
-        )
+        r = client.post("/api/chat/conversations", headers=widget_headers, json={})
         if r.status_code == 503:
             pytest.skip("Chat services not initialized (503) — may need NATS warmup")
         assert r.status_code in (200, 201), f"Start conversation failed: {r.status_code}"
@@ -267,11 +273,10 @@ class TestTier1ChatPipeline:
         r = client.post(
             "/api/chat/message",
             headers=widget_headers,
-            json={"conversation_id": conv_id, "content": "What products do you have?"}
+            json={"conversation_id": conv_id, "content": "What products do you have?"},
         )
         # 200 = response, 202 = accepted (async), 503 = services not ready
-        assert r.status_code in (200, 201, 202, 503), \
-            f"Send message failed: {r.status_code} — {r.text[:200]}"
+        assert r.status_code in (200, 201, 202, 503), f"Send message failed: {r.status_code} — {r.text[:200]}"
 
     @pytest.mark.tier1
     def test_t1_03_sse_stream_endpoint(self, client, widget_headers):
@@ -288,11 +293,10 @@ class TestTier1ChatPipeline:
         r = client.get(
             f"/api/chat/stream/{conv_id}/status",
             headers=widget_headers,
-            params={"widget_key": widget_headers.get("X-Widget-Key", "")}
+            params={"widget_key": widget_headers.get("X-Widget-Key", "")},
         )
         # 200 = status available, 404 = no active stream (both OK)
-        assert r.status_code in (200, 404), \
-            f"Stream status returned {r.status_code}"
+        assert r.status_code in (200, 404), f"Stream status returned {r.status_code}"
 
     @pytest.mark.tier1
     def test_t1_04_conversation_state(self, client, widget_headers):
@@ -304,10 +308,7 @@ class TestTier1ChatPipeline:
         data = r.json()
         conv_id = data.get("conversation_id") or data.get("id")
 
-        r = client.get(
-            f"/api/chat/conversations/{conv_id}",
-            headers=widget_headers
-        )
+        r = client.get(f"/api/chat/conversations/{conv_id}", headers=widget_headers)
         assert r.status_code in (200, 404)
 
     @pytest.mark.tier1
@@ -320,11 +321,7 @@ class TestTier1ChatPipeline:
         data = r.json()
         conv_id = data.get("conversation_id") or data.get("id")
 
-        r = client.post(
-            f"/api/chat/conversations/{conv_id}/end",
-            headers=widget_headers,
-            json={}
-        )
+        r = client.post(f"/api/chat/conversations/{conv_id}/end", headers=widget_headers, json={})
         assert r.status_code in (200, 204, 404)
 
     @pytest.mark.tier1
@@ -351,8 +348,7 @@ class TestTier1AdminAPI:
     def test_t1_07_dashboard_usage(self, client, tenant_admin_headers, tenant_id):
         """Dashboard usage endpoint should return data."""
         r = client.get(f"/api/dashboard/usage?tenant={tenant_id}", headers=tenant_admin_headers)
-        assert r.status_code in (200, 429, 503), \
-            f"Dashboard usage returned {r.status_code}"
+        assert r.status_code in (200, 429, 503), f"Dashboard usage returned {r.status_code}"
 
     @pytest.mark.tier1
     def test_t1_08_knowledge_base_list(self, client, tenant_admin_headers, tenant_id):
@@ -399,20 +395,15 @@ class TestTier1GDPR:
         for path in gdpr_endpoints:
             r = client.post(path, json={}, headers={"Content-Type": "application/json"})
             # 401 (no HMAC) or 400 (bad payload) — not 404 or 500
-            assert r.status_code in (400, 401, 422, 500), \
-                f"GDPR endpoint {path} returned {r.status_code}"
+            assert r.status_code in (400, 401, 422, 500), f"GDPR endpoint {path} returned {r.status_code}"
 
     @pytest.mark.tier1
     def test_t1_14_api_key_reset_endpoint(self, client):
         """Public API key reset endpoint should be reachable."""
-        r = client.post(
-            "/api/admin/api-keys/reset",
-            json={"email": "test@example.com"}
-        )
+        r = client.post("/api/admin/api-keys/reset", json={"email": "test@example.com"})
         # 200 = processed (always returns 200 for enumeration prevention)
         # 429 = rate limited (also correct)
-        assert r.status_code in (200, 429), \
-            f"API key reset returned {r.status_code}"
+        assert r.status_code in (200, 429), f"API key reset returned {r.status_code}"
 
 
 class TestTier1CrossTenantIsolation:
@@ -423,17 +414,12 @@ class TestTier1CrossTenantIsolation:
         """Widget key should only access its own tenant's data."""
         # A valid widget key should not be able to access admin endpoints
         r = client.get("/api/dashboard/usage", headers=widget_headers)
-        assert r.status_code in (401, 403), \
-            "Widget key should NOT access admin dashboard"
+        assert r.status_code in (401, 403), "Widget key should NOT access admin dashboard"
 
     @pytest.mark.tier1
     def test_t1_16_forged_tenant_rejected(self, client, widget_headers):
         """Forged tenant_id in request body should be ignored."""
-        r = client.post(
-            "/api/chat/conversations",
-            headers=widget_headers,
-            json={"tenant_id": "fake-tenant-id-12345"}
-        )
+        r = client.post("/api/chat/conversations", headers=widget_headers, json={"tenant_id": "fake-tenant-id-12345"})
         # Server derives tenant_id from auth, ignoring any body field
         # Should NOT return data from fake-tenant-id
         if r.status_code in (200, 201):
@@ -568,25 +554,19 @@ class TestTier1Cycle9Endpoints:
     def test_t1_26_superadmin_queues(self, client, admin_headers):
         """Superadmin queues: 200 (SPA key), 403 (tenant key per SPEC-1667), or 503."""
         r = client.get("/api/superadmin/queues", headers=admin_headers)
-        assert r.status_code in (200, 403, 503), (
-            f"Expected 200/403/503, got {r.status_code}"
-        )
+        assert r.status_code in (200, 403, 503), f"Expected 200/403/503, got {r.status_code}"
 
     @pytest.mark.tier1
     def test_t1_27_superadmin_compliance(self, client, admin_headers):
         """Superadmin compliance: 200 (SPA key), 403 (tenant key per SPEC-1667), or 503."""
         r = client.get("/api/superadmin/compliance", headers=admin_headers)
-        assert r.status_code in (200, 403, 503), (
-            f"Expected 200/403/503, got {r.status_code}"
-        )
+        assert r.status_code in (200, 403, 503), f"Expected 200/403/503, got {r.status_code}"
 
     @pytest.mark.tier1
     def test_t1_28_superadmin_integrations_health(self, client, admin_headers):
         """Superadmin integration health: 200 (SPA key), 403 (tenant key per SPEC-1667), or 503."""
         r = client.get("/api/superadmin/integrations/health", headers=admin_headers)
-        assert r.status_code in (200, 403, 503), (
-            f"Expected 200/403/503, got {r.status_code}"
-        )
+        assert r.status_code in (200, 403, 503), f"Expected 200/403/503, got {r.status_code}"
 
 
 class TestTier2Performance:
@@ -628,6 +608,7 @@ class TestTier2Performance:
     def test_t2_04_concurrent_health_checks(self, client):
         """5 concurrent health checks should all succeed."""
         import concurrent.futures
+
         def check():
             with httpx.Client(base_url=client.base_url, timeout=10) as c:
                 return c.get("/health").status_code
@@ -641,8 +622,7 @@ class TestTier2Performance:
         """Widget bundle should be under 100KB (production IIFE)."""
         r = client.get("/widget.js")
         assert r.status_code == 200, (
-            f"widget.js not served (status {r.status_code}) — "
-            "widget delivery is production-critical"
+            f"widget.js not served (status {r.status_code}) — widget delivery is production-critical"
         )
         size_kb = len(r.content) / 1024
         assert size_kb < 120, f"widget.js is {size_kb:.0f}KB (limit: 120KB)"
@@ -668,8 +648,9 @@ class TestTier2Consistency:
 
         # Key Vault should be healthy (or dev_mode for environments without KV)
         if "key_vault" in data:
-            assert data["key_vault"].get("status") in ("healthy", "connected", "dev_mode"), \
+            assert data["key_vault"].get("status") in ("healthy", "connected", "dev_mode"), (
                 f"Key Vault: {data['key_vault']}"
+            )
 
         # Circuit breakers all CLOSED
         if "circuit_breakers" in data:
@@ -678,14 +659,12 @@ class TestTier2Consistency:
             if "services" in cb:
                 for name, svc in cb["services"].items():
                     state = svc.get("state", svc) if isinstance(svc, dict) else svc
-                    assert state in ("closed", "CLOSED", "HALF_OPEN", "half_open"), \
-                        f"Circuit breaker {name} is {state}"
+                    assert state in ("closed", "CLOSED", "HALF_OPEN", "half_open"), f"Circuit breaker {name} is {state}"
             else:
                 # Flat structure fallback
                 for name, state in cb.items():
                     if isinstance(state, str):
-                        assert state in ("CLOSED", "HALF_OPEN"), \
-                            f"Circuit breaker {name} is {state}"
+                        assert state in ("CLOSED", "HALF_OPEN"), f"Circuit breaker {name} is {state}"
 
     @pytest.mark.tier2
     def test_t2_08_semantic_cache_functional(self, client):

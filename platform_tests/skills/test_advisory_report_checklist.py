@@ -26,6 +26,6 @@ def test_advisory_report_checklist_states_the_unresolved_choice_duty() -> None:
     assert "without a permission ledger, mandatory interview or AUQ-only receipt" in text
 
 
-def test_checklist_is_a_deferred_baseline_rule_not_a_projection() -> None:
-    # Deferred rules load on `::open <activity>` from the baseline; a projected copy would defeat the deferral.
+def test_checklist_is_read_from_the_authored_rule_source() -> None:
+    # All rules are read on demand from the authored baseline; none needs a projected copy.
     assert not PROJECTED.exists()

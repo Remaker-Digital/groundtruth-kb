@@ -4,41 +4,40 @@ Create the Agent Red product catalog in Stripe (test or live mode).
 
 Idempotent: safe to re-run. Looks up existing products by metadata key
 `agent_red_id` before creating. Outputs a JSON mapping file to
-config/stripe_product_ids.json for use by downstream integration code.
+applications/Agent_Red/config/stripe_product_ids.json for downstream integration code.
 
 Usage:
     # Ensure STRIPE_SECRET_KEY is set (test key: sk_test_...)
     export STRIPE_SECRET_KEY=sk_test_...
     python scripts/stripe/create_product_catalog.py
 
+    # Update only tax codes on the existing mapped products:
+    python scripts/stripe/create_product_catalog.py --update-tax-codes
+
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
+import re
 import sys
 from pathlib import Path
 
 try:
     import stripe
 except ImportError:
-    print("ERROR: stripe package not installed. Run: pip install stripe")
-    sys.exit(1)
+    stripe = None
 
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------
 
-stripe.api_key = os.environ.get("STRIPE_SECRET_KEY")
-if not stripe.api_key:
-    print("ERROR: STRIPE_SECRET_KEY environment variable is not set.")
-    print("  For test mode: export STRIPE_SECRET_KEY=sk_test_...")
-    sys.exit(1)
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-OUTPUT_PATH = PROJECT_ROOT / "config" / "stripe_product_ids.json"
+APP_ROOT = PROJECT_ROOT / "applications" / "Agent_Red"
+OUTPUT_PATH = APP_ROOT / "config" / "stripe_product_ids.json"
 
 # Metadata key used to make lookups idempotent
 META_KEY = "agent_red_id"
@@ -62,10 +61,7 @@ SUBSCRIPTION_TIERS = [
     {
         "agent_red_id": "tier_starter",
         "name": "Agent Red Starter",
-        "description": (
-            "AI customer engagement for small Shopify stores. "
-            "Includes 1,000 conversations/month."
-        ),
+        "description": ("AI customer engagement for small Shopify stores. Includes 1,000 conversations/month."),
         "monthly_price_cents": 14900,  # $149/mo
         "annual_price_cents": 149000,  # $1,490/yr ($124/mo, ~17% off)
         "overage_decimal": "4",  # $0.04 per conversation
@@ -74,10 +70,7 @@ SUBSCRIPTION_TIERS = [
     {
         "agent_red_id": "tier_professional",
         "name": "Agent Red Professional",
-        "description": (
-            "Advanced AI engagement with cross-session learning. "
-            "Includes 5,000 conversations/month."
-        ),
+        "description": ("Advanced AI engagement with cross-session learning. Includes 5,000 conversations/month."),
         "monthly_price_cents": 39900,  # $399/mo
         "annual_price_cents": 399000,  # $3,990/yr ($332/mo, ~17% off)
         "overage_decimal": "2.5",  # $0.025 per conversation
@@ -86,10 +79,7 @@ SUBSCRIPTION_TIERS = [
     {
         "agent_red_id": "tier_enterprise",
         "name": "Agent Red Enterprise",
-        "description": (
-            "Full-featured AI engagement with white-label support. "
-            "Includes 20,000 conversations/month."
-        ),
+        "description": ("Full-featured AI engagement with white-label support. Includes 20,000 conversations/month."),
         "monthly_price_cents": 99900,  # $999/mo
         "annual_price_cents": 999000,  # $9,990/yr ($832/mo, ~17% off)
         "overage_decimal": "1.5",  # $0.015 per conversation
@@ -294,18 +284,20 @@ def ensure_billing_meter(client: stripe.StripeClient) -> str:
             print(f"  ✓ Billing Meter exists: conversation_overage ({meter.id})")
             return meter.id
 
-    meter = client.v1.billing.meters.create({
-        "display_name": "Conversation Overage",
-        "event_name": "conversation_overage",
-        "default_aggregation": {"formula": "sum"},
-        "customer_mapping": {
-            "type": "by_id",
-            "event_payload_key": "stripe_customer_id",
-        },
-        "value_settings": {
-            "event_payload_key": "value",
-        },
-    })
+    meter = client.v1.billing.meters.create(
+        {
+            "display_name": "Conversation Overage",
+            "event_name": "conversation_overage",
+            "default_aggregation": {"formula": "sum"},
+            "customer_mapping": {
+                "type": "by_id",
+                "event_payload_key": "stripe_customer_id",
+            },
+            "value_settings": {
+                "event_payload_key": "value",
+            },
+        }
+    )
     print(f"  + Created Billing Meter: conversation_overage ({meter.id})")
     return meter.id
 
@@ -482,7 +474,41 @@ def create_coupon(catalog: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-def main() -> None:
+def update_tax_codes() -> int:
+    """Update exact mapped product IDs without creating objects or rewriting the map."""
+    catalog = json.loads(OUTPUT_PATH.read_text(encoding="utf-8"))
+    if not isinstance(catalog, dict):
+        raise ValueError("Catalog must be an object")
+    products = {}
+    for section in ("tiers", "packs", "addons"):
+        entries = catalog.get(section, {})
+        if not isinstance(entries, dict):
+            raise ValueError(f"Catalog section {section} must be an object")
+        for name, entry in entries.items():
+            product_id = entry.get("product_id") if isinstance(entry, dict) else None
+            if not isinstance(product_id, str) or not re.fullmatch(r"prod_[A-Za-z0-9]+", product_id):
+                raise ValueError(f"Invalid product ID for {section}/{name}")
+            products.setdefault(product_id, f"{section}/{name}")
+    if not products:
+        raise ValueError("Catalog contains no mapped products")
+
+    updated = skipped = errors = 0
+    for product_id, label in products.items():
+        try:
+            product = stripe.Product.retrieve(product_id)
+            if getattr(product, "tax_code", None) == TAX_CODE_SAAS_B2B:
+                skipped += 1
+                continue
+            stripe.Product.modify(product_id, tax_code=TAX_CODE_SAAS_B2B)
+            updated += 1
+        except stripe.StripeError as error:
+            print(f"ERROR updating {label} ({product_id}): {error}")
+            errors += 1
+    print(f"Tax codes: {updated} updated, {skipped} already set, {errors} errors.")
+    return 1 if errors else 0
+
+
+def create_catalog() -> None:
     mode = "LIVE" if stripe.api_key.startswith("sk_live") else "TEST"
     print(f"Agent Red — Stripe Product Catalog Setup ({mode} mode)")
     print("=" * 55)
@@ -507,11 +533,35 @@ def main() -> None:
     OUTPUT_PATH.write_text(json.dumps(catalog, indent=2) + "\n", encoding="utf-8")
 
     print(f"\n✓ Catalog written to {OUTPUT_PATH.relative_to(PROJECT_ROOT)}")
-    print(f"  1 meter, {len(catalog['tiers'])} tiers, "
-          f"{len(catalog['packs'])} packs, "
-          f"{len(catalog['addons'])} add-ons, "
-          f"{len(catalog['coupons'])} coupons")
+    print(
+        f"  1 meter, {len(catalog['tiers'])} tiers, "
+        f"{len(catalog['packs'])} packs, "
+        f"{len(catalog['addons'])} add-ons, "
+        f"{len(catalog['coupons'])} coupons"
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Create the catalog or update existing mapped tax codes")
+    parser.add_argument("--update-tax-codes", action="store_true", help="Update mapped product tax codes only")
+    args = parser.parse_args(argv)
+    if stripe is None:
+        print("ERROR: stripe package is not installed")
+        return 1
+    key = os.environ.get("STRIPE_SECRET_KEY")
+    if not key:
+        print("ERROR: STRIPE_SECRET_KEY environment variable is not set")
+        return 1
+    stripe.api_key = key
+    try:
+        if args.update_tax_codes:
+            return update_tax_codes()
+        create_catalog()
+    except (OSError, ValueError, stripe.StripeError) as error:
+        print(f"ERROR: {error}")
+        return 1
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

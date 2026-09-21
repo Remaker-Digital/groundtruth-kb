@@ -123,8 +123,6 @@ _ALLOWLIST_PATH_FRAGMENTS = (
     "groundtruth-kb/src/groundtruth_kb/bridge/registry.py",
     "groundtruth-kb/src/groundtruth_kb/bridge/routing.py",
     # DEPRECATED stub templates and tutorials.
-    "templates/bridge-os-poller-setup-prompt.md",
-    "templates/rules/bridge-poller-canonical.md",
     "tutorials/bridge-smart-poller.md",
     "tutorials/bridge-smart-poller-activation.md",
     "tutorials/bridge-os-scheduler.md",

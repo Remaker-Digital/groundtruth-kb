@@ -1,0 +1,24 @@
+# Goose execution reliability floor (harness G) - canonical configuration.
+#
+# Read by scripts/goose_harness.py (_load_floor_config) and resolved by
+# scripts/goose_execution_guard.py::ExecutionFloorConfig.from_toml. The harness
+# refuses to run when this file is absent: the neutral baseline is the only
+# configuration tree, and the guard's built-in values are schema defaults for
+# absent keys, not a substitute for the contract. Values below state the floor
+# explicitly; they equal the guard's schema defaults.
+schema_version = 1
+
+[write_verification]
+enabled = true
+write_tool_names = ["write", "write_file", "Write", "Edit"]
+intentional_empty_allowlist = []
+
+[leak_detection]
+retry_attempts = 0
+retry_backoff_seconds = 0
+
+[leak_detection.patterns]
+
+[provenance_guard]
+enabled = true
+scan_scope = "run_window"

@@ -174,16 +174,19 @@ form before execution.
 
 ## Schema Validation
 
-Assertions are validated at write time in `insert_spec()`, `update_spec()`,
-and `gt import`. Validation checks:
+The schema rules are defined in `groundtruth_kb.assertion_schema`
+(`validate_assertion`, `validate_assertion_list`); the retired SQLite writer
+applied them at write time. The native writer (`gt spec record`) stores the
+`assertions` field as authored, so a malformed machine assertion is handled
+when `gt assert` evaluates it (failed with a detail such as
+`Missing 'pattern' field`, or skipped for a non-machine type), not refused at
+write time. The rules:
 
 - Required fields present (or aliases)
 - Operators in allowed set
 - Path safety (no absolute paths or parent traversal)
 - Composition depth and non-empty children
 - Non-machine types pass without validation
-
-Opt out with `validate_assertions=False` for tested migration tooling only.
 
 ## Running Assertions
 
@@ -194,7 +197,6 @@ gt assert
 # Run for a single spec
 gt assert --spec GOV-01
 
-# Python API
-from groundtruth_kb.assertions import run_all_assertions
-summary = run_all_assertions(db, project_root)
+# Machine-readable summary for scripts and CI (exit 0 only when the aggregate result is PASS)
+gt assert --triggered-by github-actions --json
 ```

@@ -4,11 +4,10 @@ import subprocess
 
 import pytest
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_commit_boundary import commit_environment as commit_environment
-from platform_tests.groundtruth_kb.test_native_commit_boundary import invoke, real_index
-from platform_tests.groundtruth_kb.test_native_project_finalization import base, git, integration
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration, invoke, real_index
+from platform_tests.groundtruth_kb.finalization_fixtures import commit_environment as commit_environment
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

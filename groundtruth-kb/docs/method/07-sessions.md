@@ -42,6 +42,14 @@ activate automation. Read-only lifecycle guidance can be offered proactively;
 it does not perform harvest. Missing lifecycle-hook or harvest capability remains
 an explicit limitation with a recovery route.
 
+The context's disposable scratch directory is removed by the explicit
+`gt session scratch-teardown` verb, not by a session-end hook (none exists in
+the harness manifests). The service derives `scratchpad/<session-context-id>`
+from the immutable binding, removes exactly that directory, refuses an unbound
+context or a redirected path, unlinks links without following them and reports
+entries the host refuses to delete as a partial outcome. Siblings, the
+registered checkout, formal history and the binding are untouched.
+
 Report actual work, tests, failed/unexecuted checks and unresolved choices. Finish
 or release this context's exact artifact action. A useful owner-copyable
 continuation may contain timestamped observations and canonical retrieval

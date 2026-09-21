@@ -12,6 +12,9 @@ set -e
 REPO_ROOT=$(git rev-parse --show-toplevel)
 PYTHON_BIN="${PYTHON:-python}"
 
+# Known synthetic findings are attested by exact line identity in
+# config/governance/secret-scan-allowlist.toml (read from the index); a stale
+# entry fails the scan. Candidate-high findings on any other line refuse the commit.
 "$PYTHON_BIN" scripts/scan_secrets.py --staged || exit $?
 
 # WI-3473: ruff format --check on staged Python (separate gate from ruff check).
@@ -20,7 +23,14 @@ PYTHON_BIN="${PYTHON:-python}"
 "$PYTHON_BIN" scripts/check_ruff_format.py --staged || exit $?
 
 # Inspect actual staged paths. Bridge messages, generated harness output and
-# runtime state are not work product. Reviewed forward deletion remains possible.
+# runtime state are not work product. The projector roots (.agent .claude .codex
+# .cursor .goose .api-harness) are gitignored at the repository top level and
+# refused here as postimages (owner ruling D14, 2026-09-17), so the ignore rule
+# and the refusal state one policy; rendered output comes from `gt harness
+# project`, never from a commit. config/governance/ carries no derived files: the
+# timer inventory derives to .groundtruth/derived/, a non-product prefix refused
+# as well. Deletions remain the route for retiring historical tracked copies;
+# reviewed forward deletion stays possible.
 "$PYTHON_BIN" scripts/check_commit_pathspec_safety.py --staged || exit $?
 
 # Validate that staged baseline/projector sources can produce their projections.

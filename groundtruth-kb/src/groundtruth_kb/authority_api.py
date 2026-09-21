@@ -27,22 +27,26 @@ from groundtruth_kb.bridge.native import (
     FenceRequest,
     NativeBridgeService,
     PublishWorkRequest,
+    ScratchTeardownRequest,
 )
 from groundtruth_kb.native_authority import (
     AuthorityService,
     DependencyMutation,
+    FormalLinkIdentifier,
     HarnessMutation,
     Identifier,
     MembershipMove,
     ProjectAuthorizationChange,
     ProjectFormalLinkMutation,
     ProjectMutation,
+    ProjectRetirement,
     SpecMutation,
     TermMutation,
     TestMutation,
     TestPhaseMutation,
     TestPlanMutation,
     WorkItemMutation,
+    WorkItemRetirement,
 )
 from groundtruth_kb.postgres_kernel import PostgresKernelError, canonical_json_bytes, parse_json_bytes
 from groundtruth_kb.project.native_finalization import (
@@ -173,6 +177,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         _query_fields(request, {"native_context_id"})
         return _result(bridge.session_context(native_context_id))
 
+    @app.post("/v1/sessions/scratch-teardown")
+    def scratch_teardown(request: ScratchTeardownRequest) -> Response:
+        return _result(bridge.scratch_teardown(request))
+
     @app.post("/v1/bridge/check-effects")
     def bridge_check_effects(request: EffectCheckRequest) -> Response:
         return _result(bridge.check_effects(request))
@@ -264,6 +272,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         scope: str | None = None,
         source_type: str | None = None,
         work_item_id: str | None = None,
+        artifact_type: str | None = None,
     ) -> Response:
         accepted = {
             "after",
@@ -289,6 +298,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
             "scope",
             "source_type",
             "work_item_id",
+            "artifact_type",
         }
         _query_fields(request, accepted)
         filters = {
@@ -314,6 +324,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
                 "scope": scope,
                 "source_type": source_type,
                 "work_item_id": work_item_id,
+                "artifact_type": artifact_type,
             }.items()
             if value is not None
         }
@@ -343,6 +354,17 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.post("/v1/projects/{project_id}/commit-failed")
     def commit_failed(project_id: Identifier, request: CommitFailure) -> Response:
         return _result(finalization.failure(project_id, request))
+
+    # Formal-link addresses accept the long historical identities of imported
+    # obsolete relationships; they are registered before the generic domain
+    # reads so the specific address wins for this domain.
+    @app.get("/v1/project-formal-links/{record_id}/history")
+    def project_formal_link_history(record_id: FormalLinkIdentifier) -> Response:
+        return _result(service.history("project-formal-links", record_id))
+
+    @app.get("/v1/project-formal-links/{record_id}")
+    def show_project_formal_link(record_id: FormalLinkIdentifier) -> Response:
+        return _result(service.show("project-formal-links", record_id))
 
     @app.get("/v1/{domain}/{record_id}/history")
     def history(domain: Domain, record_id: Identifier) -> Response:
@@ -396,12 +418,16 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     def set_project_authorization(record_id: Identifier, request: ProjectAuthorizationChange) -> Response:
         return _result(service.set_project_authorization(record_id, request))
 
+    @app.post("/v1/projects/{record_id}/retire")
+    def retire_project(record_id: Identifier, request: ProjectRetirement) -> Response:
+        return _result(service.retire_project(record_id, request))
+
     @app.put("/v1/project-dependencies/{record_id}")
     def amend_dependency(record_id: Identifier, request: DependencyMutation) -> Response:
         return _result(service.amend_dependency(record_id, request))
 
     @app.put("/v1/project-formal-links/{record_id}")
-    def amend_project_formal_link(record_id: Identifier, request: ProjectFormalLinkMutation) -> Response:
+    def amend_project_formal_link(record_id: FormalLinkIdentifier, request: ProjectFormalLinkMutation) -> Response:
         return _result(service.amend_project_formal_link(record_id, request))
 
     @app.get("/v1/projects/{record_id}/readiness")
@@ -415,6 +441,10 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.post("/v1/work-items/{record_id}/move")
     def move(record_id: Identifier, request: MembershipMove) -> Response:
         return _result(service.move_work_item(record_id, request))
+
+    @app.post("/v1/work-items/{record_id}/retire")
+    def retire_work_item(record_id: Identifier, request: WorkItemRetirement) -> Response:
+        return _result(service.retire_work_item(record_id, request))
 
     @app.get("/v1/work-items/{record_id}/context")
     def context(record_id: Identifier) -> Response:

@@ -126,6 +126,46 @@ Passing this drill demonstrates its isolated recovery scenario. Ordinary CLI
 cutover, the authority service, unattended backup/retention, service startup
 and a storage-loss recovery copy require their own operational validation.
 
+### Measured recovery and transition figures (2026-09-17, M12)
+
+Three recovery drills ran `restore_from_copy.py` into a disposable cluster on
+127.0.0.1:55436; each ended with `archive_recovery_complete`, timeline 2 and
+replay confirmed to the end of the last archived segment
+(`replay_reached_last_archived_segment`):
+
+| Drill (local time) | Base backup + archive | Wall time (UTC) | Readback |
+|---|---|---|---|
+| 13:05 rehearsal, before the transition | `base-20260917T091501Z` + segments B4, B5 | 16 s (20:05:16.9 - 20:05:33.2) | redo done 0/B5000130; 101,670 rows; predecessor schema 2f250715... |
+| 15:06 post-transition base | `base-20260917T220547Z` (self-contained, segment BA) | 9 s (22:06:01.7 - 22:06:10.3) | redo done 0/BA000120; 101,938 rows; schema 4b5f8275... |
+| 15:21 WAL tail from the pre-transition base | `base-20260917T215831Z` + segments B7 - BB | 17 s (22:20:54.4 - 22:21:11.3) | B8, B9, BA, BB restored from the archive; redo done 0/BB000130; 101,938 rows; schema 4b5f8275...; the schema transition and the 268 `repository_ref = platform` writes (record version 2, written 15:03:24 - 15:05:46 local) came back from WAL after the base |
+
+Row arithmetic: 101,938 = 101,670 + 268 (the history rows of the D11 write
+set). Records: `E:\GTKB-realignment-validation\m12-4-recovery-drill\`,
+`E:\GTKB-realignment-validation\m12-4-recovery-drill-post-transition\` and
+`E:\GTKB-realignment-validation\m12-4-wal-tail-drill\drill\` (a
+`restore-report.json` in each).
+
+Production transition (M12.3; record
+`E:\GTKB-realignment-validation\m123-production\record.json`): the domain
+service was down from 14:58:31 to 15:03:23 local (4 min 52 s), covering the
+pre-transition base backup with its restore point, the detached checkout of
+commit 313c5b597, eight projection regenerations (652/652 generated files
+byte-equal to the accepted snapshot) and the schema transition itself (under
+1 s: `upgraded`, 25 tables; a repeat reported `already_current`). `/v1/status`
+answered ready on schema 4b5f8275... within 3 s of the scheduled task's
+restart. The 16:32 restart check measured the listener closed 2.8 s after a
+stop request and ready 2.4 s after a start request. The transition reported
+`unresolved_project_repositories = 627`; the D11 write set then bound the 268
+active execution projects to `repository_ref = platform` through the native
+writer with exact readbacks and no refusal, leaving 359.
+
+`unresolved_project_repositories = 359` is the ruled end state for this
+cluster (owner ruling D11, 2026-09-17), not a residual to work off: the 359
+closed projects (348 retired, 11 cancelled) keep `repository_ref` NULL
+permanently, the writer's closed-project rule (`project_structure_frozen`)
+stands, and no reconciliation work item follows. The counter is an
+upgrade-time diagnostic; it fired once on this cluster and does not recur.
+
 ## Native domain service qualification
 
 The package's `authority` dependency extra installs FastAPI and Uvicorn. The
@@ -535,9 +575,16 @@ service alone leaves the CLI refusing. Three files start the service unattended:
   environment confined to that process: `PGSERVICEFILE` = `credentials/pg_service.conf`, after every inherited `PG*`
   value, every inherited `GT_POSTGRES_*` override (the configuration loader maps those onto the `[postgresql]` section
   and would redirect the service selection) and any inherited `GT_AUTHORITY_URL` are dropped. On Windows the service
-  runs inside a job object that ends every process in it when the launcher ends, so stopping the launcher never
-  leaves a listener behind. Containment precedes execution: without a job nothing is started; the service is created
-  suspended, placed in the job and only then resumed, so no descendant can exist outside the job; a service that
+  runs inside a named kill-on-close job object for the installation root
+  (`Local\gtkb-domain-service-<first 24 hex digits of the sha256 of the normalized root>`; the mechanics are
+  `groundtruth_kb.job_containment`, shared with `gt dashboard` under owner ruling D27); the launcher's handle is the
+  job's only handle, so the job ends every process in it when the launcher ends and stopping the launcher never
+  leaves a listener behind. Containment precedes execution: without a job nothing is started, and a second launcher
+  for a root whose job is already held exits 3 (`held by another launcher for this root`) before anything starts;
+  the service is created
+  suspended, placed in the job and only then resumed, so no descendant can exist outside the job; an assignment
+  refused with ERROR_ACCESS_DENIED right after the job terminated its members is retried for up to two seconds
+  while the service stays suspended; a service that
   cannot be placed in the job or resumed is ended while still suspended and the launcher exits 3. Output is appended to `logs/domain-service.log`. It refuses to start when
   the credential file or the operator config is missing. `--print-command` shows the command and the names of the
   environment keys it sets, never their values.
@@ -571,9 +618,52 @@ cannot redirect the operator config's service, the readiness probe's timeout wit
 5.1 and PowerShell 7, and (opt-in, `GTKB_RUN_POSTGRES_INTEGRATION=1`) a launch to readiness against the disposable
 installation with a deliberately polluted parent environment, the probe waiting through the service's delayed
 readiness, the complete process tree ending with the launcher so that the listener disappears, refusal before anything
-is started when no job exists, an uncontainable service ended before it runs (no child, no descendant), a real
+is started when no job exists, refusal of a second launcher while the root's named job is held, an uncontainable
+service ended before it runs (no child, no descendant), a real
 descendant born inside the job and ended when the job closes, and the cleanup safety net leaving a foreign
 listener alone. Scheduled startup
 itself is established at registration on the owner's workstation: task state Running after a logon, the status
 readback above, and the current state read back through the ordinary CLI. Resumption of ordinary sessions waits for
 that evidence, and the client `authority_url` is set only after it.
+
+## Dashboard control plane
+
+`gt dashboard start` and `gt dashboard stop` follow the domain-service pattern above (owner ruling D20, 2026-09-17):
+
+- On Windows, `start` creates one named kill-on-close job object for the runtime root
+  (`Local\gtkb-dashboard-<first 24 hex digits of the sha256 of the runtime root>`), creates the refresh service (a
+  venv redirector and its child) and Grafana (`grafana.exe` and its plugin children) suspended, places each in the
+  job and only then resumes it, so no descendant ever exists outside the job. The children inherit the job handle,
+  which keeps the job alive exactly as long as one of them lives; when the last member ends, the job and any
+  straggler end with it. `start` writes `<runtime root>/dashboard-launch.json` naming the job, the launched
+  processes, the ports, the interval and the selected configuration; nothing in that record decides what `stop`
+  signals. The former `pids/*.pid` records no longer exist and a leftover one means nothing to the package. The job
+  primitives (`groundtruth_kb.job_containment`) are the ones the domain-service launcher uses; the two prefixes keep
+  a dashboard job and a service job for one root distinct, and an extra handle opened to a job delays kill-on-close
+  until it is closed.
+- `stop` opens the job by name, holds a handle to every member, terminates the job and waits until every handle is
+  signalled and the job counts no active process. It reports each member with its executable and outcome:
+  `terminated`, or `exited` for a member that ended on its own before the request. Nothing outside the job is
+  touched. Refusals are distinguishable by class: `DashboardTerminationRefused` (the job, or `taskkill` for a
+  single process, refused the request while the process still runs), `DashboardTerminationUnconfirmed` (the
+  request was accepted but a held handle stayed unsignalled: 15 s for a job member, 5 s for `taskkill`) and
+  `DashboardIdentityError` (a recorded process is not the launched one; nothing was signalled). The launch record
+  is kept for inspection after a refusal.
+- A derived dashboard database whose schema is not this package's is moved aside as
+  `<runtime root>/gtkb-dashboard.sqlite.legacy-<UTC stamp>` and rebuilt from `templates/dashboard/schema.sql`;
+  the refresh result (`legacy_database_moved_to`) and the refresh-service log name the reason and the new path.
+  Disqualifying shapes: a table the schema does not define, a table missing an expected column (the July-9
+  `kpi_snapshots(id, metric, value, unit, captured_at, source)` file that refused the 2026-09-17 production start),
+  a NOT NULL column without a default that the refresh never writes, or a file SQLite cannot read. Additive
+  migration columns (nullable or defaulted) are accepted. A legacy or foreign derived schema is no history.
+- Grafana's launch environment pins every server-initiated network path off: analytics reporting, version and
+  plugin-update checks, the preinstall/background plugin installer and its auto-update
+  (`GF_PLUGINS_PREINSTALL_DISABLED=true`, `GF_PLUGINS_PREINSTALL_AUTO_UPDATE=false`), plugin administration from
+  the UI (`GF_PLUGINS_PLUGIN_ADMIN_ENABLED=false`) and signing-key retrieval (the embedded key verifies the pinned
+  SQLite plugin). `GF_LOG_MODE=console` makes the launcher's redirect the single writer of `logs/grafana.log`.
+  On 2026-09-17 the production start let Grafana's background installer fetch plugin updates from grafana.com into
+  the qualification Grafana home; that path is closed by these pins.
+- `gt dashboard install` remains the route that places Grafana under `<project>/.groundtruth/tools/grafana`
+  (pinned 13.2.1 archive and checksum, pinned SQLite datasource plugin, signature verified by the pinned runtime).
+- Launch the dashboard from an ordinary shell or scheduled task: a launcher that itself runs inside a kill-on-close
+  job passes that containment on, and the dashboard ends with that job.

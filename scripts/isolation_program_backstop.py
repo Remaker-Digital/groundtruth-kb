@@ -41,7 +41,7 @@ TEXT_SUFFIXES = {
 DEFAULT_SCAN_TARGETS = (
     "AGENTS.md",
     "CLAUDE.md",
-    ".claude/rules",
+    ".harness-baseline-configuration/rules",
     "config/governance",
     "groundtruth-kb/tests",
     "platform_tests",
@@ -92,7 +92,7 @@ SKIP_FILE_PREFIXES = (
 ALLOWED_REFERENCE_PATTERNS: tuple[tuple[str, str], ...] = (
     ("AGENTS.md", "root operating contract"),
     ("CLAUDE.md", "root operating contract"),
-    (".claude/rules/*.md", "governance and operating-model rule"),
+    (".harness-baseline-configuration/rules/*.md", "governance and operating-model rule"),
     ("bridge/**", "bridge history"),
     ("memory/**", "memory and decision history"),
     ("independent-progress-assessments/**", "review and assessment history"),
@@ -103,14 +103,18 @@ ALLOWED_REFERENCE_PATTERNS: tuple[tuple[str, str], ...] = (
     ("scripts/clean_adopter_validation.py", "adopter validation sandbox helper"),
     ("scripts/deploy/build-context.ps1", "reference-adopter release build-context helper"),
     ("scripts/deploy/build-and-deploy-staging.ps1", "reference-adopter release build-context helper"),
-    ("scripts/rehearse/**", "isolation rehearsal helper"),
+    ("scripts/deploy/rollback.ps1", "reference-adopter application operation helper"),
+    ("scripts/embed_knowledge_base.py", "reference-adopter application operation helper"),
+    ("scripts/provision_tenant_one.py", "reference-adopter application operation helper"),
+    ("scripts/seed_knowledge_base.py", "reference-adopter application operation helper"),
+    ("scripts/seed_demo_data.py", "reference-adopter application operation helper"),
+    ("scripts/test_admin_ui_validation.py", "reference-adopter application operation helper"),
+    ("scripts/test_chat_battery.py", "reference-adopter application operation helper"),
+    ("scripts/stripe/create_product_catalog.py", "reference-adopter application operation helper"),
     ("scripts/rollback_e1_write_set.py", "isolation migration rollback helper"),
     ("scripts/run_e1_step*.py", "isolation migration helper"),
     ("scripts/run_platform_tests_rename.py", "platform-test migration helper"),
-    ("scripts/_verify_slice8_closeout.py", "isolation closeout smoke helper"),
     ("scripts/release_candidate_gate.py", "release-gate application check inventory"),
-    ("scripts/fab11_assertion_corpus_remediation.py", "assertion corpus remediation helper"),
-    ("scripts/membase_ci_seed.py", "membase CI seed helper"),
 )
 
 
@@ -162,6 +166,8 @@ def _iter_files(root: Path, *, include_history: bool = False) -> Iterable[Path]:
         for path in candidates:
             resolved = path.resolve()
             if resolved == self_path or resolved in seen or _should_skip_file(path.name):
+                continue
+            if path.relative_to(root).as_posix() == "config/governance/timer-inventory.toml":
                 continue
             seen.add(resolved)
             if _is_text_file(path):

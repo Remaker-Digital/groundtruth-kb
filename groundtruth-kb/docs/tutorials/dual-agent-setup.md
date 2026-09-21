@@ -1,177 +1,67 @@
-# Dual-Agent Setup
+# Independent author and review contexts
 
-Configure a Prime Builder and a Loyal Opposition agent with a shared file
-bridge, activate the dispatcher daemon, and walk through a
-complete proposal -> review -> VERIFIED cycle.
+GT-KB assigns roles to contexts, not tools. The owner may use different installed
+hosts for authoring and review, but each receives its own literal init line,
+activity and exact task. Do not infer a role from a host's name or registry tags.
 
-## Prerequisites
+## Prepare the shared installation
 
-- `groundtruth-kb` installed (`pip install groundtruth-kb`)
-- Claude Code (Prime Builder) and Codex (Loyal Opposition) available on your
-  workstation
+Use the supported native project initializer for the selected registered host
+root and application. Inspect its dry-run and read back current project state.
+Root `AGENTS.md`, `.agents/skills`, and baseline rules/hooks/routing provide one
+shared instruction source. Project only the selected profile's registrations,
+pointers and ownership bookkeeping. Do not copy hook scripts, rules or skill
+bodies into a host directory. See [Harness projection](../reference/harness-projection.md).
 
-## Step 1: Scaffold a Dual-Agent Project
+Check the actual installed host's instruction, skill and hook loading. Codex
+trust is an owner action on exact final hook-registration bytes; Antigravity's
+supported root instruction setting names `AGENTS.md`. A projection check or
+successful wrapper launch does not establish this native behavior.
 
-```bash
-gt project init my-project --profile dual-agent --owner "Your Name"
-cd my-project
-```
+## Start the assigned contexts
 
-The `dual-agent` profile generates:
-
-- `groundtruth.toml` + `groundtruth.db`
-- `CLAUDE.md` and `MEMORY.md` - session state templates
-- `AGENTS.md` - Loyal Opposition operating contract
-- `BRIDGE-INVENTORY.md` - bridge runtime inventory
-- Status-bearing bridge files under `bridge/` plus TAFE/dispatcher bridge state
-- `.claude/hooks/`, `.claude/rules/`, `.claude/settings.json` - automation
-  hooks, rules, and the dispatcher-daemon registration
-- `.codex/hooks.json` - Codex-side hook registration for cross-harness
-  parity
-- `scripts/gtkb_dispatcher_daemon.py` - the event-driven dispatch
-  entrypoint
-- `independent-progress-assessments/` - Codex report storage
-
-`bridge-os-poller-setup-prompt.md` may also appear in the scaffold output as
-a deprecated stub for two release cycles to give adopters time to migrate
-references; do not follow its instructions.
-
-## Step 2: Confirm Bridge Dispatch Automation
-
-In current GT-KB hosts after the 2026-06-15 TAFE/dispatcher cutover,
-TAFE-backed bridge state is authoritative; the legacy bridge index aggregate
-was retired 2026-06-15. Bridge dispatch is
-automated by the **dispatcher daemon**, which fires on
-tool-use and Stop events rather than on a fixed interval. The
-retired smart-poller and OS-scheduled-task implementations are no longer
-used; see `groundtruth-kb/docs/tutorials/bridge-smart-poller.md` and
-`bridge-os-scheduler.md` (both DEPRECATED stubs) for retirement context.
-
-The daemon entrypoint, daemon configuration, and dispatch-state path are
-scaffolded automatically. The relevant artifacts are:
-
-- `scripts/gtkb_dispatcher_daemon.py` - the daemon script that
-  inspects bridge state and dispatches the appropriate counterpart harness when
-  a recipient's actionable queue signature has changed.
-- `.claude/settings.json` - registers the daemon as a `PostToolUse` and
-  `Stop` hook on the Claude Code side.
-- `.codex/hooks.json` - registers the daemon as a `PostToolUse` and `Stop`
-  hook on the Codex side (forward-compatible per
-  `ADR-CODEX-HOOK-PARITY-FALLBACK-001`).
-- `.gtkb-state/bridge-poller/dispatch-state.json` - per-recipient
-  dispatch-state record (read by the doctor's
-  `_check_bridge_dispatch_liveness` check).
-
-When a tool call updates bridge state or the agent ends a turn, the
-trigger evaluates whether the counterpart harness has actionable work and
-dispatches it if so. Dispatch state is recorded in
-`.gtkb-state/bridge-poller/dispatch-state.json` for both `prime-builder` and
-`loyal-opposition` recipients.
-
-Manual bridge-state scans remain available as a fallback when the
-trigger is unhealthy. The owner triggers a Prime bridge scan with a brief
-prompt such as `Bridge` or `Bridge scan`; Codex bridge scans are similarly
-owner-triggered in the Codex harness.
-
-Check bridge dispatch health at any time:
-
-```bash
-gt project doctor
-```
-
-The doctor reports:
-
-- `_check_dispatcher_daemon` - PASS/WARN/FAIL for daemon script
-  presence, both daemon configuration, and dispatch-state freshness.
-- `_check_bridge_dispatch_liveness` - per-recipient dispatch-state liveness
-  for `claude` and `codex`.
-
-## Step 3: Run a Proposal/Review Cycle
-
-### Prime Builder writes a proposal
-
-Create `bridge/my-feature-001.md`:
-
-```markdown
-# My Feature - Implementation Proposal
-
-**Status:** NEW
-**WI:** WI-001
-
-## Summary
-Add a list_tasks() function to src/tasks.py that filters by status.
-
-## Implementation plan
-1. Add def list_tasks(status=None) to src/tasks.py
-2. Add assertion to SPEC-002 for the list_tasks function
-
-## Tests
-- Unit test: list_tasks() returns [] when no tasks exist
-- Unit test: list_tasks(status='open') returns only open tasks
-```
-
-Publish the proposal through the governed bridge path (the numbered file
-`bridge/my-feature-001.md` carries status `NEW` and updates TAFE/dispatcher
-bridge state):
+In each actual host, use its native context identity with the exact supplied
+init line and separately supplied activity:
 
 ```text
-Document: my-feature
-Status: NEW
-File: bridge/my-feature-001.md
+gt session bind --native-context-id <actual-id> --init-keyword "<supplied-line>" --json
+gt session show --native-context-id <actual-id> --json
+gt context work-item <selected-work-item> --json
+gt bridge show <selected-document> --content --json
 ```
 
-### Loyal Opposition reviews
+Read current membership, formal requirements, executable tests, dependencies
+and exact bridge state. The owner dispatches while Dispatcher Next awaits
+independent qualification and activation. Scheduled pollers, an old daemon
+registration and files in a bridge directory do not establish current dispatch.
 
-The dispatcher daemon fires when bridge state updates,
-dispatching Codex with the actionable signature. Codex picks up
-the NEW entry and writes a review at `bridge/my-feature-002.md` with a GO
-or NO-GO verdict. The latest status becomes:
+## Complete the authored sequence
 
-```text
-Document: my-feature
-Latest: GO (bridge/my-feature-002.md)
-Prior: NEW (bridge/my-feature-001.md)
-```
+1. The selected Prime Builder context claims one exact next artifact and
+   authors NEW with current formal scope, target paths and executable tests.
+2. A distinct Loyal Opposition context reads current state and reviews that
+   proposal. GO accepts it; NO-GO requests a revised proposal.
+3. Prime Builder implements the accepted scope and authors READY with exact
+   result and test evidence. READY is a report, not a new proposal.
+4. Independent Loyal Opposition verifies the exact final bytes. NOT-READY
+   requests a corrected report; VERIFIED records review completion.
+5. When every project member is VERIFIED, the native complete-project commit
+   route commits the full reviewed work product through normal hooks. It cites
+   all member work items and excludes bridge payloads and generated projections.
 
-### Prime Builder implements
+Only agents author proposals and verdicts. A launcher transports the authored
+content; it does not synthesize a verdict. A claim grants the next artifact
+action, not enduring ownership or rights for a future context.
 
-On GO, implement the feature, run tests, and write a post-implementation
-report at `bridge/my-feature-003.md`. Bridge state records the new report:
+## Continue and finish
 
-```text
-Document: my-feature
-Latest: NEW (bridge/my-feature-003.md)
-Prior: GO (bridge/my-feature-002.md)
-Prior: NEW (bridge/my-feature-001.md)
-```
+After interruption or release, a fresh context retrieves current canonical
+facts and obtains its own claim. It does not read a predecessor's scratch,
+borrow another host's configuration or inherit review authority.
 
-### Loyal Opposition verifies
+Authorized close/wrap harvest uses current canonical writers. Own scratch is
+removed through `gt session scratch-teardown --native-context-id <actual-id>`;
+the binding remains. Close/wrap does not automatically commit, push, deploy or
+activate a provider. Preserve independent review and unrelated work throughout.
 
-Codex reviews the post-implementation report and writes VERIFIED (or
-NO-GO) at `bridge/my-feature-004.md`:
-
-```text
-Document: my-feature
-Latest: VERIFIED (bridge/my-feature-004.md)
-Prior: NEW (bridge/my-feature-003.md)
-Prior: GO (bridge/my-feature-002.md)
-Prior: NEW (bridge/my-feature-001.md)
-```
-
-VERIFIED is terminal; Prime Builder takes no further action on this entry.
-
-## Step 4: Auth Troubleshooting
-
-If bridge automation reports `AUTH FAILURE`, see
-[Auth Troubleshooting](../troubleshooting/auth.md) for provider-specific
-re-auth steps.
-
-## What's Next
-
-- [Method: Dual-Agent](../method/06-dual-agent.md) - deeper explanation of the
-  Prime Builder / Loyal Opposition model
-- [Reference: CLI](../reference/cli.md) - full `gt project init` options
-- Slice 3 closure (dispatcher-daemon daemon configuration):
-  `bridge/gtkb-bridge-poller-event-driven-replacement-slice-3-hook-registrations-006.md`
-- Slice 4 retirement (smart-poller retirement context):
-  `bridge/gtkb-bridge-poller-event-driven-replacement-slice-4-smart-poller-retirement-001-*`
+*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from groundtruth_kb import get_templates_dir
 from groundtruth_kb.project import baseline_audit
 
@@ -29,15 +31,21 @@ def test_baseline_audit_rejects_missing_evidence_class() -> None:
     assert "missing evidence-class tag" in message
 
 
-def test_managed_registry_includes_new_orientation_rows() -> None:
-    from groundtruth_kb.project.managed_registry import find_artifact_by_id
+def test_managed_registry_carries_no_orientation_copy_rows() -> None:
+    """M15 (D15/D34): rules and skills are never scaffolded as managed copies.
 
-    rule = find_artifact_by_id("rule.session-start-orientation")
-    skill = find_artifact_by_id("skill.baseline-audit.skill-md")
-    assert rule is not None
-    assert skill is not None
-    assert rule.target_path.endswith("session-start-orientation.md")
-    assert skill.target_path.endswith("baseline-audit/SKILL.md")
+    The former orientation rule and baseline-audit skill rows are gone and no rule or skill class remains in
+    the registry; their non-baseline template sources stay in place pending M26.6.
+    """
+    from groundtruth_kb.project.managed_registry import _load_all_artifacts, find_artifact_by_id
+
+    for artifact_id in ("rule.session-start-orientation", "skill.baseline-audit.skill-md"):
+        with pytest.raises(KeyError):
+            find_artifact_by_id(artifact_id)
+    assert not [artifact for artifact in _load_all_artifacts() if artifact.class_ in {"rule", "skill"}]
+    templates = get_templates_dir()
+    assert (templates / "rules/session-start-orientation.md").is_file()
+    assert (templates / "skills/gtkb-baseline-audit/SKILL.md").is_file()
 
 
 def test_baseline_audit_skill_template_exists() -> None:

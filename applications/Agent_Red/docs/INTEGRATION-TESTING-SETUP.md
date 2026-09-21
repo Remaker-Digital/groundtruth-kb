@@ -30,9 +30,11 @@ This guide explains how to set up and run integration tests with real Stripe tes
    - Copy the "Signing secret" (starts with `whsec_`)
 
 4. **Verify your products exist**:
-   - The integration tests use the product IDs from `config/stripe_product_ids.json`
+   - The integration tests use `applications/Agent_Red/config/stripe_product_ids.json`
+     relative to the repository root
    - These should already exist in your Stripe test account
-   - If not, run: `python scripts/stripe/create_product_catalog.py`
+   - If not, run from the repository root: `python scripts/stripe/create_product_catalog.py`.
+     This writes the application mapping above.
 
 ### 2. Shopify Partner Setup
 

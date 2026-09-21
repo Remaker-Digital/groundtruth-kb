@@ -36,9 +36,11 @@ WRITE_ENV = "GTKB_RETIRED_REFERENCE_BASELINE_WRITE"
 
 SURFACES = (
     ".harness-baseline-configuration",
+    ".agents/skills",
     "scripts",
     "groundtruth-kb/src",
     "groundtruth-kb/templates",
+    "groundtruth-kb/docs",
     "config",
     "AGENTS.md",
     "CLAUDE.md",
@@ -47,6 +49,15 @@ SURFACES = (
 EXCLUDED_PARTS = frozenset({"__pycache__", "tests", "archive", ".pytest-tmp", "node_modules"})
 SCANNED_SUFFIXES = frozenset({".py", ".md", ".toml", ".json", ".sh", ".ps1", ".txt", ".yml", ".yaml", ""})
 MAX_BYTES = 2_000_000
+EXCLUDED_RELATIVE_PATHS = frozenset(
+    {
+        "config/governance/timer-inventory.toml",
+        "memory/topics/reference_openai_api_key.md",
+        ".quality/release-candidate-tracked-secrets.json",
+        "groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/credential_scan.py",
+        "applications/Agent_Red/docs/owner-messages-all.json",
+    }
+)
 
 TOKENS: dict[str, re.Pattern[str]] = {
     "NO-ACTION": re.compile(r"\bNO-ACTION\b"),
@@ -58,6 +69,7 @@ TOKENS: dict[str, re.Pattern[str]] = {
     "harness-state/": re.compile(r"\bharness-state/"),
     "formal-artifact-approvals": re.compile(r"formal-artifact-approvals"),
     "TAFE": re.compile(r"\bTAFE\b"),
+    "retired-dispatch-mechanism": re.compile(r"(?i)\b(?:dispatcher[_ -]daemon|(?:bridge[_ -])?smart[_ -]poller)\b"),
     "config/agent-control": re.compile(r"config/agent-control"),
 }
 
@@ -79,6 +91,8 @@ def _iter_files(project_root: Path = PROJECT_ROOT) -> Iterator[Path]:
         if not root.is_dir():
             continue
         for path in sorted(root.rglob("*")):
+            if path.relative_to(project_root).as_posix() in EXCLUDED_RELATIVE_PATHS:
+                continue
             if not path.is_file():
                 continue
             if EXCLUDED_PARTS & set(path.relative_to(project_root).parts):
@@ -185,3 +199,31 @@ def test_purged_tokens_keep_a_zero_allowance(tmp_path: Path) -> None:
     assert _differences({}, reintroduced) == [
         "scripts/reintroduced.py: DECISION-NNNN rose from 0 to 1 (a retired concept was reintroduced)"
     ]
+
+
+def test_skill_move_keeps_authored_guidance_in_the_ratchet_subject(tmp_path):
+    path = tmp_path / ".agents/skills/example/SKILL.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("Current guidance names PAUTH", encoding="utf-8")
+    assert scan(tmp_path)[".agents/skills/example/SKILL.md"]["PAUTH"] == 1
+
+
+def test_timer_inventory_is_excluded_before_any_content_read(tmp_path, monkeypatch):
+    path = tmp_path / "config/governance/timer-inventory.toml"
+    path.parent.mkdir(parents=True)
+    path.write_text("excluded fixture", encoding="utf-8")
+    original = Path.read_text
+
+    def guarded(current, *args, **kwargs):
+        assert current != path, "broad reference scans must not read the timer inventory"
+        return original(current, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded)
+    assert scan(tmp_path) == {}
+
+
+def test_authored_docs_are_covered_by_retired_dispatch_reference_check(tmp_path):
+    path = tmp_path / "groundtruth-kb/docs/current-guide.md"
+    path.parent.mkdir(parents=True)
+    path.write_text("Start the dispatcher daemon and smart-poller.", encoding="utf-8")
+    assert scan(tmp_path) == {"groundtruth-kb/docs/current-guide.md": {"retired-dispatch-mechanism": 2}}

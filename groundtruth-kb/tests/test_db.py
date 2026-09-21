@@ -1411,7 +1411,7 @@ class TestHarnesses:
             changed_by="test",
             change_reason="initial registration",
             invocation_surfaces={"interactive": "claude", "headless": "claude -p"},
-            capabilities_ref="config/agent-control/harness-capability-registry.toml",
+            capabilities_ref="infrastructure/claude/installed.json",
         )
         assert result is not None
         assert result["id"] == "B"
@@ -1422,7 +1422,7 @@ class TestHarnesses:
         assert result["role"] == '["prime-builder"]'
         assert result["reviewer_precedence"] is None
         assert result["invocation_surfaces"] == '{"interactive": "claude", "headless": "claude -p"}'
-        assert result["capabilities_ref"].endswith("harness-capability-registry.toml")
+        assert result["capabilities_ref"] == "infrastructure/claude/installed.json"
 
     def test_insert_harness_version_bumps(self, db):
         v1 = db.insert_harness(

@@ -16,7 +16,7 @@ Section layout:
     Provenance                       (4 tests)
     Native specification source      (5 tests)
     Composition and text output      (3 tests)
-    CLI                              (3 tests, two need the disposable authority)
+    CLI                              (4 tests, three need the disposable authority)
 
 Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 Licensed under AGPL-3.0-or-later.
@@ -757,6 +757,101 @@ class TestReconcileCLI:
         assert report["finding_count"] == payload["total_findings"] == 1
         assert report["findings"][0]["spec_id"] == "SPEC-GONE"
         assert report["findings"][0]["file_target"] == "src/gone.py"
+
+    def test_gt_kb_reconcile_provisionals_reports_an_api_set_verification_marker(self, native_application, monkeypatch):
+        """R26 over the API path (WI-7861): a replacement verified through `PUT /v1/specifications/{id}` expires
+        its provisional; before the writer admits the marker (no executable test) the detector is silent."""
+        client = native_application.client
+        _put_spec(client, "SPEC-R", {"title": "Replacement", "status": "active", "authority": "stated"})
+        _put_spec(
+            client,
+            "SPEC-P",
+            {"title": "Provisional", "status": "active", "authority": "provisional", "provisional_until": "SPEC-R"},
+        )
+
+        def provisionals():
+            result = native_application.invoke("kb", "reconcile", "--provisionals", "--json")
+            assert result.exit_code == 0, result.output
+            payload = json.loads(result.output)
+            assert [r["category"] for r in payload["reports"]] == ["expired_provisionals"]
+            return payload["reports"][0]["findings"]
+
+        def verify(expected_version):
+            return client.request(
+                "PUT",
+                "/v1/specifications/SPEC-R",
+                body={
+                    "expected_version": expected_version,
+                    "actor": "qualification",
+                    "reason": "The replacement shipped",
+                    "fields": {"implementation_verified_at": True},
+                },
+            )
+
+        assert provisionals() == []
+        with pytest.raises(AuthorityClientError) as refused:
+            verify(1)
+        assert refused.value.code == "verification_evidence_required"
+        assert provisionals() == []
+        for domain, record_id, fields in [
+            (
+                "tests",
+                "TEST-R",
+                {
+                    "title": "Replacement behaviour",
+                    "spec_id": "SPEC-R",
+                    "test_type": "integration",
+                    "test_file": "tests/test_replacement.py",
+                    "expected_outcome": "Replacement observed",
+                },
+            ),
+            ("test-plans", "PLAN-R", {"title": "Replacement qualification"}),
+            (
+                "test-phases",
+                "PHASE-R",
+                {
+                    "title": "Shipped",
+                    "plan_id": "PLAN-R",
+                    "phase_order": 1,
+                    "gate_criteria": "Pass",
+                    "test_ids": ["TEST-R"],
+                },
+            ),
+        ]:
+            client.request(
+                "PUT",
+                f"/v1/{domain}/{record_id}",
+                body={
+                    "expected_version": 0,
+                    "actor": "qualification",
+                    "reason": "Verification evidence",
+                    "fields": fields,
+                },
+            )
+        verified = verify(1)
+        assert verified["version"] == 2 and verified["implementation_verified_at"]
+        before = native_application.facts()
+        calls: list[tuple[str, str]] = []
+        original_request = AuthorityClient.request
+
+        def transport(self, method, path, *, body=None, query=None):
+            calls.append((method, path))
+            return original_request(self, method, path, body=body, query=query)
+
+        with monkeypatch.context() as patched:
+            patched.setattr(AuthorityClient, "request", transport)
+            findings = provisionals()
+        assert findings == [
+            {
+                "type": "expired_provisional",
+                "spec_id": "SPEC-P",
+                "replacement_spec_id": "SPEC-R",
+                "replacement_status": "active",
+                "replacement_implementation_verified_at": verified["implementation_verified_at"],
+            }
+        ]
+        assert calls and all(method == "GET" and path == "/v1/specifications" for method, path in calls)
+        assert native_application.facts() == before
 
     def test_gt_kb_reconcile_refuses_without_an_authority_url(self, tmp_path, runner):
         """No SQLite fallback: a configuration without authority_url is refused, not opened locally."""

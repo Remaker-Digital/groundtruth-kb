@@ -6,9 +6,9 @@ neither authorizes a bypass nor qualifies an actual emergency operation.
 
 import json
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 
 def test_wi7164_canonical_emergency_bootstrap_operational_event(bridge):

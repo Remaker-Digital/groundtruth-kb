@@ -14,9 +14,9 @@ _ROOT = Path(__file__).resolve().parents[2]
 def _run(path: Path, payload: dict, telemetry: Path) -> dict:
     env = os.environ.copy()
     env["GTKB_GATE_DENIALS_PATH"] = str(telemetry)
-    env["CLAUDE_PROJECT_DIR"] = str(_ROOT)
+    env["GTKB_PROJECT_ROOT"] = str(_ROOT)
     proc = subprocess.run(
-        [sys.executable, str(path)],
+        [sys.executable, "-B", str(path)],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
@@ -34,7 +34,7 @@ def _first_record(path: Path) -> dict:
 def test_scanner_safe_writer_block_logs_denial(tmp_path: Path) -> None:
     telemetry = tmp_path / "scanner.jsonl"
     result = _run(
-        _ROOT / ".claude" / "hooks" / "scanner-safe-writer.py",
+        _ROOT / ".harness-baseline-configuration" / "hooks" / "scanner-safe-writer.py",
         {
             "tool_name": "Write",
             "tool_input": {

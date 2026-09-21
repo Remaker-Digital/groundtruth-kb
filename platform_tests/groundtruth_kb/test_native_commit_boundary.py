@@ -2,115 +2,18 @@
 
 from __future__ import annotations
 
-import socket
 import threading
 import time
 from pathlib import Path
 
 import pytest
-import uvicorn
-from click.testing import CliRunner
-from groundtruth_kb.cli import main
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_project_finalization import (
-    base,
-    git,
-    integration,
-    post,
-    two_members,
-)
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration, invoke, real_index
+from platform_tests.groundtruth_kb.finalization_fixtures import commit_environment as commit_environment
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-
-@pytest.fixture
-def commit_environment(bridge, tmp_path, monkeypatch, request):
-    git(bridge[3], "config", "core.filemode", "false")
-    if getattr(request, "param", False):
-        git(bridge[3], "update-index", "--chmod=+x", "--", "code.py")
-    client, contexts, root, parent = two_members(bridge)
-
-    def assert_review(where):
-        for number in (1, 2):
-            current = client.get(f"/v1/bridge/chain-{number}/artifacts").json()
-            reviewed = client.get(f"/v1/bridge/chain-{number}/show").json()["attempt"]["verified_artifacts"]
-            assert current == reviewed, (where, current, reviewed)
-
-    assert_review("after verification")
-    main_root = integration(root)
-    hooks = main_root / ".githooks"
-    hooks.mkdir()
-    reference = hooks / "reference-transaction"
-    reference.write_text(
-        '#!/bin/sh\nif [ -n "$GTKB_PROJECT_COMMIT_PROJECT" ]; then\n'
-        'exec "$GTKB_PROJECT_COMMIT_PYTHON" -m groundtruth_kb.project.native_commit "$@"\nfi\nexit 0\n',
-        encoding="utf-8",
-        newline="\n",
-    )
-    reference.chmod(0o755)
-    git(main_root, "config", "core.hooksPath", ".githooks")
-    prepared = post(client, "prepare-commit").json()
-    assert prepared["status"] == "ready_to_commit", prepared
-    checkout = Path(prepared["checkout"]["path"])
-    assert_review("after preparation")
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        port = listener.getsockname()[1]
-        server = uvicorn.Server(uvicorn.Config(client.app, host="127.0.0.1", port=port, log_level="error"))
-        worker = threading.Thread(target=lambda: server.run(sockets=[listener]), daemon=True)
-        worker.start()
-        deadline = time.monotonic() + 10
-        while not server.started and worker.is_alive() and time.monotonic() < deadline:
-            time.sleep(0.01)
-        assert server.started
-        config = tmp_path / "commit-client.toml"
-        config.write_text(
-            f'[groundtruth]\nauthority_url="http://127.0.0.1:{port}"\n',
-            encoding="utf-8",
-        )
-        message = tmp_path / "commit-message.txt"
-        message.write_text(
-            "Complete the independently reviewed product (WI-1) (WI-2)\n",
-            encoding="utf-8",
-        )
-        assert_review("after server startup")
-        monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
-        try:
-            for number in (1, 2):
-                current = client.get(f"/v1/bridge/chain-{number}/artifacts").json()
-                reviewed = client.get(f"/v1/bridge/chain-{number}/show").json()["attempt"]["verified_artifacts"]
-                assert current == reviewed, (current, reviewed)
-            yield client, root, parent, checkout, hooks, config, message
-        finally:
-            server.should_exit = True
-            worker.join(10)
-            assert not worker.is_alive()
-
-
-def invoke(config, message):
-    return CliRunner().invoke(
-        main,
-        [
-            "--config",
-            str(config),
-            "projects",
-            "commit",
-            "PROJECT-1",
-            "--native-context-id",
-            "lo3",
-            "--expected-version",
-            "1",
-            "--message-file",
-            str(message),
-            "--json",
-        ],
-    )
-
-
-def real_index(root):
-    return Path(git(root, "rev-parse", "--path-format=absolute", "--git-path", "index").stdout.strip())
 
 
 def pending_invocation_report(pending, submitted_at, wait_seconds=15):
@@ -151,6 +54,8 @@ def test_normal_hooks_refuse_before_head_and_preserve_foreign_index(commit_envir
     hook.chmod(0o755)
     result = invoke(config, message)
     assert result.exit_code != 0, result.output
+    assert not list(checkout.glob(".gtkb-index-*"))
+    assert not list(real_index(checkout).parent.glob("gtkb-commit-*"))
     expected = {
         "refuse": "qualification-refusal",
         "content": "exact reviewed bytes",
@@ -187,6 +92,8 @@ def test_successful_normal_commit_excludes_and_preserves_foreign_staging(
         hook.chmod(0o755)
     result = invoke(config, message)
     assert result.exit_code == 0, f"{result.output}\nexception: {result.exception!r}"
+    assert not list(checkout.glob(".gtkb-index-*"))
+    assert not list(real_index(checkout).parent.glob("gtkb-commit-*"))
     assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "verified"
     assert base(checkout) == base(integration(root)) != parent
     assert git(checkout, "show", "--format=", "--name-only", "HEAD").stdout.splitlines() == ["code.py", "second.py"]
@@ -286,6 +193,8 @@ def test_stalled_commit_callback_releases_reference_lock_without_advancing_head(
             finally:
                 release.set()
         assert result.exit_code != 0 and "configured authority is unavailable" in result.output, result.output
+        assert not list(checkout.glob(".gtkb-index-*"))
+        assert not list(real_index(checkout).parent.glob("gtkb-commit-*"))
         assert 4 <= stalled_seconds < 10
         assert not lock.exists()
         assert len(requests) == 1
@@ -306,3 +215,75 @@ def test_stalled_commit_callback_releases_reference_lock_without_advancing_head(
         server.server_close()
         worker.join(5)
         assert not worker.is_alive()
+
+
+def test_timed_out_real_callback_finishes_before_recovery(commit_environment, monkeypatch):
+    from concurrent.futures import ThreadPoolExecutor
+
+    from groundtruth_kb.postgres_kernel import PostgresKernelError
+    from groundtruth_kb.project.native_finalization import NativeProjectFinalization
+
+    client, root, parent, checkout, _hooks, config, message = commit_environment
+    foreign = checkout / "foreign_tracked.txt"
+    foreign.write_text("foreign staged work\n", encoding="utf-8")
+    git(checkout, "add", "--", foreign.name)
+    foreign.write_bytes(b"foreign unstaged work\x00")
+    index_before = real_index(checkout).read_bytes()
+    branch = git(checkout, "symbolic-ref", "HEAD").stdout.strip()
+    lock = Path(git(checkout, "rev-parse", "--path-format=absolute", "--git-path", branch + ".lock").stdout.strip())
+    entered, release, finished = threading.Event(), threading.Event(), threading.Event()
+    captured, results, recovery = {}, [], []
+    check = NativeProjectFinalization._check_commit_locked
+    project = NativeProjectFinalization._project
+
+    def delayed(self, tx, project_id, request):
+        captured.update(
+            tx=tx, thread=threading.get_ident(), callback=self._commit_callbacks[project_id], request=request
+        )
+        entered.set()
+        try:
+            assert release.wait(20), "test failed to release the real callback"
+            result = check(self, tx, project_id, request)
+            results.append(result)
+            return result
+        finally:
+            finished.set()
+
+    def observe_recovery(self, tx, project_id, request, **kwargs):
+        if tx is captured.get("tx") and threading.get_ident() != captured.get("thread"):
+            recovery.append((finished.is_set(), project_id not in self._commit_callbacks))
+        return project(self, tx, project_id, request, **kwargs)
+
+    monkeypatch.setattr(NativeProjectFinalization, "_check_commit_locked", delayed)
+    monkeypatch.setattr(NativeProjectFinalization, "_project", observe_recovery)
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending = pool.submit(invoke, config, message)
+        try:
+            assert entered.wait(40), "the real commit callback did not arrive"
+            assert lock.is_file(), "Git must hold its selected reference lock during the callback"
+            deadline = time.monotonic() + 10
+            while lock.exists() and time.monotonic() < deadline:
+                time.sleep(0.05)
+            assert not lock.exists(), "the client deadline did not release Git's reference lock"
+            assert not finished.is_set()
+            assert not pending.done()
+            assert recovery == [], "recovery used the shared transaction before the real callback finished"
+        finally:
+            release.set()
+        result = pending.result(timeout=40)
+    assert result.exit_code != 0, result.output
+    assert "fresh_verification_required" in result.output and "commit_not_confirmed" in result.output
+    assert "timed out" in result.output
+    assert len(results) == 1 and results[0]["status"] == "ready_to_update_reference"
+    assert recovery and all(after_finish and retired for after_finish, retired in recovery)
+    assert base(checkout) == base(integration(root)) == parent
+    assert real_index(checkout).read_bytes() == index_before
+    assert foreign.read_bytes() == b"foreign unstaged work\x00"
+    assert git(checkout, "show", ":foreign_tracked.txt").stdout == "foreign staged work\n"
+    assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "active"
+    assert len(client.get("/v1/bridge/queue", params={"role": "lo"}).json()["eligible"]) == 2
+    access_count = len(recovery)
+    with pytest.raises(PostgresKernelError) as error:
+        captured["callback"](captured["request"])
+    assert error.value.code == "commit_not_in_progress"
+    assert len(results) == 1 and len(recovery) == access_count

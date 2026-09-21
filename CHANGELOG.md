@@ -8,9 +8,16 @@ The version source of truth is [`groundtruth-kb/src/groundtruth_kb/__init__.py`]
 
 ## [Unreleased]
 
-Active development happens on the `develop` branch. Current bridge status is
-resolved through dispatcher/TAFE bridge state and versioned bridge files; the
-standing backlog (`gt backlog list`) tracks planned work.
+Harness instructions now use authored root `AGENTS.md`, one shared
+`.agents/skills` tree and baseline rules/hooks/routing. The eight projection
+profiles emit required registrations, pointers and ownership bookkeeping;
+copied rule, hook, skill-body and provider-routing output is retired. The
+official DeepSeek SDK remains a separate ninth actual host. Native host loading,
+trust and behavior require installed evidence.
+
+Current work and bridge state are read through native services. The owner
+dispatches while the successor dispatcher awaits independent qualification and
+activation. Historical release entries below retain their original context.
 
 ## [0.7.0-rc1]
 

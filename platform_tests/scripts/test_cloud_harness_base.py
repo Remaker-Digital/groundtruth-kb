@@ -69,6 +69,7 @@ def _profile(**overrides) -> base.AdopterProfile:
         auth_env_key="TESTCLOUD_API_KEY",
         provider_routing_key="testcloud",
         routing_config_path=CFG_PATH,
+        native_hook_settings_path=CFG_PATH.parent / "settings.json",
         dialect=base.DIALECT_OPENAI_CHAT,
         hook_tier=base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
         extra_headers={},
@@ -1539,8 +1540,9 @@ def test_repeated_identical_pretool_timeouts_hit_existing_no_progress_bound(
 
 def test_native_full_hooks_run_tool_loop_still_enforces_guard_floor(tmp_path: Path) -> None:
     root = _root(tmp_path)
-    (root / CFG_PATH.parent / "hooks").mkdir(parents=True)
-    (root / CFG_PATH.parent / "hooks" / "credential-scan.py").write_text("print('{}')\n", encoding="utf-8")
+    hooks = root / ".harness-baseline-configuration/hooks"
+    hooks.mkdir(parents=True)
+    (hooks / "credential-scan.py").write_text("print('{}')\n", encoding="utf-8")
     route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Write",))
     turns: list[dict] = []
 

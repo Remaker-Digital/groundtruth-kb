@@ -1,4 +1,4 @@
-"""Projected hooks use the selected package and cannot silently replace it.
+"""Authored hooks use the selected package and cannot silently replace it.
 
 These subprocess checks exercise current derivations, not actual host invocation.
 """
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 import tomllib
@@ -19,6 +20,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILES = tomllib.loads((ROOT / "scripts/harness_projection/profiles.toml").read_text(encoding="utf-8"))["harnesses"]
 HARNESSES = [name for name, row in PROFILES.items() if row.get("status") != "profile_pending"]
 HOOKS = ("directive-enforcement-adapter.py", "code-quality-baseline-proposal-check.py")
+HOOKS_ROOT = Path(".harness-baseline-configuration/hooks")
 
 
 @pytest.fixture(scope="module")
@@ -28,6 +30,7 @@ def projected(tmp_path_factory):
     target = tmp_path_factory.mktemp("selected-package-hooks")
     projector = _load_projector(ROOT)
     assert len(HARNESSES) == 8
+    shutil.copytree(ROOT / HOOKS_ROOT, target / HOOKS_ROOT, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for harness in HARNESSES:
         plan = projector.build_plan(harness)
         assert not plan.gaps, plan.gaps
@@ -48,6 +51,7 @@ def hook_environment(projected, harness):
     return {
         **os.environ,
         PROFILES[harness]["project_dir_var"]: str(projected),
+        "GTKB_PROJECT_ROOT": str(projected),
         "PYTHONIOENCODING": "utf-8",
         "PYTHONDONTWRITEBYTECODE": "1",
     }
@@ -75,7 +79,7 @@ finally:
         }
     )
     result = subprocess.run(
-        [sys.executable, "-P", "-c", probe, str(projected / PROFILES[harness]["hooks_dir"] / hook), str(origin_report)],
+        [sys.executable, "-B", "-P", "-c", probe, str(projected / HOOKS_ROOT / hook), str(origin_report)],
         input=json.dumps(payload),
         text=True,
         encoding="utf-8",
@@ -109,7 +113,7 @@ def test_unavailable_selected_package_does_not_fall_back_to_checkout(projected, 
             "-S",
             "-c",
             "import runpy,sys; runpy.run_path(sys.argv[1],run_name='__main__')",
-            str(projected / PROFILES[harness]["hooks_dir"] / hook),
+            str(projected / HOOKS_ROOT / hook),
         ],
         input="{}",
         text=True,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from http.client import HTTPMessage
+from pathlib import Path
 from typing import IO, Any
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
@@ -98,3 +99,48 @@ class AuthorityClient:
             return parse_json_bytes(payload)
         except Exception as error:  # intentional-catch: malformed canonical JSON is reported as invalid_response
             raise AuthorityClientError("invalid_response", "Authority returned invalid canonical JSON") from error
+
+
+def configured_authority_client(root: Path) -> AuthorityClient:
+    """Use the selected root's configuration and environment; never discover a parent store.
+
+    Only a genuinely absent URL is authority_not_configured. Invalid or unreadable
+    settings retain their configuration error. An absent TOML still allows the
+    ordinary GT_AUTHORITY_URL setting through GTConfig's environment loader.
+    """
+    from groundtruth_kb.config import GTConfig
+
+    path = root / "groundtruth.toml"
+    config_path: Path | None
+    try:
+        path.stat()
+    except FileNotFoundError:
+        config_path = None
+    else:
+        config_path = path
+    config = GTConfig.load(config_path=config_path, discover=False)
+    if not config.authority_url:
+        raise AuthorityClientError("authority_not_configured", "No authority_url is configured")
+    return AuthorityClient(config.authority_url)
+
+
+def page_records(client: AuthorityClient, path: str, *, query: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+    """Read a native collection completely, refusing malformed rows or stalled cursors."""
+    collected: list[dict[str, Any]] = []
+    after: str | None = None
+    while True:
+        result = client.request("GET", path, query={**(query or {}), "limit": 1000, "after": after})
+        records = result.get("records") if isinstance(result, dict) else None
+        next_after = result.get("next_after") if isinstance(result, dict) else None
+        if not isinstance(records, list) or any(
+            not isinstance(row, dict) or not isinstance(row.get("id"), str) or not row["id"] for row in records
+        ):
+            raise AuthorityClientError("invalid_response", f"{path} records are malformed")
+        if next_after is not None and (
+            not isinstance(next_after, str) or not next_after or (after is not None and next_after <= after)
+        ):
+            raise AuthorityClientError("invalid_response", f"{path} pagination did not advance")
+        collected.extend(records)
+        if next_after is None:
+            return collected
+        after = next_after

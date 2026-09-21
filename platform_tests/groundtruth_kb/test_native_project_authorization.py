@@ -11,13 +11,12 @@ import pytest
 from groundtruth_kb.native_authority import ProjectAuthorizationChange
 from groundtruth_kb.postgres_kernel import PostgresKernelError, PostgresTransaction
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, seed, work_fields
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_project_dependencies import ready_checkout
-from platform_tests.groundtruth_kb.test_native_project_finalization import base, git, integration
-from platform_tests.groundtruth_kb.test_project_association_consistency import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver, ready_checkout
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

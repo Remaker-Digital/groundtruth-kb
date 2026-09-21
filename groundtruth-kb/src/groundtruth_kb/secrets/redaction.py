@@ -11,6 +11,10 @@ doctor alert summaries, log files.
 
 Tests in tests/secrets/test_redaction.py assert that for every output mode
 the raw fixture value never appears in the output text.
+
+``line_identity`` hashes a whole scanned line (not only the matched value). It
+is the key of the commit gate's synthetic allowlist and is only printed for a
+line that allowlist has already attested as synthetic.
 """
 
 from __future__ import annotations
@@ -33,3 +37,14 @@ def redact_for_output(value: str) -> str:
     the value itself.
     """
     return f"<redacted len={len(value)} {fingerprint(value)}>"
+
+
+def line_identity(line: str) -> str:
+    """Return the full SHA-256 hex digest of one line of scanned text.
+
+    The line is hashed exactly as the scanner saw it: its UTF-8 bytes without the
+    line terminator, so an LF index blob and a CRLF working-tree copy of the same
+    line share one identity. Callers must not print it for a finding that has not
+    been attested as synthetic; the scanner's JSON report never includes it.
+    """
+    return hashlib.sha256(line.encode("utf-8")).hexdigest()

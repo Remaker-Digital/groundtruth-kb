@@ -114,25 +114,21 @@ standing for a triggered concept, it must:
    state.
 
 This principle extends the Simplicity Principle above and
-`GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Capture routes to the MemBase backlog per
-`GOV-STANDING-BACKLOG-001`. It does NOT supersede `GOV-ARTIFACT-APPROVAL-001` —
-renaming an existing protected surface still requires formal artifact approval
-evidence; the principle governs new names and flags existing mismatches for
-governed correction. Whether a name is event-shaped is a judgment, not a
-mechanical test; the accompanying assertion checks only that this rule is present
-and that the named anti-pattern vocabulary does not reappear in this surface.
+`GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Capture concrete naming or persistence
+defects through the current backlog writer, using current formal requirements
+and independent review. Existing owner direction does not require a separate
+approval-evidence artifact. Naming is a judgment about the actual behavior;
+a structural assertion cannot establish complete behavioral conformance.
 
 ## Clean-Before-You-Leave Principle
 
-When implementation work is complete, all temp, ephemeral, or session-only
-artifacts must be cleaned up before the session ends. This includes temp
-files, harness-local scratch files, `memory/` temp files, and any other
-session-only artifacts. The session must leave the system in a clean state
-for the next session. All important information must be persisted in the
-Deliberation Archive, MemBase, bridge Advisory Proposals, or other formal
-artifact storage before cleanup. If new code or durable artifacts have been
-created as part of the work product of an implementation, those must be
-registered as formal artifacts (change controlled) before cleanup.
+After the authorized work and knowledge harvest, remove this context's temporary
+output through the supported cleanup route. Preserve unrelated files, required
+qualification evidence and current formal history. Put retained knowledge in
+its established canonical source through the native writer and read it back;
+a deliberation archive, bridge payload or session-memory file is not a durable
+authority or a substitute for that source. Use the native scratch-teardown
+operation described in `session-bootstrap.md`; it preserves the context binding.
 
 ## Session startup and wrap-up
 
@@ -153,6 +149,19 @@ Per `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
 `GOV-GTKB-ADOPTION-ENFORCEMENT-001`: new candidate skills, plug-ins, or
 doctor checks identified during adoption work must be added to the top of the
 outstanding work queue until adopted, explicitly rejected, or superseded.
+
+## Retained working priorities
+
+Technical work has elevated priority over creative/content work.
+Implementation, executable tests, result analysis and working capabilities take
+priority over marketing and cosmetic changes within the owner's selected work.
+
+Never remove code, tests, features, or procedure entries without explicit owner approval
+in the current session. Existing explicit owner direction covering the removal
+satisfies this requirement; do not ask again for the same decision. Temporary
+output follows the current authorized cleanup scope and retention requirements.
+
+Formal retrieval: SPEC-0282, SPEC-0735, SPEC-0472, SPEC-0744, SPEC-0850.
 
 ## Copyright
 

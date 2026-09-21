@@ -50,8 +50,18 @@ from pathlib import Path
 
 import pytest
 
+import groundtruth_kb
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
-HOOK_PATH = REPO_ROOT / "templates" / "hooks" / "scanner-safe-writer.py"
+HOOK_PATH = REPO_ROOT.parent / ".harness-baseline-configuration" / "hooks" / "scanner-safe-writer.py"
+
+
+@pytest.fixture(autouse=True)
+def isolated_denial_log(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Every direct call and child process owns its denial-log destination."""
+    monkeypatch.setenv("GTKB_PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setenv("PYTHONDONTWRITEBYTECODE", "1")
+    monkeypatch.delenv("GTKB_GATE_DENIALS_PATH", raising=False)
 
 
 # ---------------------------------------------------------------------------
@@ -92,6 +102,42 @@ def _load_hook_module():
     return module
 
 
+def _run_hook_with_selected_package(tmp_path: Path, *arguments: str, input_text: str | None = None):
+    """Keep the parent's selected package in the child and observe its actual imports."""
+    package_root = Path(groundtruth_kb.__file__).resolve().parent.parent
+    expected = os.environ.get("GTKB_EXPECTED_PACKAGE_ROOT")
+    if expected:
+        assert package_root == Path(expected).resolve()
+    origin_path = tmp_path / "scanner-child-origin.json"
+    env = os.environ.copy()
+    env["PYTHONPATH"] = str(package_root)
+    env["SCANNER_TEST_ORIGIN"] = str(origin_path)
+    code = """import json, os, runpy, sys
+from pathlib import Path
+sys.argv = sys.argv[1:]
+try:
+    runpy.run_path(sys.argv[0], run_name="__main__")
+finally:
+    origins = {name: module.__file__ for name, module in sys.modules.items()
+               if (name == "groundtruth_kb" or name.startswith("groundtruth_kb."))
+               and getattr(module, "__file__", None)}
+    Path(os.environ["SCANNER_TEST_ORIGIN"]).write_text(json.dumps(origins), encoding="utf-8")
+"""
+    result = subprocess.run(
+        [sys.executable, "-B", "-P", "-c", code, str(HOOK_PATH), *arguments],
+        input=input_text,
+        capture_output=True,
+        text=True,
+        cwd=tmp_path,
+        env=env,
+        timeout=30,
+    )
+    origins = json.loads(origin_path.read_text(encoding="utf-8"))
+    assert {"groundtruth_kb", "groundtruth_kb.governance.credential_patterns"} <= set(origins)
+    assert all(Path(path).resolve().is_relative_to(package_root / "groundtruth_kb") for path in origins.values())
+    return result
+
+
 @pytest.fixture(scope="module")
 def hook_module():
     """Module-scoped hook import — reused across tests for direct-API access."""
@@ -106,25 +152,16 @@ def hook_module():
 def test_self_test_emits_deny_and_writes_record(tmp_path: Path) -> None:
     """``python scanner-safe-writer.py --self-test`` must emit a deny JSON,
     print the CANONICAL_CATALOG_USED marker to stderr, and append one JSON
-    line to ``.claude/hooks/scanner-safe-writer.log``.
+    line to ``.groundtruth/runtime/gate-denials.jsonl``.
     """
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(REPO_ROOT / "src")
-    result = subprocess.run(
-        [sys.executable, str(HOOK_PATH), "--self-test"],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        env=env,
-        timeout=30,
-    )
+    result = _run_hook_with_selected_package(tmp_path, "--self-test")
     assert result.returncode == 0, f"self-test exit code {result.returncode}; stderr={result.stderr}"
     assert "CANONICAL_CATALOG_USED" in result.stderr
     stdout_data = json.loads(result.stdout.strip())
     hook_out = stdout_data["hookSpecificOutput"]
     assert hook_out["permissionDecision"] == "deny"
     assert hook_out["hookEventName"] == "PreToolUse"
-    log_path = tmp_path / ".claude" / "hooks" / "scanner-safe-writer.log"
+    log_path = tmp_path / ".groundtruth" / "runtime" / "gate-denials.jsonl"
     assert log_path.exists(), "self-test did not write a deny record"
     lines = [ln for ln in log_path.read_text(encoding="utf-8").splitlines() if ln.strip()]
     assert len(lines) == 1, f"expected exactly one deny record line, got {len(lines)}"
@@ -235,10 +272,12 @@ def test_deny_record_schema_version_is_literal_int_1(hook_module, tmp_path: Path
             "bridge/foo-001.md",
             [("aws_key", "AWS access key ID (AKIA...)", (0, 10))],
             session_id="unit-test",
+            reason="fixture credential refusal",
+            payload={"project_root": str(tmp_path)},
         )
     finally:
         os.chdir(old_cwd)
-    log_path = tmp_path / ".claude" / "hooks" / "scanner-safe-writer.log"
+    log_path = tmp_path / ".groundtruth" / "runtime" / "gate-denials.jsonl"
     assert log_path.exists()
     record = json.loads(log_path.read_text(encoding="utf-8").splitlines()[0])
     assert record["schema_version"] == 1
@@ -257,10 +296,12 @@ def test_deny_record_schema_version_is_first_field_in_json_text(hook_module, tmp
             "bridge/foo-001.md",
             [("aws_key", "AWS access key ID (AKIA...)", (0, 10))],
             session_id="unit-test",
+            reason="fixture credential refusal",
+            payload={"project_root": str(tmp_path)},
         )
     finally:
         os.chdir(old_cwd)
-    log_path = tmp_path / ".claude" / "hooks" / "scanner-safe-writer.log"
+    log_path = tmp_path / ".groundtruth" / "runtime" / "gate-denials.jsonl"
     line = log_path.read_text(encoding="utf-8").splitlines()[0]
     assert line.startswith('{"schema_version": 1,'), (
         f"raw JSON does not start with schema_version: 1 — got {line[:40]!r}"
@@ -273,19 +314,10 @@ def test_deny_record_schema_version_is_first_field_in_json_text(hook_module, tmp
 
 
 def test_canonical_catalog_used_when_groundtruth_kb_on_path(tmp_path: Path) -> None:
-    """With ``PYTHONPATH`` pointing at ``src``, the canonical marker is
+    """With ``PYTHONPATH`` pointing at the selected package, the canonical marker is
     emitted and ``CANONICAL_CATALOG_USED`` appears on stderr.
     """
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(REPO_ROOT / "src")
-    result = subprocess.run(
-        [sys.executable, str(HOOK_PATH), "--self-test"],
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        env=env,
-        timeout=30,
-    )
+    result = _run_hook_with_selected_package(tmp_path, "--self-test")
     assert "CANONICAL_CATALOG_USED" in result.stderr
     assert "FALLBACK_CATALOG_USED" not in result.stderr
 
@@ -402,7 +434,7 @@ def test_scanner_safe_writer_fallback_exact_canonical_mirror() -> None:
     # deny-record interface. Collectors index on pattern_name (+ optionally
     # pattern+flags) — descriptions may diverge between canonical and
     # fallback catalogs without breaking the interface contract. See schema
-    # v1 docstring in templates/hooks/scanner-safe-writer.py.
+    # v1 docstring in .harness-baseline-configuration/hooks/scanner-safe-writer.py.
     #
     # Strict parity: name + pattern + flags.
     for name, (c_pat, c_flg, _c_desc) in canonical_by_name.items():
@@ -452,21 +484,11 @@ def test_non_write_tool_events_pass_through(tmp_path: Path, tool_name: str) -> N
         },
         "session_id": "unit-test",
     }
-    env = os.environ.copy()
-    env["PYTHONPATH"] = str(REPO_ROOT / "src")
-    result = subprocess.run(
-        [sys.executable, str(HOOK_PATH)],
-        input=json.dumps(payload),
-        capture_output=True,
-        text=True,
-        cwd=tmp_path,
-        env=env,
-        timeout=30,
-    )
+    result = _run_hook_with_selected_package(tmp_path, input_text=json.dumps(payload))
     assert result.returncode == 0
     stdout = result.stdout.strip()
     assert stdout == "{}", f"expected pass '{{}}', got {stdout!r}"
-    log_path = tmp_path / ".claude" / "hooks" / "scanner-safe-writer.log"
+    log_path = tmp_path / ".groundtruth" / "runtime" / "gate-denials.jsonl"
     assert not log_path.exists() or not log_path.read_text(encoding="utf-8").strip(), (
         "non-Write tool event unexpectedly wrote a deny record"
     )

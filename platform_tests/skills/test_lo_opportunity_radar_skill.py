@@ -9,7 +9,7 @@ from pathlib import Path
 import yaml
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILL = ROOT / ".harness-baseline-configuration/skills/gtkb-lo-opportunity-radar/SKILL.md"
+SKILL = ROOT / ".agents/skills/gtkb-lo-opportunity-radar/SKILL.md"
 
 
 def test_skill_file_exists_with_valid_frontmatter():

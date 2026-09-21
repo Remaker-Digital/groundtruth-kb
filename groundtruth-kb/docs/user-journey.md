@@ -46,7 +46,7 @@ GroundTruth asks a few questions:
 - **Project name:** Engage
 - **Profile:** `local-only` (solo developer, no reviewer agent yet)
 
-The scaffold creates: `groundtruth.db`, `.claude/hooks/`, `CLAUDE.md`, `MEMORY.md`.
+The native initializer validates the selected application/project and registered host root. Harness instructions come from authored root `AGENTS.md`, shared `.agents/skills` and baseline rules/hooks/routing; each host receives only declared registrations and pointers. Current domain state is read through native services. See [Harness projection](reference/harness-projection.md).
 
 With the scaffold generator, Sarah also gets seed specifications:
 

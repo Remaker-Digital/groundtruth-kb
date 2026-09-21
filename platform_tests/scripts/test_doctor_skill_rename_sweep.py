@@ -30,7 +30,7 @@ def _init_repo(tmp: Path) -> None:
 
 
 def _make_gtkb_skill(tmp: Path, name: str) -> None:
-    d = tmp / ".claude" / "skills" / f"gtkb-{name}" / "helpers"
+    d = tmp / ".agents" / "skills" / f"gtkb-{name}" / "helpers"
     d.mkdir(parents=True, exist_ok=True)
     (d / "helper.py").write_text("# renamed skill helper\n", encoding="utf-8")
 
@@ -45,7 +45,7 @@ def test_warns_while_bare_reference_remains(tmp_path: Path) -> None:
     _init_repo(tmp_path)
     _make_gtkb_skill(tmp_path, "verify")
     bare = "verify"
-    _write_tracked(tmp_path, "scripts/user.py", f'HELPER = ".claude/skills/{bare}/helpers/w.py"\n')
+    _write_tracked(tmp_path, "scripts/user.py", f'HELPER = ".agents/skills/{bare}/helpers/w.py"\n')
     _git(tmp_path, "add", "-A")
 
     result = _check_skill_rename_reference_sweep(tmp_path)
@@ -71,7 +71,7 @@ def test_excluded_trees_do_not_count(tmp_path: Path) -> None:
     _make_gtkb_skill(tmp_path, "verify")
     bare = "verify"
     for rel in ("bridge/audit.md", "archive/old.py", ".gtkb-state/scratch.json"):
-        _write_tracked(tmp_path, rel, f'REF = ".claude/skills/{bare}/helpers"\n')
+        _write_tracked(tmp_path, rel, f'REF = ".agents/skills/{bare}/helpers"\n')
     _git(tmp_path, "add", "-A")
 
     result = _check_skill_rename_reference_sweep(tmp_path)
@@ -81,7 +81,7 @@ def test_excluded_trees_do_not_count(tmp_path: Path) -> None:
 
 def test_self_maintaining_derivation_no_gtkb_dirs(tmp_path: Path) -> None:
     _init_repo(tmp_path)
-    (tmp_path / ".claude" / "skills").mkdir(parents=True, exist_ok=True)
+    (tmp_path / ".agents" / "skills").mkdir(parents=True, exist_ok=True)
     _write_tracked(tmp_path, "scripts/user.py", 'HELPER = "ok"\n')
     _git(tmp_path, "add", "-A")
 
@@ -98,7 +98,7 @@ def test_sweep_unicode_output_preserves_warning(tmp_path: Path) -> None:
     _write_tracked(
         tmp_path,
         "scripts/unicode.py",
-        f'# UTF-8 left arrow: ←; HELPER = ".claude/skills/{bare}/helpers/w.py"\n',
+        f'# UTF-8 left arrow: ←; HELPER = ".agents/skills/{bare}/helpers/w.py"\n',
     )
     _git(tmp_path, "add", "-A")
 

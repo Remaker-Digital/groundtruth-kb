@@ -1,7 +1,7 @@
 # Independent bridge collaboration
 
-Use the [bridge protocol](file-bridge-protocol.md) and
-[delivery guidance](bridge-essential.md) with current formal and work state
+Use the [bridge protocol](../../../.harness-baseline-configuration/rules/file-bridge-protocol.md) and
+[delivery guidance](../../../.harness-baseline-configuration/rules/bridge-essential.md) with current formal and work state
 retrieved through the native CLI. This rule describes role responsibilities; it
 does not assign a harness, model or previous agent to future work.
 

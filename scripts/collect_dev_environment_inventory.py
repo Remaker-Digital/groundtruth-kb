@@ -440,7 +440,7 @@ def _repo_surfaces(project_root: Path) -> dict[str, Any]:
 
     return {
         "rules": entries(baseline + "/rules", "*.md"),
-        "skills": entries(baseline + "/skills", "*/SKILL.md"),
+        "skills": entries(".agents/skills", "*/SKILL.md"),
         "hooks": entries(baseline + "/hooks", "*.py"),
         "commands": entries(baseline + "/commands", "*.md"),
         "git_hooks": {"pre_commit": _file_state(project_root, ".githooks/pre-commit"), "classification": "public_safe"},

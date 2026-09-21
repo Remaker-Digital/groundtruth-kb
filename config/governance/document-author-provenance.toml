@@ -2,7 +2,8 @@ schema_version = 1
 
 governed_surfaces = [
   "bridge/**/*.md",
-  ".claude/rules/**/*.md",
+  ".harness-baseline-configuration/rules/**/*.md",
+  "independent-progress-assessments/**/*.md",
   "memory/**/*.md",
   "docs/**/*.md",
 ]

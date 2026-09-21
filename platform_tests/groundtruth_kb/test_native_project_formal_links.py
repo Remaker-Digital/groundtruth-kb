@@ -12,14 +12,28 @@ from groundtruth_kb.bridge import native as native_bridge
 from groundtruth_kb.native_authority import ProjectFormalLinkMutation
 from groundtruth_kb.postgres_kernel import TABLE_SPECS, PostgresKernelError, PostgresTransaction
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, seed, work_fields
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_bridge import claim, deliver
-from platform_tests.groundtruth_kb.test_native_project_dependencies import ready_checkout
-from platform_tests.groundtruth_kb.test_project_association_consistency import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver, ready_checkout
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+
+# The existing canonical OPS relationship selected for status-only retirement (D35/N33,
+# request "N33 obsolete completion_guard link 90"). Its identity concatenated untruncated
+# historical components and is 323 characters, beyond the ordinary 256-character identifier.
+# It is an existing identity, not current authorization; the formal-link addresses must reach
+# it unchanged. It must never be renamed or shortened here.
+LONG_OBSOLETE_LINK_ID = (
+    "PAL-PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING-SESSION-STARTUP-LATENCY-"
+    "COMPLETION-GUARD-PAUTH-PROJECT-GTKB-OPS-DISPATCHER-MODERNIZATION-DISPATCHER-BLACK-BOX-HARDENING-SESSION-"
+    "STARTUP-LATENCY-WI-5650-SLICE-A-STARTUP-RELAY-SELF-HEAL-OBSERVABILITY-AND-DIAGNOSTIC-ACCURACY-KEEPOPEN-"
+    "PLAN-INCOMPLETE"
+)
+OBSOLETE_LINK_IDS = pytest.mark.parametrize(
+    "record_id", ["OBSOLETE", LONG_OBSOLETE_LINK_ID], ids=["ordinary", "long-historical"]
+)
 
 
 def fields(**extra):
@@ -386,17 +400,24 @@ def _import_obsolete_project_link(service, artifact_type, record_id="OBSOLETE"):
     )
 
 
+@OBSOLETE_LINK_IDS
 @pytest.mark.parametrize("artifact_type", ["bridge_thread", "completion_guard"])
-def test_obsolete_link_retirement_preserves_identity_project_and_formal_roots(native, artifact_type):
+def test_obsolete_link_retirement_preserves_identity_project_and_formal_roots(native, artifact_type, record_id):
     service, client, _, _ = native
     seed(client)
-    _import_obsolete_project_link(service, artifact_type)
+    _import_obsolete_project_link(service, artifact_type, record_id)
     original_project = client.get("/v1/projects/PROJECT-1").json()
     original_roots = client.get("/v1/project-formal-links").json()
     with service.kernel.transaction(read_only=True) as tx:
-        original = tx.get("project_artifact_links", {"id": "OBSOLETE"})
+        original = tx.get("project_artifact_links", {"id": record_id})
+    assert original in original_project["artifact_links"]
+    assert client.get(f"/v1/project-formal-links/{record_id}").json() == original
+    chain = client.get(f"/v1/project-formal-links/{record_id}/history")
+    assert chain.status_code == 200, chain.text
+    assert chain.json()["current"] == original
+    assert [(e["version"], e["prior_version"], e["state"]) for e in chain.json()["history"]] == [(1, None, original)]
     history = history_count(service)
-    result = change(client, "OBSOLETE", version=1, status="retired")
+    result = change(client, record_id, version=1, status="retired")
     assert result.status_code == 200, result.text
     row = result.json()
     assert row["version"] == 2 and row["status"] == "retired"
@@ -404,10 +425,16 @@ def test_obsolete_link_retirement_preserves_identity_project_and_formal_roots(na
         assert row[key] == original[key]
     expected_project = {
         **original_project,
-        "artifact_links": [link for link in original_project["artifact_links"] if link["id"] != "OBSOLETE"],
+        "artifact_links": [link for link in original_project["artifact_links"] if link["id"] != record_id],
     }
     assert client.get("/v1/projects/PROJECT-1").json() == expected_project
-    assert client.get("/v1/project-formal-links/OBSOLETE").json() == row
+    assert client.get(f"/v1/project-formal-links/{record_id}").json() == row
+    chain = client.get(f"/v1/project-formal-links/{record_id}/history").json()
+    assert chain["current"] == row
+    assert [(e["version"], e["prior_version"], e["state"]) for e in chain["history"]] == [
+        (1, None, original),
+        (2, 1, row),
+    ]
     assert client.get("/v1/project-formal-links").json() == original_roots
     assert history_count(service) == history + 1
     for version, values, code in (
@@ -415,11 +442,11 @@ def test_obsolete_link_retirement_preserves_identity_project_and_formal_roots(na
         (2, {"status": "active"}, "invalid_formal_link"),
         (2, {"status": "retired", "artifact_ref": "other"}, "invalid_formal_link"),
     ):
-        refused = change(client, "OBSOLETE", version=version, **values)
+        refused = change(client, record_id, version=version, **values)
         assert refused.status_code == (409 if code == "cas_conflict" else 422)
         assert refused.json()["error"]["code"] == code
     with service.kernel.transaction(read_only=True) as tx:
-        assert tx.get("project_artifact_links", {"id": "OBSOLETE"}) == row
+        assert tx.get("project_artifact_links", {"id": record_id}) == row
     assert history_count(service) == history + 1
 
 
@@ -519,19 +546,24 @@ def test_retirement_route_cannot_create_an_obsolete_relationship(native):
     assert history_count(service) == history
 
 
+@OBSOLETE_LINK_IDS
 @pytest.mark.parametrize("artifact_type", ["bridge_thread", "completion_guard"])
-def test_real_cli_retires_obsolete_link_with_project_readback(membership_cli, tmp_path, artifact_type):
+def test_real_cli_retires_obsolete_link_with_project_readback(membership_cli, tmp_path, artifact_type, record_id):
     service, client, cli, stop = membership_cli
-    _import_obsolete_project_link(service, artifact_type)
+    _import_obsolete_project_link(service, artifact_type, record_id)
     document = tmp_path / "retirement.json"
     document.write_text(json.dumps({"status": "retired"}), encoding="utf-8")
     before = client.get("/v1/projects/PROJECT-1").json()
+    imported = next(link for link in before["artifact_links"] if link["id"] == record_id)
+    shown = cli("projects", "formal-links", "show", record_id, "--json")
+    assert shown.returncode == 0, shown.stdout + shown.stderr
+    assert json.loads(shown.stdout) == imported
     command = [
         "projects",
         "formal-links",
         "record",
         "--id",
-        "OBSOLETE",
+        record_id,
         "--fields-file",
         str(document),
         "--expected-version",
@@ -550,12 +582,25 @@ def test_real_cli_retires_obsolete_link_with_project_readback(membership_cli, tm
     shown = json.loads(readback.stdout)
     assert shown == {
         **before,
-        "artifact_links": [link for link in before["artifact_links"] if link["id"] != "OBSOLETE"],
+        "artifact_links": [link for link in before["artifact_links"] if link["id"] != record_id],
     }
-    direct = cli("projects", "formal-links", "show", "OBSOLETE", "--json")
+    direct = cli("projects", "formal-links", "show", record_id, "--json")
     assert direct.returncode == 0, direct.stdout + direct.stderr
     assert json.loads(direct.stdout) == after
+    assert after["id"] == record_id and after["version"] == 2
     assert after["status"] == "retired" and after["artifact_type"] == artifact_type
+    chain = cli("projects", "formal-links", "show", record_id, "--history", "--json")
+    assert chain.returncode == 0, chain.stdout + chain.stderr
+    versions = json.loads(chain.stdout)
+    assert versions["current"] == after
+    assert [(e["version"], e["prior_version"], e["state"]) for e in versions["history"]] == [
+        (1, None, imported),
+        (2, 1, after),
+    ]
+    text = cli("projects", "formal-links", "show", record_id, "--history")
+    assert text.returncode == 0, text.stdout + text.stderr
+    assert text.stdout.startswith(f"{record_id} v2: PROJECT-1 -> {artifact_type}:historical-reference [retired]")
+    assert "Version History:" in text.stdout and "  v2 " in text.stdout and "  v1 " in text.stdout
     assert client.get("/v1/projects/PROJECT-1").json() == shown
     history = history_count(service)
     stop()
@@ -563,4 +608,113 @@ def test_real_cli_retires_obsolete_link_with_project_readback(membership_cli, tm
     assert unavailable.returncode != 0 and "authority_unavailable" in unavailable.stdout + unavailable.stderr
     assert history_count(service) == history
     with service.kernel.transaction(read_only=True) as tx:
-        assert tx.get("project_artifact_links", {"id": "OBSOLETE"}) == after
+        assert tx.get("project_artifact_links", {"id": record_id}) == after
+
+
+def test_long_historical_link_identity_reaches_formal_link_routes_while_ordinary_limits_hold(native):
+    """The 323-character canonical relationship is readable and retirable; every other address keeps its cap."""
+    service, client, _, _ = native
+    seed(client)
+    assert len(LONG_OBSOLETE_LINK_ID) == 323 > 256
+    assert change(client, **fields()).status_code == 200
+    _import_obsolete_project_link(service, "completion_guard", LONG_OBSOLETE_LINK_ID)
+    with service.kernel.transaction(read_only=True) as tx:
+        original = tx.get("project_artifact_links", {"id": LONG_OBSOLETE_LINK_ID})
+    formal = client.get("/v1/project-formal-links/LINK-1").json()
+    history = history_count(service)
+    shown = client.get(f"/v1/project-formal-links/{LONG_OBSOLETE_LINK_ID}")
+    assert shown.status_code == 200, shown.text
+    assert shown.json() == original and shown.json()["id"] == LONG_OBSOLETE_LINK_ID
+    chain = client.get(f"/v1/project-formal-links/{LONG_OBSOLETE_LINK_ID}/history")
+    assert chain.status_code == 200, chain.text
+    assert chain.json()["current"] == original
+    assert [(e["version"], e["prior_version"], e["state"], e["actor"]) for e in chain.json()["history"]] == [
+        (1, None, original, "qualification")
+    ]
+    assert client.get("/v1/projects/PROJECT-1").json()["artifact_links"] == [formal, original]
+    listed = client.get("/v1/project-formal-links", params={"artifact_type": "completion_guard"})
+    assert [row["id"] for row in listed.json()["records"]] == [LONG_OBSOLETE_LINK_ID]
+    # A long identity that does not exist is not found; the address contract does not refuse it.
+    for suffix in ("", "/history"):
+        missing = client.get(f"/v1/project-formal-links/{LONG_OBSOLETE_LINK_ID}-ABSENT{suffix}")
+        assert missing.status_code == 404 and missing.json()["error"]["code"] == "not_found", missing.text
+    # The lexical rule is unchanged: the address has no length cap, but it keeps its shape.
+    malformed_shape = [{"location": ["path", "record_id"], "type": "string_pattern_mismatch"}]
+    for malformed in ("-" + "A" * 322, "A" * 300 + "!"):
+        for suffix in ("", "/history"):
+            refused = client.get(f"/v1/project-formal-links/{malformed}{suffix}")
+            assert refused.status_code == 422 and refused.json()["fields"] == malformed_shape, refused.text
+        refused = change(client, malformed, version=1, status="retired")
+        assert refused.status_code == 422 and refused.json()["fields"] == malformed_shape, refused.text
+    # Every other address and every request field keeps the ordinary 256-character identifier.
+    too_long = [{"location": ["path", "record_id"], "type": "string_too_long"}]
+    for path in (
+        f"/v1/projects/{LONG_OBSOLETE_LINK_ID}",
+        f"/v1/specifications/{LONG_OBSOLETE_LINK_ID}/history",
+        f"/v1/work-items/{LONG_OBSOLETE_LINK_ID}/context",
+    ):
+        refused = client.get(path)
+        assert refused.status_code == 422 and refused.json()["fields"] == too_long, refused.text
+    refused = put(client, "specifications", LONG_OBSOLETE_LINK_ID, {"title": "Too long"})
+    assert refused.status_code == 422 and refused.json()["fields"] == too_long, refused.text
+    refused = change(client, "LINK-2", project_id=LONG_OBSOLETE_LINK_ID, artifact_ref="SPEC-1")
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["fields"] == [{"location": ["body", "fields", "project_id"], "type": "string_too_long"}]
+    assert history_count(service) == history
+    # Stale version, then exactly one status-only transition, then the retired row is immutable.
+    stale = change(client, LONG_OBSOLETE_LINK_ID, version=0, status="retired")
+    assert stale.status_code == 409 and stale.json()["error"]["code"] == "cas_conflict", stale.text
+    assert stale.json()["error"]["details"]["id"] == LONG_OBSOLETE_LINK_ID
+    retired = change(client, LONG_OBSOLETE_LINK_ID, version=1, status="retired")
+    assert retired.status_code == 200, retired.text
+    row = retired.json()
+    assert row["version"] == 2 and row["status"] == "retired"
+    for key in ("id", "project_id", "artifact_type", "artifact_ref", "relationship", "notes"):
+        assert row[key] == original[key]
+    assert client.get(f"/v1/project-formal-links/{LONG_OBSOLETE_LINK_ID}").json() == row
+    chain = client.get(f"/v1/project-formal-links/{LONG_OBSOLETE_LINK_ID}/history").json()
+    assert chain["current"] == row
+    assert [(e["version"], e["prior_version"], e["state"]) for e in chain["history"]] == [
+        (1, None, original),
+        (2, 1, row),
+    ]
+    assert client.get("/v1/projects/PROJECT-1").json()["artifact_links"] == [formal]
+    assert client.get("/v1/project-formal-links/LINK-1").json() == formal
+    assert history_count(service) == history + 1
+    reactivated = change(client, LONG_OBSOLETE_LINK_ID, version=2, status="active")
+    assert reactivated.status_code == 422 and reactivated.json()["error"]["code"] == "invalid_formal_link"
+    with service.kernel.transaction(read_only=True) as tx:
+        assert tx.get("project_artifact_links", {"id": LONG_OBSOLETE_LINK_ID}) == row
+    assert history_count(service) == history + 1
+
+
+def test_formal_link_list_filters_by_artifact_type_and_defaults_to_specifications(native):
+    service, client, _, _ = native
+    seed(client)
+    assert change(client, **fields()).status_code == 200
+    _import_obsolete_project_link(service, "bridge_thread")
+    _import_obsolete_project_link(service, "completion_guard", record_id="GUARD")
+    history = history_count(service)
+
+    def listed(**params):
+        result = client.get("/v1/project-formal-links", params=params)
+        assert result.status_code == 200, result.text
+        return [row["id"] for row in result.json()["records"]]
+
+    assert listed() == ["LINK-1"]
+    assert listed(artifact_type="spec") == ["LINK-1"]
+    assert listed(artifact_type="bridge_thread") == ["OBSOLETE"]
+    assert listed(artifact_type="completion_guard", project_id="PROJECT-1") == ["GUARD"]
+    assert listed(artifact_type="completion_guard", project_id="PROGRAM-1") == []
+    for kind in ("git_commit", "other"):
+        refused = client.get("/v1/project-formal-links", params={"artifact_type": kind})
+        assert refused.status_code == 422 and refused.json()["error"]["code"] == "invalid_query", refused.text
+    assert history_count(service) == history
+    retired = change(client, "OBSOLETE", version=1, status="retired")
+    assert retired.status_code == 200, retired.text
+    result = client.get("/v1/project-formal-links", params={"artifact_type": "bridge_thread", "status": "retired"})
+    assert result.json()["records"] == [retired.json()]
+    assert listed(artifact_type="bridge_thread", status="active") == []
+    assert listed(artifact_type="completion_guard") == ["GUARD"]
+    assert listed() == ["LINK-1"]
+    assert history_count(service) == history + 1

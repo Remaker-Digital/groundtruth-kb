@@ -10,9 +10,8 @@ from pathlib import Path
 import pytest
 from groundtruth_kb import cursor_readiness as verify_cursor_dispatch
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, history_count, put
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 from scripts import verify_claude_dispatch, verify_codex_dispatch, verify_ollama_dispatch
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

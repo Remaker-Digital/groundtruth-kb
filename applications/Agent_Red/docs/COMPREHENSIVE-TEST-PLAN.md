@@ -1266,11 +1266,11 @@ These are infrastructure-as-code validation tests (run via `terraform validate` 
 
 | ID | Test | Validates |
 |----|------|-----------|
-| UIT-71 | create_product_catalog.py — creates all 27 Stripe objects | Catalog script |
+| UIT-71 | create_product_catalog.py — creates all declared catalog objects | Catalog script |
 | UIT-72 | create_product_catalog.py — idempotent (re-run safe) | Idempotency |
-| UIT-73 | update_tax_codes.py — updates existing products | Tax script |
+| UIT-73 | create_product_catalog.py --update-tax-codes — updates existing mapped products without creating objects or rewriting the mapping | Tax update operation |
 | UIT-74 | stripe_product_ids.json — valid JSON schema | Config file |
-| UIT-75 | stripe_product_ids.json — all 27 IDs present | Completeness |
+| UIT-75 | stripe_product_ids.json — all declared catalog IDs present | Completeness |
 | UIT-76 | uvicorn startup command works | App boot |
 | UIT-77 | uvicorn with --reload for development | Dev mode |
 | UIT-78 | pip install -r requirements.txt succeeds | Dependencies |

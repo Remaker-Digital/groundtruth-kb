@@ -1,4 +1,13 @@
-"""Real-index work-product boundaries; reads preserve index and foreign bytes."""
+"""Real-index work-product boundaries; reads preserve index and foreign bytes.
+
+M15 stage 1 (owner ruling D15 as amended by R3; D34 R1 option B, R4): the root
+``AGENTS.md`` (the moved baseline instruction file), the declared root pointers
+``CLAUDE.md`` / ``.goosehints`` and the skills source ``.agents/skills/**`` are
+tracked authored sources outside the projector's output, so their postimages commit;
+their bytes are pinned by the acceptance checker (``declared_pointer_drift``), not by
+this refusal. ``GEMINI.md`` and ``.cursorrules`` stay refused until an M13 Q0 shows a
+host needs them, and every rendered root (including ``.agent``) stays refused.
+"""
 
 from __future__ import annotations
 
@@ -48,7 +57,17 @@ def inspect_unchanged(repo):
 
 @pytest.mark.parametrize(
     "name",
-    ["src/module.py", ".harness-baseline-configuration/rules/topic.md", "docs/bracket[1].md", "docs/café note.md"],
+    [
+        "src/module.py",
+        ".harness-baseline-configuration/rules/topic.md",
+        ".harness-baseline-configuration/hooks/gate.py",
+        ".agents/skills/gtkb-verify/SKILL.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".goosehints",
+        "docs/bracket[1].md",
+        "docs/café note.md",
+    ],
 )
 def test_real_product_index_passes_without_permission_evidence(repo, name):
     stage(repo, name)
@@ -64,8 +83,17 @@ def test_real_product_index_passes_without_permission_evidence(repo, name):
         "bridge/item.json",
         ".codex/hooks.json",
         "sub/.claude/settings.json",
-        "AGENTS.md",
+        ".agent/rules/gtkb-pointer.md",
+        "GEMINI.md",
+        "gemini.md",
+        ".cursorrules",
+        ".agents/rules/topic.md",
+        ".agents/hooks/gate.py",
+        ".agents/AGENTS.md",
+        "sub/.agents/skills/gtkb-verify/SKILL.md",
+        ".groundtruth/runtime/gate-denials.jsonl",
         ".groundtruth/inventory/public.json",
+        ".groundtruth/derived/timer-inventory.toml",
         ".groundtruth/formal-artifact-approvals/packet.md",
         "config/agent-control/registry.json",
         "scratchpad/context/note.md",
@@ -84,15 +112,47 @@ def test_nonproduct_postimages_refuse_even_without_mixed_source(repo, name, with
     assert result["refused"] == [{"path": name, "reason": "not_work_product"}]
 
 
+@pytest.mark.parametrize("name", [".gtkb-index-old/index", "sub/.GTKB-index-old/index"])
+@pytest.mark.parametrize("existing", [False, True])
+def test_disposable_index_additions_and_modifications_refuse(repo, name, existing):
+    if existing:
+        stage(repo, name, "historical disposable index\n")
+        git(repo, "commit", "-qm", "historical preimage")
+    stage(repo, name, "new disposable index\n")
+    stage(repo, "src/product.txt")
+    result = inspect_unchanged(repo)
+    assert result["status"] == "fail"
+    assert result["refused"] == [{"path": name, "reason": "not_work_product"}]
+    assert result["product"] == ["src/product.txt"]
+
+
+def test_root_pointer_postimages_pass_and_agent_pointer_is_refused(repo):
+    """R1 option B: the tracked root carriers commit; the rendered in-config-dir pointer never does."""
+    assert not {"agents.md", "claude.md", ".goosehints"} & checker.GENERATED_ROOT_FILES
+    assert {"gemini.md", ".cursorrules"} <= checker.GENERATED_ROOT_FILES
+    assert ".agent" in checker.RUNTIME_COMPONENTS and ".agents" not in checker.RUNTIME_COMPONENTS
+    stage(repo, "AGENTS.md", "# GT-KB session instructions\n")
+    stage(repo, "CLAUDE.md", "@AGENTS.md\n")
+    stage(repo, ".goosehints", "Follow ./AGENTS.md (GT-KB session instructions).\n")
+    stage(repo, ".agents/skills/gtkb-verify/SKILL.md", "---\nname: gtkb-verify\ndescription: Verify.\n---\n")
+    result = inspect_unchanged(repo)
+    assert result["status"] == "pass"
+    assert result["product"] == [".agents/skills/gtkb-verify/SKILL.md", ".goosehints", "AGENTS.md", "CLAUDE.md"]
+    stage(repo, ".agent/rules/gtkb-pointer.md", "Follow ./AGENTS.md.\n")
+    result = inspect_unchanged(repo)
+    assert result["status"] == "fail"
+    assert result["refused"] == [{"path": ".agent/rules/gtkb-pointer.md", "reason": "not_work_product"}]
+
+
 def test_forward_deletion_and_product_rename_remain_possible(repo):
-    for name in ["bridge/old.md", ".codex/old.json", "src/old.txt"]:
+    for name in ["bridge/old.md", ".codex/old.json", ".gtkb-index-old/index", "src/old.txt"]:
         stage(repo, name)
     git(repo, "commit", "-qm", "preimage")
-    git(repo, "rm", "--", "bridge/old.md", ".codex/old.json")
+    git(repo, "rm", "--", "bridge/old.md", ".codex/old.json", ".gtkb-index-old/index")
     git(repo, "mv", "src/old.txt", "src/new.txt")
     result = inspect_unchanged(repo)
     assert result["status"] == "pass"
-    assert set(result["removals"]) == {"bridge/old.md", ".codex/old.json", "src/old.txt"}
+    assert set(result["removals"]) == {"bridge/old.md", ".codex/old.json", ".gtkb-index-old/index", "src/old.txt"}
     assert result["product"] == ["src/new.txt"]
 
 

@@ -20,19 +20,28 @@ Modes:
               drift and leftover files that still exist; exit 1 on any
               difference, 0 when clean
 
-The engine renders these surface classes from the baseline:
-    skills/   full SKILL.md bodies (plus reference files), token-substituted,
-              stamped after frontmatter
-    rules/    all baseline rules, token-substituted, stamped
-    hooks/    hook scripts token-substituted + the harness-native hook
-              registration rendered from hooks/manifest.toml
-    routing   the selected provider's models and routes from routing.toml
+The engine renders these surface classes (owner ruling D15/D34: a projection is
+the minimum a host's limitation requires - registrations and pointers, never
+copies):
+    skills    pointer stubs under <skills_stub_dir> when skills_discovery =
+              "pointer_stubs" (the source frontmatter block verbatim, the stamp,
+              one pointer line to .agents/skills/<name>/SKILL.md and an adapter
+              block hashing the frontmatter only); nothing when
+              "agents_skills" (the host reads .agents/skills in place)
+    hooks     the harness-native hook registration rendered from the baseline
+              hooks/manifest.toml only; the scripts run in place from
+              .harness-baseline-configuration/hooks and every command ends
+              with `--harness <name>`
     config    native config.toml declared by the selected adaptation profile
-    ownership .projection-manifest.json listing every produced path, so
-              cleanup and --check can distinguish managed from unmanaged files
+    ownership .projection-manifest.json listing every produced path and its
+              acceptance class, so cleanup and --check can distinguish
+              managed from unmanaged files
+    pointers  the profile's [pointer_files] entries, declared bytes verbatim
 
-Unresolved neutral tokens fail the render (fail closed) - a token the profile
-cannot substitute is a projector gap, never silent passthrough.
+Rules are never projected: hosts read .harness-baseline-configuration/rules on
+demand. Unresolved neutral tokens in manifest args or config_toml fail the
+render (fail closed) - a token the profile cannot substitute is a projector gap,
+never silent passthrough.
 """
 
 from __future__ import annotations
@@ -51,7 +60,6 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path, PurePosixPath
 
-import tomlkit
 import yaml
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -77,6 +85,12 @@ class ProjectionError(RuntimeError):
 
 
 BASELINE_ROOT_NAME = ".harness-baseline-configuration"
+# D15 (as amended by R3, D34): the one skills source lives outside the baseline
+# directory and hook scripts run in place from the baseline. Both are read from
+# profiles.toml [baseline] by name and pinned to these constants (fail closed).
+SKILLS_ROOT_NAME = ".agents/skills"
+HOOKS_ROOT_NAME = ".harness-baseline-configuration/hooks"
+SKILLS_DISCOVERY_MODES = frozenset({"agents_skills", "pointer_stubs"})
 
 
 def normalize_planned_rel(rel: str) -> str:
@@ -117,19 +131,41 @@ class Plan:
 
 
 def load_profiles() -> dict:
-    return tomllib.loads(PROFILES_PATH.read_text(encoding="utf-8"))
+    if not PROFILES_PATH.is_file() or PROFILES_PATH.resolve() != PROFILES_PATH:
+        raise ProjectionError(f"Required source declaration missing or redirected: {PROFILES_PATH}")
+    try:
+        return tomllib.loads(PROFILES_PATH.read_text(encoding="utf-8"))
+    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
+        raise ProjectionError(f"Required source declaration unreadable: {PROFILES_PATH}: {exc}") from exc
+
+
+def resolve_source_roots(project_root: Path, baseline_cfg: dict) -> dict[str, Path]:
+    """Resolve the fixed authored layout; no alternate or projected source is accepted."""
+    roots = {}
+    for key, expected in (
+        ("root", BASELINE_ROOT_NAME),
+        ("skills_root", SKILLS_ROOT_NAME),
+        ("hooks_root", HOOKS_ROOT_NAME),
+    ):
+        if baseline_cfg.get(key) != expected:
+            raise ProjectionError(f"[baseline] {key} must be {expected!r}: {baseline_cfg.get(key)!r}")
+        path = project_root / expected
+        if path.resolve() != path:
+            raise ProjectionError(f"Authored {key} is redirected: {path}")
+        roots[key] = path
+    return roots
 
 
 def token_map(profile: dict, baseline_cfg: dict) -> dict[str, str]:
+    """Neutral tokens substituted in manifest args and config_toml.
+
+    Nothing is copied any more (D15), so the per-profile skills/rules/hooks/session
+    keys are gone; ``baseline_cfg`` stays in the signature for existing callers.
+    """
     return {
         "HARNESS_CONFIG_DIR": profile["config_dir"],
-        "HARNESS_SKILLS_DIR": profile["skills_dir"],
-        "HARNESS_RULES_DIR": profile["rules_dir"],
-        "HARNESS_HOOKS_DIR": profile["hooks_dir"],
         "HARNESS_PROJECT_DIR_VAR": profile["project_dir_var"],
-        "HARNESS_SESSION_ID_VAR": profile["session_id_var"],
         "HARNESS_NAME": profile["name"],
-        "SHARED_HELPERS_DIR": runtime_relative(baseline_cfg["shared_helpers_dir"]),
     }
 
 
@@ -277,13 +313,31 @@ def _projected_timeout(profile: dict, hook: dict) -> int | None:
     return timeout_val
 
 
+def _hook_target(hook: dict, profile: dict) -> str:
+    """Registration path of one manifest hook: scripts run in place (D15, no copies).
+
+    Shared hooks (script_root = "project_scripts") live under scripts/; every other
+    hook under the baseline hooks root. Adapter-based hosts (stdin_adapter: codex,
+    cursor, antigravity) resolve the target against their own host root and refuse
+    ``..``, so they get the plain host-root-relative path also under --application
+    (R12); the other hosts get runtime_relative() (``../../`` under --application).
+    """
+    script = hook["script"]
+    rel = f"scripts/{script}" if hook.get("script_root") == "project_scripts" else f"{HOOKS_ROOT_NAME}/{script}"
+    if profile.get("stdin_adapter"):
+        return rel
+    return runtime_relative(rel)
+
+
+def _identity_args(profile: dict) -> list[str]:
+    """Owner ruling R10: every registration names its host after the manifest args."""
+    return ["--harness", profile["name"]]
+
+
 def _hook_command(profile: dict, hook: dict, tokens: dict[str, str], gaps: list[str]) -> str:
     windowless = bool(profile.get("windowless_hooks"))
     interpreter = projected_interpreter(windowless=windowless)
-    if hook.get("script_root") == "project_scripts":
-        target = runtime_relative(f"scripts/{hook['script']}")
-    else:
-        target = f"{profile['hooks_dir']}/{hook['script']}"
+    target = _hook_target(hook, profile)
     adapter = runtime_relative(str(profile["stdin_adapter"])) if profile.get("stdin_adapter") else ""
     if adapter:
         command = f'"{interpreter}" -B {adapter} {target}'
@@ -291,6 +345,7 @@ def _hook_command(profile: dict, hook: dict, tokens: dict[str, str], gaps: list[
         command = f'"{interpreter}" -B {target}'
     for arg in hook.get("args", []):
         command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+    command += " " + " ".join(_identity_args(profile))
     return command
 
 
@@ -387,14 +442,47 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
                 plan.removes.append(normalized)
 
 
-def remove_planned_path(target: Path) -> bool:
+def _sweep_empty_parents(start: Path, config_root: Path) -> None:
+    """Remove the directories a planned removal emptied, walking upward, stopping at config_root.
+
+    os.removedirs semantics bounded to the harness config directory: config_root
+    itself is never removed, nothing outside it is touched, a symlink or junction is
+    never followed, a directory that still holds anything (an unmanaged local file,
+    a host's runtime state) stops the walk, and an OSError from a directory a host
+    process holds open (Windows) stops it silently - an empty directory holds no
+    bytes and --check treats it as informational.
+    """
+    try:
+        bound = config_root.resolve()
+    except OSError:
+        return
+    parent = start
+    while True:
+        try:
+            if parent.is_symlink() or getattr(parent, "is_junction", lambda: False)():
+                return
+            resolved = parent.resolve()
+            if resolved == bound or not resolved.is_relative_to(bound):
+                return
+            if not parent.is_dir() or any(parent.iterdir()):
+                return
+            parent.rmdir()
+        except OSError:
+            return
+        parent = parent.parent
+
+
+def remove_planned_path(target: Path, config_root: Path | None = None) -> bool:
+    """Remove one planned path; with config_root, also sweep the parents it emptied (bounded)."""
     if target.is_symlink() or target.is_file():
         target.unlink()
-        return True
-    if target.is_dir():
+    elif target.is_dir():
         shutil.rmtree(target)
-        return True
-    return False
+    else:
+        return False
+    if config_root is not None:
+        _sweep_empty_parents(target.parent, config_root)
+    return True
 
 
 def _get_ruff_cmd() -> list[str]:
@@ -467,6 +555,24 @@ def skill_fields(text: str) -> dict[str, str]:
     return fields
 
 
+def frontmatter_block(text: str) -> str:
+    """The YAML frontmatter block of a skill file, byte-for-byte after newline normalisation.
+
+    Same delimiter rules as skill_fields: line 0 is ``---`` and the block ends at the
+    next ``---`` line inclusive; the result is those lines joined with LF plus one
+    trailing LF. The stub renderer copies this block verbatim and hashes it alone
+    (R2), so a body-only edit of the source changes no stub byte.
+    """
+    lines = text.removeprefix("\ufeff").splitlines()
+    if not lines or lines[0] != "---":
+        raise ValueError("Missing opening skill frontmatter")
+    try:
+        end = lines.index("---", 1)
+    except ValueError as error:
+        raise ValueError("Missing closing skill frontmatter") from error
+    return "\n".join(lines[: end + 1]) + "\n"
+
+
 def adapter_metadata_block(harness: str, source_rel: str, source_text: str) -> str:
     """Descriptive generation metadata; conformance compares the complete plan.
 
@@ -515,13 +621,10 @@ _NATIVE_CWD_BOOTSTRAP = "& { param([string]$adapterRel, [string]$hook, [string]$
 
 
 def _native_cwd_hook_command(profile: dict, hook: dict, event: str, timeout: int, tokens: dict, gaps: list[str]) -> str:
-    target = (
-        runtime_relative(f"scripts/{hook['script']}")
-        if hook.get("script_root") == "project_scripts"
-        else f"{profile['hooks_dir']}/{hook['script']}"
-    )
+    target = _hook_target(hook, profile)
     arguments = [profile["stdin_adapter"], target, event, str(max(2, timeout - 2))]
     arguments.extend(substitute(arg, tokens, "hooks/manifest.toml", gaps) for arg in hook.get("args", []))
+    arguments.extend(_identity_args(profile))
     # Arguments cross cmd.exe quoting and then PowerShell's -Command parser.
     # Double quotes protect shell metacharacters; inner single-quoted literals
     # prevent PowerShell from interpreting them as expressions.
@@ -533,14 +636,16 @@ def _native_cwd_hook_command(profile: dict, hook: dict, event: str, timeout: int
     if APPLICATION_NAME:
         # Git's common directory resolves an application worktree back to its
         # registered slot. The hosting layout then selects the same installation
-        # after relocation, without an embedded drive or checkout path.
+        # after relocation, without an embedded drive or checkout path. The hook
+        # target is host-root-relative (the baseline hooks root or scripts/, R12),
+        # so it joins against the host root like the adapter and the interpreter.
         resolve = (
             "$root = Split-Path -Parent $common; $applicationRoot = $root; "
             f"if ((Split-Path -Leaf $root) -ne '{APPLICATION_NAME}' -or "
             "(Split-Path -Leaf (Split-Path -Parent $root)) -ne 'applications') "
             "{ throw 'Native context is outside the selected application repository' }; "
             "$root = Split-Path -Parent (Split-Path -Parent $root); "
-            "$hook = Join-Path $applicationRoot $hook;"
+            "$hook = Join-Path $root $hook;"
         )
         bootstrap = bootstrap.replace("$root = Split-Path -Parent $common;", resolve)
     return 'powershell.exe -NoProfile -NonInteractive -Command "' + bootstrap + '" ' + " ".join(quoted)
@@ -563,17 +668,14 @@ def render_hooks_registration(
             if native_event is None:
                 gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
                 continue
-            target = (
-                runtime_relative(f"scripts/{hook['script']}")
-                if hook.get("script_root") == "project_scripts"
-                else f"{profile['hooks_dir']}/{hook['script']}"
-            )
+            target = _hook_target(hook, profile)
             timeout = _projected_timeout(profile, hook) or 30
             interpreter = projected_interpreter(windowless=True)
             adapter = runtime_relative(str(profile["stdin_adapter"]))
             command = f'"{interpreter}" -B {adapter} --event {native_event} --timeout {max(1, timeout - 2)} {target}'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+            command += " " + " ".join(_identity_args(profile))
             entry = {"type": "command", "command": command, "timeout": timeout}
             if native_event in {"PreToolUse", "PostToolUse"}:
                 entry = {"matcher": _intent_matcher(profile, hook), "hooks": [entry]}
@@ -588,12 +690,10 @@ def render_hooks_registration(
                 gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
                 continue
             interpreter = projected_interpreter(windowless=False)
-            if hook.get("script_root") == "project_scripts":
-                command = f'"{interpreter}" -B {runtime_relative("scripts/" + hook["script"])}'
-            else:
-                command = f'"{interpreter}" -B {profile["hooks_dir"]}/{hook["script"]}'
+            command = f'"{interpreter}" -B {_hook_target(hook, profile)}'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+            command += " " + " ".join(_identity_args(profile))
             entry: dict = {"command": command}
             timeout = _projected_timeout(profile, hook)
             if timeout is not None:
@@ -621,14 +721,12 @@ def render_hooks_registration(
                 continue
             intents = hook.get("intents", ["all"])
             matcher = "|".join(m for m in (matchers.get(i, "") for i in intents) if m)
-            if hook.get("script_root") == "project_scripts":
-                script_path = f"${profile['project_dir_var']}/{runtime_relative('scripts/' + hook['script'])}"
-            else:
-                script_path = f"${profile['project_dir_var']}/{profile['hooks_dir']}/{hook['script']}"
+            script_path = f"${profile['project_dir_var']}/{_hook_target(hook, profile)}"
             interpreter = projected_interpreter(windowless=True, project_dir_var=profile["project_dir_var"])
             command = f'"{interpreter}" -B "{script_path}"'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
+            command += " " + " ".join(_identity_args(profile))
             if mode == "native_cwd_hooks_json":
                 command = _native_cwd_hook_command(
                     profile, hook, native_event, _projected_timeout(profile, hook) or 30, tokens, gaps
@@ -681,30 +779,109 @@ def render_hooks_registration(
     return None
 
 
-def render_provider_routing(profile: dict, baseline: Path) -> str:
-    """Derive only the selected provider's models and routes from the baseline."""
-    provider = profile["name"]
-    source = baseline / "routing.toml"
-    try:
-        data = tomllib.loads(source.read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, tomllib.TOMLDecodeError) as exc:
-        raise ProjectionError("canonical provider routing source is missing or unreadable") from exc
-    models = data.get("models")
-    routing = data.get("routing")
-    if data.get("schema_version") != 1 or not isinstance(models, dict) or not isinstance(routing, dict):
-        raise ProjectionError("canonical provider routing must contain schema 1, models and routing tables")
-    selected = {key: row for key, row in models.items() if isinstance(row, dict) and row.get("provider") == provider}
-    own = routing.get(provider)
-    if not selected or not isinstance(own, dict):
-        raise ProjectionError(f"canonical provider routing is incomplete for {provider}")
-    skills = own.get("skills", {})
-    if not isinstance(skills, dict) or any(not isinstance(value, str) for value in skills.values()):
-        raise ProjectionError(f"canonical provider skill routing is invalid for {provider}")
-    if any(not isinstance(key, str) or key not in selected for key in [own.get("default_model"), *skills.values()]):
-        raise ProjectionError(f"canonical provider routing references an unconfigured {provider} model")
-    return "# Generated from the canonical harness baseline; edit the source and re-project.\n" + tomlkit.dumps(
-        {"schema_version": 1, "models": selected, "routing": {provider: own}}
-    )
+STUB_POINTER_LINE = (
+    "Read and follow `{target}` - this stub only registers the skill `{name}` for the {harness} host; "
+    "the skill body, helpers and references live there.\n"
+)
+
+
+def render_stub(profile: dict, name: str, block: str, stamp_text: str) -> str:
+    """Pointer-stub bytes (R2): frontmatter block verbatim, stamp, one pointer line, adapter block.
+
+    The adapter block hashes the frontmatter block only, so the stub, its digest and
+    --check are insensitive to body-only edits of the source skill. Under
+    --application the pointer target is ``../../.agents/skills/<name>/SKILL.md``
+    (R12) while the canonical-source line stays host-relative.
+    """
+    source_rel = f"{SKILLS_ROOT_NAME}/{name}/SKILL.md"
+    rel_out = f"{profile['skills_stub_dir']}/{name}/SKILL.md"
+    body = STUB_POINTER_LINE.format(target=runtime_relative(source_rel), name=name, harness=profile["name"])
+    text = apply_stamp(rel_out, block + body, stamp_text)
+    return text + "\n<!--\n" + adapter_metadata_block(profile["name"], source_rel, block) + "-->\n"
+
+
+def render_skill_stubs(profile: dict, skills_root: Path, stamp_text: str, plan: Plan) -> None:
+    """Render one pointer stub per <skills_root>/<name>/SKILL.md (depth one; never token-substituted)."""
+    stub_dir = profile["skills_stub_dir"]
+    for path in sorted(skills_root.glob("*/SKILL.md")):
+        if not path.is_file() or is_projection_junk(path, skills_root):
+            continue
+        name = path.parent.name
+        rel_out = f"{stub_dir}/{name}/SKILL.md"
+        # Universal newlines: a CRLF working tree renders the same stub bytes as an LF one.
+        text = path.read_text(encoding="utf-8", errors="surrogateescape").removeprefix("\ufeff")
+        try:
+            if skill_fields(text)["name"] != name:
+                raise ValueError("Skill name differs from its directory")
+            block = frontmatter_block(text)
+        except ValueError as error:
+            plan.gaps.append(f"{rel_out}: {error}")
+            continue
+        if TOKEN_RE.search(block):
+            plan.gaps.append(f"token_in_skill_frontmatter: {SKILLS_ROOT_NAME}/{name}/SKILL.md")
+            continue
+        plan.writes[rel_out] = render_stub(profile, name, block, stamp_text)
+
+
+def _is_relative_output_path(rel: object) -> bool:
+    """A plain relative POSIX path: no drive, no backslash, no ``..``, no ``./`` or ``//`` noise."""
+    if not isinstance(rel, str) or not rel or "\\" in rel or ":" in rel:
+        return False
+    path = PurePosixPath(rel)
+    return bool(path.parts) and not path.is_absolute() and ".." not in path.parts and rel == path.as_posix()
+
+
+def render_pointer_files(profile: dict, plan: Plan) -> None:
+    """Write each declared [pointer_files] entry verbatim under config_dir: no stamp, no substitution."""
+    config_dir = profile["config_dir"]
+    for rel, value in (profile.get("pointer_files") or {}).items():
+        if not _is_relative_output_path(rel) or not isinstance(value, str):
+            plan.gaps.append(f"invalid_pointer_file: {config_dir}/{rel}")
+            continue
+        plan.writes[f"{config_dir}/{rel}"] = value
+
+
+def classify_write(rel: str, profile: dict) -> str | None:
+    """Acceptance class of one planned write (D34 line 29); None means unclassified.
+
+    Shared with the acceptance checker through the loaded module so the two never
+    diverge: registration (the hook registration and native config.toml), ownership (the manifest, R15 (a)) and pointer (skill stubs at depth
+    one under skills_stub_dir, declared [pointer_files]).
+    """
+    config_dir = profile["config_dir"]
+    if rel == f"{config_dir}/.projection-manifest.json":
+        return "ownership"
+    if profile.get("hooks_projection") and rel == profile.get("hooks_json_path"):
+        return "registration"
+    if "config_toml" in profile and rel == f"{config_dir}/config.toml":
+        return "registration"
+    stub_dir = profile.get("skills_stub_dir")
+    if profile.get("skills_discovery") == "pointer_stubs" and stub_dir and rel.startswith(f"{stub_dir}/"):
+        parts = rel[len(stub_dir) + 1 :].split("/")
+        if len(parts) == 2 and parts[0] and parts[1] == "SKILL.md":
+            return "pointer"
+    if any(rel == f"{config_dir}/{key}" for key in profile.get("pointer_files") or {}):
+        return "pointer"
+    return None
+
+
+def validate_profile(profile: dict, plan: Plan) -> None:
+    """Fail closed on a profile whose skills or pointer declaration the engine cannot honour."""
+    config_dir = profile["config_dir"]
+    discovery = profile.get("skills_discovery")
+    stub_dir = profile.get("skills_stub_dir")
+    if discovery not in SKILLS_DISCOVERY_MODES:
+        plan.gaps.append(f"invalid_skills_discovery: {profile['name']}: {discovery!r}")
+    elif discovery == "pointer_stubs":
+        if not isinstance(stub_dir, str) or not stub_dir:
+            plan.gaps.append(f"missing_skills_stub_dir: {profile['name']}")
+        elif not _is_relative_output_path(stub_dir) or not stub_dir.startswith(f"{config_dir}/"):
+            plan.gaps.append(f"skills_stub_dir_escapes_config_dir: {stub_dir}")
+    elif stub_dir is not None:
+        plan.gaps.append(f"unexpected_skills_stub_dir: {profile['name']}: agents_skills declares no stub tree")
+    pointer_files = profile.get("pointer_files")
+    if pointer_files is not None and not isinstance(pointer_files, dict):
+        plan.gaps.append(f"invalid_pointer_file: {profile['name']}: pointer_files must be a table")
 
 
 def _contains_baseline_payload(path: Path) -> bool:
@@ -734,12 +911,12 @@ def build_plan(harness: str) -> Plan:
             "(GOV-HARNESS-NEUTRAL-BASELINE-001 obligation 6: file or extend the work item)"
         )
     profile["name"] = harness
-    base = PROJECT_ROOT / baseline_cfg["root"]
+    source_roots = resolve_source_roots(PROJECT_ROOT, baseline_cfg)
+    base = source_roots["root"]
     if not base.is_dir():
         raise ProjectionError(f"baseline root missing: {base}")
     tokens = token_map(profile, baseline_cfg)
     stamp_text = profiles["stamp"]["text"].format(baseline_root=baseline_cfg["root"], harness=harness)
-    deferred_rules = set(baseline_cfg.get("deferred_rules") or [])
     plan = Plan()
 
     # Native registrations and old runtime output are not neutral inputs.
@@ -754,79 +931,20 @@ def build_plan(harness: str) -> Plan:
     if plan.gaps:
         return plan
 
-    surfaces = {}
-    if profile.get("skills_dir"):
-        surfaces["skills"] = profile["skills_dir"]
-    if profile.get("rules_projection") and profile.get("rules_dir"):
-        surfaces["rules"] = profile["rules_dir"]
-    if profile.get("hooks_dir"):
-        surfaces["hooks"] = profile["hooks_dir"]
-    for src_name, dst_root in surfaces.items():
-        src_root = base / src_name
-        if not src_root.is_dir():
-            continue
-        for path in sorted(src_root.rglob("*")):
-            if not path.is_file():
-                continue
-            if is_projection_junk(path, src_root):
-                continue
-            rel_in_surface = path.relative_to(src_root).as_posix()
-            if src_name == "hooks" and rel_in_surface == "manifest.toml":
-                continue  # the registration is rendered natively, below
-            if src_name == "rules" and rel_in_surface in deferred_rules:
-                # Activity-envelope deferral (WI-4949): these load on
-                # ::open <activity>, read from the baseline. A harness rules
-                # dir auto-loads wholesale, so projecting them here would
-                # defeat the deferral and make it advisory only.
-                plan.removes.append(f"{dst_root}/{rel_in_surface}")
-                continue
-            rel_out = f"{dst_root}/{rel_in_surface}"
-            if path.suffix.lower() in TEXT_SUFFIXES:
-                source_text = path.read_text(encoding="utf-8", errors="surrogateescape")
-                text = substitute(source_text, tokens, rel_out, plan.gaps)
-                if src_name == "skills" and rel_in_surface.endswith("SKILL.md"):
-                    text = text.removeprefix("\ufeff")
-                    try:
-                        fields = skill_fields(text)
-                        if fields["name"] != path.parent.name:
-                            raise ValueError("Skill name differs from its directory")
-                    except ValueError as error:
-                        plan.gaps.append(f"{rel_out}: {error}")
-                        continue
-                text = apply_stamp(rel_out, text, stamp_text)
-                if src_name == "skills" and rel_in_surface.endswith("SKILL.md"):
-                    source_rel = f"{baseline_cfg['root']}/{src_name}/{rel_in_surface}"
-                    block = adapter_metadata_block(profile["name"], source_rel, source_text)
-                    text = text + "\n<!--\n" + block + "-->\n"
-                if rel_out.endswith(".py") and text != source_text:
-                    # Token substitution changes line lengths, so a
-                    # format-conforming baseline does not guarantee a
-                    # format-conforming projection. The engine emits
-                    # gate-conforming output; ruff format is deterministic,
-                    # so plan idempotence is preserved.
-                    text = ruff_format(text, rel_out, plan.gaps)
-                plan.writes[rel_out] = text
-            else:
-                # Fail closed on an artifact class the projector does not
-                # recognize, naming the offending material (WI-7112). Silently
-                # copying an unknown class through a latin-1 round-trip is how a
-                # stray artifact reaches every registered harness at once, and a
-                # gap that does not say WHAT was unrecognized reproduces the
-                # diagnosis cost this guard exists to remove.
-                offending = f"{baseline_cfg['root']}/{src_name}/{rel_in_surface}"
-                artifact_class = path.suffix.lower() or path.name
-                plan.gaps.append(
-                    f"unrecognized artifact class '{artifact_class}' at {offending}; "
-                    "classify it as projectable (extend TEXT_SUFFIXES) or as excluded "
-                    "(extend is_projection_junk) - the projector will not guess"
-                )
-                continue
+    # The host skills root must exist (fail closed, as the baseline root above);
+    # stubs always render from the HOST root, also under --application (R12).
+    skills_root = source_roots["skills_root"]
+    if not skills_root.is_dir():
+        raise ProjectionError(f"skills root missing: {skills_root}")
+    validate_profile(profile, plan)
+    if plan.gaps:
+        return plan
 
-    if profile.get("routing_projection"):
-        try:
-            plan.writes[f"{profile['config_dir']}/routing.toml"] = render_provider_routing(profile, base)
-        except ProjectionError as exc:
-            plan.gaps.append(str(exc))
+    # Skills: pointer stubs or nothing (D15); rules: never projected, read on
+    # demand from the baseline; hooks: registration only, rendered below.
+    if profile["skills_discovery"] == "pointer_stubs":
+        render_skill_stubs(profile, skills_root, stamp_text, plan)
+    render_pointer_files(profile, plan)
 
     manifest_path = base / baseline_cfg["hook_manifest"]
     if manifest_path.is_file():
@@ -871,8 +989,24 @@ def build_plan(harness: str) -> Plan:
             else:
                 plan.writes[rel_out] = apply_stamp(rel_out, text, stamp_text)
 
-    ownership = sorted(plan.writes) + [f"{profile['config_dir']}/.projection-manifest.json"]
-    plan.writes[f"{profile['config_dir']}/.projection-manifest.json"] = (
+    manifest_rel = f"{profile['config_dir']}/.projection-manifest.json"
+    # Every write carries an acceptance class (D34 line 29; R15 (a) for the
+    # manifest). `classes` is additive: `paths` stays the flat list the read-back
+    # in apply_leftover_removes validates. An unclassifiable write is a projector
+    # defect and fails before anything is written.
+    classes: dict[str, list[str]] = {"registration": [], "ownership": [manifest_rel], "pointer": []}
+    for rel in sorted(plan.writes):
+        artifact_class = classify_write(rel, profile)
+        if artifact_class is None:
+            kind = (
+                "unexpected_skill_copy"
+                if rel.startswith(f"{profile['config_dir']}/skills/")
+                else "unclassified projector output"
+            )
+            raise ProjectionError(f"{kind}: {rel}")
+        classes[artifact_class].append(rel)
+    ownership = sorted(plan.writes) + [manifest_rel]
+    plan.writes[manifest_rel] = (
         json.dumps(
             {
                 "_comment": "Ownership manifest - paths produced by the GT-KB projection engine for this harness. Files inside projector-owned subtrees but absent from this list are unmanaged (candidates for cleanup or projector-gap review).",
@@ -880,6 +1014,7 @@ def build_plan(harness: str) -> Plan:
                 "baseline_root": baseline_cfg["root"],
                 "engine": "scripts/harness_projection/project_harness.py",
                 "paths": ownership,
+                "classes": classes,
             },
             indent=2,
         )
@@ -895,6 +1030,12 @@ def projection_inputs() -> dict[str, str]:
     paths = {Path(__file__).resolve(), PROFILES_PATH.resolve(), PROJECT_ROOT / "pyproject.toml"}
     baseline = PROJECT_ROOT / BASELINE_ROOT_NAME
     paths.update(path for path in baseline.rglob("*") if path.is_file() and not is_projection_junk(path, baseline))
+    # Stub sources are the frontmatter carriers only; helper and reference files are
+    # read in place by every host and are not projection inputs.
+    skills_root = PROJECT_ROOT / SKILLS_ROOT_NAME
+    paths.update(
+        path for path in skills_root.glob("*/SKILL.md") if path.is_file() and not is_projection_junk(path, skills_root)
+    )
     # The baseline manifest can name host scripts, and profiles can name stdin
     # adapters. Their bytes are part of the consumer's preview, not a live cache.
     profiles = load_profiles()
@@ -986,8 +1127,10 @@ def run(harness: str, mode: str) -> int:
         finally:
             tmp_target.unlink(missing_ok=True)
     removed = 0
+    config_dir = str((load_profiles()["harnesses"].get(harness) or {}).get("config_dir") or "").strip()
+    config_root = output_root() / config_dir if config_dir else None
     for rel in plan.removes:
-        if remove_planned_path(output_root() / rel):
+        if remove_planned_path(output_root() / rel, config_root):
             removed += 1
     print(f"PROJECTED {harness}: {len(plan.writes)} files, {removed} leftovers removed")
     return 0

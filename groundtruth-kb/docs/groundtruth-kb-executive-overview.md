@@ -118,7 +118,7 @@ GroundTruth-KB is built on current-generation, industry-standard technology:
 | Type Safety | Python 3.11+ with `mypy --strict` | Full static type coverage, zero errors |
 | CI/CD | GitHub Actions | Industry standard, matrix testing across platforms |
 | Cloud | Azure (starter scaffolding) | Docker templates and minimal Terraform provider stubs; teams add cloud resources for their environment |
-| Web UI | FastAPI + Jinja2 | Built-in `gt serve` dashboard for spec tracking, assertions, and work items |
+| Operations dashboard | Grafana OSS + frser-sqlite-datasource | `gt dashboard install` and `gt dashboard start` run a local operations dashboard from the base package |
 | Security | Credential detection built-in; CI placeholders for OWASP scanning tools | Teams configure Semgrep, Bandit, and accessibility tools per project |
 | Search | ChromaDB (optional) | Semantic search over Deliberation Archive (DA) |
 

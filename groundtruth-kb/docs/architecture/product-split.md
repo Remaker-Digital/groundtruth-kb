@@ -1,123 +1,82 @@
 # GroundTruth Product Architecture
 
-## Overview
+GroundTruth-KB provides a Python package and CLI for canonical engineering
+records, native coordination, application initialization and diagnostics.
+The package's current version is reported by `python -m groundtruth_kb --version`.
 
-GroundTruth is a single Python package (`groundtruth-kb`) organized into three
-functional layers plus file-bridge automation guidance for dual-agent projects.
-All layers ship together and are installed from a single wheel.
+## Canonical records and coordination
 
----
+The native service stores current records and history in PostgreSQL. CLI and
+service APIs own validation, version checks and domain transitions. Callers use
+those interfaces rather than opening authority tables directly.
 
-## Architecture Layers
+| Capability | Current interface |
+| --- | --- |
+| Specifications and assertions | `gt spec`, `gt assert` |
+| Executable test records and phases | `gt tests`, `gt test-plans` |
+| Projects, membership and work items | `gt projects`, `gt backlog` |
+| Session attribution | `gt session bind`, `gt session show` |
+| Current task context | `gt context work-item <WI-ID> --json` |
+| Coordination state and next actions | `gt bridge state-report --json`, `gt bridge queue --role <pb-or-lo> --json` |
 
-### Layer 1 - Core Knowledge Database (MemBase)
+The selected configuration identifies the native authority. Current formal
+records carry requirements; operational notes and bridge messages do not become
+a second specification or decision store.
 
-The foundation: an append-only SQLite database with governance gates and an
-assertion engine.
+## Independent implementation and review
 
-| Capability | CLI commands |
-|------------|--------------|
-| MemBase (knowledge database) | `gt init` - create project config and database |
-| Seed data | `gt seed` - populate governance specs and optional examples |
-| Assertions | `gt assert` - run machine-checkable spec assertions |
-| Web dashboard | `gt serve` - optional FastAPI UI (`[web]` extra) |
-| Summary | `gt summary` - quick project overview |
-| Application initialization | `gt project init` - the single native initializer for a registered application |
+The owner selects work while Dispatcher Next remains inactive. Agents author
+their own proposals and verdicts. They read current task/attempt state, claim
+the exact next artifact and deliver authored bytes through the native CLI.
 
-Layer 1 is what ADR-0001: Three-Tier Memory Architecture calls MemBase — the canonical knowledge and specifications tier.
+The ordinary sequence is NEW → GO → READY → VERIFIED. A rejected proposal
+receives NO-GO and then a REVISED proposal. A rejected implementation report
+receives NOT-READY and then a corrected READY report. A claim reserves the next
+artifact, not a work-item thread. Roles belong to session contexts and are not
+fixed to a particular harness.
 
-### Layer 2 - Project Scaffold
+The complete verified project is the commit unit. Applicable native commit
+checks bind the independently reviewed bytes to the actual Git commit.
+Coordination messages are disposable; committed work product excludes them and
+generated projections. See the [CLI reference](../reference/cli.md) and
+[dual-agent setup](../tutorials/dual-agent-setup.md).
 
-Project initialization, profile-based setup, and scaffold maintenance.
+## Application files and harness configuration
 
-| Capability | CLI commands |
-|------------|--------------|
-| Project scaffold | `gt project init` - generate or retrofit a repo with rules, hooks, bridge inventory, and report templates |
-| Profiles | `gt project init my-project --profile <profile>` - pre-built configurations (`local-only`, `dual-agent`, `dual-agent-webapp`) |
-| Scaffold upgrade | `gt project upgrade` - update managed scaffold files when the package version changes |
+An application is registered under a host and its execution project carries an
+explicit repository reference. File initialization follows those two bindings:
 
-### Layer 3 - Workstation Doctor
+| Capability | Current interface |
+| --- | --- |
+| Application registration | `gt application register <APPLICATION> --host-root <host>` |
+| File initialization | `gt project init <APPLICATION> --project-id <PROJECT> --host-root <host> --owner <owner>` |
+| Application diagnosis | `gt project doctor --project-id <PROJECT> --host-root <host>` |
+| Managed-file upgrade | `gt project upgrade <APPLICATION> --project-id <PROJECT> --host-root <host>` |
 
-Environment verification and readiness reporting.
+Profiles select application scaffolding. Harness choices select projected
+registrations and pointers; shared authored hooks, rules and skills remain the
+source. Projectors produce derived outputs. Upgrade preserves application-owned
+files and previews changes before application.
 
-| Capability | CLI commands |
-|------------|--------------|
-| Doctor | `gt project doctor` - detect installed tools, verify config, produce readiness reports |
+Initialization creates no local authority database or automatic commit. Core
+specification intake reads the next canonical question and records explicit
+answers through its ordinary writer. See [application isolation](isolation.md)
+and the [bootstrap guide](../bootstrap.md).
 
-### File Bridge Automation
+## Derived views
 
-Dual-agent projects use a project-owned file bridge:
+The optional application search cache and operations dashboard are rebuildable
+views. `gt project chroma regenerate` rebuilds application-scoped search data.
+`gt dashboard` initializes, refreshes and operates the local Grafana dashboard.
+Their cached data is not canonical authority, and a green display does not
+replace qualification or review.
 
-- TAFE-backed bridge state plus the status-bearing numbered files under
-  `bridge/` are the authoritative review queue (after the 2026-06-15 WI-4510
-  Phase-3 cutover).
-- Bridge documents under `bridge/` hold implementation reports, reviews, and
-  verdicts.
-- Prime Builder writes `NEW` and `REVISED`.
-- Loyal Opposition writes `GO`, `NO-GO`, and terminal `VERIFIED`.
-- The dispatcher daemon
-  (`scripts/gtkb_dispatcher_daemon.py`) runs through the headless dispatcher
-  supervisor path and dispatches the appropriate counterpart harness when a
-  recipient's actionable queue signature changes. The retired smart-poller and
-  OS-poller implementations are archived under `archive/smart-poller-2026-05-09/`.
-- `BRIDGE-INVENTORY.md` captures daemon configuration, the daemon script,
-  dispatch-state path, CLI commands, plugins, MCP servers, skills, logs,
-  locks, and the manual bridge-scan fallback procedure.
-- `bridge-os-poller-setup-prompt.md` is retained as a DEPRECATED
-  compatibility stub for two release cycles; do not follow its content for
-  new installations.
+## Package boundaries
 
-The older SQLite/MCP bridge runtime remains in the package only as legacy
-compatibility code. New projects should not use it as the active bridge.
+The package implements the native CLI, domain/service code, application
+scaffolding, projectors and diagnostics. Application code, external accounts,
+cloud deployment and operator-selected hosting stay with the application and
+its owner. Local runtime setup and host qualification remain explicit
+operations.
 
----
-
-## Package Contents
-
-| Component | Location |
-|-----------|----------|
-| KB engine, CLI, web UI, gates | `groundtruth_kb/` |
-| Legacy SQLite/MCP bridge runtime | `groundtruth_kb/bridge/` |
-| Project scaffold commands | `gt project init`, `gt project doctor`, `gt project upgrade` |
-| Method documentation | `docs/method/` |
-| File bridge setup docs | `docs/method/12-file-bridge-automation.md` |
-| Reference templates | `templates/` (CLAUDE.md, AGENTS.md, MEMORY.md, bridge inventory, setup prompt, hooks, rules, CI/CD) |
-| Built-in governance gates | ADRDCLAssertionGate, OwnerApprovalGate |
-
----
-
-## Scope Boundary
-
-`groundtruth-kb` initializes MemBase, provides the tools to manage
-specifications, tests, work items, and assertions, scaffolds project structure
-from profiles, and verifies workstation readiness.
-
-It does not provision cloud infrastructure, create external accounts, install
-OS scheduled tasks, or deploy applications. Production infrastructure and
-project-specific bridge poller setup are the responsibility of the downstream
-project, using the package templates and setup prompt.
-
----
-
-## Reference Implementation
-
-The patterns packaged by `groundtruth-kb` were developed and validated in a
-production commercial SaaS project. The current reusable dual-agent pattern is:
-
-- File bridge queue and status protocol
-- Cross-harness event-driven bridge dispatch (dispatcher daemon)
-- Prompt and agent-configuration capture
-- Session hook and rule file conventions
-- Operational expectations for evidence, auditability, and owner burden
-
----
-
-## Current Status
-
-| Component | Version | Status |
-|-----------|---------|--------|
-| groundtruth-kb | 0.7.0rc1 | Release candidate — extracted from production system (2,000+ specs, 11,000+ tests) |
-
----
-
-*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

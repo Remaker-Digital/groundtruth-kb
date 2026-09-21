@@ -33,8 +33,8 @@ from groundtruth_kb.coherence import (
 )
 from groundtruth_kb.postgres_kernel import TABLE_SPECS, PostgresTransaction
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 
 def _hash(path: Path) -> str:

@@ -33,9 +33,9 @@ from groundtruth_kb.authority_client import AuthorityClient
 from groundtruth_kb.postgres_kernel import TABLE_SPECS
 from groundtruth_kb.project.native_finalization import NativeProjectFinalization
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put, seed, work_fields
-from platform_tests.groundtruth_kb.test_native_bridge import authored
+from platform_tests.groundtruth_kb.bridge_fixtures import authored
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+from platform_tests.groundtruth_kb.native_fixtures import put, seed, work_fields
 
 
 class _Response:
@@ -117,6 +117,12 @@ def _stage_baseline(host: Path) -> None:
         ROOT / ".harness-baseline-configuration",
         host / ".harness-baseline-configuration",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.lock"),
+    )
+    # D15: the one skills source lives beside the baseline; the projector fails closed without it.
+    shutil.copytree(
+        ROOT / ".agents/skills",
+        host / ".agents/skills",
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
     shutil.copytree(
         ROOT / "scripts/harness_projection",

@@ -242,7 +242,10 @@ def test_interleaved_unmanaged_registrations_survive_a_baseline_change(native_ap
     pre = merged["hooks"]["PreToolUse"]
     assert custom_group in pre
     managed = [group for group in pre if group != custom_group]
-    assert managed and all(".claude/hooks" in json.dumps(group) or "scripts/" in json.dumps(group) for group in managed)
+    assert managed and all(
+        ".harness-baseline-configuration/hooks" in json.dumps(group) or "scripts/" in json.dumps(group)
+        for group in managed
+    )
     assert any('"timeout": 7' in json.dumps(group) for group in managed)
     assert pre.count(custom_group) == 1 and len(pre) == len(managed) + 1
     assert plan_upgrade(_options(native_application)).changes == ()
@@ -266,6 +269,7 @@ def test_retired_projection_output_is_removed_and_never_resurrected(native_appli
     manifest_path = target / ".claude/.projection-manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     retired = target / ".claude/hooks/workstream-focus.py"
+    retired.parent.mkdir(parents=True, exist_ok=True)
     retired.write_text("# retired hook that a previous projection produced\n", encoding="utf-8")
     manifest["paths"].append(".claude/hooks/workstream-focus.py")
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

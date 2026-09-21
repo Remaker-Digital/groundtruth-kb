@@ -13,11 +13,11 @@ from groundtruth_kb.native_authority import DependencyMutation
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, seed, work_fields
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_project_finalization import base, git, integration, post, verify
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver, ready_checkout
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration, post, verify
+from platform_tests.groundtruth_kb.native_fixtures import history_count, project, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
@@ -44,11 +44,6 @@ def amend(client, record_id="DEP-1", **fields):
     response = put(client, "project-dependencies", record_id, fields, expected_version=current["version"])
     assert response.status_code == 200, response.text
     return response.json()
-
-
-def project(client, record_id="PROJECT-2"):
-    response = put(client, "projects", record_id, {"name": record_id, "target_outcome": "A complete test outcome"})
-    assert response.status_code == 200, response.text
 
 
 def set_project_status(service, record_id, status):
@@ -246,17 +241,6 @@ def test_dependency_added_after_new_claim_blocks_delivery_without_consuming_it(b
     deliver(client, contexts, "new-chain", "lo1", 2, "NO-GO")
 
 
-def ready_checkout(bridge):
-    _, client, contexts, root = bridge
-    deliver(client, contexts, "effect-chain", "pb1", 1, "NEW")
-    deliver(client, contexts, "effect-chain", "lo1", 2, "GO")
-    reserved = claim(client, "effect-chain", "pb2", 2, "READY").json()
-    fence = {"native_context_id": "pb2", "fence": reserved["fence"]}
-    opened = client.post("/v1/bridge/effect-chain/worktree", json=fence).json()
-    (Path(opened["path"]) / "code.py").write_text("result = 42\n", encoding="utf-8")
-    return client, root, {**fence, "expected_artifacts": opened["artifact_preimages"]}
-
-
 def test_changed_prerequisite_blocks_publication_and_fence_check(bridge):
     client, root, body = ready_checkout(bridge)
     project(client)
@@ -347,3 +331,115 @@ def test_closure_is_rechecked_before_integration_and_real_commit_unblocks_succes
     assert result.status_code == 200 and result.json()["status"] == "confirmed", result.text
     assert base(integration(root)) == commit
     assert client.get("/v1/projects/PROJECT-2/readiness").json()["ready"]
+
+
+def test_dependency_recovery_revalidates_cycle_and_preserves_exact_history(native):
+    service, client, _, _ = native
+    seed(client)
+    project(client)
+    original_projects = {
+        record_id: client.get(f"/v1/projects/{record_id}").json()["project"] for record_id in ("PROJECT-1", "PROJECT-2")
+    }
+    original_project_histories = {
+        record_id: client.get(f"/v1/projects/{record_id}/history").json() for record_id in original_projects
+    }
+    created = add(client)
+    retired = amend(client, status="retired")
+    assert retired["version"] == 2 and retired["status"] == "retired"
+    reverse = add(client, "DEP-REVERSE", dependent="PROJECT-2", prerequisite="PROJECT-1")
+    before_count = history_count(service)
+    before_history = client.get("/v1/project-dependencies/DEP-1/history").json()
+    before_reverse = client.get("/v1/project-dependencies/DEP-REVERSE/history").json()
+    before_readiness = client.get("/v1/projects/PROJECT-1/readiness").json()
+    before_refusal_projects = {
+        record_id: client.get(f"/v1/projects/{record_id}").json() for record_id in original_projects
+    }
+
+    # Re-activating the existing edge, not adding a new one, would now form a cycle.
+    refused = put(client, "project-dependencies", "DEP-1", {"status": "active"}, expected_version=2)
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["code"] == "dependency_cycle"
+    assert client.get("/v1/project-dependencies/DEP-1").json() == retired
+    assert client.get("/v1/project-dependencies/DEP-1/history").json() == before_history
+    assert client.get("/v1/project-dependencies/DEP-REVERSE/history").json() == before_reverse
+    assert client.get("/v1/projects/PROJECT-1/readiness").json() == before_readiness
+    assert history_count(service) == before_count
+    assert {
+        record_id: client.get(f"/v1/projects/{record_id}").json() for record_id in original_projects
+    } == before_refusal_projects
+    assert {
+        record_id: client.get(f"/v1/projects/{record_id}").json()["project"] for record_id in original_projects
+    } == original_projects
+    assert {
+        record_id: client.get(f"/v1/projects/{record_id}/history").json() for record_id in original_projects
+    } == original_project_histories
+
+    retired_reverse = amend(client, "DEP-REVERSE", status="retired")
+    assert retired_reverse["version"] == reverse["version"] + 1
+    before_recovery = history_count(service)
+    recovered = amend(client, status="active")
+    assert recovered["version"] == 3 and recovered["status"] == "active"
+    history = client.get("/v1/project-dependencies/DEP-1/history").json()
+    assert history["current"] == recovered
+    assert history["history"][:-1] == before_history["history"]
+    transitions = [(row["version"], row["prior_version"], row["state"]["status"]) for row in history["history"]]
+    assert transitions == [
+        (1, None, "active"),
+        (2, 1, "retired"),
+        (3, 2, "active"),
+    ]
+    assert [row["state"] for row in history["history"]] == [created, retired, recovered]
+    assert all(row["actor"] == "qualification" for row in history["history"])
+    assert all(row["reason"] == "Exercise native domain behavior" for row in history["history"])
+    assert history_count(service) == before_recovery + 1
+    assert not client.get("/v1/projects/PROJECT-1/readiness").json()["ready"]
+    assert client.get("/v1/project-dependencies/DEP-REVERSE").json() == retired_reverse
+    assert {
+        record_id: client.get(f"/v1/projects/{record_id}").json()["project"] for record_id in original_projects
+    } == original_projects
+    assert {
+        record_id: client.get(f"/v1/projects/{record_id}/history").json() for record_id in original_projects
+    } == original_project_histories
+
+
+def test_dependency_failure_after_insert_rolls_back_current_rows_and_history(native, monkeypatch):
+    from groundtruth_kb.postgres_kernel import PostgresTransaction
+
+    service, client, _, _ = native
+    seed(client)
+    project(client)
+    assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    original_projects = {
+        record_id: client.get(f"/v1/projects/{record_id}").json() for record_id in ("PROJECT-1", "PROJECT-2")
+    }
+    original_work = client.get("/v1/work-items/WI-1").json()
+    original_work_history = client.get("/v1/work-items/WI-1/history").json()
+    original_dependencies = client.get("/v1/project-dependencies").json()
+    before_count = history_count(service)
+    original_mutate = PostgresTransaction.mutate
+    inserted = []
+
+    def fail_after_insert(tx, **request):
+        result = original_mutate(tx, **request)
+        if request["table"] == "project_dependencies" and request["identity"] == {"id": "DEP-FAULT"}:
+            # Non-vacuity: row and its history really exist before the fault.
+            assert tx.get("project_dependencies", {"id": "DEP-FAULT"}) == result["record"]
+            assert len(tx.history("project_dependencies", {"id": "DEP-FAULT"})) == 1
+            inserted.append(result["record"]["version"])
+            raise PostgresKernelError("fixture_dependency_after_insert", "Qualification fault after dependency insert")
+        return result
+
+    monkeypatch.setattr(PostgresTransaction, "mutate", fail_after_insert)
+    result = put(client, "project-dependencies", "DEP-FAULT", dependency_fields())
+    assert result.status_code == 422, result.text
+    assert result.json()["error"]["code"] == "fixture_dependency_after_insert"
+    assert inserted == [1]
+    assert client.get("/v1/project-dependencies/DEP-FAULT").status_code == 404
+    assert client.get("/v1/project-dependencies/DEP-FAULT/history").status_code == 404
+    assert client.get("/v1/project-dependencies").json() == original_dependencies
+    assert client.get("/v1/work-items/WI-1").json() == original_work
+    assert client.get("/v1/work-items/WI-1/history").json() == original_work_history
+    assert {
+        record_id: client.get(f"/v1/projects/{record_id}").json() for record_id in original_projects
+    } == original_projects
+    assert history_count(service) == before_count

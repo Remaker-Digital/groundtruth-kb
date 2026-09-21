@@ -1,112 +1,48 @@
-# Templates Reference
+# Templates and managed sources
 
-GroundTruth KB ships 30 template files used by `gt project init` to
-scaffold new applications. Templates are organized
-by category and copied selectively based on the chosen profile and options.
+Project templates create application-specific files under the supported native
+initializer. They do not establish a second harness baseline. The selected
+application/project, registered host root, current authority and overwrite scope
+are validated by the native initializer; inspect its dry-run before application.
 
-## Template Inventory
+## Shared harness material
 
-### Project Files
+Root `AGENTS.md` is authored once. `.agents/skills` holds the shared skills;
+`.harness-baseline-configuration/rules`, `hooks` and `routing.toml` hold the
+focused rules, hook implementations and API routing. Host settings and pointer
+stubs are derived by the declared projection profile. See
+[Harness projection](harness-projection.md) for source paths and output classes.
 
-| Template | Copied to | Description |
-|----------|-----------|-------------|
-| `templates/CLAUDE.md` | `CLAUDE.md` | Claude Code project instructions |
-| `templates/MEMORY.md` | `MEMORY.md` | Session state and operational memory |
-| `templates/rules/canonical-terminology.md` | `.claude/rules/canonical-terminology.md` | Canonical ADR-0001 glossary (MemBase, DA, Prime Builder, Loyal Opposition, etc.) |
-| `templates/rules/canonical-terminology.toml` | `.claude/rules/canonical-terminology.toml` | Profile-aware doctor config (required terms + required files + severity) |
-| `templates/BRIDGE-INVENTORY.md` | `BRIDGE-INVENTORY.md` | Bridge automation component registry |
-| `templates/README.md` | `README.md` | Project README with setup instructions |
-| `templates/project/Makefile` | `Makefile` | Common tasks: test, lint, serve, assert |
-| `templates/project/.editorconfig` | `.editorconfig` | Editor settings (indent, charset, EOL) |
-| `templates/project/.pre-commit-config.yaml` | `.pre-commit-config.yaml` | Pre-commit hooks (ruff, trailing whitespace) |
-| `templates/project/env.example` | `.env.example` | Environment variable template |
+Do not copy rules or hook scripts into a host directory, generate another
+`AGENTS.md` from a duplicate baseline file, or create an application-local skill
+body. A hosted application's skill pointer resolves to the shared host tree.
+Root `CLAUDE.md` and `.goosehints` are concise pointers, not independent guidance.
 
-### Dual-Agent Files
+## Application files and upgrades
 
-These are included when the profile is `dual-agent` or `dual-agent-webapp`:
+The selected initializer may author application configuration, starter source,
+specification inputs and optional CI files. Inspect the current native command,
+selected profile and managed-artifact registry for its exact inventory; an old
+template count is not an upgrade contract. Application source belongs to that
+application's governed work product. Template existence alone does not make a
+file managed or grant permission to replace an existing file.
 
-| Template | Copied to | Description |
-|----------|-----------|-------------|
-| `templates/project/AGENTS.md` | `AGENTS.md` | Loyal Opposition operating contract |
-| `templates/project/codex-bootstrap/CODEX-REVIEW-OPERATING-CONTRACT.md` | `independent-progress-assessments/` | Review ground rules |
-| `templates/project/codex-bootstrap/CODEX-SESSION-BOOTSTRAP.md` | `independent-progress-assessments/` | Codex session startup checklist |
-| `templates/project/codex-bootstrap/CODEX-WAY-OF-WORKING.md` | `independent-progress-assessments/` | Codex operating principles |
-| `templates/project/codex-bootstrap/LOYAL-OPPOSITION-LOG.md` | `independent-progress-assessments/` | Running review log |
+Use the native project doctor/upgrade routes for their declared checks and
+repairs. Use `gt harness project <profile>` for shared-source derivation. A clean
+doctor or projection result does not prove an actual host session loaded its
+instructions, discovered a skill or executed a hook.
 
-### Web Application Files
+## Current work process
 
-These are included when the profile is `dual-agent-webapp`:
+The owner selects the exact task and supplies literal init/activity inputs.
+Each fresh context uses native binding and reads current project/work/bridge
+state through the CLI. Independent contexts author proposals, implementations,
+reports and verdicts according to the current bridge phase. Dispatcher does not
+author lifecycle content, and owner dispatch remains in place until the successor
+dispatcher is independently qualified and activated.
 
-| Template | Copied to | Description |
-|----------|-----------|-------------|
-| `templates/project/Dockerfile` | `Dockerfile` | Container build for the web UI |
-| `templates/project/docker-compose.yml` | `docker-compose.yml` | Local multi-container setup |
-| `templates/project/settings.local.json` | `.claude/settings.local.json` | Claude Code local settings |
-
-### CI Workflows
-
-Included unless `--no-include-ci` is passed:
-
-| Template | Copied to | Description |
-|----------|-----------|-------------|
-| `templates/ci/build.yml` | `.github/workflows/build.yml` | Docker build and push |
-| `templates/ci/deploy.yml` | `.github/workflows/deploy.yml` | Deployment pipeline |
-| `templates/ci/test.yml` | `.github/workflows/test.yml` | Test and lint checks |
-
-### Hooks
-
-Claude Code automation hooks, copied to `.claude/hooks/`:
-
-| Template | Copied to | Description |
-|----------|-----------|-------------|
-| `templates/hooks/assertion-check.py` | `.claude/hooks/assertion-check.py` | Session-start assertion runner |
-| `templates/hooks/credential-scan.py` | `.claude/hooks/credential-scan.py` | Pre-commit credential scanner |
-| `templates/hooks/destructive-gate.py` | `.claude/hooks/destructive-gate.py` | Dangerous command blocker |
-| `templates/hooks/intake-classifier.py` | `.claude/hooks/intake-classifier.py` | Requirement intake classifier (F5) |
-| `templates/hooks/scheduler.py` | `.claude/hooks/scheduler.py` | Bridge poller scheduler |
-| `templates/hooks/session-health.py` | `.claude/hooks/session-health.py` | Session health snapshot on Stop (F7) |
-| `templates/hooks/spec-classifier.py` | `.claude/hooks/spec-classifier.py` | Spec-first workflow enforcer (legacy) |
-
-### Rules
-
-Agent behavior rules, copied to `.claude/rules/`:
-
-| Template | Copied to | Description |
-|----------|-----------|-------------|
-| `templates/rules/prime-builder.md` | `.claude/rules/prime-builder.md` | Prime Builder operating rules |
-| `templates/rules/loyal-opposition.md` | `.claude/rules/loyal-opposition.md` | Loyal Opposition rules |
-| `templates/rules/prime-bridge-collaboration-protocol.md` | `.claude/rules/prime-bridge-collaboration-protocol.md` | Bridge exchange protocol |
-| `templates/rules/bridge-poller-canonical.md` | `.claude/rules/bridge-poller-canonical.md` | Canonical bridge poller pattern |
-| `templates/rules/report-depth.md` | `.claude/rules/report-depth.md` | Report quality standard |
-
-### Bridge Automation
-
-| Template | Description |
-|----------|-------------|
-| `templates/bridge-os-poller-setup-prompt.md` | DEPRECATED stub. Smart poller and OS poller both retired in Slice 4 (2026-05-09); retained as compatibility stub for two release cycles. Bridge dispatch is automated by the dispatcher daemon registered in `.claude/settings.json` and `.codex/hooks.json`. See `docs/tutorials/dual-agent-setup.md`. |
-
-## Profile Matrix
-
-Which templates are included per profile:
-
-| Category | `local-only` | `dual-agent` | `dual-agent-webapp` |
-|----------|:---:|:---:|:---:|
-| Project files | yes | yes | yes |
-| Hooks | yes | yes | yes |
-| Rules (prime-builder) | yes | yes | yes |
-| CI workflows | opt-in | opt-in | opt-in |
-| Dual-agent files | | yes | yes |
-| Rules (LO, bridge, report) | | yes | yes |
-| Web app files | | | yes |
-| Bridge automation | | yes | yes |
-
-## Customization
-
-Template files are copied once at scaffold time. After creation, they belong
-to your project — edit them freely. The `gt project upgrade` command can
-refresh templates to the current version, but respects customization flags
-and defaults to dry-run mode.
-
----
+Session logs and temporary bridge payloads are not durable authority. Do not
+create a memory or deliberation archive to stand in for current formal, project
+or work-item records. See [Dual-Agent Setup](../tutorials/dual-agent-setup.md).
 
 *Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*

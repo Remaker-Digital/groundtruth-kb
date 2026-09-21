@@ -15,7 +15,7 @@ checks through ``gt secrets scan``.
 
 from groundtruth_kb.secrets.allowlist import Allowlist, AllowlistEntry, AllowlistLoadError
 from groundtruth_kb.secrets.patterns import PRODUCTION_PATTERNS, TEST_SYNTHETIC_PATTERNS, Severity
-from groundtruth_kb.secrets.redaction import fingerprint, redact_for_output
+from groundtruth_kb.secrets.redaction import fingerprint, line_identity, redact_for_output
 from groundtruth_kb.secrets.scanner import (
     Finding,
     GitScanError,
@@ -33,6 +33,7 @@ __all__ = [
     "TEST_SYNTHETIC_PATTERNS",
     "Severity",
     "fingerprint",
+    "line_identity",
     "redact_for_output",
     "Allowlist",
     "AllowlistEntry",

@@ -37,8 +37,18 @@ import asyncio
 import logging
 import sys
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+APP_ROOT = REPO_ROOT / "applications" / "Agent_Red"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
+from scripts._env import load_env_local  # noqa: E402 - standalone script bootstrap
+
+if str(APP_ROOT) not in sys.path:
+    sys.path.insert(0, str(APP_ROOT))
 
 logger = logging.getLogger(__name__)
 
@@ -836,7 +846,7 @@ TOTAL_ARTICLES = len(SEED_ARTICLES)
 
 def print_summary() -> None:
     """Print a summary of the seed articles."""
-    print(f"\nAgent Red Knowledge Base Seed Data (v2.0 — Optimized)")
+    print("\nAgent Red Knowledge Base Seed Data (v2.0 — Optimized)")
     print(f"{'=' * 55}")
     print(f"Total articles: {TOTAL_ARTICLES}")
     print()
@@ -857,7 +867,7 @@ def print_summary() -> None:
     store_count = sum(1 for a in SEED_ARTICLES if "store" in a.get("tags", []))
     reference_count = TOTAL_ARTICLES - qa_count - store_count
 
-    print(f"By content type:")
+    print("By content type:")
     print(f"  Reference articles: {reference_count}")
     print(f"  Q&A pairs: {qa_count}")
     print(f"  Store product data: {store_count}")
@@ -883,7 +893,7 @@ def print_summary() -> None:
     min_chars = min(content_lengths)
     max_chars = max(content_lengths)
 
-    print(f"Content statistics:")
+    print("Content statistics:")
     print(f"  Total: {total_chars:,} characters")
     print(f"  Average: {avg_chars} chars/article")
     print(f"  Range: {min_chars}-{max_chars} chars/article")
@@ -915,17 +925,12 @@ async def load_to_cosmos(
         dry_run: If True, build documents but do not persist.
         embed: If True, embed all articles after loading (requires Azure OpenAI).
     """
-    # Add src to path so we can import the multi_tenant modules
-    project_root = Path(__file__).resolve().parent.parent
-    if str(project_root) not in sys.path:
-        sys.path.insert(0, str(project_root))
-
     from src.multi_tenant.cosmos_schema import KnowledgeBaseDocument
-    from src.multi_tenant.repository import KnowledgeBaseRepository
     from src.multi_tenant.knowledge_vectorizer import compute_content_hash
+    from src.multi_tenant.repository import KnowledgeBaseRepository
 
     repo = KnowledgeBaseRepository()
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     # Idempotency: fetch existing active titles to avoid duplicates
     existing = await repo.list_active(tenant_id)
@@ -976,26 +981,15 @@ async def load_to_cosmos(
             logger.exception("Failed to create knowledge entry: %s", article["title"])
 
     print(f"\nLoad complete: {created} created, {skipped} skipped, {errors} errors")
+    if errors:
+        raise RuntimeError(f"{errors} knowledge base articles failed to load")
 
-    # Embed all unembedded articles if requested
-    if embed and not dry_run and created > 0:
-        print(f"\nEmbedding {created} new articles...")
-        try:
-            from src.multi_tenant.knowledge_vectorizer import get_knowledge_vectorizer
+    # Use the same complete, explicit-client route as the standalone operator.
+    # Existing unembedded entries must also be retried after an earlier failure.
+    if embed and not dry_run:
+        from scripts.embed_knowledge_base import run
 
-            vectorizer = get_knowledge_vectorizer()
-            if not vectorizer._configured:
-                # Try to configure with Azure OpenAI
-                from src.chat.pipeline import _create_openai_client
-
-                openai_client = _create_openai_client()
-                vectorizer.configure(kb_repo=repo, openai_client=openai_client)
-
-            embedded = await vectorizer.embed_unembedded(tenant_id)
-            print(f"Embedding complete: {embedded} articles embedded")
-        except Exception as e:
-            print(f"Embedding failed: {e}")
-            print("Articles loaded but not embedded. Run with Azure OpenAI credentials to enable vector search.")
+        await run(tenant_id=tenant_id, do_embed=True)
 
 
 async def main() -> None:
@@ -1029,17 +1023,25 @@ async def main() -> None:
     print_summary()
 
     if args.load or args.dry_run:
+        load_env_local(env_file=APP_ROOT / ".env.local")
+        from src.multi_tenant.cosmos_client import get_cosmos_manager
+
         print(f"Loading {TOTAL_ARTICLES} articles for tenant: {args.tenant_id}")
         if args.dry_run:
             print("(Dry run mode - no database writes)")
         if args.embed:
             print("(Embedding enabled — will vectorize after loading)")
         print()
-        await load_to_cosmos(
-            tenant_id=args.tenant_id,
-            dry_run=args.dry_run,
-            embed=args.embed,
-        )
+        cosmos = get_cosmos_manager()
+        try:
+            await cosmos._ensure_client()
+            await load_to_cosmos(
+                tenant_id=args.tenant_id,
+                dry_run=args.dry_run,
+                embed=args.embed,
+            )
+        finally:
+            await cosmos.close()
     else:
         print("To load into Cosmos DB, run with --load (or --dry-run to preview)")
         print("  python scripts/seed_knowledge_base.py --load --tenant-id <TENANT_ID>")

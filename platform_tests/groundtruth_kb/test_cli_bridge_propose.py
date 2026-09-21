@@ -25,10 +25,10 @@ from groundtruth_kb.postgres_kernel import PostgresKernelError
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
@@ -323,7 +323,8 @@ def test_documented_proposal_header_delivers_through_actual_cli(bridge, tmp_path
         deliver(client, contexts, document, "lo1", 2, "NO-GO")
         head = 2
     root = Path(__file__).resolve().parents[2]
-    skill = (root / ".harness-baseline-configuration/skills/gtkb-propose/SKILL.md").read_text(encoding="utf-8")
+    # D15: the one skills source; the baseline directory holds rules and hooks only.
+    skill = (root / ".agents/skills/gtkb-propose/SKILL.md").read_text(encoding="utf-8")
     example = re.search(r"## Authored header example\n.*?```text\n(.*?)```", skill, re.S)
     assert example is not None
     with socket.socket() as socket_probe:

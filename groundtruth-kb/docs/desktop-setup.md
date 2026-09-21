@@ -50,12 +50,13 @@ local-first setup that supports:
 
 - A GitHub account is required. If the repository is private, the client team
   must have access to the repository before installation.
-- If the team wants the fastest path with the included `CLAUDE.md` and
-  `.claude/` hooks/rules, they should use Claude Code or a compatible workflow
-  and have the necessary Anthropic account access in place.
-- If the team chooses another AI coding environment, the GroundTruth method
-  still applies, but the `CLAUDE.md` and `.claude/` surfaces may need to be
-  adapted to that tool.
+- Select a supported harness profile and use its projector. For Claude Code,
+  `.claude/` contains native registration and skill pointers; shared skills live
+  in `.agents/skills`, while rules and hook implementations remain under
+  `.harness-baseline-configuration`. Supply the account access required by the
+  selected host.
+- To use another supported coding environment, select its projector profile;
+  do not manually adapt a generated `.claude/` tree.
 - Docker Desktop licensing may require a paid subscription depending on the
   client's organization and usage terms. Confirm licensing before standardizing
   on Docker Desktop for commercial work.
@@ -73,7 +74,6 @@ pip install groundtruth-kb
 Optional extras:
 
 ```bash
-pip install "groundtruth-kb[web]"
 pip install "groundtruth-kb[dev]"
 ```
 
@@ -119,7 +119,7 @@ gt dashboard install
 gt dashboard start
 ```
 
-Open `http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard`.
+Open `http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard`.
 If enterprise policy requires a managed Grafana install, install Grafana and
 the SQLite datasource plugin through the approved channel and pass
 `--grafana-home` to `gt dashboard install` or `gt dashboard start`.

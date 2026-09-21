@@ -13,10 +13,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import subprocess
 import sys
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 
 from goose_execution_guard import (
@@ -29,14 +30,28 @@ from windows_subprocess import no_window_subprocess_kwargs
 
 AUTHOR_IDENTITY = "Goose G"
 AUTHOR_HARNESS_ID = "G"
+# GT-KB context identity is owned by the Goose host (its own session id reaches the
+# hooks); a value inherited from the launching process is never passed on.
+CONTEXT_IDENTITY_VARIABLES = ("GTKB_AUTHOR_SESSION_CONTEXT_ID", "GTKB_NATIVE_CONTEXT_ID")
 DEFAULT_MAX_TURNS = 40
 DEFAULT_TIMEOUT_SECONDS = 3600.0
 DEFAULT_SESSION_TIMEOUT_SECONDS = 5400.0
 GOOSE_CLI = "goose"
+# Canonical execution-floor contract (neutral baseline); there is no second
+# configuration tree and no silent fallback when the file is absent.
+FLOOR_CONFIG_RELATIVE_PATH = Path(".harness-baseline-configuration") / "goose-execution-floor.toml"
 
 
 class GooseHarnessError(RuntimeError):
     """Raised for fail-closed harness errors."""
+
+
+def child_environment(env: Mapping[str, str] | None = None) -> dict[str, str]:
+    """Environment for the Goose child: harness and model metadata, no inherited context identity, no role."""
+    child = dict(os.environ if env is None else env)
+    for name in CONTEXT_IDENTITY_VARIABLES:
+        child.pop(name, None)
+    return child
 
 
 def _find_goose_cli() -> str:
@@ -118,8 +133,14 @@ def build_system_prompt(skill: str | None) -> str | None:
 
 
 def _load_floor_config(project_root: Path) -> ExecutionFloorConfig:
-    """Load the execution reliability floor configuration."""
-    config_path = project_root / "config" / "agent-control" / "goose-execution-floor.toml"
+    """Load the execution reliability floor from the canonical baseline file.
+
+    The harness refuses to run without the file: the guard's built-in values are
+    schema defaults for absent keys, not a substitute for the contract.
+    """
+    config_path = project_root / FLOOR_CONFIG_RELATIVE_PATH
+    if not config_path.is_file():
+        raise GooseHarnessError(f"execution floor configuration is absent: {config_path}")
     return ExecutionFloorConfig.from_toml(config_path)
 
 
@@ -129,6 +150,14 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = parser.parse_args(raw_argv)
 
     project_root = Path(args.project_root).resolve() if args.project_root else resolve_project_root()
+
+    # WI-5831: Resolve the execution reliability floor before spawning the
+    # child so an absent contract fails here, not after a model run.
+    try:
+        floor_config = _load_floor_config(project_root)
+    except GooseHarnessError as exc:
+        print(f"goose_harness: {exc}", file=sys.stderr)
+        return 1
 
     # WI-5831: Export live model configuration before spawning the child.
     # This ensures the child environment carries the spawn model identity
@@ -171,6 +200,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             text=True,
             timeout=args.timeout,
             cwd=str(project_root),
+            env=child_environment(),
             # WI-5071: goose (harness G) is a dispatch target; a console-less
             # dispatched grandchild would otherwise pop a visible console for
             # the goose CLI. Every sibling harness launcher applies this.
@@ -217,7 +247,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     # WI-5831: Run the execution reliability floor guard after payload parsing
     # but before returning. This runs every enabled check and emits structured
     # diagnostics on stderr if findings are detected.
-    floor_config = _load_floor_config(project_root)
     diagnostic: RunDiagnostic = evaluate_run(
         data,
         project_root,

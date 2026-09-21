@@ -4,7 +4,8 @@
 Two paired tests prove the registry covers the template-source tree:
 
 T1a (forward existence): every FILE-class registry record's ``template_path``
-resolves to an existing file under ``groundtruth-kb/templates/``.
+resolves to an existing file under ``groundtruth-kb/templates/`` (adopter templates) or,
+for the authored hooks that run in place, at the host root (M15, D15/D34).
 
 T1b (reverse coverage): every file under ``groundtruth-kb/templates/`` is
 referenced by some FILE-class record's ``template_path`` (or is in the
@@ -36,7 +37,6 @@ _NON_SCAFFOLDED_TEMPLATE_FILES: frozenset[str] = frozenset(
         "README.md",
         "CLAUDE.md",
         "BRIDGE-INVENTORY.md",
-        "bridge-os-poller-setup-prompt.md",
         # The registry files themselves are not their own scaffold targets.
         "managed-artifacts.toml",
         "scaffold-ownership.toml",
@@ -71,21 +71,37 @@ _OWNER_APPROVED_SLICE3_DEFERRAL: frozenset[str] = frozenset(
         "ci/standard/test.yml",
         "ci/integrations/.coderabbitai.yaml",
         "ci/integrations/dependabot.yml",
-        # Project-root scaffold templates (8 files; Slice 3 scope).
+        # Project-root scaffold templates (7 files; Slice 3 scope). project/AGENTS.md was retired
+        # (no scaffold reader; the baseline AGENTS.md is the current source).
         "project/.editorconfig",
         "project/.pre-commit-config.yaml",
-        "project/AGENTS.md",
         "project/Dockerfile",
         "project/Makefile",
         "project/docker-compose.yml",
         "project/env.example",
         "project/settings.local.json",
-        # Codex bootstrap docs (4 files; Slice 3 dual-agent scope).
-        # Release candidate gate managed skill templates.
-        "skills/release-candidate-gate/SKILL.md",
-        "skills/release-candidate-gate/scripts/release_candidate_gate.py",
     }
 )
+
+
+# Non-baseline template files retained for M26.6 (design R-C8): the registry no longer scaffolds rule or
+# skill copies (M15, D15/D34), and these sources have no baseline counterpart, so they stay in place
+# unregistered until that milestone disposes of them (c107 already removed the retired poller rule, the
+# gtkb-bridge helper scripts and the release-candidate-gate templates; six files remain).
+_RETAINED_FOR_M26_6: frozenset[str] = frozenset(
+    {
+        "hooks/bridge-compliance-gate.py",
+        "hooks/session-health.py",
+        "rules/canonical-terminology-policy.toml",
+        "rules/prime-bridge-collaboration-protocol.md",
+        "rules/session-start-orientation.md",
+        "skills/gtkb-baseline-audit/SKILL.md",
+    }
+)
+
+# Authored hook sources run in place from the host baseline; their registry rows carry the host-root path
+# as both template_path and target_path.
+_AUTHORED_SOURCE_PREFIX = ".harness-baseline-configuration/"
 
 
 def _templates_dir() -> Path:
@@ -93,6 +109,11 @@ def _templates_dir() -> Path:
     here = Path(__file__).resolve()
     # tests/test_registry_ast_coverage.py -> groundtruth-kb/templates/
     return here.parents[1] / "templates"
+
+
+def _host_root() -> Path:
+    """Locate the host root (the checkout that holds ``.harness-baseline-configuration/``)."""
+    return Path(__file__).resolve().parents[2]
 
 
 def test_every_file_class_record_template_path_exists() -> None:
@@ -104,6 +125,7 @@ def test_every_file_class_record_template_path_exists() -> None:
     from groundtruth_kb.project.ownership import OwnershipResolver
 
     templates_root = _templates_dir()
+    host_root = _host_root()
     resolver = OwnershipResolver()
     missing: list[str] = []
 
@@ -113,7 +135,8 @@ def test_every_file_class_record_template_path_exists() -> None:
         template_path = getattr(record.source, "template_path", None)
         if not template_path:
             continue
-        if not (templates_root / template_path).is_file():
+        source_root = host_root if template_path.startswith(_AUTHORED_SOURCE_PREFIX) else templates_root
+        if not (source_root / template_path).is_file():
             missing.append(f"{record.id}: {template_path}")
 
     assert not missing, (
@@ -159,7 +182,7 @@ def test_every_template_source_file_has_registry_coverage() -> None:
             # location (dashboard.py reads templates/dashboard directly); they have no application
             # target path and are covered by the dashboard installer's own tests.
             continue
-        if rel in _OWNER_APPROVED_SLICE3_DEFERRAL:
+        if rel in _OWNER_APPROVED_SLICE3_DEFERRAL or rel in _RETAINED_FOR_M26_6:
             continue
         if rel not in registered_template_paths:
             unregistered.append(rel)
@@ -172,6 +195,22 @@ def test_every_template_source_file_has_registry_coverage() -> None:
         f"_NON_SCAFFOLDED_TEMPLATE_FILES allowlist if the file is "
         f"intentionally template-only (documentation, README)."
     )
+
+
+def test_retained_m26_6_template_files_exist_and_are_unregistered() -> None:
+    """Every M26.6 retention entry is a real, unregistered template file (a registered or deleted entry is stale)."""
+    from groundtruth_kb.project.ownership import OwnershipResolver
+
+    templates_root = _templates_dir()
+    registered = {
+        getattr(record.source, "template_path", None)
+        for record in OwnershipResolver().all_records()
+        if record.source_class == "file" and record.source is not None
+    }
+    for rel in sorted(_RETAINED_FOR_M26_6):
+        assert (templates_root / rel).is_file(), rel
+        assert rel not in registered, rel
+    assert not (_RETAINED_FOR_M26_6 & _OWNER_APPROVED_SLICE3_DEFERRAL)
 
 
 def test_owner_approved_slice3_deferral_paths_exist() -> None:

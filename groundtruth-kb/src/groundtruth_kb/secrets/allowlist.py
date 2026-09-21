@@ -3,11 +3,13 @@
 
 Anchored: SPEC-SEC-ALLOWLIST-001 v1 (S333).
 
-Allowlist entries live at ``tests/secrets/fixtures/allowlist.toml`` (tracked).
-Each entry carries ``value`` (exact, case-sensitive), ``path`` (exact relative
-path under ``tests/``), and ``justification`` (free text). The scanner allows
-a finding only when both ``value`` and ``path`` match an entry exactly. Any
-allowlist entry whose path is outside ``tests/`` is rejected on load.
+Allowlist entries live at ``platform_tests/secrets/fixtures/allowlist.toml``
+(tracked; ``entries = []`` today). Each entry carries ``value`` (exact,
+case-sensitive), ``path`` (exact relative path under one of the repository's
+test trees: ``tests/``, ``platform_tests/``, ``groundtruth-kb/tests/``), and
+``justification`` (free text). The scanner allows a finding only when both
+``value`` and ``path`` match an entry exactly. Any allowlist entry whose path is
+outside those test trees is rejected on load.
 
 Per the Codex ``-002`` F1 fix on bridge/gtkb-sec-redaction-commit-gate-001-002.md,
 fixture values must NOT be provider-shaped contiguous committed text — use
@@ -21,7 +23,8 @@ import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-_TESTS_PREFIX = "tests/"
+TEST_TREE_PREFIXES: tuple[str, ...] = ("tests/", "platform_tests/", "groundtruth-kb/tests/")
+DEFAULT_ALLOWLIST_PATH = Path("platform_tests/secrets/fixtures/allowlist.toml")
 
 
 @dataclass(frozen=True)
@@ -67,10 +70,11 @@ class Allowlist:
             if not isinstance(path, str) or not path:
                 raise AllowlistLoadError(f"allowlist.toml entries[{index}]: missing 'path'")
             normalized_path = path.replace("\\", "/")
-            if not normalized_path.startswith(_TESTS_PREFIX):
+            if not normalized_path.startswith(TEST_TREE_PREFIXES):
+                allowed = ", ".join(TEST_TREE_PREFIXES)
                 raise AllowlistLoadError(
                     f"allowlist.toml entries[{index}]: production-path entries are prohibited "
-                    f"(path={path!r}); allowlist values may only sit under {_TESTS_PREFIX!r}."
+                    f"(path={path!r}); allowlist values may only sit under {allowed}."
                 )
             parsed.append(
                 AllowlistEntry(

@@ -71,8 +71,10 @@ def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
+    (root / "AGENTS.md").write_text("Shared root instructions.\n", encoding="utf-8")
     (root / ach.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
-    (root / ach.ROUTING_CONFIG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
+    (root / ach.NATIVE_HOOK_SETTINGS_PATH.parent).mkdir(parents=True, exist_ok=True)
+    (root / ach.NATIVE_HOOK_SETTINGS_PATH).write_text('{"hooks": {}}', encoding="utf-8")
     (root / ach.ROUTING_CONFIG_PATH).write_text(
         """
 schema_version = 1
@@ -105,7 +107,7 @@ default_model = "openrouter-same-model"
         encoding="utf-8",
     )
     for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
-        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
+        relative = Path(".agents") / "skills" / name / "SKILL.md"
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((Path(__file__).resolve().parents[2] / relative).read_bytes())
@@ -236,7 +238,7 @@ def test_shared_native_hook_layer_accepts_real_alibaba_empty_pretool_adapter(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir = root / ach.NATIVE_HOOK_SETTINGS_PATH.parent
     settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
@@ -278,7 +280,7 @@ def test_shared_native_hook_layer_converts_real_alibaba_pretool_timeout_to_block
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir = root / ach.NATIVE_HOOK_SETTINGS_PATH.parent
     settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
@@ -350,7 +352,7 @@ def test_alibaba_user_prompt_timeout_preserves_original_provider_prompt(
     tmp_path: Path,
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir = root / ach.NATIVE_HOOK_SETTINGS_PATH.parent
     settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
@@ -393,7 +395,7 @@ def test_alibaba_native_full_loop_preserves_candidate_when_stop_times_out(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     root = make_root(tmp_path)
-    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir = root / ach.NATIVE_HOOK_SETTINGS_PATH.parent
     settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
@@ -432,7 +434,7 @@ def test_alibaba_native_full_loop_preserves_candidate_when_stop_times_out(
 def test_alibaba_native_full_loop_continues_when_posttool_maintenance_times_out(tmp_path: Path) -> None:
     root = make_root(tmp_path)
     (root / "note.txt").write_text("governed evidence", encoding="utf-8")
-    settings_dir = root / ach.ROUTING_CONFIG_PATH.parent
+    settings_dir = root / ach.NATIVE_HOOK_SETTINGS_PATH.parent
     settings_dir.mkdir(exist_ok=True)
     (settings_dir / "settings.json").write_text(
         json.dumps(
@@ -521,6 +523,7 @@ def test_main_uses_env_only_endpoint_and_never_prints_key(
         assert prompt == "hello"
         assert model_route.key == "alib-route"
         assert selected_endpoint == endpoint
+        assert kwargs["system_prompt"] == "Shared root instructions.\n"
         assert api_key == key
         assert max_turns == 600
         assert kwargs["timeout"] == 900

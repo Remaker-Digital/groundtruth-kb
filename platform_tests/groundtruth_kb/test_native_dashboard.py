@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import socket
 import sqlite3
 import subprocess
 import sys
@@ -15,15 +16,8 @@ from groundtruth_kb.authority_client import AuthorityClient
 from groundtruth_kb.cli import main
 from groundtruth_kb.config import GTConfig
 
-from platform_tests.groundtruth_kb.test_native_authority_service import (
-    history_count,
-    put,
-    seed,
-    work_fields,
-)
-from platform_tests.groundtruth_kb.test_native_authority_service import (
-    native as _native_fixture,
-)
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import native as _native_fixture
 
 native = _native_fixture
 
@@ -87,53 +81,65 @@ def test_native_dashboard_refuses_source_database_as_output_before_effects(tmp_p
     assert not (tmp_path / ".groundtruth").exists()
 
 
-@pytest.mark.skipif(sys.platform != "win32", reason="Windows process handle and venv process-tree behavior")
-def test_dashboard_stop_checks_creation_identity_and_stops_only_its_recorded_process_tree(tmp_path):
-    process = subprocess.Popen(
+@pytest.mark.skipif(sys.platform != "win32", reason="Windows job containment and venv process-tree behavior")
+def test_dashboard_stop_ends_only_the_members_of_its_own_job(tmp_path):
+    """Membership in this runtime's job decides what is signalled: a process outside the job survives the stop even
+    when the launch record names it, and a contained process tree ends with the job; no pid record exists."""
+    foreign = subprocess.Popen(
         [sys.executable, "-c", "import os,time; print(os.getpid(),flush=True); time.sleep(120)"],
         stdout=subprocess.PIPE,
         text=True,
         creationflags=subprocess.CREATE_NO_WINDOW,
     )
-    try:
-        worker_pid = int(process.stdout.readline())
-        paths = dashboard.resolve_dashboard_paths(GTConfig(project_root=tmp_path))
-        record_path = paths.pids_dir / "refresh-service.pid"
-        dashboard._write_pid(record_path, process.pid)
-        record = json.loads(record_path.read_text())
-        assert record["pid"] == process.pid and record["created_at"] and record["executable"]
-        assert dashboard._read_live_pid(record_path) == process.pid
-        # Reusing the number with a different creation identity must never signal it.
-        record["created_at"] += "0"
-        record_path.write_text(json.dumps(record))
-        assert dashboard.stop_dashboard(paths) == []
-        assert process.poll() is None and dashboard._pid_alive(worker_pid)
-        assert not record_path.exists()
-        dashboard._write_pid(record_path, process.pid)
-        assert dashboard.stop_dashboard(paths) == [process.pid]
-        process.wait(timeout=10)
-        assert not dashboard._pid_alive(worker_pid)
-        assert not record_path.exists()
-    finally:
-        if process.poll() is None:
-            subprocess.run(
-                ["taskkill", "/PID", str(process.pid), "/T", "/F"],
-                capture_output=True,
-                timeout=15,
-                creationflags=subprocess.CREATE_NO_WINDOW,
-            )
-            process.wait(timeout=10)
-        process.stdout.close()
-
-
-def test_dashboard_legacy_pid_only_record_cannot_authorize_stopping(tmp_path):
     paths = dashboard.resolve_dashboard_paths(GTConfig(project_root=tmp_path))
-    record_path = paths.pids_dir / "refresh-service.pid"
-    record_path.parent.mkdir(parents=True)
-    record_path.write_text(str(os.getpid()))
+    paths.logs_dir.mkdir(parents=True)
+    job_name = dashboard._dashboard_job_name(paths.runtime_root)
+    job = dashboard._create_dashboard_job(job_name)
+    contained = None
+    try:
+        foreign_worker = int(foreign.stdout.readline())
+        with (paths.logs_dir / "contained.log").open("ab") as log:
+            contained = dashboard._start_contained(
+                [sys.executable, "-c", "import os,time; time.sleep(120)"], tmp_path, dict(os.environ), log, job
+            )
+        dashboard._close_handle(job)
+        job = None
+        foreign_identity = dashboard._process_identity(foreign.pid)
+        dashboard._write_launch_record(
+            paths.launch_record,
+            {"job": job_name, "members": [{"role": "refresh-service", **foreign_identity}]},
+        )
+        stopped = dashboard.stop_dashboard(paths)
+        assert {entry.pid for entry in stopped} >= {contained.pid}
+        assert foreign.pid not in {entry.pid for entry in stopped}
+        assert foreign.poll() is None and dashboard._pid_alive(foreign_worker), "a foreign process was signalled"
+        assert contained.wait(timeout=10) is not None
+        assert not paths.launch_record.exists()
+        assert not (paths.runtime_root / "pids").exists()
+        assert dashboard._open_dashboard_job(job_name) is None
+    finally:
+        if job is not None:
+            dashboard._close_handle(job)
+        for process in (foreign, contained):
+            if process is not None and process.poll() is None:
+                process.kill()
+                process.wait(timeout=10)
+        foreign.stdout.close()
+
+
+def test_dashboard_legacy_pid_record_cannot_authorize_stopping(tmp_path):
+    """A bare pid file from the retired pid-record layout names nothing to this package, and a launch record that
+    is not well-formed is refused for inspection rather than acted on or rewritten."""
+    paths = dashboard.resolve_dashboard_paths(GTConfig(project_root=tmp_path))
+    legacy = paths.runtime_root / "pids" / "refresh-service.pid"
+    legacy.parent.mkdir(parents=True)
+    legacy.write_text(str(os.getpid()))
+    assert dashboard.stop_dashboard(paths) == []
+    assert legacy.read_text() == str(os.getpid())
+    paths.launch_record.write_text(str(os.getpid()))
     with pytest.raises(ValueError, match="requires inspection"):
         dashboard.stop_dashboard(paths)
-    assert record_path.read_text() == str(os.getpid())
+    assert paths.launch_record.read_text() == str(os.getpid())
 
 
 def _free_port():
@@ -321,15 +327,26 @@ HTTPServer(('127.0.0.1',int(os.environ['GF_SERVER_HTTP_PORT'])), Handler).serve_
                 dashboard.start_dashboard(paths, config, config_path=config_path, **ports)
             assert len(launches) == 2
             assert all(process.poll() is not None for process, _ in launches)
-            assert list(paths.pids_dir.iterdir()) == []
+            assert not paths.launch_record.exists()
+            if sys.platform == "win32":
+                assert dashboard._open_dashboard_job(dashboard._dashboard_job_name(paths.runtime_root)) is None
         else:
             first = dashboard.start_dashboard(paths, config, config_path=config_path, **ports)
             second = dashboard.start_dashboard(paths, config, config_path=config_path, **ports)
             assert first == second and len(launches) == 2
+            record = json.loads(paths.launch_record.read_text(encoding="utf-8"))
+            assert {(m["role"], m["pid"]) for m in record["members"]} == {
+                ("refresh-service", first.refresh_pid),
+                ("grafana", first.grafana_pid),
+            }
+            assert record["job"] == first.job
             with pytest.raises(RuntimeError, match="does not match"):
                 dashboard.start_dashboard(paths, config, config_path=config_path, interval_minutes=2, **ports)
             assert all(process.poll() is None for process, _ in launches)
-            assert set(dashboard.stop_dashboard(paths)) == {first.refresh_pid, first.grafana_pid}
+            stopped = dashboard.stop_dashboard(paths)
+            assert {entry.pid for entry in stopped} >= {first.refresh_pid, first.grafana_pid}
+            assert all(entry.outcome == "terminated" and entry.executable for entry in stopped)
+            assert not paths.launch_record.exists()
             assert dashboard.stop_dashboard(paths) == []
     finally:
         for process, identity in launches:
@@ -705,7 +722,10 @@ HTTPServer(('127.0.0.1',int(os.environ['GF_SERVER_HTTP_PORT'])),Handler).serve_f
             base = f"http://127.0.0.1:{ports['refresh_port']}"
             assert _http(base + "/dashboard-data.json")[1]["metrics"]["backlog_active_items"] == 1
             assert _http(base + "/refresh", {}, "test-only-n11-token")[0] == 200
-            assert set(dashboard.stop_dashboard(paths)) == {started.refresh_pid, started.grafana_pid}
+            assert {entry.pid for entry in dashboard.stop_dashboard(paths)} >= {
+                started.refresh_pid,
+                started.grafana_pid,
+            }
             assert all(os.environ[key] == value for key, value in inherited.items())
         finally:
             for process, identity in launches:
@@ -805,3 +825,244 @@ def test_actual_refresh_service_logs_readiness_and_access_to_stderr(dashboard_au
         if process.poll() is None:
             assert dashboard._terminate_pid(process.pid, identity)
         process.wait(timeout=10)
+
+
+# A stand-in for either launch: the refresh stand-in is a parent that spawns the child holding the listener (the
+# Windows venv redirector shape); the Grafana stand-in serves its own health route and spawns a plugin child.
+STAND_IN = """
+import os, pathlib, subprocess, sys, time
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+role, port, payload, pid_file = sys.argv[1], int(sys.argv[2]), sys.argv[3], pathlib.Path(sys.argv[4])
+if role == "refresh-parent":
+    child = subprocess.Popen([sys.executable, __file__, "refresh-child", str(port), payload, str(pid_file)])
+    raise SystemExit(child.wait())
+if role == "plugin":
+    time.sleep(300)
+if role == "grafana":
+    plugin = subprocess.Popen([sys.executable, __file__, "plugin", "0", "{}", "-"])
+    pid_file.write_text(str(plugin.pid), encoding="utf-8")
+else:
+    pid_file.write_text(str(os.getpid()), encoding="utf-8")
+body = payload.encode("utf-8")
+
+
+class Handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, *args):
+        pass
+
+
+HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+"""
+
+
+def _wait_gone(pid, seconds=15.0):
+    import time
+
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if not dashboard._pid_alive(pid):
+            return True
+        time.sleep(0.1)
+    return not dashboard._pid_alive(pid)
+
+
+def _stand_in_runtime(tmp_path, monkeypatch):
+    """A project whose refresh service and Grafana are the spawning stand-ins; returns what the test needs."""
+    config_path = tmp_path / "groundtruth.toml"
+    config_path.write_text("[groundtruth]\n", encoding="utf-8")
+    config = GTConfig.load(config_path=config_path, discover=False)
+    paths = dashboard.resolve_dashboard_paths(config)
+    binary = paths.grafana_home / "bin" / "grafana.exe"
+    binary.parent.mkdir(parents=True)
+    binary.write_bytes(b"Stand-in launch placeholder")
+    (paths.grafana_home / "conf").mkdir()
+    (paths.grafana_home / "conf/defaults.ini").write_text("Stand-in home")
+    stand_in = tmp_path / "stand_in.py"
+    stand_in.write_text(STAND_IN, encoding="utf-8")
+    ports = {"grafana_port": _free_port(), "refresh_port": _free_port()}
+    interval = 7
+    health = json.dumps(
+        {
+            "project_root": str(paths.project_root),
+            "runtime_root": str(paths.runtime_root),
+            "dashboard_db": str(paths.db_path),
+            "interval_seconds": interval * 60,
+            "config_path": str(config_path.resolve()),
+            "grafana_port": ports["grafana_port"],
+            "last_result": {"status": "completed"},
+            "last_error": "",
+            "refreshing": False,
+        }
+    )
+    child_pid, plugin_pid = tmp_path / "refresh-child.pid", tmp_path / "plugin.pid"
+    original_popen = subprocess.Popen
+
+    def spawn(args, **kwargs):
+        if args[0] == "taskkill":
+            return original_popen(args, **kwargs)
+        if args[0] == str(binary):
+            args = [
+                sys.executable,
+                str(stand_in),
+                "grafana",
+                str(ports["grafana_port"]),
+                '{"database": "ok"}',
+                str(plugin_pid),
+            ]
+        else:
+            assert args[:3] == [sys.executable, "-m", "groundtruth_kb.dashboard_service"]
+            args = [sys.executable, str(stand_in), "refresh-parent", str(ports["refresh_port"]), health, str(child_pid)]
+        return original_popen(args, **kwargs)
+
+    monkeypatch.setattr(dashboard.subprocess, "Popen", spawn)
+    return config, config_path, paths, ports, interval, child_pid, plugin_pid
+
+
+def _read_pid(path, seconds=30.0):
+    import time
+
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        if path.exists() and path.read_text(encoding="utf-8").strip():
+            return int(path.read_text(encoding="utf-8"))
+        time.sleep(0.1)
+    raise AssertionError(f"{path} was not written by the stand-in")
+
+
+def _end_stand_ins(paths, pids):
+    """Safety net after a failed assertion: end whatever the job still holds, then any listed pid."""
+    if sys.platform == "win32":
+        job = dashboard._open_dashboard_job(dashboard._dashboard_job_name(paths.runtime_root))
+        if job is not None:
+            try:
+                dashboard._kernel32().TerminateJobObject(job, 1)
+            finally:
+                dashboard._close_handle(job)
+    for pid in pids:
+        if pid and dashboard._pid_alive(pid):
+            subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=30)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="job containment is a Windows mechanism")
+@pytest.mark.timeout(120)
+def test_start_contains_both_trees_in_one_job_and_stop_ends_every_member_without_survivor(tmp_path, monkeypatch):
+    """The refresh stand-in's child (the listener) and the Grafana stand-in's plugin child are born inside the job;
+    start records the job; stop reports every member as terminated, nothing survives, the ports close, the job is
+    gone and no pid file was ever written."""
+    config, config_path, paths, ports, interval, child_pid, plugin_pid = _stand_in_runtime(tmp_path, monkeypatch)
+    pids = []
+    try:
+        started = dashboard.start_dashboard(paths, config, config_path=config_path, interval_minutes=interval, **ports)
+        listener, plugin = _read_pid(child_pid), _read_pid(plugin_pid)
+        pids = [started.refresh_pid, started.grafana_pid, listener, plugin]
+        job_name = dashboard._dashboard_job_name(paths.runtime_root)
+        assert started.job == job_name
+        record = json.loads(paths.launch_record.read_text(encoding="utf-8"))
+        assert record["job"] == job_name and {m["pid"] for m in record["members"]} == {
+            started.refresh_pid,
+            started.grafana_pid,
+        }
+        assert not (paths.runtime_root / "pids").exists()
+        job = dashboard._open_dashboard_job(job_name)
+        assert job is not None, "start did not leave the job alive for its members"
+        try:
+            members = set(dashboard._job_member_pids(job))
+        finally:
+            dashboard._close_handle(job)
+        assert set(pids) <= members, f"launched processes outside the job: {set(pids) - members}"
+        stopped = dashboard.stop_dashboard(paths)
+        by_pid = {entry.pid: entry for entry in stopped}
+        assert set(pids) <= set(by_pid), f"members not reported: {set(pids) - set(by_pid)}"
+        assert all(by_pid[pid].outcome == "terminated" and by_pid[pid].executable for pid in pids)
+        assert set(by_pid) == members, "the report names exactly the members the job held"
+        for pid in pids:
+            assert _wait_gone(pid), f"member {pid} survived the stop"
+        assert not paths.launch_record.exists()
+        assert dashboard._open_dashboard_job(job_name) is None
+        for port in ports.values():
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", port))
+        assert dashboard.stop_dashboard(paths) == []
+    finally:
+        _end_stand_ins(paths, pids)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="job containment is a Windows mechanism")
+@pytest.mark.timeout(120)
+def test_stop_reports_a_member_that_exits_mid_stop_and_still_ends_cleanly(tmp_path, monkeypatch):
+    """A member that ends on its own between the stop's enumeration and its termination is reported as exited, the
+    rest are terminated, and the stop completes without a refusal."""
+    config, config_path, paths, ports, interval, child_pid, plugin_pid = _stand_in_runtime(tmp_path, monkeypatch)
+    pids = []
+    try:
+        started = dashboard.start_dashboard(paths, config, config_path=config_path, interval_minutes=interval, **ports)
+        listener, plugin = _read_pid(child_pid), _read_pid(plugin_pid)
+        pids = [started.refresh_pid, started.grafana_pid, listener, plugin]
+        original_members = dashboard._job_member_pids
+
+        def members_then_plugin_exits(job):
+            members = original_members(job)
+            assert plugin in members
+            subprocess.run(["taskkill", "/PID", str(plugin), "/F"], capture_output=True, timeout=30)
+            assert _wait_gone(plugin)
+            return members
+
+        monkeypatch.setattr(dashboard, "_job_member_pids", members_then_plugin_exits)
+        stopped = dashboard.stop_dashboard(paths)
+        by_pid = {entry.pid: entry for entry in stopped}
+        assert by_pid[plugin].outcome == "exited"
+        assert all(by_pid[pid].outcome == "terminated" for pid in (started.refresh_pid, started.grafana_pid, listener))
+        for pid in pids:
+            assert _wait_gone(pid), f"member {pid} survived the stop"
+        assert not paths.launch_record.exists()
+        assert dashboard._open_dashboard_job(dashboard._dashboard_job_name(paths.runtime_root)) is None
+    finally:
+        _end_stand_ins(paths, pids)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="job containment is a Windows mechanism")
+@pytest.mark.timeout(120)
+def test_start_relaunches_a_dead_member_into_the_existing_job(tmp_path, monkeypatch):
+    """When Grafana's tree has died but the refresh service still runs, a second start reuses the refresh service,
+    launches Grafana into the job that already exists (the handle it opens is made inheritable again), rewrites
+    the record with the new member, and a stop then ends both trees."""
+    config, config_path, paths, ports, interval, child_pid, plugin_pid = _stand_in_runtime(tmp_path, monkeypatch)
+    pids = []
+    try:
+        first = dashboard.start_dashboard(paths, config, config_path=config_path, interval_minutes=interval, **ports)
+        listener, plugin = _read_pid(child_pid), _read_pid(plugin_pid)
+        pids = [first.refresh_pid, first.grafana_pid, listener, plugin]
+        subprocess.run(["taskkill", "/PID", str(first.grafana_pid), "/T", "/F"], capture_output=True, timeout=30)
+        assert _wait_gone(first.grafana_pid) and _wait_gone(plugin)
+        plugin_pid.unlink()
+        second = dashboard.start_dashboard(paths, config, config_path=config_path, interval_minutes=interval, **ports)
+        new_plugin = _read_pid(plugin_pid)
+        pids += [second.grafana_pid, new_plugin]
+        assert second.refresh_pid == first.refresh_pid and second.grafana_pid != first.grafana_pid
+        assert second.job == first.job
+        record = json.loads(paths.launch_record.read_text(encoding="utf-8"))
+        assert {(m["role"], m["pid"]) for m in record["members"]} == {
+            ("refresh-service", first.refresh_pid),
+            ("grafana", second.grafana_pid),
+        }
+        job = dashboard._open_dashboard_job(first.job)
+        assert job is not None
+        try:
+            members = set(dashboard._job_member_pids(job))
+        finally:
+            dashboard._close_handle(job)
+        assert {first.refresh_pid, listener, second.grafana_pid, new_plugin} <= members
+        stopped = {entry.pid for entry in dashboard.stop_dashboard(paths)}
+        assert {first.refresh_pid, listener, second.grafana_pid, new_plugin} <= stopped
+        for pid in (first.refresh_pid, listener, second.grafana_pid, new_plugin):
+            assert _wait_gone(pid), f"member {pid} survived the stop"
+        assert dashboard._open_dashboard_job(first.job) is None
+    finally:
+        _end_stand_ins(paths, pids)

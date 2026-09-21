@@ -232,7 +232,7 @@ Validates the deployed version is functional and existing data is preserved.
 ### Step C.11: Tier 0 Regression Tests
 
 - **Action:** `PROD_URL=https://$TARGET_FQDN WIDGET_KEY=$PREVIEW_WIDGET_KEY AGENTRED_API_KEY=$AGENTRED_API_KEY python -m pytest tests/regression/test_upgrade_regression.py -x -q -m tier0 --tb=short`
-- **Expected:** 17 passed, 0 failed
+- **Expected:** 18 passed, 0 failed
 - **On Fail:** **ROLLBACK IMMEDIATELY.** Tier 0 failures indicate broken core functionality.
 
 ### Step C.12: Tier 1 Regression Tests

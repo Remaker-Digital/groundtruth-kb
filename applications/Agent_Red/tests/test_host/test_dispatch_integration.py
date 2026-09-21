@@ -21,17 +21,17 @@ import os
 import pytest
 
 from src.multi_tenant.superadmin_api._diagnostics import (
+    _INPROCESS_SUITES,
+    _TEST_HOST_URL,
+    _TESTHOST_SUITES,
     VALID_ENVIRONMENTS,
     VALID_SUITES,
-    _INPROCESS_SUITES,
-    _TESTHOST_SUITES,
-    _TEST_HOST_URL,
 )
-
 
 # ---------------------------------------------------------------------------
 # Dispatch routing — correct path for each suite
 # ---------------------------------------------------------------------------
+
 
 class TestDispatchRouting:
     """Verify correct routing between in-process and test host."""
@@ -57,9 +57,6 @@ class TestDispatchRouting:
     def test_property_routes_to_testhost(self):
         assert "property" in _TESTHOST_SUITES
 
-    def test_pipeline_routes_to_testhost(self):
-        assert "pipeline" in _TESTHOST_SUITES
-
     def test_full_routes_to_testhost(self):
         assert "full" in _TESTHOST_SUITES
 
@@ -73,6 +70,7 @@ class TestDispatchRouting:
 # ---------------------------------------------------------------------------
 # Test host URL configuration
 # ---------------------------------------------------------------------------
+
 
 class TestHostConfiguration:
     """Test host URL and connectivity configuration."""
@@ -104,6 +102,7 @@ class TestHostConfiguration:
 # Forwarding payload validation
 # ---------------------------------------------------------------------------
 
+
 class TestForwardingPayload:
     """Verify the payload shape sent to the test host /run endpoint."""
 
@@ -125,6 +124,7 @@ class TestForwardingPayload:
 # ---------------------------------------------------------------------------
 # Suite validation edge cases
 # ---------------------------------------------------------------------------
+
 
 class TestSuiteValidation:
     """Edge cases in suite validation."""
@@ -156,6 +156,7 @@ class TestSuiteValidation:
 # Environment validation edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestEnvironmentValidation:
     """Environment parameter validation."""
 
@@ -175,6 +176,7 @@ class TestEnvironmentValidation:
 # ---------------------------------------------------------------------------
 # Security — no user input in subprocess args
 # ---------------------------------------------------------------------------
+
 
 class TestSecurityBoundaries:
     """Verify test host doesn't expose subprocess injection vectors."""
@@ -206,6 +208,7 @@ class TestSecurityBoundaries:
 # ---------------------------------------------------------------------------
 # HMAC auth contract for verification runner
 # ---------------------------------------------------------------------------
+
 
 class TestHmacAuthContract:
     """HMAC authentication between main API and verification runner."""
@@ -243,10 +246,10 @@ class TestHmacAuthContract:
     def test_wrong_secret_fails(self):
         """Token signed with one secret fails verification with another."""
         from src.multi_tenant.auth import (
+            AuthenticationError,
             generate_verification_token,
             verify_verification_token,
         )
-        from src.multi_tenant.auth import AuthenticationError
 
         token = generate_verification_token("run-wrong", "correct-secret")
         with pytest.raises(AuthenticationError):
@@ -255,10 +258,10 @@ class TestHmacAuthContract:
     def test_tampered_run_id_fails(self):
         """Tampering with the run_id invalidates the HMAC."""
         from src.multi_tenant.auth import (
+            AuthenticationError,
             generate_verification_token,
             verify_verification_token,
         )
-        from src.multi_tenant.auth import AuthenticationError
 
         token = generate_verification_token("run-original", "secret")
         parts = token.split(".")
@@ -269,10 +272,10 @@ class TestHmacAuthContract:
     def test_tampered_timestamp_fails(self):
         """Tampering with the timestamp invalidates the HMAC."""
         from src.multi_tenant.auth import (
+            AuthenticationError,
             generate_verification_token,
             verify_verification_token,
         )
-        from src.multi_tenant.auth import AuthenticationError
 
         token = generate_verification_token("run-ts", "secret")
         parts = token.split(".")
@@ -282,24 +285,21 @@ class TestHmacAuthContract:
 
     def test_empty_secret_rejected(self):
         """Empty secret is rejected."""
-        from src.multi_tenant.auth import verify_verification_token
-        from src.multi_tenant.auth import AuthenticationError
+        from src.multi_tenant.auth import AuthenticationError, verify_verification_token
 
         with pytest.raises(AuthenticationError):
             verify_verification_token("1234.run.abcd", "")
 
     def test_empty_token_rejected(self):
         """Empty token is rejected."""
-        from src.multi_tenant.auth import verify_verification_token
-        from src.multi_tenant.auth import AuthenticationError
+        from src.multi_tenant.auth import AuthenticationError, verify_verification_token
 
         with pytest.raises(AuthenticationError):
             verify_verification_token("", "secret")
 
     def test_malformed_token_rejected(self):
         """Malformed token (wrong number of parts) is rejected."""
-        from src.multi_tenant.auth import verify_verification_token
-        from src.multi_tenant.auth import AuthenticationError
+        from src.multi_tenant.auth import AuthenticationError, verify_verification_token
 
         with pytest.raises(AuthenticationError):
             verify_verification_token("only-one-part", "secret")
@@ -311,7 +311,9 @@ class TestHmacAuthContract:
     def test_constant_time_comparison(self):
         """Verification uses secrets.compare_digest for constant-time check."""
         import inspect
+
         from src.multi_tenant.auth import verify_verification_token
+
         source = inspect.getsource(verify_verification_token)
         assert "compare_digest" in source
 
@@ -320,18 +322,21 @@ class TestHmacAuthContract:
 # Run ID format contract
 # ---------------------------------------------------------------------------
 
+
 class TestRunIdContract:
     """Run ID format expected by SPA and stored in Cosmos."""
 
     def test_generated_run_id_starts_with_prefix(self):
         """Auto-generated run IDs start with 'run-'."""
         import uuid
+
         run_id = f"run-{uuid.uuid4().hex[:12]}"
         assert run_id.startswith("run-")
 
     def test_run_id_is_url_safe(self):
         """Run IDs must be URL-safe (used in path: /status/{run_id})."""
         import uuid
+
         run_id = f"run-{uuid.uuid4().hex[:12]}"
         # URL-safe characters only
         safe_chars = set("abcdefghijklmnopqrstuvwxyz0123456789-_")

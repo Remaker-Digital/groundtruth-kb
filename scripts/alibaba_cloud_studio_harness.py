@@ -45,7 +45,8 @@ LOYAL_OPPOSITION_BRIDGE_SKILLS = base.LOYAL_OPPOSITION_BRIDGE_SKILLS
 CANONICAL_TOOLS = base.CANONICAL_TOOLS
 
 DEFAULT_ENDPOINT = "https://dashscope.aliyuncs.com/apps/anthropic"
-ROUTING_CONFIG_PATH = Path(".api-harness") / "alibaba-cloud-studio" / "routing.toml"
+ROUTING_CONFIG_PATH = Path(".harness-baseline-configuration/routing.toml")
+NATIVE_HOOK_SETTINGS_PATH = Path(".api-harness/alibaba-cloud-studio/settings.json")
 AUTHOR_IDENTITY = "Alibaba Cloud Studio H"
 AUTHOR_HARNESS_ID = "H"
 API_KEY_ENV = "ALIBABA_API_KEY"
@@ -60,6 +61,7 @@ _ALIBABA_PROFILE = base.AdopterProfile(
     auth_env_key=API_KEY_ENV,
     provider_routing_key="alibaba-cloud-studio",
     routing_config_path=ROUTING_CONFIG_PATH,
+    native_hook_settings_path=NATIVE_HOOK_SETTINGS_PATH,
     dialect=base.DIALECT_ANTHROPIC_MESSAGES,
     hook_tier=base.HOOK_TIER_NATIVE_FULL,
     auth_style=base.AUTH_STYLE_AUTHORIZATION_BEARER,
@@ -200,15 +202,21 @@ def run_tool_loop(
     )
 
 
-def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
-    """Load current neutral bridge instructions without assigning a runtime role."""
+def build_system_prompt(skill: str | None, project_root: Path) -> str:
+    """Load shared root instructions and the selected skill without assigning a role."""
+    root_source = project_root / "AGENTS.md"
+    if not root_source.resolve().is_relative_to(project_root.resolve()):
+        raise AlibabaCloudStudioHarnessError("Shared root instructions resolve outside the project root")
+    try:
+        root_instructions = root_source.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise AlibabaCloudStudioHarnessError("Shared root instructions are unavailable: AGENTS.md") from exc
+    if not root_instructions.strip():
+        raise AlibabaCloudStudioHarnessError("Shared root instructions are unavailable: empty AGENTS.md")
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return None
+        return root_instructions
     selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
-    sources = [
-        project_root / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
-        for name in ("gtkb-bridge", selected)
-    ]
+    sources = [project_root / ".agents" / "skills" / name / "SKILL.md" for name in ("gtkb-bridge", selected)]
     try:
         instructions = [path.read_text(encoding="utf-8") for path in sources]
     except (OSError, UnicodeError) as exc:
@@ -217,7 +225,7 @@ def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
         raise AlibabaCloudStudioHarnessError(
             "Current canonical bridge skill instructions are unavailable: empty source"
         )
-    return "\n\n".join(instructions)
+    return "\n\n".join([root_instructions, *instructions])
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -226,9 +234,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--model",
         default=DEFAULT_MODEL_ROUTE,
-        help="Routing model key from .api-harness/alibaba-cloud-studio/routing.toml.",
+        help="Routing model key from .harness-baseline-configuration/routing.toml.",
     )
-    parser.add_argument("--skill", help="Skill or task route key from .api-harness/alibaba-cloud-studio/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .harness-baseline-configuration/routing.toml.")
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
     parser.add_argument(

@@ -2,8 +2,11 @@
 
 The former frozen acceptance module required eight carriers to be current and fully evaluable from the retired local
 store. The current corpus is read here with each carrier's expected status; the active carriers must carry stated
-authority, unique outer assertion ids, live root-bound enforcement sources and a PASS from the artifact evaluator
-wherever executable assertions exist. Carriers without executable assertions are named, not silently tolerated.
+authority, unique outer assertion ids, live root-bound enforcement sources, a PASS from the artifact evaluator
+wherever inline assertions exist and, wherever the evaluator reports UNASSESSED, at least one TEST row of the carrier
+that names an executable test module of this repository (read from /v1/tests, function verified when named). A
+carrier's required test artifacts must each exist and be bound that way. Every active carrier proves an executable
+binding natively; nothing is named.
 """
 
 from __future__ import annotations
@@ -29,13 +32,6 @@ AUTHORITY_CARRIERS = {
     "DCL-SESSION-ROLE-RESOLUTION-001": "active",
     "DCL-CHANGE-CONTROLLED-ARTIFACT-EVALUABILITY-001": "active",
 }
-# Active carriers whose imported records carry no executable assertion; the evaluator reports them UNASSESSED.
-# Adding executable assertions to them is formal work, not a test concern; removing a name here requires that work.
-WITHOUT_EXECUTABLE_ASSERTIONS = {
-    "DCL-ACTIVITY-CONTEXT-MANIFEST-001",
-    "GOV-SOURCE-OF-TRUTH-FRESHNESS-001",
-    "GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001",
-}
 
 
 @pytest.fixture(scope="module")
@@ -59,20 +55,28 @@ def _active(carriers: dict[str, dict]) -> dict[str, dict]:
     return {record_id: record for record_id, record in carriers.items() if record["status"] == "active"}
 
 
-def test_active_carriers_are_stated_and_uniquely_asserted(carriers):
+@pytest.fixture(scope="module")
+def bindings(executable_test_bindings, carriers) -> dict[str, list[dict]]:
+    """Executable TEST rows per active carrier, read natively (the conftest fixture states the executable rule)."""
+    return {record_id: executable_test_bindings(record_id) for record_id in _active(carriers)}
+
+
+def _inline_assertion_ids(record: dict) -> list:
+    return [item.get("id") for item in record.get("assertions") or [] if isinstance(item, dict)]
+
+
+def test_active_carriers_are_stated_and_uniquely_asserted(carriers, bindings):
     problems: list[str] = []
     for record_id, record in _active(carriers).items():
         if record.get("authority") != "stated":
             problems.append(f"{record_id}: authority is {record.get('authority')!r}, expected 'stated'")
-        assertion_ids = [item.get("id") for item in record.get("assertions") or [] if isinstance(item, dict)]
+        assertion_ids = _inline_assertion_ids(record)
         if any(not assertion_id for assertion_id in assertion_ids):
             problems.append(f"{record_id}: every outer assertion requires an id")
         if len(assertion_ids) != len(set(assertion_ids)):
             problems.append(f"{record_id}: duplicate outer assertion ids")
-        if not assertion_ids and record_id not in WITHOUT_EXECUTABLE_ASSERTIONS:
-            problems.append(f"{record_id}: no executable assertion and not named as such")
-        if assertion_ids and record_id in WITHOUT_EXECUTABLE_ASSERTIONS:
-            problems.append(f"{record_id}: now carries executable assertions; remove it from the named list")
+        if not assertion_ids and not bindings[record_id]:
+            problems.append(f"{record_id}: no inline assertion and no executable TEST binding")
     assert not problems, "\n".join(problems)
 
 
@@ -95,7 +99,7 @@ def test_active_carrier_enforcement_sources_are_live_root_bound_files(carriers):
     assert not problems, "\n".join(problems)
 
 
-def test_active_carriers_with_executable_assertions_evaluate_to_pass(evaluator, carriers):
+def test_active_carriers_with_executable_assertions_evaluate_to_pass(evaluator, carriers, bindings):
     outcomes = {
         record_id: evaluator.evaluate_spec(record, project_root=REPO_ROOT)
         for record_id, record in _active(carriers).items()
@@ -103,8 +107,26 @@ def test_active_carriers_with_executable_assertions_evaluate_to_pass(evaluator, 
     failures = [
         f"{record_id}: {result['carrier_result']} ({result['evaluation_reason']})"
         for record_id, result in outcomes.items()
-        if record_id not in WITHOUT_EXECUTABLE_ASSERTIONS and result["carrier_result"] != "PASS"
+        if _inline_assertion_ids(carriers[record_id]) and result["carrier_result"] != "PASS"
+    ]
+    failures += [
+        f"{record_id}: UNASSESSED ({result['evaluation_reason']}) and no executable TEST binding"
+        for record_id, result in outcomes.items()
+        if result["carrier_result"] == "UNASSESSED" and not bindings[record_id]
     ]
     assert not failures, "\n".join(failures)
-    unassessed = {record_id for record_id, result in outcomes.items() if result["carrier_result"] == "UNASSESSED"}
-    assert unassessed == WITHOUT_EXECUTABLE_ASSERTIONS, unassessed ^ WITHOUT_EXECUTABLE_ASSERTIONS
+
+
+def test_required_test_artifacts_have_executable_bindings(carriers, bindings):
+    problems: list[str] = []
+    for record_id, record in _active(carriers).items():
+        constraints = record.get("constraints")
+        required = constraints.get("required_test_artifacts") if isinstance(constraints, dict) else None
+        bound_files = {Path(row["test_file"]).as_posix() for row in bindings[record_id]}
+        for raw_path in required or []:
+            module = Path(raw_path).as_posix()
+            if not (REPO_ROOT / module).is_file():
+                problems.append(f"{record_id}: required test artifact is missing: {raw_path}")
+            elif module not in bound_files:
+                problems.append(f"{record_id}: required test artifact has no executable TEST binding: {raw_path}")
+    assert not problems, "\n".join(problems)

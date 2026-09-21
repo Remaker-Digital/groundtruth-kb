@@ -14,17 +14,10 @@ import sys
 
 import pytest
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put  # noqa: F401
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, harness_fields, history_count, put
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-
-def harness_fields(**extra):
-    fields = {"harness_name": "qualification", "harness_type": "test", "capabilities_ref": "qualification.json"}
-    fields.update(extra)
-    return fields
 
 
 def test_harness_is_created_registered_and_follows_the_lifecycle_graph(native):
@@ -140,7 +133,11 @@ def test_the_ordinary_cli_records_a_harness_through_a_served_authority(native, t
         assert refused.returncode != 0 and "invalid_harness_transition" in refused.stderr
         shown = gt("harness", "show", "H-CLI")
         assert shown.returncode == 0 and json.loads(shown.stdout)["version"] == 1
-        assert client.get("/v1/harnesses/H-CLI").json()["harness_name"] == "cli-recorded"
+        current = client.get("/v1/harnesses/H-CLI").json()
+        assert current["harness_name"] == "cli-recorded"
+        assert current["capabilities_ref"] == harness_fields()["capabilities_ref"]
+        assert not (tmp_path / "harness-state").exists()
+        assert not (tmp_path / "groundtruth.db").exists()
     finally:
         if process.poll() is None:
             process.terminate()

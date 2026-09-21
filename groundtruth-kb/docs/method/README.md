@@ -17,9 +17,9 @@ Engineering discipline for AI-powered systems — from specification to producti
 | 07 | [Session Discipline](07-sessions.md) | Session IDs, wrap-up procedures, audit cadence |
 | 08 | [Architecture Decisions](08-architecture.md) | ADR/DCL information, native authoring and bounded verification evidence |
 | 09 | [Adoption & Promotion](09-adoption.md) | Upstream/downstream model, managed files, update procedures |
-| 10 | [KB Tooling](10-tooling.md) | Installation, CLI commands, web UI, configuration |
+| 10 | [KB Tooling](10-tooling.md) | Installation, CLI commands, configuration, automation |
 | 11 | [Operational Configuration Capture](11-operational-configuration.md) | How to capture bridges, automations, directives, and role configuration |
-| 12 | [File Bridge Automation](12-file-bridge-automation.md) | Durable file bridge polling, status semantics, prompts, plugins, skills, and scheduler capture |
+| 12 | [Native bridge coordination](12-file-bridge-automation.md) | Current context, claims, authored delivery, verification and terminal cleanup through native services |
 
 ## Architecture documents
 

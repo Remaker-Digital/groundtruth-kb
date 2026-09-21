@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Deployment automation writers and the specification verification marker (WI-7860, WI-7861; owner ruling D17)
+
+- `scripts/_defect_reporter.py::create_defect` records DEFECT work items through
+  the native authority: `AuthorityClient` on the configured `authority_url`, a
+  client-chosen `WI-NNNN` from a paged listing, a CAS create under
+  `PROJECT-GTKB-NATIVE-APPLICATION-LIFECYCLE` with the pipeline's explicit actor,
+  reason, governing specification and own executable test, and an exact readback.
+  Every failure raises `DefectReportError`; the retired `tools/knowledge-db` path
+  and the warn-and-continue `None` return are gone from `scripts/test_pipeline.py`,
+  `scripts/deploy_pipeline.py`, `scripts/deploy_orchestrator.py` and the Agent Red
+  copy. `scripts/test_pipeline.py::_record_phase_result` is retired (the native
+  authority has no execution-result route); the pre-flight checklist's call site,
+  which cited the retired SPEC-1617, is retired with it.
+- `PUT /v1/specifications/{id}` (`gt spec record`) accepts
+  `implementation_verified_at: true` — service-stamped, refused with
+  `verification_evidence_required` unless an executable test of the specification
+  sits in an active test-plan phase — and `null` to clear the marker;
+  `gt kb reconcile --provisionals` (R26) now reports API-set markers.
+
 ### Added — Session-start orientation gate (gtkb-session-start-orientation-gate)
 
 - **ORIENT block contract** in `templates/rules/session-start-orientation.md` with

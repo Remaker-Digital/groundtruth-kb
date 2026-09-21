@@ -4,9 +4,9 @@ import pytest
 from groundtruth_kb.bridge.native import parse_authored_message
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 
 @pytest.mark.parametrize("context", ["pb1", "lo1"])

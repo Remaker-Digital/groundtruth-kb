@@ -563,6 +563,12 @@ def plan_scaffold(options: ScaffoldOptions) -> ScaffoldPlan:
             generated.append(name)
         for name, identity in rendered["inputs"].items():
             inputs[host / name] = identity
+    # Root files are never generated (owner ruling R1 option B): AGENTS.md is tracked
+    # source and the root pointers are declared, so no rendered write may sit at the
+    # application root where the derived-roots ignore rule below would swallow it.
+    root_level = sorted(name for name in generated if "/" not in name)
+    if root_level:
+        raise ValueError("Projection emitted a root-level file: " + ", ".join(root_level))
     generated_roots = sorted({name.split("/")[0] + "/" for name in generated})
     if generated_roots:
         files[".gitignore"] += ("\n# Derived harness configuration\n" + "\n".join(generated_roots) + "\n").encode()

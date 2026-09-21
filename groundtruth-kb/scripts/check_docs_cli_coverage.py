@@ -250,19 +250,14 @@ def check_no_stale_github_install() -> list[str]:
     Since v0.3.1, groundtruth-kb is published to PyPI. Current install guidance
     should use ``pip install groundtruth-kb`` or ``pip install "groundtruth-kb[extra]"``.
     GitHub direct references (``@ git+https://...``) in docs are stale unless they
-    are in the changelog, the publish workflow smoke test, or explicitly framed as
+    are in the changelog or explicitly framed as
     source-install alternatives.
     """
     failures: list[str] = []
     git_ref_pattern = re.compile(r"groundtruth-kb.*@\s*git\+https://")
 
-    # Files where GitHub direct refs are intentionally kept
-    intentional_git_refs = {
-        ROOT / ".github" / "workflows" / "publish.yml",  # smoke test
-    }
-
     for filepath in _collect_scannable_files():
-        if _is_changelog(filepath) or filepath in intentional_git_refs:
+        if _is_changelog(filepath):
             continue
         text = filepath.read_text(encoding="utf-8")
         for i, line in enumerate(text.splitlines(), 1):

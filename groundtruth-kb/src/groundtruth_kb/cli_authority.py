@@ -62,6 +62,9 @@ def _emit(value: Any, json_output: bool, *, complete: bool = False) -> None:
                 )
             elif record.get("artifact_type") == "spec":
                 label = f"{record['project_id']} -> {record['artifact_ref']} [{record['status']}]"
+            elif record.get("artifact_type") in {"bridge_thread", "completion_guard"}:
+                kind = f"{record['artifact_type']}:{record['artifact_ref']}"
+                label = f"{record['project_id']} -> {kind} [{record['status']}]"
             click.echo(f"{record['id']} v{record.get('version', '?')}: {label}")
             description = record.get("description", record.get("definition"))
             if description:
@@ -127,6 +130,14 @@ def _domain_group(name: str, domain: str, *, read_only: bool = False, help: str 
     @click.option("--spec-id", default=None)
     @click.option("--plan-id", default=None)
     @click.option("--project-id", default=None, hidden=domain != "project-formal-links")
+    @click.option(
+        "--artifact-type",
+        "artifact_type",
+        type=click.Choice(["spec", "bridge_thread", "completion_guard"]),
+        default=None,
+        hidden=domain != "project-formal-links",
+        help="Formal-link kind to list; defaults to spec.",
+    )
     @click.option(
         "--repository-ref",
         default=None,
@@ -232,7 +243,8 @@ NATIVE_COMMANDS: dict[str, click.Command] = {
 
 
 projects_group.add_command(_domain_group("dependencies", "project-dependencies"))
-projects_group.add_command(_domain_group("formal-links", "project-formal-links"))
+formal_links_group = _domain_group("formal-links", "project-formal-links")
+projects_group.add_command(formal_links_group)
 
 
 @click.group("validate")
@@ -304,16 +316,33 @@ def harness_diagnostic(ctx: click.Context, harness_id: str, native_context_id: s
 
 @click.command("assert")
 @click.option("--spec", "spec_id", default=None, help="Evaluate one current specification.")
+@click.option(
+    "--scope",
+    "application_scope",
+    default=None,
+    help=(
+        "Application scope to evaluate: gtkb_platform or application:<name>. Default: application:<name> from the "
+        "project root's application.toml marker, else gtkb_platform. Records with no scope are evaluated as well "
+        "and counted; records of another scope are excluded."
+    ),
+)
 @click.option("--triggered-by", default="cli", help="Label this observation; no execution history is written.")
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
-def native_assert(ctx: click.Context, spec_id: str | None, triggered_by: str, json_output: bool) -> None:
+def native_assert(
+    ctx: click.Context, spec_id: str | None, application_scope: str | None, triggered_by: str, json_output: bool
+) -> None:
     """Observe current definitions from one selected authority without canonical writes."""
     from groundtruth_kb.assertions import format_summary, run_all_assertions
+    from groundtruth_kb.isolation.scope import ApplicationScopeError, select_application_scope
 
     config = _config(ctx)
     client = _client(ctx, config=config)
     project_root = config.project_root.resolve()
+    try:
+        scope = select_application_scope(project_root, application_scope)
+    except ApplicationScopeError as error:
+        raise click.ClickException(f"{error.code}: {error}") from error
 
     class CurrentSpecifications:
         def get_spec(self, ident: str) -> dict[str, Any]:
@@ -352,12 +381,22 @@ def native_assert(ctx: click.Context, spec_id: str | None, triggered_by: str, js
                 cursors.add(next_after)
                 after = next_after
 
-    summary = run_all_assertions(CurrentSpecifications(), project_root, triggered_by=triggered_by, spec_id=spec_id)
+    summary = run_all_assertions(
+        CurrentSpecifications(), project_root, triggered_by=triggered_by, spec_id=spec_id, application_scope=scope
+    )
     current = _config(ctx)
-    if (current.authority_url, current.project_root.resolve()) != (config.authority_url, project_root):
+    try:
+        current_scope = select_application_scope(current.project_root.resolve(), application_scope)
+    except ApplicationScopeError:
+        current_scope = None
+    if (current.authority_url, current.project_root.resolve(), current_scope) != (
+        config.authority_url,
+        project_root,
+        scope,
+    ):
         raise click.ClickException(
-            "assertion_configuration_changed: The selected authority or project root changed during evaluation. "
-            "Read the current configuration and evaluate again."
+            "assertion_configuration_changed: The selected authority, project root or application scope changed "
+            "during evaluation. Read the current configuration and evaluate again."
         )
     if json_output:
         _emit(summary, True)
@@ -387,6 +426,18 @@ def set_project_authorization(ctx: click.Context, /, project_id: str, json_outpu
     )
 
 
+@projects_group.command("retire")
+@click.option("--id", "record_id", required=True, help="Active program or execution project to retire.")
+@click.option("--reason", required=True, help="Change reason recorded with the retired version.")
+@click.option("--expected-version", type=click.IntRange(1), required=True, help="Current project version.")
+@click.option("--actor", required=True, help="Attribution recorded with the retired version.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def retire_project(ctx: click.Context, /, record_id: str, json_output: bool, **body: Any) -> None:
+    """Retire one active program or project by status only, with history; authorization, memberships and links stay."""
+    _emit(_call(ctx, "POST", f"/v1/projects/{quote(record_id, safe='')}/retire", body=body), json_output, complete=True)
+
+
 @projects_group.command("readiness")
 @click.argument("project_id")
 @click.option("--gate", type=click.Choice(["readiness", "closure"]), default="readiness", show_default=True)
@@ -404,6 +455,20 @@ def project_readiness(ctx: click.Context, project_id: str, gate: str, json_outpu
 def work_item_readiness(ctx: click.Context, work_item_id: str, json_output: bool) -> None:
     """Explain whether this item's reviewed or committed predecessors are available."""
     _emit(_call(ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/readiness"), json_output)
+
+
+@backlog_group.command("retire")
+@click.option("--id", "record_id", required=True, help="Open work item to retire.")
+@click.option("--reason", required=True, help="Change reason recorded with the retired version.")
+@click.option("--expected-version", type=click.IntRange(1), required=True, help="Current work-item version.")
+@click.option("--actor", required=True, help="Attribution recorded with the retired version.")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def retire_work_item(ctx: click.Context, /, record_id: str, json_output: bool, **body: Any) -> None:
+    """Retire one open work item by status only, with history; its parent, links and notes are preserved."""
+    _emit(
+        _call(ctx, "POST", f"/v1/work-items/{quote(record_id, safe='')}/retire", body=body), json_output, complete=True
+    )
 
 
 @projects_group.command("move-item")
@@ -620,6 +685,18 @@ def bind_session(ctx: click.Context, /, json_output: bool, **body: Any) -> None:
 def show_session(ctx: click.Context, native_context_id: str, json_output: bool) -> None:
     """Resolve the supplied native context, with no fallback to another session."""
     _emit(_call(ctx, "GET", "/v1/sessions/binding", query={"native_context_id": native_context_id}), json_output)
+
+
+@native_session_group.command("scratch-teardown")
+@click.option("--native-context-id", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def scratch_teardown(ctx: click.Context, /, json_output: bool, **body: Any) -> None:
+    """Remove exactly this context's disposable scratch directory; a partial outcome exits 1."""
+    result = _call(ctx, "POST", "/v1/sessions/scratch-teardown", body=body)
+    _emit(result, json_output)
+    if result["status"] == "partial":
+        raise click.exceptions.Exit(1)
 
 
 @click.group("bridge")
@@ -926,14 +1003,14 @@ def dashboard_start(
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
 def dashboard_stop(ctx: click.Context, runtime_root: Path | None, json_output: bool) -> None:
-    """Stop the launches recorded for this runtime after checking process identity."""
+    """End every process of this runtime's dashboard job and report each one."""
     from groundtruth_kb.dashboard import resolve_dashboard_paths, stop_dashboard
 
     try:
         stopped = stop_dashboard(resolve_dashboard_paths(_config(ctx), runtime_root=runtime_root))
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         raise click.ClickException(str(error)) from error
-    _emit({"stopped": stopped}, json_output)
+    _emit({"stopped": [asdict(process) for process in stopped]}, json_output)
 
 
 @dashboard_group.command("serve")

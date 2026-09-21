@@ -2,8 +2,8 @@
 
 This document defines what a Repeatable Procedure is, how to create one, and how to maintain one. All procedures referenced here are operational SOPs (Standard Operating Procedures) that must be executable with consistent results across sessions and operators.
 
-> **Audience:** AI assistants (Claude) and human operators.
-> **Authority:** This specification is referenced from `CLAUDE.md` and governs all files tagged as Repeatable Procedures.
+> **Audience:** Agents and human operators.
+> **Source:** These are maintained application operating instructions under current canonical requirements, including SPEC-1830. Generated harness instructions do not grant authority.
 
 ---
 
@@ -303,7 +303,7 @@ VARIABLES:
   PROD_URL           = https://agent-red-api-gateway.orangeglacier-f566a4e7.eastus.azurecontainerapps.io
   WIDGET_KEY         = (from .env.local PREVIEW_WIDGET_KEY; rotates on every re-seed)
   AGENTRED_API_KEY   = (superadmin user API key — must match .env.local SUPERADMIN_PREVIEW_API_KEY; rotates on every re-seed)
-  TIER0_COUNT        = 17
+  TIER0_COUNT        = 18
   TIER1_COUNT        = 28
   TIER2_COUNT        = 10
 
@@ -317,7 +317,7 @@ PRECONDITIONS:
 STEPS:
   STEP 1: Run Tier 0 (Blocking — rollback if any fail)
     ACTION:    PROD_URL=$PROD_URL WIDGET_KEY=$WIDGET_KEY python -m pytest tests/regression/test_upgrade_regression.py -x -q -m tier0 --tb=short
-    EXPECTED:  17 passed, 0 failed
+    EXPECTED:  18 passed, 0 failed
     VERIFY:    Exit code 0; summary line shows "$TIER0_COUNT passed"
     ON FAIL:   STOP. Rollback deployment immediately (scripts/deploy/rollback.ps1).
 
@@ -341,7 +341,7 @@ POSTCONDITIONS:
 KNOWN FAILURE MODES:
   | Failure | Classification | Resolution |
   |---------|---------------|------------|
-  | NATS not ready (503 on chat endpoints) | Environment transient | Wait 30-60s after deployment for NATS warmup. Tests skip 503 gracefully. |
+  | NATS not ready (503 on chat endpoints) | Environment transient | Wait 30-60s after deployment for NATS warmup. Tier 1/2 chat tests skip 503; Tier 0 requires /ready 200 and a 201 conversation, so a 503 there is a failure. |
   | AGENTRED_API_KEY not set → Tier 1 skips | Environment (operator) | Set env var before running: $env:AGENTRED_API_KEY = "ar_user_..." |
   | Production unreachable → entire suite skips | Environment transient | conftest.py skips all tests if /health fails connectivity check |
   | Health P95 latency spike after deploy | Environment transient | Cold start. Re-run Tier 2 after 5 minutes. |

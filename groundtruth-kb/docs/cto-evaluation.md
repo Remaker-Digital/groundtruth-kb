@@ -68,7 +68,7 @@ gt dashboard start
 Open:
 
 ```text
-http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard
+http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard
 ```
 
 Refresh manually when needed:

@@ -16,9 +16,11 @@ def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
+    (root / "AGENTS.md").write_text("Shared root instructions.\n", encoding="utf-8")
     (root / orh.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
+    (root / orh.NATIVE_HOOK_SETTINGS_PATH.parent).mkdir(parents=True, exist_ok=True)
     (root / orh.ROUTING_CONFIG_PATH.parent / "hooks").mkdir(parents=True)
-    (root / orh.ROUTING_CONFIG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
+    (root / orh.NATIVE_HOOK_SETTINGS_PATH).write_text('{"hooks": {}}', encoding="utf-8")
     (root / "scripts").mkdir()
     for guard in {*orh.BRIDGE_WRITE_GUARDS, *orh.BRIDGE_EDIT_GUARDS, *orh.WRITE_EDIT_GUARDS, *orh.BASH_GUARDS}:
         path = root / guard
@@ -44,7 +46,7 @@ max_turns = 600
         encoding="utf-8",
     )
     for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
-        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
+        relative = Path(".agents") / "skills" / name / "SKILL.md"
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((Path(__file__).resolve().parents[2] / relative).read_bytes())
@@ -188,6 +190,7 @@ def test_main_loads_env_local_key_before_live_dispatch(
         assert project_root == root.resolve()
         assert max_turns == 600
         assert kwargs["skill"] == "bridge-review"
+        assert kwargs["system_prompt"].startswith("Shared root instructions.\n")
         assert kwargs["timeout"] == 900
         assert kwargs["session_timeout"] == 3600
         return "done"

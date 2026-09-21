@@ -20,6 +20,10 @@ STANDALONE = ADMIN / "standalone"
 SHARED = ADMIN / "shared"
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 CLAUDE_DIR = Path(__file__).resolve().parents[2] / ".claude"
+# The never-remove rule's authored carrier (M15, R1 option B: root CLAUDE.md is a pointer to AGENTS.md).
+GOVERNANCE_RULE = (
+    Path(__file__).resolve().parents[2] / ".harness-baseline-configuration" / "rules" / "governance-principles.md"
+)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -237,9 +241,10 @@ class TestSpec0472NeverRemoveWithoutApproval:
     """SPEC-0472: Code, tests, features MUST NEVER be removed without approval."""
 
     def test_rule_in_claude_md(self):
-        claude_md = Path(__file__).resolve().parents[2] / "CLAUDE.md"
-        src = claude_md.read_text(encoding="utf-8")
-        assert "Never remove" in src or "never remove" in src, "CLAUDE.md must enforce never-remove rule"
+        # R1 option B: the root CLAUDE.md is the @AGENTS.md pointer; the rule is carried by the authored
+        # governance-principles rule that every host reads on demand.
+        src = GOVERNANCE_RULE.read_text(encoding="utf-8")
+        assert "Never remove" in src or "never remove" in src, "the governance rule must enforce never-remove"
         assert "explicit owner approval" in src.lower() or "owner approval" in src.lower(), (
             "Must require explicit owner approval"
         )
@@ -322,8 +327,7 @@ class TestSpec0744NeverRemoveRule:
     """SPEC-0744: Never remove code/tests/features without owner approval."""
 
     def test_protected_behavior_rule(self):
-        claude_md = Path(__file__).resolve().parents[2] / "CLAUDE.md"
-        src = claude_md.read_text(encoding="utf-8")
+        src = GOVERNANCE_RULE.read_text(encoding="utf-8")
         assert "Never remove" in src, "Must enforce never-remove rule"
 
 
@@ -364,7 +368,6 @@ class TestSpec0850NeverRemoveRule2:
     """SPEC-0850: Never remove code/tests/features without approval (restatement)."""
 
     def test_protected_removal_rule(self):
-        claude_md = Path(__file__).resolve().parents[2] / "CLAUDE.md"
-        src = claude_md.read_text(encoding="utf-8")
+        src = GOVERNANCE_RULE.read_text(encoding="utf-8")
         assert "NEVER" in src or "never" in src, "Must have never-remove rule"
         assert "owner approval" in src.lower(), "Must require owner approval"

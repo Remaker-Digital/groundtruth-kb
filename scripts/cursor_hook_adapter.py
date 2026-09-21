@@ -189,6 +189,7 @@ def main() -> int:
     payload = _read_payload()
     adapted_in = _to_claude_pretooluse(payload)
     env = os.environ.copy()
+    env.setdefault("GTKB_PROJECT_ROOT", str(PROJECT_ROOT))
     env.setdefault("GTKB_HARNESS_NAME", "cursor")
     env.setdefault("GTKB_HARNESS_ID", "E")
     env.setdefault("GTKB_AUTHOR_MODEL", "Composer")
@@ -212,7 +213,7 @@ def main() -> int:
     if creationflags:
         run_kwargs["creationflags"] = creationflags
 
-    completed = subprocess.run([sys.executable, str(target), *sys.argv[2:]], **run_kwargs)
+    completed = subprocess.run([sys.executable, "-B", str(target), *sys.argv[2:]], **run_kwargs)
     if completed.stderr:
         sys.stderr.write(completed.stderr)
     stdout = (completed.stdout or "").strip()

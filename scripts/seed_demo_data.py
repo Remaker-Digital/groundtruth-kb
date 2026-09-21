@@ -11,10 +11,11 @@ Usage:
     # Write to Cosmos DB:
     python scripts/seed_demo_data.py --seed
 
-    # Also seed knowledge base (32 articles):
+    # Also seed the knowledge base:
     python scripts/seed_demo_data.py --seed --seed-kb
 
-Requires Azure credentials in .env.local:
+Requires Azure credentials in applications/Agent_Red/.env.local or the environment:
+    SEED_TENANT_ID selects the target tenant (default: remaker-digital-001).
     COSMOS_DB_ENDPOINT, COSMOS_DB_KEY, COSMOS_DB_DATABASE
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -29,21 +30,22 @@ import os
 import random
 import sys
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 # ---------------------------------------------------------------------------
 # Project setup
 # ---------------------------------------------------------------------------
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+APP_ROOT = REPO_ROOT / "applications" / "Agent_Red"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-# Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+from scripts._env import load_env_local  # noqa: E402 - standalone script bootstrap
 
-load_env_local()
+if str(APP_ROOT) not in sys.path:
+    sys.path.insert(0, str(APP_ROOT))
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -53,7 +55,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 TENANT_ID = "remaker-digital-001"
-NOW = datetime.now(timezone.utc)
+NOW = datetime.now(UTC)
 BILLING_PERIOD = NOW.strftime("%Y-%m")
 
 # Customer personas for realistic conversations
@@ -80,7 +82,7 @@ CONVERSATION_TEMPLATES = [
                 "content": "Hi, I'm interested in Agent Red for my Shopify store. How does the pricing work?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Welcome! Agent Red offers three tiers:\n\n- **Starter** ($149/mo): 1,000 conversations included\n- **Professional** ($399/mo): 5,000 conversations included\n- **Enterprise** ($999/mo): 20,000 conversations included\n\nAll plans include our full AI pipeline with 6 specialized agents, Persistent Customer Memory, and fail-closed safety validation. Would you like me to help you estimate which tier fits your store's volume?",
             },
             {
@@ -88,12 +90,12 @@ CONVERSATION_TEMPLATES = [
                 "content": "We get about 3,000 support messages a month. Which plan would you recommend?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Based on 3,000 monthly conversations, the **Professional plan** ($399/mo) would be ideal. It includes 5,000 conversations, giving you room to grow. You'd also get cross-session learning (Layer 3 memory) which builds customer preference profiles over time.\n\nAt your volume, the effective cost per conversation is about $0.08 - compared to $0.40-$1.00+ with competitors like Gorgias or Tidio Pro. That's 4-12x more cost-effective.\n\nWould you like to start a 14-day free trial?",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "setup",
@@ -103,22 +105,22 @@ CONVERSATION_TEMPLATES = [
                 "content": "I just installed the Agent Red app on my Shopify store. How do I set it up?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Great choice! Here's how to get started:\n\n1. **Complete the Setup Wizard** - Go to the Agent Red admin panel. The 9-step wizard will guide you through brand voice, escalation rules, and widget appearance.\n\n2. **Seed your Knowledge Base** - Add your FAQs, product info, and policies. The AI uses this to answer customer questions accurately.\n\n3. **Customize your Widget** - Choose colors, position, greeting message, and avatar to match your store's brand.\n\n4. **Enable the Chat Widget** - In Shopify Admin > Online Store > Themes > Customize, toggle the Agent Red Chat app embed.\n\nThe whole process takes about 15-20 minutes. Need help with any specific step?",
             },
             {"role": "customer", "content": "How do I add my return policy to the knowledge base?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": 'Go to **Knowledge Base** in the left sidebar. Click **Add Article**, then:\n\n- **Title**: "Return Policy"\n- **Category**: Select "Policy"\n- **Content**: Paste your return policy text\n\nOnce saved, the AI will immediately start using it to answer return-related questions. You can also add articles for shipping, warranty, sizing guides, and any other common topics.\n\nTip: The more detailed your knowledge base, the better the AI responses. Would you like help formatting any of your policies?',
             },
             {"role": "customer", "content": "That's perfect, thanks!"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "You're welcome! If you need anything else during setup, just ask. Your AI assistant is ready to start helping customers as soon as you enable the widget. Have a great day!",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "integration",
@@ -128,17 +130,17 @@ CONVERSATION_TEMPLATES = [
                 "content": "Does Agent Red integrate with Zendesk? We use it for our support tickets.",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Yes! Agent Red integrates with Zendesk for seamless escalation. When the AI detects a conversation that needs human attention - complex complaints, refund disputes, or when a customer explicitly asks for a person - it automatically creates a Zendesk ticket with the full conversation context.\n\nThe integration uses Zendesk's REST API with your existing API token. You can configure escalation rules in the Configuration page - set keywords, confidence thresholds, and routing preferences.\n\nWould you like me to walk you through the Zendesk setup?",
             },
             {"role": "customer", "content": "Yes please, what do I need to configure?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Here's what you'll need:\n\n1. Your Zendesk subdomain (e.g., yourcompany.zendesk.com)\n2. An API token from Zendesk Admin > API > OAuth Tokens\n3. The email associated with your Zendesk admin account\n\nIn Agent Red, go to **Configuration** > **Integrations** section and enter these credentials. The connection is tested immediately.\n\nEscalated conversations will appear in Zendesk with:\n- Full conversation transcript\n- Customer sentiment analysis\n- AI's confidence score\n- Suggested category tags\n\nThis saves your agents significant context-switching time. Need anything else?",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "escalation",
@@ -148,7 +150,7 @@ CONVERSATION_TEMPLATES = [
                 "content": "I need to speak with a human agent please. The AI keeps giving me wrong information about my order.",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "I completely understand your frustration, and I apologize for any incorrect information. Let me connect you with a human agent right away.\n\nI'm transferring you now with the full context of our conversation so you won't need to repeat yourself. A team member will be with you shortly.\n\nIs there anything specific you'd like me to flag for the agent about your order issue?",
             },
             {
@@ -168,12 +170,12 @@ CONVERSATION_TEMPLATES = [
         "messages": [
             {"role": "customer", "content": "What makes Agent Red different from Tidio or Gorgias?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Great question! Here are Agent Red's key differentiators:\n\n**1. Persistent Customer Memory** - Our unique 4-layer memory system remembers every customer across sessions. No competitor offers per-customer vector RAG over historical transcripts.\n\n**2. Price** - Agent Red is 4-21x cheaper per conversation than Gorgias, Tidio Pro, Zendesk, or Intercom.\n\n**3. Speed** - Our P50 latency target is 1,500ms, compared to Intercom's published 7,000ms.\n\n**4. Safety** - Fail-closed Critic validation means no unvalidated AI response ever reaches your customers.\n\n**5. Lightweight Widget** - 15-20KB gzip vs Tidio's 40-60KB or Intercom's 80-100KB.\n\nWould you like a detailed comparison for any specific feature?",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "billing",
@@ -183,29 +185,29 @@ CONVERSATION_TEMPLATES = [
                 "content": "I'm on the Starter plan and just hit my 1,000 conversation limit. What happens now?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "No worries - your service continues uninterrupted! Here's how overage works:\n\nOnce you exceed your included 1,000 conversations, additional conversations are billed at $0.04 each. You can also pre-purchase **Conversation Packs** at a discount:\n\n- 1,000 pack: $29 ($0.029/conv)\n- 5,000 pack: $99 ($0.020/conv)\n- 20,000 pack: $249 ($0.012/conv)\n\nPacks are valid for 90 days and consumed before overage billing kicks in.\n\nAlternatively, upgrading to **Professional** ($399/mo for 5,000 included) might save you money if your volume stays above 1,000. Would you like me to help you compare?",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "widget_customization",
         "messages": [
             {"role": "customer", "content": "Can I change the colors of the chat widget to match my store's theme?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Absolutely! The widget is fully customizable. Go to **Widget** in the admin sidebar. You can configure:\n\n- **Primary color** - Button and header accent color\n- **Position** - Bottom-right, bottom-left, or custom offset\n- **Dark/Light mode** - Including auto-detection\n- **Agent name and avatar** - Your brand identity\n- **Greeting message** - First message customers see\n- **Pre-chat form** - Collect name/email before chat starts\n\nChanges preview in real-time on the right side of the configuration page. Once saved, they deploy instantly to your live store.\n\nThe widget uses Shadow DOM isolation, so your store's CSS never interferes with the chat styling and vice versa.",
             },
             {"role": "customer", "content": "Perfect, can I also hide it on certain pages like the checkout?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Yes! Use **Page Rules** in the Widget configuration. You can set glob patterns like:\n\n- `/checkout/*` - Hide on checkout pages\n- `/account/*` - Hide on account pages\n- `/collections/sale` - Hide on specific collection\n\nThe widget will only appear on pages that don't match your exclusion rules. This is great for reducing distractions during checkout.",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "memory",
@@ -215,24 +217,24 @@ CONVERSATION_TEMPLATES = [
                 "content": "I chatted with your AI last week about sizing for the blue jacket. Does it remember me?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Yes! I can see from our previous conversation that you were looking at the Alpine Blue Puffer Jacket in size L. You mentioned you typically wear L in most brands but were concerned about the chest measurement.\n\nBased on your preferences, the L should fit well - the chest measures 44 inches which matches what you described. We also noted you prefer a slightly relaxed fit.\n\nWould you like to go ahead with the L, or would you like me to check any other measurements?",
             },
             {"role": "customer", "content": "Wow, that's impressive! Yes, I'll go with the L. Thanks for remembering!"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Happy to help! That's our Persistent Customer Memory at work - every interaction builds on the last so you never have to repeat yourself.\n\nYou can add the Alpine Blue Puffer Jacket in size L to your cart directly from our product page. If you have any questions about care instructions or return policy, I'm here!\n\nEnjoy the jacket!",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "trial",
         "messages": [
             {"role": "customer", "content": "How does the free trial work?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Our 14-day free trial includes:\n\n- 50 conversations to test with real customers\n- Layer 1 Persistent Customer Memory\n- Full admin dashboard access\n- Demo data pre-loaded so you can explore immediately\n- No credit card required to start\n\nDuring the trial, you'll see exactly how the AI handles your customers, including the memory system and safety validation. At the end of 14 days, you choose a plan or the trial expires naturally - no surprise charges. Your configuration and knowledge base are preserved when you upgrade.\n\nWant to start your trial now?",
             },
         ],
@@ -247,56 +249,56 @@ CONVERSATION_TEMPLATES = [
                 "content": "What AI models does Agent Red use? I want to understand the tech behind it.",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Agent Red uses a pipeline of 6 specialized AI agents, each optimized for their task:\n\n1. **Intent Classifier** (GPT-4o-mini) - Routes queries across 17 intent categories with 98% accuracy\n2. **Knowledge Retrieval** (text-embedding-3-large) - Searches your knowledge base using semantic vector search\n3. **Response Generator** (GPT-4o) - Crafts personalized responses using context from all other agents\n4. **Escalation Handler** (GPT-4o-mini) - Detects when human intervention is needed\n5. **Critic/Supervisor** (GPT-4o-mini) - Validates every response for safety before delivery\n6. **Analytics** (GPT-4o-mini) - Monitors performance metrics\n\nAll models run on Azure OpenAI Service within the Azure security perimeter. PII is tokenized before any external AI call.\n\nWant to know more about any specific component?",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "order_tracking",
         "messages": [
             {"role": "customer", "content": "Where's my order? I placed it 5 days ago."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "I'd be happy to help you track your order! Could you please provide your order number? It should be in your confirmation email, starting with # followed by numbers.",
             },
             {"role": "customer", "content": "It's #2847"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Thank you! I can see order #2847 was shipped on February 1st via USPS Priority Mail. The tracking number is 9400111899223847562. According to the latest update, it's currently at the regional distribution center and is expected to arrive by February 7th.\n\nYou can track it directly at usps.com with that tracking number. Would you like me to help with anything else regarding your order?",
             },
             {"role": "customer", "content": "Thanks, that's all I needed!"},
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
     {
         "topic": "return_request",
         "messages": [
             {"role": "customer", "content": "I want to return the shoes I bought. They don't fit right."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "I'm sorry to hear the shoes didn't fit! I can help you with a return.\n\nBased on our return policy, you have 30 days from delivery for a full refund on unworn items. Here's what to do:\n\n1. Pack the shoes in their original box\n2. Include the packing slip from your order\n3. Use our prepaid return label (I can email it to you)\n\nOnce we receive the return, your refund will be processed within 3-5 business days.\n\nWould you like me to send the return label to your email on file, or would you prefer an exchange for a different size?",
             },
             {"role": "customer", "content": "Exchange for a half size up please"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "I'll set up an exchange for one half size up. Let me check availability... Great news, that size is in stock!\n\nI'll send a return label to your email and the exchange pair will ship as soon as we receive the return. You'll get a new tracking number by email.\n\nIs there anything else I can help with?",
             },
         ],
         "agents": ["intent-classifier", "knowledge-retrieval", "response-generator", "critic-supervisor"],
-        "status": "ended",
+        "status": "resolved",
     },
 ]
 
 # Team members
 TEAM_MEMBERS = [
-    {"email": "mike@remakerdigital.com", "name": "Mike VanDusen", "role": "owner"},
+    {"email": "mike@remakerdigital.com", "name": "Mike VanDusen", "role": "admin"},
     {"email": "sarah@remakerdigital.com", "name": "Sarah Mitchell", "role": "admin"},
-    {"email": "carlos@remakerdigital.com", "name": "Carlos Mendez", "role": "agent"},
-    {"email": "priya@remakerdigital.com", "name": "Priya Sharma", "role": "agent"},
+    {"email": "carlos@remakerdigital.com", "name": "Carlos Mendez", "role": "escalation_agent"},
+    {"email": "priya@remakerdigital.com", "name": "Priya Sharma", "role": "escalation_agent"},
 ]
 
 
@@ -338,7 +340,7 @@ def build_conversation_docs() -> list[dict]:
             )
 
         ended = current_ts + timedelta(seconds=random.randint(5, 60))
-        is_ended = template["status"] in ("ended", "escalated")
+        is_ended = template["status"] in ("resolved", "escalated")
         conv_id = f"conv-demo-{i + 1:03d}"
 
         doc = {
@@ -371,6 +373,7 @@ def build_conversation_docs() -> list[dict]:
         started = random_past_datetime(30)
         ended = started + timedelta(minutes=random.randint(1, 15))
         conv_id = f"conv-demo-{j + 1:03d}"
+        status = random.choice(["resolved", "resolved", "resolved", "active"])
 
         simple_messages = [
             {
@@ -380,7 +383,7 @@ def build_conversation_docs() -> list[dict]:
                 "message_id": str(uuid.uuid4()),
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Standard shipping takes 3-5 business days. Express is 1-2 days for an additional fee.",
                 "timestamp": (started + timedelta(seconds=45)).isoformat(),
                 "message_id": str(uuid.uuid4()),
@@ -391,7 +394,7 @@ def build_conversation_docs() -> list[dict]:
             "id": conv_id,
             "tenant_id": TENANT_ID,
             "conversation_id": conv_id,
-            "status": random.choice(["ended", "ended", "ended", "active"]),
+            "status": status,
             "customer_id": customer["id"],
             "customer_name": customer["name"],
             "is_billable": True,
@@ -405,7 +408,7 @@ def build_conversation_docs() -> list[dict]:
             "internal_notes": [],
             "messages": simple_messages,
             "started_at": started.isoformat(),
-            "ended_at": ended.isoformat() if random.random() > 0.15 else None,
+            "ended_at": ended.isoformat() if status == "resolved" else None,
             "last_activity_at": ended.isoformat(),
             "last_message_at": ended.isoformat(),
         }
@@ -429,11 +432,11 @@ def build_team_member_docs() -> list[dict]:
                 "display_name": member["name"],
                 "role": member["role"],
                 "is_active": True,
-                "max_concurrent_conversations": 10 if member["role"] in ("owner", "admin") else 5,
+                "max_concurrent_conversations": 10 if member["role"] == "admin" else 5,
                 "created_at": joined.isoformat(),
                 "updated_at": last_login.isoformat(),
                 "last_login_at": last_login.isoformat(),
-                "invited_by": "mike@remakerdigital.com" if member["role"] != "owner" else None,
+                "invited_by": None,
             }
         )
     return docs
@@ -455,12 +458,12 @@ SARAH_SESSIONS = [
                 "content": "Hi! I'm looking for a winter jacket for hiking. I'm usually a size M in women's.",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Welcome, Sarah! I'd recommend our Alpine Trail Puffer in size M. It's rated to -15C and weighs only 450g. Our customers love it for winter hiking. Would you like to see the color options?",
             },
             {"role": "customer", "content": "Yes! Do you have it in dark green?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Great choice! The Alpine Trail Puffer comes in Forest Green, Midnight Blue, and Charcoal. The Forest Green is one of our most popular colors. I've noted your preference for dark green. Shall I add it to your cart?",
             },
             {"role": "customer", "content": "Not yet, I want to think about it. Thanks!"},
@@ -473,7 +476,7 @@ SARAH_SESSIONS = [
         "messages": [
             {"role": "customer", "content": "Hi again! I'm back to look at that jacket."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Welcome back, Sarah! I remember you were interested in the Alpine Trail Puffer in Forest Green, size M. It's still in stock! Since your last visit, we've also started a 15% winter clearance sale that applies to this jacket. Would you like to take advantage of that?",
             },
             {
@@ -481,12 +484,12 @@ SARAH_SESSIONS = [
                 "content": "Oh nice! Yes, that sounds great. Can you also tell me about the return policy?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Absolutely! We offer a 30-day no-questions-asked return policy. If the M doesn't fit, you can exchange it for free — we'll even cover return shipping. Given that you mentioned hiking, I'd note the jacket is designed for a slightly athletic fit, so it may run a touch slimmer than casual brands. Would you like me to add the Forest Green M to your cart at the sale price?",
             },
             {"role": "customer", "content": "Yes please! Add it to my cart."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Done! The Alpine Trail Puffer in Forest Green, size M has been added to your cart at $169.15 (15% off $199). Happy hiking, Sarah!",
             },
         ],
@@ -501,7 +504,7 @@ SARAH_SESSIONS = [
                 "content": "Hi! I received my jacket yesterday. It fits perfectly but the zipper feels a bit stiff.",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Hi Sarah! I'm glad the Alpine Trail Puffer in Forest Green fits well! The zipper stiffness is common with new jackets — it should loosen up after a few uses. You can also apply a small amount of zipper wax or silicone lubricant to help. If it doesn't improve within a week, we'll exchange it under our 30-day policy. How does that sound?",
             },
             {
@@ -509,7 +512,7 @@ SARAH_SESSIONS = [
                 "content": "That's helpful, I'll try the wax. Also, do you have matching hiking pants?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Yes! Since you liked the Alpine Trail Puffer, you might love the Alpine Trail Softshell Pants. They come in Forest Green (matching your jacket!) in size M. They're water-resistant with articulated knees for hiking. $89 regular price, or $75.65 with the winter clearance. Would you like to see more details?",
             },
         ],
@@ -525,12 +528,12 @@ MARCUS_SESSIONS = [
         "messages": [
             {"role": "customer", "content": "Looking for a road bike under $2000. I commute 15 miles daily."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "For a 15-mile daily commute under $2,000, I'd recommend the Velocity Commuter Pro ($1,799). It features a lightweight aluminum frame, Shimano 105 groupset, and hydraulic disc brakes — ideal for stop-and-go urban riding. We also have the Endurance Sport ($1,499) if you'd prefer to save for accessories. Which interests you more?",
             },
             {"role": "customer", "content": "Tell me more about the Velocity. What's the weight?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "The Velocity Commuter Pro weighs 9.2kg (20.3 lbs). Key specs:\n- Shimano 105 R7000 11-speed\n- Hydraulic disc brakes (all-weather stopping)\n- 700x28c puncture-resistant tires\n- Integrated rear rack mounts\n\nIt's been our best-selling commuter for the past two seasons. Would you like to schedule a test ride?",
             },
         ],
@@ -542,17 +545,17 @@ MARCUS_SESSIONS = [
         "messages": [
             {"role": "customer", "content": "Back about the Velocity. What tire width can the frame handle?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Max tire clearance: 35mm. Stock is 28mm. Most commuters run 28-32mm for the speed/comfort balance.",
             },
             {"role": "customer", "content": "Good. Fender compatibility?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Full fender mounts, front and rear. SKS Bluemels 45mm fit perfectly. Want me to bundle them with the bike?",
             },
             {"role": "customer", "content": "Not yet. What colors?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Matte Black, Gunmetal Grey, and Racing Red. All three in stock in your size range (I'll confirm exact sizing when you're ready).",
             },
         ],
@@ -564,12 +567,12 @@ MARCUS_SESSIONS = [
         "messages": [
             {"role": "customer", "content": "Ready to buy the Velocity in Matte Black. I'm 5'11\". What size?"},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "56cm frame. Our sizing chart puts 5'11\" at 56cm for road geometry. Added to cart: Velocity Commuter Pro, Matte Black, 56cm — $1,799. Proceed to checkout?",
             },
             {"role": "customer", "content": "Yes. Also add the SKS fenders you mentioned."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Done. Cart total: $1,799 + $45 (SKS Bluemels 45mm) = $1,844 before tax. Free shipping on orders over $100. Anything else?",
             },
             {"role": "customer", "content": "That's it. Thanks."},
@@ -585,7 +588,7 @@ MARCUS_SESSIONS = [
                 "content": "Bike arrived. Front derailleur needs adjusting — shifts skip between 3rd and 4th gear.",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "That's a cable tension issue — common after shipping. Two options:\n1. Self-adjust: quarter-turn clockwise on the barrel adjuster near the shifter\n2. Free tune-up at any partner shop (use order #MR-2847)\n\nWhich do you prefer?",
             },
             {
@@ -593,7 +596,7 @@ MARCUS_SESSIONS = [
                 "content": "I'll try the barrel adjuster first. If that doesn't work, where's the nearest partner shop to 94110?",
             },
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Nearest to 94110:\n- Bay City Bikes, 1489 Valencia St (0.8 mi) — open until 7pm today\n- Pedal Works, 3255 21st St (1.2 mi) — appointment only\n\nBoth honor the free tune-up with your order number.",
             },
         ],
@@ -605,12 +608,12 @@ MARCUS_SESSIONS = [
         "messages": [
             {"role": "customer", "content": "Need a bike lock recommendation. Something portable."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "For your daily commute, two options:\n- Kryptonite Evolution Mini-7 ($79) — 3.5 lbs, fits in a jersey pocket\n- ABUS Bordo 6000 ($89) — foldable, mounts on frame\n\nBoth are Sold Secure Gold rated. Given your preference for minimal gear, the Bordo frame mount keeps it out of your way.",
             },
             {"role": "customer", "content": "Bordo. Add to cart."},
             {
-                "role": "agent",
+                "role": "ai",
                 "content": "Added: ABUS Bordo 6000, $89. Ships free. Your Velocity accessories are building up nicely. Anything else?",
             },
             {"role": "customer", "content": "No. Thanks."},
@@ -956,7 +959,7 @@ def build_memory_conversation_docs() -> list[dict]:
                     "id": session["conv_id"],
                     "tenant_id": TENANT_ID,
                     "conversation_id": session["conv_id"],
-                    "status": "ended",
+                    "status": "resolved",
                     "customer_id": customer_id,
                     "customer_name": customer_name,
                     "is_billable": True,
@@ -1072,87 +1075,108 @@ async def seed(dry_run: bool = True, seed_kb: bool = False) -> None:
 
     # Initialize Cosmos DB
     from src.multi_tenant.cosmos_client import get_cosmos_manager
+    from src.multi_tenant.cosmos_schema import TeamMemberDocument, UsageCounterDocument
+    from src.multi_tenant.repository import DocumentConflictError, TeamMemberRepository, UsageRepository
 
     cosmos = get_cosmos_manager()
-    await cosmos.initialize()
-
-    # Get containers
-    conversations_container = cosmos.get_container("conversations")
-    team_container = cosmos.get_container("team_members")
-    usage_container = cosmos.get_container("usage")
-    profiles_container = cosmos.get_container("customer_profiles")
-    vectors_container = cosmos.get_container("memory_vectors")
-
-    # Seed conversations (generic + memory persona sessions)
-    print("Seeding conversations...")
-    created_convs = 0
-    for doc in all_conversations:
-        try:
-            await conversations_container.upsert_item(doc)
-            created_convs += 1
-        except Exception as e:
-            logger.warning("  Failed conversation %s: %s", doc["id"], e)
-    print(f"  [OK] {created_convs}/{len(all_conversations)} conversations seeded")
-
-    # Seed team members
-    print("Seeding team members...")
-    created_team = 0
-    for doc in team_members:
-        try:
-            await team_container.upsert_item(doc)
-            created_team += 1
-        except Exception as e:
-            logger.warning("  Failed team member %s: %s", doc["id"], e)
-    print(f"  [OK] {created_team}/{len(team_members)} team members seeded")
-
-    # Seed customer profiles (Layer 1)
-    print("Seeding customer profiles (Layer 1)...")
-    created_profiles = 0
-    for doc in customer_profiles:
-        try:
-            await profiles_container.upsert_item(doc)
-            created_profiles += 1
-        except Exception as e:
-            logger.warning("  Failed profile %s: %s", doc["id"], e)
-    print(f"  [OK] {created_profiles}/{len(customer_profiles)} profiles seeded")
-
-    # Seed memory vectors (Layer 2)
-    print("Seeding memory vectors (Layer 2)...")
-    created_vectors = 0
-    for doc in memory_vectors:
-        try:
-            await vectors_container.upsert_item(doc)
-            created_vectors += 1
-        except Exception as e:
-            logger.warning("  Failed vector %s: %s", doc["id"], e)
-    print(f"  [OK] {created_vectors}/{len(memory_vectors)} vectors seeded")
-
-    # Seed extracted patterns (Layer 3) — stored in customer_profiles container
-    print("Seeding extracted patterns (Layer 3)...")
-    created_patterns = 0
-    for doc in patterns:
-        try:
-            await profiles_container.upsert_item(doc)
-            created_patterns += 1
-        except Exception as e:
-            logger.warning("  Failed pattern %s: %s", doc["id"], e)
-    print(f"  [OK] {created_patterns}/{len(patterns)} patterns seeded")
-
-    # Seed usage counter
-    print("Seeding usage counter...")
     try:
-        await usage_container.upsert_item(usage_counter)
-        print("  [OK] Usage counter seeded")
-    except Exception as e:
-        logger.warning("  Failed usage counter: %s", e)
+        await cosmos.initialize()
+        errors = 0
 
-    # Optionally seed knowledge base
-    if seed_kb:
-        print()
-        print("Seeding knowledge base (32 articles)...")
-        from scripts.seed_knowledge_base import load_to_cosmos
+        # Get containers
+        conversations_container = cosmos.get_container("conversations")
+        team_repo = TeamMemberRepository()
+        usage_repo = UsageRepository()
+        profiles_container = cosmos.get_container("customer_profiles")
+        vectors_container = cosmos.get_container("memory_vectors")
 
-        await load_to_cosmos(tenant_id=TENANT_ID)
+        # Seed conversations (generic + memory persona sessions)
+        print("Seeding conversations...")
+        created_convs = 0
+        for doc in all_conversations:
+            try:
+                await conversations_container.upsert_item(doc)
+                created_convs += 1
+            except Exception as e:
+                errors += 1
+                logger.warning("  Failed conversation %s: %s", doc["id"], e)
+        print(f"  [OK] {created_convs}/{len(all_conversations)} conversations seeded")
+
+        # Existing accounts, including the provisioned superadmin, remain intact.
+        print("Seeding team members...")
+        created_team = 0
+        existing_team = 0
+        for doc in team_members:
+            try:
+                await team_repo.create(TENANT_ID, TeamMemberDocument(**doc))
+                created_team += 1
+            except DocumentConflictError:
+                existing_team += 1
+            except Exception as e:
+                errors += 1
+                logger.warning("  Failed team member %s: %s", doc["id"], e)
+        print(f"  [OK] {created_team} team members created; {existing_team} existing accounts preserved")
+
+        # Seed customer profiles (Layer 1)
+        print("Seeding customer profiles (Layer 1)...")
+        created_profiles = 0
+        for doc in customer_profiles:
+            try:
+                await profiles_container.upsert_item(doc)
+                created_profiles += 1
+            except Exception as e:
+                errors += 1
+                logger.warning("  Failed profile %s: %s", doc["id"], e)
+        print(f"  [OK] {created_profiles}/{len(customer_profiles)} profiles seeded")
+
+        # Seed memory vectors (Layer 2)
+        print("Seeding memory vectors (Layer 2)...")
+        created_vectors = 0
+        for doc in memory_vectors:
+            try:
+                await vectors_container.upsert_item(doc)
+                created_vectors += 1
+            except Exception as e:
+                errors += 1
+                logger.warning("  Failed vector %s: %s", doc["id"], e)
+        print(f"  [OK] {created_vectors}/{len(memory_vectors)} vectors seeded")
+
+        # Seed extracted patterns (Layer 3) — stored in customer_profiles container
+        print("Seeding extracted patterns (Layer 3)...")
+        created_patterns = 0
+        for doc in patterns:
+            try:
+                await profiles_container.upsert_item(doc)
+                created_patterns += 1
+            except Exception as e:
+                errors += 1
+                logger.warning("  Failed pattern %s: %s", doc["id"], e)
+        print(f"  [OK] {created_patterns}/{len(patterns)} patterns seeded")
+
+        # Demo data must not reset a tenant's existing billing counters.
+        print("Seeding usage counter...")
+        try:
+            await usage_repo.create(TENANT_ID, UsageCounterDocument(**usage_counter))
+            print("  [OK] Usage counter seeded")
+        except DocumentConflictError:
+            print("  [OK] Existing usage counter preserved")
+        except Exception as e:
+            errors += 1
+            logger.warning("  Failed usage counter: %s", e)
+
+        # Optionally seed knowledge base
+        if seed_kb:
+            print()
+            print("Seeding knowledge base...")
+            from scripts.seed_knowledge_base import load_to_cosmos
+
+            await load_to_cosmos(tenant_id=TENANT_ID)
+
+        if errors:
+            raise RuntimeError(f"{errors} demo data writes failed; re-run to retry")
+
+    finally:
+        await cosmos.close()
 
     print()
     print("=" * 65)
@@ -1164,9 +1188,9 @@ async def seed(dry_run: bool = True, seed_kb: bool = False) -> None:
     print(f"  Memory vectors:     {created_vectors}")
     print(f"  Extracted patterns: {created_patterns}")
     print(f"  Team members:       {created_team}")
-    print(f"  Usage counter:      1")
+    print("  Usage counter:      1")
     if seed_kb:
-        print(f"  KB articles:        32")
+        print("  KB articles:        loaded")
     print()
     print("  The standalone admin at /admin/standalone/ should now")
     print("  show populated data across all pages, including")
@@ -1175,6 +1199,7 @@ async def seed(dry_run: bool = True, seed_kb: bool = False) -> None:
 
 
 async def main() -> None:
+    global TENANT_ID
     parser = argparse.ArgumentParser(
         description="Seed demo data for Agent Red admin preview",
     )
@@ -1189,6 +1214,8 @@ async def main() -> None:
         help="Also seed the knowledge base with 32 Agent Red articles",
     )
     args = parser.parse_args()
+    load_env_local(env_file=APP_ROOT / ".env.local")
+    TENANT_ID = os.environ.get("SEED_TENANT_ID", "remaker-digital-001")
 
     await seed(dry_run=not args.seed, seed_kb=args.seed_kb)
 

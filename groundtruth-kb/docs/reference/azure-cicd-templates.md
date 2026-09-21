@@ -159,7 +159,7 @@ The scaffold does NOT do any of the following:
 - Support a `--force` overwrite mode. This is intentional: scaffold-once
   adopter-owned lifecycle matches the D1/D2/D3 pattern. Delete a file and
   re-run `--apply` if you want to regenerate it.
-- Provide any Azure DevOps Pipelines templates (DELIB-0827 GHA-only).
+- Provide any Azure DevOps Pipelines templates.
 
 ## Troubleshooting
 
@@ -171,11 +171,12 @@ The scaffold does NOT do any of the following:
 | `vars.AZURE_CLIENT_ID` resolves to empty string | The job does not declare a matching `environment:`, or the Environment does not have the variable set. |
 | `terraform plan` drift on resources the adopter never changed | Managed services (e.g. AKS upgrades, Azure Policy remediation) are rotating fields; consider a `lifecycle.ignore_changes` block. |
 
-## Authoritative sources
+## Implementation
 
-- Proposal: `bridge/gtkb-azure-cicd-gates-005.md` (REVISED-2).
-- Review (GO): `bridge/gtkb-azure-cicd-gates-006.md`.
-- Parent track: D3 `bridge/gtkb-azure-iac-skeleton-006.md` VERIFIED.
+The authored CI/CD template catalog and scaffold implementation live in
+`src/groundtruth_kb/_azure_cicd_templates.py` and `src/groundtruth_kb/cicd_scaffold.py`.
+Current canonical formal records carry requirements; bridge messages are not
+permanent approval or recovery evidence.
 
 ---
 

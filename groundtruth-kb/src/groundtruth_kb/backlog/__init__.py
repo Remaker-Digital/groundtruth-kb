@@ -1,8 +1,9 @@
 """Backlog helpers backed by MemBase work_items.
 
 The legacy approval-state compatibility module remains importable for
-historical rows only. New implementation authority must flow through
-project-level PAUTH, bridge GO, and implementation-start authorization.
+historical rows only. Work items have one parent project and inherit its
+current authorization value. Independent review and a current artifact-scoped
+claim are separate requirements, never additional authorization carriers.
 """
 
 from __future__ import annotations

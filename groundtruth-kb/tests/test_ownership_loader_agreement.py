@@ -205,12 +205,14 @@ def test_resolver_classify_path_matches_registry_target_path() -> None:
 
 def test_resolver_registry_row_wins_over_glob_on_exact_match() -> None:
     """FILE-class target_path wins over any ownership-glob that would also match."""
-    # .claude/hooks/destructive-gate.py is a registry row (the assertion-check hook retired with the SQLite
-    # assertion runner); it wins even though a hypothetical glob like ".claude/**" could also match.
+    # M15 (D15/D34): the authored hook identity is the registry row and runs in place from the baseline; the
+    # retired projected copy path is no longer a row and falls through to the adopter-owned fallback.
     resolver = OwnershipResolver()
-    rec = resolver.classify_path(".claude/hooks/destructive-gate.py")
+    rec = resolver.classify_path(".harness-baseline-configuration/hooks/destructive-gate.py")
     assert rec.id == "hook.destructive-gate"
     assert rec.source_class == "file"
+    copy = resolver.classify_path(".claude/hooks/destructive-gate.py")
+    assert copy.source_class == "__fallback__" and copy.ownership == "adopter-owned"
 
 
 def test_resolver_path_classification_excludes_settings_and_gitignore() -> None:
@@ -236,17 +238,17 @@ def test_resolver_path_classification_excludes_settings_and_gitignore() -> None:
 def test_artifacts_for_scaffold_unchanged_by_sibling_file() -> None:
     """With scaffold-ownership.toml present, artifacts_for_scaffold excludes ownership-glob rows.
 
-    Current registry (after the retirements of the SQLite-era hooks, the packet gate, the rehearsal recipe and
-    the Codex adapters): local-only scaffolds 14 = 6 hooks + 5 rules + 2 files + 1 skill; dual-agent scaffolds
-    37 = 7 hooks + 12 rules + 7 skills + 2 files + 5 settings registrations + 4 gitignore patterns.
+    Current registry (M15, D15/D34: no rule/skill copies, four paired authored hooks): local-only scaffolds
+    6 = 4 hooks + 2 files; dual-agent scaffolds 13 = 4 hooks + 4 settings registrations + 3 gitignore patterns
+    + 2 files.
 
     The sibling file contains only ownership-glob records which are filtered
     out by the helper — the ownership-glob exclusion invariant is preserved.
     """
     ids = {a.id for a in artifacts_for_scaffold("local-only")}
-    assert len(ids) == 14
+    assert len(ids) == 6
     ids_da = {a.id for a in artifacts_for_scaffold("dual-agent")}
-    assert len(ids_da) == 37
+    assert len(ids_da) == 13
     # None are ownership-glob.
     assert all("adopter-" not in i for i in ids_da), "ownership-glob leaked into scaffold"
 

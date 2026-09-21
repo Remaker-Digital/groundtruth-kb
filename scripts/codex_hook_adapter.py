@@ -58,8 +58,8 @@ def _target(raw):
         raise ValueError("Redirected hook target")
     path = path if path.is_absolute() else ROOT / path
     rel = path.relative_to(ROOT)
-    if not (rel.is_relative_to("scripts") or rel.is_relative_to(".codex/hooks")):
-        raise ValueError("Hook target must be platform code or this harness's own projected hook")
+    if not (rel.is_relative_to("scripts") or rel.is_relative_to(".harness-baseline-configuration/hooks")):
+        raise ValueError("Hook target must be platform code or an authored baseline hook")
     if not path.is_file() or path.resolve() != path:
         raise ValueError("Hook target is missing or redirected")
     return path

@@ -369,19 +369,26 @@ def test_selected_claude_harness_settings_keep_the_nested_schema_and_safety_gate
 
 
 @both_host_locations
-def test_selected_claude_harness_projects_current_skills_and_bridge_rules(claude_application) -> None:
-    """The projected skills are the neutral baseline: native bridge proposals without a file writer, spec intake
-    with its helper and the bridge rule files; authored files and bridge rules never name the platform's own app."""
-    _, created, target = claude_application
-    skill = target / ".claude/skills/gtkb-bridge-propose/SKILL.md"
-    assert "gt bridge deliver" in skill.read_text(encoding="utf-8")
-    assert not (target / ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py").exists()
-    assert (target / ".claude/skills/gtkb-spec-intake/SKILL.md").read_text(encoding="utf-8").strip()
-    helper = (target / ".claude/skills/gtkb-spec-intake/helpers/spec_intake.py").read_text(encoding="utf-8")
+def test_selected_claude_harness_points_to_host_skills_and_reads_host_rules(claude_application) -> None:
+    """Applications receive registrations/pointers; authored guidance and helpers stay in the host."""
+    native, created, target = claude_application
+    host = native.host
+    source = host / ".agents/skills"
+    authored = (source / "gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
+    assert "gt bridge deliver" in authored
+    stub = (target / ".claude/skills/gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
+    assert "../../.agents/skills/gtkb-bridge-propose/SKILL.md" in stub
+    assert "gt bridge deliver" not in stub
+    intake = (source / "gtkb-spec-intake/SKILL.md").read_text(encoding="utf-8")
+    assert intake.strip()
+    helper = (source / "gtkb-spec-intake/helpers/spec_intake.py").read_text(encoding="utf-8")
     assert all(f"def {name}(" in helper for name in ("capture_candidate", "confirm_candidate", "reject_candidate"))
+    assert not (target / ".claude/skills/gtkb-spec-intake/helpers").exists()
+    assert not (target / ".agents").exists()
+    assert not (target / ".claude/rules").exists()
     for rule in BRIDGE_RULE_FILES:
-        text = (target / ".claude/rules" / rule).read_text(encoding="utf-8")
-        assert "Agent Red" not in text, rule
+        text = (host / ".harness-baseline-configuration/rules" / rule).read_text(encoding="utf-8")
+        assert text.strip() and "Agent Red" not in text, rule
     generated = set(created["generated_paths"])
     for name, body in _created(target).items():
         if name not in generated:

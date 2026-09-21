@@ -56,7 +56,8 @@ CHAT_RETRY_BACKOFF_SECONDS = (1.0, 2.0, 4.0)
 RETRYABLE_HTTP_STATUS = frozenset({429, 500, 502, 503, 504})
 # WI-4734: full bridge verification can exceed the old 24-turn ceiling.
 DEFAULT_MAX_TURNS = 80
-ROUTING_CONFIG_PATH = Path(".api-harness") / "ollama" / "routing.toml"
+ROUTING_CONFIG_PATH = Path(".harness-baseline-configuration/routing.toml")
+NATIVE_HOOK_SETTINGS_PATH = Path(".api-harness/ollama/settings.json")
 MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
@@ -75,29 +76,15 @@ _OLLAMA_HOOK_PROFILE = base.NativeHookProfile(
     author_harness_id=AUTHOR_HARNESS_ID,
     default_endpoint=DEFAULT_ENDPOINT,
     routing_config_path=ROUTING_CONFIG_PATH,
+    native_hook_settings_path=NATIVE_HOOK_SETTINGS_PATH,
     dialect=base.DIALECT_OLLAMA_NATIVE,
 )
 
 
-BRIDGE_WRITE_GUARDS = (
-    ROUTING_CONFIG_PATH.parent / Path("hooks/credential-scan.py"),
-    ROUTING_CONFIG_PATH.parent / Path("hooks/scanner-safe-writer.py"),
-    Path("scripts/implementation_start_gate.py"),
-)
-BRIDGE_EDIT_GUARDS = (
-    ROUTING_CONFIG_PATH.parent / Path("hooks/credential-scan.py"),
-    ROUTING_CONFIG_PATH.parent / Path("hooks/scanner-safe-writer.py"),
-    Path("scripts/implementation_start_gate.py"),
-)
-WRITE_EDIT_GUARDS = (
-    ROUTING_CONFIG_PATH.parent / Path("hooks/credential-scan.py"),
-    ROUTING_CONFIG_PATH.parent / Path("hooks/scanner-safe-writer.py"),
-    Path("scripts/implementation_start_gate.py"),
-)
-BASH_GUARDS = (
-    ROUTING_CONFIG_PATH.parent / Path("hooks/destructive-gate.py"),
-    Path("scripts/implementation_start_gate.py"),
-)
+BRIDGE_WRITE_GUARDS = base.BRIDGE_WRITE_GUARDS
+BRIDGE_EDIT_GUARDS = base.BRIDGE_EDIT_GUARDS
+WRITE_EDIT_GUARDS = base.WRITE_EDIT_GUARDS
+BASH_GUARDS = base.BASH_GUARDS
 
 
 class OllamaHarnessError(RuntimeError):
@@ -376,22 +363,28 @@ def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str
         raise OllamaHarnessError(f"unknown model route: {route_key}") from exc
 
 
-def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
-    """Load current neutral bridge instructions without assigning a runtime role."""
+def build_system_prompt(skill: str | None, project_root: Path) -> str:
+    """Load shared root instructions and the selected skill without assigning a role."""
+    root_source = project_root / "AGENTS.md"
+    if not root_source.resolve().is_relative_to(project_root.resolve()):
+        raise OllamaHarnessError("Shared root instructions resolve outside the project root")
+    try:
+        root_instructions = root_source.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise OllamaHarnessError("Shared root instructions are unavailable: AGENTS.md") from exc
+    if not root_instructions.strip():
+        raise OllamaHarnessError("Shared root instructions are unavailable: empty AGENTS.md")
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return None
+        return root_instructions
     selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
-    sources = [
-        project_root / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
-        for name in ("gtkb-bridge", selected)
-    ]
+    sources = [project_root / ".agents" / "skills" / name / "SKILL.md" for name in ("gtkb-bridge", selected)]
     try:
         instructions = [path.read_text(encoding="utf-8") for path in sources]
     except (OSError, UnicodeError) as exc:
         raise OllamaHarnessError("Current canonical bridge skill instructions are unavailable") from exc
     if any(not text.strip() for text in instructions):
         raise OllamaHarnessError("Current canonical bridge skill instructions are unavailable: empty source")
-    return "\n\n".join(instructions)
+    return "\n\n".join([root_instructions, *instructions])
 
 
 def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -573,7 +566,7 @@ def set_author_metadata_env(
             "GTKB_NATIVE_CONTEXT_ID": native_context_id,
             "GTKB_AUTHOR_MODEL": model_id,
             "GTKB_AUTHOR_MODEL_VERSION": model_version,
-            "GTKB_AUTHOR_MODEL_CONFIGURATION": f"Ollama endpoint={endpoint}; routing=static .api-harness/ollama/routing.toml",
+            "GTKB_AUTHOR_MODEL_CONFIGURATION": f"Ollama endpoint={endpoint}; routing=static .harness-baseline-configuration/routing.toml",
         }
     )
     return updated
@@ -588,7 +581,7 @@ def _default_guard_runner(
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
     try:
         completed = subprocess.run(
-            [sys.executable, str(guard_path)],
+            [sys.executable, "-B", str(guard_path)],
             input=json.dumps(payload),
             text=True,
             encoding="utf-8",
@@ -1251,8 +1244,8 @@ def run_tool_loop(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Ollama harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Ollama.")
-    parser.add_argument("--model", help="Routing model key from .api-harness/ollama/routing.toml.")
-    parser.add_argument("--skill", help="Skill or task route key from .api-harness/ollama/routing.toml.")
+    parser.add_argument("--model", help="Routing model key from .harness-baseline-configuration/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .harness-baseline-configuration/routing.toml.")
     parser.add_argument("--bridge-document", help="Assigned canonical bridge document.")
     parser.add_argument("--bridge-version", type=int, help="Exact successor version this task must deliver.")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="Ollama endpoint; default is localhost.")

@@ -27,7 +27,8 @@ Run:
     python scripts/test_admin_ui_validation.py
 
 Requires:
-    .env.local with ADMIN_PREVIEW_API_KEY (ar_live_...)
+    applications/Agent_Red/.env.local or environment variables:
+    AGENT_RED_BASE_URL, SUPERADMIN_PREVIEW_API_KEY, PREVIEW_WIDGET_KEY
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -35,13 +36,13 @@ Requires:
 from __future__ import annotations
 
 import asyncio
-import json
 import os
 import sys
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import httpx
 
@@ -49,24 +50,19 @@ import httpx
 # Auto-load .env.local
 # ---------------------------------------------------------------------------
 # Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+REPO_ROOT = Path(__file__).resolve().parents[1]
+APP_ROOT = REPO_ROOT / "applications/Agent_Red"
+sys.path.insert(0, str(REPO_ROOT))
 
-load_env_local()
+from scripts._env import load_env_local  # noqa: E402 - standalone script bootstrap
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-# Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
-BASE_URL = os.environ.get(
-    "AGENT_RED_BASE_URL",
-    "",  # SPEC-0058: No hardcoded FQDNs
-)
-
-API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
-WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
-if not WIDGET_KEY:
-    raise SystemExit("ERROR: PREVIEW_WIDGET_KEY not set. Load .env.local or set env var.")
+BASE_URL = ""
+API_KEY = ""
+WIDGET_KEY = ""
 
 TIMEOUT = 20  # seconds per request
 
@@ -123,14 +119,11 @@ async def api_call(
     expected: list[int] | None = None,
     category: str = "",
     name: str = "",
-    allow_503: bool = True,
 ) -> TestResult:
     """Make an API call and return a TestResult."""
     url = f"{BASE_URL}{path}"
-    hdrs = headers or admin_headers()
+    hdrs = admin_headers() if headers is None else headers
     exp = expected or [200]
-    if allow_503 and 503 not in exp:
-        exp = exp + [503]  # Services may not be initialized in test env
 
     t0 = time.monotonic()
     try:
@@ -150,7 +143,7 @@ async def api_call(
             except Exception:
                 details_text = f"body_len={len(resp.content)}"
         elif resp.status_code == 503:
-            details_text = "service not initialized (expected for unprovisioned tenant)"
+            details_text = "service unavailable"
         else:
             try:
                 details_text = resp.text[:200]
@@ -204,7 +197,6 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
             expected=[200],
             category=cat,
             name="GET /health (liveness)",
-            allow_503=False,
         )
     )
 
@@ -218,7 +210,6 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
             expected=[200],
             category=cat,
             name="GET /ready (readiness)",
-            allow_503=False,
         )
     )
 
@@ -231,7 +222,6 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
         expected=[200, 401, 403],
         category=cat,
         name="GET /admin/standalone/ (HTML)",
-        allow_503=False,
     )
     results.append(r)
 
@@ -244,7 +234,6 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
         expected=[200, 401, 403],
         category=cat,
         name="GET /admin/shopify/ (HTML)",
-        allow_503=False,
     )
     results.append(r)
 
@@ -257,7 +246,6 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
         expected=[200, 404],
         category=cat,
         name="GET /widget.js (widget bundle)",
-        allow_503=False,
     )
     results.append(r)
 
@@ -270,7 +258,6 @@ async def test_system_health(client: httpx.AsyncClient) -> list[TestResult]:
         expected=[200],
         category=cat,
         name="GET /openapi.json (API schema)",
-        allow_503=False,
     )
     results.append(r)
 
@@ -1066,7 +1053,6 @@ async def test_apikey_endpoints(client: httpx.AsyncClient) -> list[TestResult]:
             category=cat,
             name="POST /api/admin/api-keys/reset (public)",
             expected=[200],  # always returns 200 for security
-            allow_503=True,
         )
     )
 
@@ -1146,7 +1132,6 @@ async def test_auth_enforcement(client: httpx.AsyncClient) -> list[TestResult]:
             expected=[401, 403],
             category=cat,
             name=f"AUTH: GET {path} (no creds -> 401/403)",
-            allow_503=False,
         )
         results.append(r)
 
@@ -1166,7 +1151,6 @@ async def test_auth_enforcement(client: httpx.AsyncClient) -> list[TestResult]:
             expected=[200],
             category=cat,
             name=f"AUTH: GET {path} (exempt -> 200)",
-            allow_503=False,
         )
         results.append(r)
 
@@ -1241,16 +1225,16 @@ async def test_chat_api_with_widget_key(client: httpx.AsyncClient) -> list[TestR
             TestResult(
                 name="GET /api/chat/conversations/{id} (state)",
                 category=cat,
-                passed=True,
-                details="Skipped — no conversation ID (503 is acceptable)",
+                passed=False,
+                failure_reason="Conversation creation did not provide an ID; state check was not executed",
             )
         )
         results.append(
             TestResult(
                 name="POST /api/chat/conversations/{id}/end",
                 category=cat,
-                passed=True,
-                details="Skipped — no conversation ID (503 is acceptable)",
+                passed=False,
+                failure_reason="Conversation creation did not provide an ID; end check was not executed",
             )
         )
 
@@ -1305,16 +1289,30 @@ def analyze_response_times(results: list[TestResult]) -> dict[str, Any]:
 
 async def main() -> int:
     """Run all admin UI validation tests."""
+    global BASE_URL, API_KEY, WIDGET_KEY
+    load_env_local(env_file=APP_ROOT / ".env.local")
+    BASE_URL = os.environ.get("AGENT_RED_BASE_URL", "").rstrip("/")
+    API_KEY = os.environ.get("SUPERADMIN_PREVIEW_API_KEY", "")
+    WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
+    target = urlsplit(BASE_URL)
+    if (
+        target.scheme not in {"http", "https"}
+        or not target.hostname
+        or target.query
+        or target.fragment
+        or target.username is not None
+        or target.password is not None
+    ):
+        print("ERROR: AGENT_RED_BASE_URL must identify the selected application endpoint")
+        return 1
+    if not API_KEY or not WIDGET_KEY:
+        print("ERROR: SUPERADMIN_PREVIEW_API_KEY and PREVIEW_WIDGET_KEY are required")
+        return 1
     print("=" * 78)
     print("  Agent Red — Admin UI End-to-End Validation")
     print(f"  Target: {BASE_URL}")
-    print(f"  API Key: {API_KEY[:12]}..." if API_KEY else "  API Key: NOT SET")
     print("=" * 78)
     print()
-
-    if not API_KEY:
-        print("ERROR: ADMIN_PREVIEW_API_KEY not set in .env.local")
-        return 1
 
     all_results: list[TestResult] = []
 

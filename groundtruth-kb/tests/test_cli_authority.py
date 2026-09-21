@@ -275,6 +275,35 @@ def test_file_scaffold_route_does_not_expose_legacy_database_writers(configured,
     assert "sqlite" not in specs_help.output.lower() and "database" not in specs_help.output.lower()
 
 
+@pytest.mark.parametrize("status,exit_code", [("removed", 0), ("absent", 0), ("partial", 1)])
+def test_session_scratch_teardown_posts_the_bound_context_and_exits_nonzero_on_partial(
+    configured, monkeypatch, status, exit_code
+):
+    config, calls, _record = configured
+    report = {
+        "status": status,
+        "session_context_id": "SENV-1",
+        "scratch_directory": "scratchpad/SENV-1",
+        "removed": [],
+        "surviving": [{"path": "held.log", "kind": "file", "reason": "PermissionError"}] if status == "partial" else [],
+    }
+    monkeypatch.setattr(AuthorityClient, "request", lambda self, method, path, **kwargs: report)
+    result = invoke(config, "session", "scratch-teardown", "--native-context-id", "ctx-1", "--json")
+    assert result.exit_code == exit_code, result.output
+    assert json.loads(result.output) == report
+    assert calls == []
+    calls_seen = []
+
+    def capture(self, method, path, **kwargs):
+        calls_seen.append((method, path, kwargs))
+        return report
+
+    monkeypatch.setattr(AuthorityClient, "request", capture)
+    assert invoke(config, "session", "scratch-teardown", "--native-context-id", "ctx-1").exit_code == exit_code
+    assert calls_seen == [("POST", "/v1/sessions/scratch-teardown", {"body": {"native_context_id": "ctx-1"}})]
+    assert invoke(config, "session", "scratch-teardown").exit_code == 2
+
+
 def test_harness_metadata_cli_uses_native_reads_and_has_no_role_mutator(configured, monkeypatch):
     config, calls, _ = configured
     records = [{"id": "H", "harness_name": "installation", "status": "active"}]
@@ -419,3 +448,27 @@ def test_native_client_does_not_follow_redirects_or_replay_write_body(status):
         thread.join(timeout=5)
         server.server_close()
     assert not thread.is_alive()
+
+
+def test_formal_links_list_passes_artifact_type_to_the_native_service(configured, monkeypatch):
+    config, calls, _record = configured
+
+    def request(self, method, path, **kwargs):
+        calls.append((method, path, kwargs))
+        return {"records": [], "next_after": None}
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    result = invoke(
+        config, "projects", "formal-links", "list", "--project-id", "P", "--artifact-type", "bridge_thread", "--json"
+    )
+    assert result.exit_code == 0, result.output
+    assert calls[-1][0:2] == ("GET", "/v1/project-formal-links")
+    assert calls[-1][2]["query"]["project_id"] == "P" and calls[-1][2]["query"]["artifact_type"] == "bridge_thread"
+    assert json.loads(result.output) == []
+    plain = invoke(config, "projects", "formal-links", "list", "--json")
+    assert plain.exit_code == 0 and calls[-1][2]["query"]["artifact_type"] is None
+    assert invoke(config, "projects", "formal-links", "list", "--artifact-type", "git_commit").exit_code == 2
+    assert len(calls) == 2
+    # The option is visible on formal-links only; other domains keep it hidden and the service refuses it.
+    assert "--artifact-type" in invoke(config, "projects", "formal-links", "list", "--help").output
+    assert "--artifact-type" not in invoke(config, "spec", "list", "--help").output

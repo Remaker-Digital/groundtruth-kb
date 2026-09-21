@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import sys
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -27,68 +28,72 @@ def test_registry_is_valid_and_covers_required_sot_classes() -> None:
     registry = _h.default_registry()
     assert _h.validate_registry(registry) == ()
 
-    classes = {record.sot_class for record in registry}
-    assert "MemBase work_items/projects" in classes
-    assert "Deliberation Archive" in classes
-    assert "Dispatcher daemon state" in classes
-    assert "Harness-local transcript metadata" in classes
-    assert "Native bridge coordination" in classes
-    assert "Bridge numbered file chain" in classes
-    assert "MemBase project_authorizations" in classes
+    assert {record.sot_class for record in registry} == {
+        "Native operating status",
+        "Native work items",
+        "Native projects",
+        "Native bridge coordination",
+    }
 
 
 @pytest.mark.parametrize(
     ("command", "expected"),
     [
-        ("gt bridge show demo --json --compact", _h.COMMAND_KIND_COMPACT),
-        ("gt backlog list --compact", _h.COMMAND_KIND_COMPACT),
-        ("gt deliberations search compact --limit 5 --json", _h.COMMAND_KIND_BOUNDED),
-        ("gt session envelope show --harness-name codex", _h.COMMAND_KIND_BOUNDED),
-        ("gt bridge show demo --json --history", _h.COMMAND_KIND_ARCHIVAL),
+        ("gt status --startup", _h.COMMAND_KIND_COMPACT),
+        ("gt backlog list --limit 20 --json", _h.COMMAND_KIND_BOUNDED),
+        ("gt projects list --limit 20 --json", _h.COMMAND_KIND_BOUNDED),
+        ("gt deliberations list --search compact --limit 5 --json", _h.COMMAND_KIND_BOUNDED),
+        ("gt projects show PROJECT-X --history --json", _h.COMMAND_KIND_ARCHIVAL),
         ("gt projects show PROJECT-X --json", _h.COMMAND_KIND_UNCLASSIFIED),
+        ("gt bridge state-report --json", _h.COMMAND_KIND_UNCLASSIFIED),
     ],
 )
 def test_command_classification(command: str, expected: str) -> None:
     assert _h.classify_command(command) == expected
 
 
-def test_duplicate_coverage_detects_wi4947_surfaces_as_covered_not_gaps() -> None:
-    rows = _h.audit_registry()
-    duplicate_ids = {row.surface.surface_id for row in rows if row.status == _h.STATUS_COVERED_DUPLICATE}
-
-    assert "bridge-current-thread" in duplicate_ids
-    assert "bridge-role-scan" in duplicate_ids
-    assert all(row.status != _h.STATUS_GAP for row in rows if "WI-4947" in row.surface.coverage_refs)
-
-
-def test_gaps_have_concrete_follow_on_dispositions() -> None:
-    rows = _h.audit_registry()
-    gaps = [row for row in rows if row.status == _h.STATUS_GAP]
-
-    assert {row.surface.surface_id for row in gaps} == {"membase-project-authorization", "dispatcher-status"}
-    assert all(row.surface.follow_on_disposition.startswith("Follow-on:") for row in gaps)
-    assert all(row.surface.governing_specs for row in gaps)
+def test_gaps_require_a_concrete_disposition_and_are_not_covered() -> None:
+    gap = replace(
+        _h.default_registry()[0], read_mode=_h.READ_MODE_GAP, follow_on_disposition="Measure and bound the response."
+    )
+    assert _h.validate_registry((gap,)) == ()
+    assert _h.audit_registry((gap,))[0].status == _h.STATUS_GAP
+    invalid = replace(gap, follow_on_disposition="")
+    assert _h.validate_registry((invalid,))
+    assert _h.audit_registry((invalid,))[0].status == _h.STATUS_INVALID
 
 
-def test_markdown_report_includes_summary_gaps_and_corrected_deliberation_refs() -> None:
-    rows = _h.audit_registry()
-    markdown = _h.render_markdown_report(rows, generated_at="2026-07-06T04-40-00Z")
+@pytest.mark.parametrize(
+    "changes",
+    [{"read_mode": "unknown"}, {"routine_command": "gt projects show PROJECT-X --json"}, {"governing_specs": ()}],
+)
+def test_invalid_read_contracts_are_rejected(changes) -> None:
+    row = replace(_h.default_registry()[0], **changes)
+    assert _h.validate_registry((row,))
+    assert _h.audit_registry((row,))[0].status == _h.STATUS_INVALID
 
-    assert "# Harness Equivalence Phase 3 SoT Compactness Audit" in markdown
-    assert "| `gap` | 2 |" in markdown
-    assert "Project authorization / PAUTH detail" in markdown
-    assert "Dispatcher health and selection status" in markdown
-    assert "DELIB-202665119" in markdown
-    assert "DELIB-202665127" in markdown
-    assert "DELIB-20260701-ENVELOPE-SHARDING-EXECUTE-RETIRE` is not used as evidence" in markdown
+
+def test_duplicate_surface_ids_are_rejected() -> None:
+    row = _h.default_registry()[0]
+    assert _h.validate_registry((row, row))
+    assert all(item.status == _h.STATUS_INVALID for item in _h.audit_registry((row, row)))
+
+
+def test_markdown_report_renders_current_routes_without_claiming_measured_payloads() -> None:
+    markdown = _h.render_markdown_report(_h.audit_registry(), generated_at="2026-09-20T00:00:00Z")
+    assert "# Native Read-Surface Compactness Report" in markdown
+    assert "| `covered` | 4 |" in markdown
+    assert "gt projects list --limit 20 --json" in markdown
+    assert "gt bridge state-report --json" in markdown
+    assert "does not execute the routes or measure their payloads" in markdown
+    assert "Project Authorization:" not in markdown
 
 
 def test_rows_as_json_is_compact_and_omits_raw_payloads() -> None:
     payload = _h.rows_as_json(_h.audit_registry())
     encoded = json.dumps(payload, sort_keys=True)
-
-    assert payload["work_item_id"] == "WI-4966"
-    assert payload["summary"][_h.STATUS_GAP] == 2
+    assert payload["summary"] == {_h.STATUS_COVERED: 4}
+    assert set(payload) == {"summary", "rows"}
     assert "raw_payload" not in encoded
     assert "full_payload" not in encoded
 

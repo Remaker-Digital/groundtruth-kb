@@ -24,6 +24,7 @@ from typing import Any, NoReturn, TypeAlias
 
 NumericValue: TypeAlias = int | Decimal
 CATALOG_RELATIVE_PATH = Path("config/governance/operational-controls.toml")
+WRITER_LOCK_NAME = "gtkb-operational-controls.lock"
 CATALOG_SCHEMA_VERSION = 2
 # Retained bounded-format limits. Changing these changes the accepted format.
 MAX_CATALOG_BYTES = 256 * 1024
@@ -541,10 +542,48 @@ def diff_operational_controls(project_root: Path, proposed: bytes) -> dict[str, 
     }
 
 
+def _writer_lock_path(project_root: Path) -> Path:
+    """The cooperative writer mutex lives in the checkout's Git metadata directory, never in the governed tree.
+
+    The directory is resolved from the filesystem (a ``.git`` directory, or a linked worktree's ``.git`` file
+    carrying a ``gitdir:`` line) rather than through ``git rev-parse``: the registry probe timeout is a control
+    inside the very catalog this writer replaces, and the setter stays a cold local operation.
+    """
+    try:
+        root = project_root.resolve(strict=True)
+    except OSError as exc:
+        _fail(
+            "unavailable_catalog", f"control artifact is unavailable ({type(exc).__name__}); restore its canonical file"
+        )
+    entry = root / ".git"
+    try:
+        info = entry.lstat()
+    except OSError:
+        _fail("writer_unavailable", "control writer requires the selected Git checkout metadata directory")
+    if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & getattr(
+        stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0
+    ):
+        _fail("unsafe_path", "Git metadata entry must not be redirected")
+    if stat.S_ISDIR(info.st_mode):
+        return entry / WRITER_LOCK_NAME
+    if stat.S_ISREG(info.st_mode):
+        try:
+            lines = entry.read_bytes()[:4096].decode("utf-8", errors="strict").splitlines()
+        except (OSError, UnicodeDecodeError):
+            lines = []
+        head = lines[0] if lines else ""
+        if head.startswith("gitdir:"):
+            target = Path(head[len("gitdir:") :].strip())
+            if not target.is_absolute():
+                target = root / target
+            if target.is_dir():
+                return target.resolve() / WRITER_LOCK_NAME
+    _fail("writer_unavailable", "control writer requires the selected Git checkout metadata directory")
+
+
 @contextmanager
-def _writer_lock(path: Path) -> Iterator[None]:
-    """One nonblocking OS mutex; there is no retry timer or retained lease."""
-    lock_path = path.with_name(path.name + ".lock")
+def _writer_lock(lock_path: Path) -> Iterator[None]:
+    """One nonblocking OS mutex on the checkout's Git metadata lock file; there is no retry timer or retained lease."""
     if lock_path.exists() or lock_path.is_symlink():
         info = lock_path.lstat()
         if (
@@ -586,10 +625,13 @@ def set_operational_controls(project_root: Path, proposed: bytes, *, expected_sh
     Direct owner edits need not take the cooperative mutex. A second read catches
     edits observed before replacement; post-replacement readback detects drift.
     No transaction/rollback guarantee is made for an uncooperative racing editor.
+    The cooperative mutex is an OS byte lock on <Git metadata directory>/gtkb-operational-controls.lock;
+    a root without Git metadata is refused (writer_unavailable) before the current artifact is read.
     """
     after = validate_operational_control_bytes(proposed)
     path = _safe_path(project_root)
-    with _writer_lock(path):
+    lock_path = _writer_lock_path(project_root)
+    with _writer_lock(lock_path):
         _safe_path(project_root)
         before = _read(path)
         if _sha(before) != expected_sha256:

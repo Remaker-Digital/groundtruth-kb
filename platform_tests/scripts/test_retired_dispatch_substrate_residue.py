@@ -27,14 +27,26 @@ FORBIDDEN_PATTERNS = (
 SKIPPED_DIR_NAMES = frozenset({"__pycache__", ".pytest_cache"})
 
 
-def _candidate_files(root: Path) -> list[Path]:
-    if root.is_file():
-        return [root]
-    if not root.exists():
-        return []
+EXCLUDED_RELATIVE_PATHS = frozenset(
+    {
+        "config/governance/timer-inventory.toml",
+        "memory/topics/reference_openai_api_key.md",
+        ".quality/release-candidate-tracked-secrets.json",
+        "groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/credential_scan.py",
+        "applications/Agent_Red/docs/owner-messages-all.json",
+    }
+)
+
+
+def _candidate_files(root: Path, project_root: Path = PROJECT_ROOT) -> list[Path]:
     out: list[Path] = []
-    for path in root.rglob("*"):
-        if any(part in SKIPPED_DIR_NAMES for part in path.parts):
+    for path in [root] if root.is_file() else root.rglob("*") if root.is_dir() else []:
+        if not path.is_relative_to(project_root):
+            continue
+        relative = path.relative_to(project_root)
+        if relative.as_posix() in EXCLUDED_RELATIVE_PATHS:
+            continue
+        if any(part in SKIPPED_DIR_NAMES for part in relative.parts):
             continue
         if path.is_file():
             out.append(path)
@@ -55,3 +67,13 @@ def test_retired_dispatch_substrate_terms_absent_from_live_release_surfaces() ->
                     hits.append(f"{rel_path}: {pattern}")
 
     assert hits == []
+
+
+def test_content_scan_omits_excluded_paths_but_keeps_neighboring_sources(tmp_path) -> None:
+    for relative in EXCLUDED_RELATIVE_PATHS:
+        excluded = tmp_path / relative
+        excluded.parent.mkdir(parents=True, exist_ok=True)
+        excluded.write_text("excluded fixture", encoding="utf-8")
+    included = tmp_path / "config/governance/ordinary.toml"
+    included.write_text("ordinary source", encoding="utf-8")
+    assert _candidate_files(tmp_path, tmp_path) == [included]

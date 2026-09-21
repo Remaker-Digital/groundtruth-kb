@@ -14,10 +14,8 @@ import sys
 
 import pytest
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_harness_diagnostic import bind, register
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, bind, history_count, register
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

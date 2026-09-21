@@ -31,7 +31,14 @@ def generated_harness_root(tmp_path_factory):
     root = tmp_path_factory.mktemp("projected")
     baseline = ".harness-baseline-configuration"
     shutil.copytree(source / baseline, root / baseline, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+    # D15: the one skills source lives beside the baseline; the projector fails closed without it.
+    shutil.copytree(
+        source / ".agents/skills", root / ".agents/skills", ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
+    )
     for relative in (
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".goosehints",
         "pyproject.toml",
         "scripts/harness_projection/project_harness.py",
         "scripts/harness_projection/profiles.toml",

@@ -11,15 +11,15 @@ from pathlib import Path
 _ROOT = Path(__file__).resolve().parents[2]
 _CLAUDE_SETTINGS = _ROOT / ".claude" / "settings.json"
 _CODEX_HOOKS = _ROOT / ".codex" / "hooks.json"
-_CLAUDE_ADAPTER = _ROOT / ".claude" / "hooks" / "directive-enforcement-adapter.py"
-_CODEX_ADAPTER = _ROOT / ".codex" / "hooks" / "directive-enforcement-adapter.py"
+_CLAUDE_ADAPTER = _ROOT / ".harness-baseline-configuration" / "hooks" / "directive-enforcement-adapter.py"
+_CODEX_ADAPTER = _ROOT / ".harness-baseline-configuration" / "hooks" / "directive-enforcement-adapter.py"
 
 
 def _run_hook(path: Path, payload: dict, telemetry: Path) -> dict:
     env = os.environ.copy()
     env["GTKB_GATE_DENIALS_PATH"] = str(telemetry)
     proc = subprocess.run(
-        [sys.executable, "-P", str(path)],
+        [sys.executable, "-B", "-P", str(path)],
         input=json.dumps(payload),
         text=True,
         capture_output=True,
@@ -110,7 +110,7 @@ def test_codex_bash_direct_gtkb_helper_script_blocks_with_structured_reason(tmp_
     telemetry = tmp_path / "denials.jsonl"
     payload = {
         "tool_name": "Bash",
-        "tool_input": {"command": ".claude/skills/gtkb-verify/helpers/write_verdict.py --slug demo"},
+        "tool_input": {"command": ".agents/skills/gtkb-verify/helpers/write_verdict.py --slug demo"},
         "cwd": str(_ROOT),
     }
 
@@ -154,7 +154,7 @@ def test_claude_powershell_direct_gtkb_helper_script_blocks(tmp_path: Path) -> N
     telemetry = tmp_path / "denials.jsonl"
     payload = {
         "tool_name": "PowerShell",
-        "tool_input": {"command": "Start-Process -FilePath .codex/skills/gtkb-verify/helpers/write_verdict.py"},
+        "tool_input": {"command": "Start-Process -FilePath .agents/skills/gtkb-verify/helpers/write_verdict.py"},
         "cwd": str(_ROOT),
     }
 

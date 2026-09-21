@@ -7,15 +7,21 @@ from __future__ import annotations
 import argparse
 import json
 import re
-import sqlite3
 import sys
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from groundtruth_kb.authority_client import (
+    AuthorityClient,
+    AuthorityClientError,
+    configured_authority_client,
+    page_records,
+)
+from groundtruth_kb.config import GTConfigError
+
 ANCHOR_RE = re.compile(r"\b(?P<prefix>SPEC|GOV|DCL|ADR|PB|REQ|DELIB|WI|GTKB)-[A-Z0-9][A-Z0-9_-]*\b")
-BRIDGE_RE = re.compile(r"\bbridge/[A-Za-z0-9_.-]+-\d{3}\.md\b")
 SOURCE_EXTENSIONS = {".py", ".md"}
 DEFAULT_SCAN_DIRS = (
     "src",
@@ -24,12 +30,14 @@ DEFAULT_SCAN_DIRS = (
     "groundtruth-kb/tests",
     "platform_tests",
     "tests",
-    ".claude/hooks",
-    ".codex/gtkb-hooks",
+    ".harness-baseline-configuration",
+    ".agents/skills",
 )
 EXCLUDED_DIRS = {
     ".git",
-    ".gtkb-state",
+    "scratchpad",
+    "credentials",
+    "bridge",
     ".mypy_cache",
     ".pytest_cache",
     ".ruff_cache",
@@ -50,7 +58,7 @@ class Citation:
 @dataclass(frozen=True)
 class AuditResult:
     root: str
-    db_path: str
+    authority_url: str
     scanned_files: int
     resolved: dict[str, int]
     orphans: list[Citation]
@@ -61,32 +69,20 @@ class AuditResult:
         return payload
 
 
-def _table_exists(conn: sqlite3.Connection, table: str) -> bool:
-    row = conn.execute(
-        "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = ?",
-        (table,),
-    ).fetchone()
-    return row is not None
+def load_resolvable_ids(client: AuthorityClient) -> dict[str, set[str]]:
+    """Resolve IDs from current native domains, including retained formal history.
 
-
-def load_resolvable_ids(db_path: Path) -> dict[str, set[str]]:
-    ids: dict[str, set[str]] = {"spec": set(), "deliberation": set(), "work_item": set()}
-    if not db_path.exists():
-        return ids
-    conn = sqlite3.connect(str(db_path))
-    try:
-        table_map = {
-            "specifications": "spec",
-            "deliberations": "deliberation",
-            "work_items": "work_item",
-        }
-        for table, kind in table_map.items():
-            if not _table_exists(conn, table):
-                continue
-            ids[kind].update(row[0] for row in conn.execute(f"SELECT DISTINCT id FROM {table}"))
-    finally:
-        conn.close()
-    return ids
+    A deliberation ID is only an existing historical reference; this audit does
+    not make its content authoritative. Bridge files are never read or required.
+    """
+    return {
+        kind: {row["id"] for row in page_records(client, endpoint)}
+        for kind, endpoint in (
+            ("spec", "/v1/specifications"),
+            ("deliberation", "/v1/deliberations"),
+            ("work_item", "/v1/work-items"),
+        )
+    }
 
 
 def _citation_kind(anchor: str) -> str:
@@ -102,7 +98,7 @@ def _scan_roots(root: Path, scan_dirs: Iterable[Path] | None) -> list[Path]:
     if scan_dirs:
         return [path if path.is_absolute() else root / path for path in scan_dirs]
     configured = [root / rel for rel in DEFAULT_SCAN_DIRS if (root / rel).exists()]
-    return configured if configured else [root]
+    return configured
 
 
 def iter_source_files(root: Path, scan_dirs: Iterable[Path] | None = None) -> Iterable[Path]:
@@ -116,7 +112,11 @@ def iter_source_files(root: Path, scan_dirs: Iterable[Path] | None = None) -> It
         for path in candidates:
             if not path.is_file() or path.suffix not in SOURCE_EXTENSIONS:
                 continue
-            if any(part in EXCLUDED_DIRS for part in path.relative_to(root).parts):
+            try:
+                relative = path.resolve().relative_to(root.resolve())
+            except ValueError:
+                continue
+            if any(part in EXCLUDED_DIRS for part in relative.parts):
                 continue
             yield path
 
@@ -138,14 +138,14 @@ def _find_citations(path: Path, root: Path) -> Iterable[Citation]:
         for match in ANCHOR_RE.finditer(line):
             anchor = match.group(0)
             yield Citation(anchor=anchor, kind=_citation_kind(anchor), path=rel_path, line=line_no)
-        for match in BRIDGE_RE.finditer(line):
-            yield Citation(anchor=match.group(0), kind="bridge", path=rel_path, line=line_no)
 
 
-def audit_root(root: Path, db_path: Path, scan_dirs: Iterable[Path] | None = None) -> AuditResult:
+def audit_root(
+    root: Path, scan_dirs: Iterable[Path] | None = None, *, client: AuthorityClient | None = None
+) -> AuditResult:
     root = root.resolve()
-    db_path = db_path.resolve()
-    resolvable = load_resolvable_ids(db_path)
+    reader = client if client is not None else configured_authority_client(root)
+    resolvable = load_resolvable_ids(reader)
     resolved: Counter[str] = Counter()
     orphans: list[Citation] = []
     scanned_files = 0
@@ -153,10 +153,7 @@ def audit_root(root: Path, db_path: Path, scan_dirs: Iterable[Path] | None = Non
     for path in iter_source_files(root, scan_dirs):
         scanned_files += 1
         for citation in _find_citations(path, root):
-            if citation.kind == "bridge":
-                is_resolved = (root / citation.anchor).is_file()
-            else:
-                is_resolved = citation.anchor in resolvable[citation.kind]
+            is_resolved = citation.anchor in resolvable[citation.kind]
             if is_resolved:
                 resolved[citation.kind] += 1
             else:
@@ -164,9 +161,9 @@ def audit_root(root: Path, db_path: Path, scan_dirs: Iterable[Path] | None = Non
 
     return AuditResult(
         root=str(root),
-        db_path=str(db_path),
+        authority_url=reader.url,
         scanned_files=scanned_files,
-        resolved={kind: resolved.get(kind, 0) for kind in ("spec", "deliberation", "work_item", "bridge")},
+        resolved={kind: resolved.get(kind, 0) for kind in ("spec", "deliberation", "work_item")},
         orphans=orphans,
     )
 
@@ -174,7 +171,6 @@ def audit_root(root: Path, db_path: Path, scan_dirs: Iterable[Path] | None = Non
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="Project root to scan.")
-    parser.add_argument("--db", type=Path, default=None, help="Knowledge DB path; defaults to <root>/groundtruth.db.")
     parser.add_argument(
         "--scan-dir",
         type=Path,
@@ -191,8 +187,11 @@ def main(argv: list[str] | None = None) -> int:
     if not root.exists():
         print(json.dumps({"error": f"root not found: {root}"}), file=sys.stderr)
         return 2
-    db_path = args.db.resolve() if args.db else root / "groundtruth.db"
-    result = audit_root(root, db_path, args.scan_dir)
+    try:
+        result = audit_root(root, args.scan_dir)
+    except (AuthorityClientError, GTConfigError, OSError, ValueError) as exc:
+        print(json.dumps({"error": str(exc)}), file=sys.stderr)
+        return 2
     print(json.dumps(result.to_jsonable(), indent=2, sort_keys=True))
     return 1 if result.orphans else 0
 

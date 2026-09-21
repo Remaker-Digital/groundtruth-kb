@@ -585,7 +585,13 @@ class TestApplicationRootSelfContainment:
         assert not missing, f"New top-level artifacts missing registry entries: {sorted(missing)}"
         for name in self.NEW_TOP_LEVEL:
             entry = entries[name]
-            assert entry["bucket"] in {"A", "B"}
+            # Platform vocabulary: groundtruth_kb.isolation.app_root_minimization.ALLOWED_CLASSIFICATIONS.
+            assert entry["classification"] in {
+                "authoritative_input",
+                "generated_output",
+                "runtime_data",
+                "bounded_temporary_output",
+            }
             assert entry.get("purpose") or (entry.get("tool") and entry.get("justification"))
 
     def test_workflow_builds_from_application_root(self):

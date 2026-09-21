@@ -31,7 +31,10 @@ absent. These assertions therefore pin coverage by plan, not absence in tree.
 
 from __future__ import annotations
 
+import json
+import shutil
 import sys
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -166,3 +169,50 @@ def test_scope_boundary_other_runtime_state_is_untouched() -> None:
         assert out_of_scope not in source, (
             f"{out_of_scope} is WI-7733 or WI-7696 scope and must not be handled by the projector here"
         )
+
+
+@pytest.mark.parametrize("harness,config_dir", _rostered_harnesses())
+def test_empty_root_reprojection_reconstructs_exact_owned_files(tmp_path, monkeypatch, harness, config_dir):
+    for relative in (".harness-baseline-configuration", ".agents/skills"):
+        shutil.copytree(
+            PROJECT_ROOT / relative, tmp_path / relative, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
+        )
+    for name in ("AGENTS.md", "CLAUDE.md", ".goosehints"):
+        shutil.copyfile(PROJECT_ROOT / name, tmp_path / name)
+    profiles = project_harness.load_profiles()
+    manifest = tomllib.loads(
+        (tmp_path / ".harness-baseline-configuration/hooks/manifest.toml").read_text(encoding="utf-8")
+    )
+    sources = {"scripts/harness_projection/profiles.toml"}
+    sources.update(
+        "scripts/" + hook["script"] for hook in manifest["hook"] if hook.get("script_root") == "project_scripts"
+    )
+    sources.update(
+        profile["stdin_adapter"] for profile in profiles["harnesses"].values() if profile.get("stdin_adapter")
+    )
+    for relative in sources:
+        target = tmp_path / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(PROJECT_ROOT / relative, target)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    monkeypatch.setattr(project_harness, "PROFILES_PATH", tmp_path / "scripts/harness_projection/profiles.toml")
+    monkeypatch.setattr(project_harness, "APPLICATION_NAME", None)
+    config = tmp_path / config_dir
+    assert not config.exists()
+    assert project_harness.run(harness, "write") == 0
+    before = {path.relative_to(tmp_path).as_posix(): path.read_bytes() for path in config.rglob("*") if path.is_file()}
+    ownership = json.loads(before[config_dir + "/.projection-manifest.json"])
+    classes = ownership["classes"]
+    assert set(classes) == {"registration", "pointer", "ownership"}
+    assert all(isinstance(paths, list) for paths in classes.values())
+    classified_paths = [path for paths in classes.values() for path in paths]
+    assert len(classified_paths) == len(set(classified_paths))
+    assert set(before) == set(ownership["paths"]) == set(classified_paths)
+    assert before
+    for relative in before:
+        (tmp_path / relative).unlink()
+    assert not any(path.is_file() for path in config.rglob("*"))
+    assert project_harness.run(harness, "write") == 0
+    after = {path.relative_to(tmp_path).as_posix(): path.read_bytes() for path in config.rglob("*") if path.is_file()}
+    assert after == before
+    assert project_harness.run(harness, "check") == 0

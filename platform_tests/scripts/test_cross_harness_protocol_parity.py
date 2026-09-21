@@ -42,9 +42,7 @@ def _read_text(relative_path: str) -> str:
 
 
 def test_harness_parity_skill_separates_derivation_installed_output_and_execution() -> None:
-    skill_text = " ".join(
-        _read_text(".harness-baseline-configuration/skills/gtkb-harness-parity-review/SKILL.md").split()
-    )
+    skill_text = " ".join(_read_text(".agents/skills/gtkb-harness-parity-review/SKILL.md").split())
 
     assert "The reviewed sources can produce the required configuration" in skill_text
     assert "The selected installed configuration agrees with those sources" in skill_text

@@ -45,7 +45,7 @@ def _installation(tmp_path):
     for name in ("cursor_harness.py", "verify_cursor_dispatch.py"):
         shutil.copyfile(REPO_ROOT / "scripts" / name, scripts / name)
     for name in ("bridge", "proposal-review", "verify"):
-        path = selected / ".cursor" / "skills" / name / "SKILL.md"
+        path = selected / ".agents" / "skills" / ("gtkb-" + name) / "SKILL.md"
         path.parent.mkdir(parents=True)
         path.write_text("Selected own instruction " + name, encoding="utf-8")
     (selected / ".env.local").write_text("CURSOR_API_KEY=synthetic-selected-value\n", encoding="utf-8")

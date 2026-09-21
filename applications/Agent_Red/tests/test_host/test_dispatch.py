@@ -9,19 +9,18 @@ container, and that the SPA trigger endpoint handles all edge cases.
 
 from __future__ import annotations
 
-
 from src.multi_tenant.superadmin_api._diagnostics import (
+    _INPROCESS_SUITES,
+    _TEST_HOST_URL,
+    _TESTHOST_SUITES,
     VALID_ENVIRONMENTS,
     VALID_SUITES,
-    _INPROCESS_SUITES,
-    _TESTHOST_SUITES,
-    _TEST_HOST_URL,
 )
-
 
 # ---------------------------------------------------------------------------
 # Suite routing constants
 # ---------------------------------------------------------------------------
+
 
 class TestSuiteRouting:
     """In-process vs test-host suite classification."""
@@ -33,9 +32,19 @@ class TestSuiteRouting:
     def test_testhost_suites_defined(self):
         """Test-host suites include all pytest-based suites."""
         expected = {
-            "unit", "core", "integration", "agents", "security",
-            "regression_pytest", "ops", "widget", "e2e_live",
-            "load", "fuzzing", "property", "pipeline", "full",
+            "unit",
+            "core",
+            "integration",
+            "agents",
+            "security",
+            "regression_pytest",
+            "ops",
+            "widget",
+            "e2e_live",
+            "load",
+            "fuzzing",
+            "property",
+            "full",
         }
         assert _TESTHOST_SUITES == expected
 
@@ -63,14 +72,14 @@ class TestSuiteRouting:
         for suite in _TESTHOST_SUITES:
             config_name = name_mapping.get(suite, suite)
             assert config_name in SUITE_CONFIGS, (
-                f"Test-host suite '{suite}' has no SuiteConfig "
-                f"(checked as '{config_name}')"
+                f"Test-host suite '{suite}' has no SuiteConfig (checked as '{config_name}')"
             )
 
 
 # ---------------------------------------------------------------------------
 # Environment validation
 # ---------------------------------------------------------------------------
+
 
 class TestEnvironmentValidation:
     """Only staging and production are valid environments."""
@@ -95,6 +104,7 @@ class TestEnvironmentValidation:
 # Test host URL configuration
 # ---------------------------------------------------------------------------
 
+
 class TestHostUrlConfig:
     """TEST_HOST_URL defaults to internal DNS name."""
 
@@ -112,6 +122,7 @@ class TestHostUrlConfig:
 # Suite naming conventions
 # ---------------------------------------------------------------------------
 
+
 class TestSuiteNaming:
     """Suite names follow project conventions."""
 
@@ -128,6 +139,4 @@ class TestSuiteNaming:
     def test_alphanumeric_or_underscore(self):
         """Suite names are alphanumeric + underscore only."""
         for suite in VALID_SUITES:
-            assert suite.replace("_", "").isalnum(), (
-                f"Suite '{suite}' has invalid characters"
-            )
+            assert suite.replace("_", "").isalnum(), f"Suite '{suite}' has invalid characters"

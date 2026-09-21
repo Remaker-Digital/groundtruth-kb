@@ -56,7 +56,6 @@ nav:
       - Start Here: start-here.md
       - CTO Evaluation Guide: cto-evaluation.md
       - A Day in the Life: day-in-the-life.md
-      - Evidence: evidence.md
       - Known Limitations: known-limitations.md
       - Bootstrap Guide: bootstrap.md
       - Desktop Setup: desktop-setup.md
@@ -74,14 +73,11 @@ nav:
       - Adoption: method/09-adoption.md
       - Tooling: method/10-tooling.md
       - Operational Config: method/11-operational-configuration.md
-      - File Bridge Automation: method/12-file-bridge-automation.md
+      - Native bridge coordination: method/12-file-bridge-automation.md
       - Deliberation Archive: method/13-deliberation-archive.md
   - Tutorials:
       - Your First Specification: tutorials/first-spec.md
       - Dual-Agent Setup: tutorials/dual-agent-setup.md
-      - Bridge Smart Poller (Retired — Historical): tutorials/bridge-smart-poller.md
-      - Bridge Smart Poller Activation (Retired — Historical): tutorials/bridge-smart-poller-activation.md
-      - Bridge OS Scheduler (Retired — Historical): tutorials/bridge-os-scheduler.md
   - Reference:
       - CLI Reference: reference/cli.md
       - Configuration: reference/configuration.md
@@ -90,13 +86,14 @@ nav:
       - Canonical Terminology: reference/canonical-terminology.md
       - Templates: reference/templates.md
       - Azure Readiness Taxonomy: reference/azure-readiness-taxonomy.md
+      - Azure IaC Templates: reference/azure-iac-templates.md
+      - Azure CI/CD Templates: reference/azure-cicd-templates.md
   - Wiki:
       - Release Health: wiki/release-health.md
   - Troubleshooting:
       - Auth Troubleshooting: troubleshooting/auth.md
   - Examples:
-      - Task Tracker: examples/task-tracker.md
+      - Adopter Fixtures: examples/task-tracker.md
   - Architecture:
       - Product Split: architecture/product-split.md
   - Contributing: contributing.md
-  - Changelog: changelog.md

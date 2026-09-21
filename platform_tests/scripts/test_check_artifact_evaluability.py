@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import sys
 from datetime import UTC, datetime
 from pathlib import Path
@@ -12,7 +13,7 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "check_artifact_evaluability.py"
 
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.authority_client import AuthorityClient, configured_authority_client  # noqa: E402
 
 
 @pytest.fixture
@@ -26,26 +27,44 @@ def evaluator():
 
 
 @pytest.fixture
-def project(tmp_path: Path) -> tuple[Path, KnowledgeDB]:
+def project(tmp_path: Path, monkeypatch):
     (tmp_path / "present.txt").write_text("ready\n", encoding="utf-8")
-    db = KnowledgeDB(tmp_path / "groundtruth.db")
-    yield tmp_path, db
-    db.close()
+    specs = {}
+    monkeypatch.setenv("GT_AUTHORITY_URL", "http://127.0.0.1:12345")
+
+    def refuse(*args, **kwargs):
+        pytest.fail("Artifact evaluation must not open SQLite")
+
+    monkeypatch.setattr("sqlite3.connect", refuse)
+
+    def request(self, method, path, *, body=None, query=None):
+        assert method == "GET" and body is None
+        if path == "/v1/specifications":
+            # Two or more records require paging, exercising the ordinary list route.
+            ordered = sorted(specs)
+            remaining = [key for key in ordered if not query.get("after") or key > query["after"]]
+            page = remaining[:1]
+            return {
+                "records": [dict(specs[key]) for key in page],
+                "next_after": page[-1] if len(remaining) > 1 else None,
+            }
+        assert path.startswith("/v1/specifications/")
+        return dict(specs[path.rsplit("/", 1)[1]])
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    return tmp_path, specs
 
 
-def _insert(db: KnowledgeDB, spec_id: str, assertions: list[dict]) -> dict:
-    db.insert_spec(
-        id=spec_id,
-        title=spec_id,
-        type="design_constraint",
-        status="specified",
-        changed_by="test",
-        change_reason="test",
-        assertions=assertions,
-    )
-    result = db.get_spec(spec_id)
-    assert result is not None
-    return result
+def _insert(specs: dict, spec_id: str, assertions: list[dict]) -> dict:
+    specs[spec_id] = {
+        "id": spec_id,
+        "title": spec_id,
+        "type": "design_constraint",
+        "status": "active",
+        "version": 1,
+        "assertions": assertions,
+    }
+    return specs[spec_id]
 
 
 def test_full_evaluation_passes_and_binds_subject_and_evaluator(evaluator, project):
@@ -127,14 +146,15 @@ def test_evaluation_does_not_record_assertion_runs(evaluator, project):
         "DCL-EVAL-005",
         [{"id": "A1", "type": "file_exists", "file": "present.txt"}],
     )
-    connection = db._get_conn()
-    before = connection.execute("SELECT COUNT(*) FROM assertion_runs").fetchone()[0]
+    before = json.dumps(db, sort_keys=True)
+    files_before = sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
 
-    report = evaluator.evaluate_specs(db, project_root=root, spec_ids=["DCL-EVAL-005"])
+    report = evaluator.evaluate_specs(configured_authority_client(root), project_root=root, spec_ids=["DCL-EVAL-005"])
 
-    after = connection.execute("SELECT COUNT(*) FROM assertion_runs").fetchone()[0]
+    after = json.dumps(db, sort_keys=True)
     assert report["aggregate_result"] == "PASS"
-    assert before == after == 0
+    assert before == after
+    assert sorted(path.relative_to(root).as_posix() for path in root.rglob("*")) == files_before
 
 
 def test_assertion_scope_requires_exactly_one_carrier(evaluator, project):
@@ -144,7 +164,7 @@ def test_assertion_scope_requires_exactly_one_carrier(evaluator, project):
 
     with pytest.raises(evaluator.EvaluationError, match="exactly one"):
         evaluator.evaluate_specs(
-            db,
+            configured_authority_client(root),
             project_root=root,
             spec_ids=["DCL-EVAL-006", "DCL-EVAL-007"],
             assertion_ids={"A1"},
@@ -233,3 +253,28 @@ def test_partial_hard_invariant_blocks_every_governed_gate(evaluator):
         evaluator.satisfies_governed_gate(evaluation, gate, hard_invariant=True) is False
         for gate in ("implementation", "verification", "promotion", "closure")
     )
+
+
+def test_cli_reads_all_native_pages_without_creating_local_state(evaluator, project, capsys):
+    root, specs = project
+    for ident in ("DCL-EVAL-PAGE1", "DCL-EVAL-PAGE2"):
+        _insert(specs, ident, [{"id": "A1", "type": "file_exists", "file": "present.txt"}])
+    before = sorted(path.relative_to(root).as_posix() for path in root.rglob("*"))
+    assert evaluator.main(["--project-root", str(root), "--json"]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert report["carrier_count"] == 2 and report["aggregate_result"] == "PASS"
+    assert sorted(path.relative_to(root).as_posix() for path in root.rglob("*")) == before
+
+
+def test_cli_native_outage_is_visible_without_sqlite_fallback(evaluator, project, monkeypatch, capsys):
+    from groundtruth_kb.authority_client import AuthorityClientError
+
+    root, _specs = project
+
+    def unavailable(self, method, path, **kwargs):
+        raise AuthorityClientError("authority_unavailable", "Selected authority unavailable")
+
+    monkeypatch.setattr(AuthorityClient, "request", unavailable)
+    assert evaluator.main(["--project-root", str(root), "--json"]) == 1
+    assert "Selected authority unavailable" in capsys.readouterr().err
+    assert not (root / "groundtruth.db").exists()

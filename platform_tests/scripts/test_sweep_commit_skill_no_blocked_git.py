@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def test_project_commit_instructions_match_the_native_cli():
-    skill = (ROOT / ".harness-baseline-configuration/skills/gtkb-sweep-commit/SKILL.md").read_text(encoding="utf-8")
+    skill = (ROOT / ".agents/skills/gtkb-sweep-commit/SKILL.md").read_text(encoding="utf-8")
     assert "gt projects commit" in skill
     result = CliRunner().invoke(main, ["projects", "commit", "--help"])
     assert result.exit_code == 0, result.output
@@ -21,9 +21,7 @@ def test_project_commit_instructions_match_the_native_cli():
 
 
 def test_project_commit_guidance_preserves_review_and_foreign_work_boundaries():
-    skill = (
-        (ROOT / ".harness-baseline-configuration/skills/gtkb-sweep-commit/SKILL.md").read_text(encoding="utf-8").lower()
-    )
+    skill = (ROOT / ".agents/skills/gtkb-sweep-commit/SKILL.md").read_text(encoding="utf-8").lower()
     skill = " ".join(skill.split())
     for concept in ["every", "verified", "mode", "object", "foreign", "same uncommitted work item", "normal", "hooks"]:
         assert concept in skill

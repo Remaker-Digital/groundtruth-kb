@@ -33,5 +33,5 @@ def test_nonexistent_claims_are_no_go_and_experiments_are_isolated_and_reverted(
     assert "reverted when the verdict is NO-GO" in rule
 
 
-def test_projection_carries_the_baseline_paragraph() -> None:
-    assert "Do not make speculative source changes" in _one_line(PROJECTION)
+def test_rule_is_authored_once_without_a_projected_copy() -> None:
+    assert not PROJECTION.exists(), "rules are read on demand from the authored baseline"

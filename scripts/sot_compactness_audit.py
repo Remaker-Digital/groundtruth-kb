@@ -5,8 +5,6 @@ This helper is intentionally read-only. It classifies large GroundTruth-KB
 source-of-truth surfaces by their routine read route, records whether that route
 is compact/current/actionable, and emits follow-on dispositions for surfaces
 that still need a compact default or compact opt-in.
-
-GO: bridge/gtkb-wi4966-cli-compactness-sot-size-controls-002.md
 """
 
 from __future__ import annotations
@@ -21,10 +19,6 @@ from pathlib import Path
 from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-BRIDGE_ID = "gtkb-wi4966-cli-compactness-sot-size-controls"
-WORK_ITEM_ID = "WI-4966"
-PROJECT_ID = "PROJECT-HARNESS-EQUIVALENCE-PHASE-3"
-PAUTH_ID = "PAUTH-PROJECT-HARNESS-EQUIVALENCE-PHASE-3-WI4966-BATCH-C-20260705"
 
 READ_MODE_COMPACT_DEFAULT = "compact_default"
 READ_MODE_COMPACT_FLAG = "compact_flag"
@@ -37,7 +31,6 @@ COMMAND_KIND_ARCHIVAL = "archival_route"
 COMMAND_KIND_UNCLASSIFIED = "unclassified"
 
 STATUS_COVERED = "covered"
-STATUS_COVERED_DUPLICATE = "covered_by_existing_work"
 STATUS_ARCHIVAL_EXPLICIT = "archival_full_explicit"
 STATUS_GAP = "gap"
 STATUS_INVALID = "invalid"
@@ -48,7 +41,6 @@ VALID_READ_MODES = {
     READ_MODE_ARCHIVAL_EXPLICIT,
     READ_MODE_GAP,
 }
-WI4947_REFS = frozenset({"WI-4947", "DELIB-202665119", "bridge/gtkb-envelope-sharding-compact-query-modes-002.md"})
 
 
 @dataclass(frozen=True)
@@ -103,99 +95,37 @@ def now_stamp() -> str:
 def default_registry() -> tuple[SurfaceRecord, ...]:
     return (
         SurfaceRecord(
-            surface_id="membase-backlog-status",
-            title="MemBase backlog rollup",
-            sot_class="MemBase work_items/projects",
-            routine_command="groundtruth-kb/.venv/Scripts/gt.exe backlog status --json",
-            read_mode=READ_MODE_COMPACT_DEFAULT,
-            expected_default="Routine status reads should emit counts and current status rollups, not raw work-item rows.",
-            coverage_refs=("GOV-STANDING-BACKLOG-001",),
-            governing_specs=("SPEC-INTAKE-46594e", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            follow_on_disposition="No new work; keep scanner-backed annotations opt-in.",
-            notes="The status command is the compact current-state route; full work-item inspection remains a separate query.",
-        ),
-        SurfaceRecord(
-            surface_id="membase-project-authorization",
-            title="Project authorization / PAUTH detail",
-            sot_class="MemBase project_authorizations",
-            routine_command="groundtruth-kb/.venv/Scripts/gt.exe projects show PROJECT-HARNESS-EQUIVALENCE-PHASE-3 --json",
-            read_mode=READ_MODE_GAP,
-            expected_default="Routine authorization checks need a compact PAUTH summary by project/work item.",
-            coverage_refs=(PAUTH_ID,),
-            governing_specs=("GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            follow_on_disposition=(
-                "Follow-on: add a compact project-authorization read route or a project-scoped PAUTH summary so "
-                "implementation-start checks do not require the full project payload."
-            ),
-            notes="Live help exposes only --json for projects show; no compact flag is present.",
-        ),
-        SurfaceRecord(
-            surface_id="deliberation-archive-targeted-search",
-            title="Deliberation Archive targeted search",
-            sot_class="Deliberation Archive",
-            routine_command='groundtruth-kb/.venv/Scripts/gt.exe deliberations search "compact query modes" --limit 5 --json',
-            read_mode=READ_MODE_COMPACT_DEFAULT,
-            expected_default="Routine DA reads should use targeted search/list filters and low limits.",
-            coverage_refs=("DELIB-202665119", "DELIB-202665127"),
-            governing_specs=("GOV-ARTIFACT-ORIENTED-GOVERNANCE-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            follow_on_disposition="No new work; keep --limit mandatory in routine DA examples and reports.",
-            notes="The invalid proposal citation DELIB-20260701-ENVELOPE-SHARDING-EXECUTE-RETIRE is intentionally omitted.",
-        ),
-        SurfaceRecord(
-            surface_id="bridge-current-thread",
-            title="Bridge current thread summary",
-            sot_class="Bridge numbered file chain",
-            routine_command=f"groundtruth-kb/.venv/Scripts/gt.exe bridge show {BRIDGE_ID} --json --compact",
+            surface_id="native-operating-status",
+            title="Native operating status",
+            sot_class="Native operating status",
+            routine_command="gt status --startup",
             read_mode=READ_MODE_COMPACT_FLAG,
-            expected_default="Routine bridge reads should expose latest status/path/version count without version payloads.",
-            coverage_refs=("WI-4947", "DELIB-202665119", "bridge/gtkb-envelope-sharding-compact-query-modes-002.md"),
-            governing_specs=("GOV-FILE-BRIDGE-AUTHORITY-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            archival_command=f"groundtruth-kb/.venv/Scripts/gt.exe bridge show {BRIDGE_ID} --json",
-            follow_on_disposition="Already covered by WI-4947 compact query work; no duplicate implementation.",
-            notes="Compact mode omits archival version chains by design.",
+            expected_default="Current operating counts and readiness use the startup summary route.",
+            coverage_refs=("groundtruth-kb/src/groundtruth_kb/cli_authority.py",),
+            governing_specs=("DCL-SESSION-STARTUP-TOKEN-BUDGET-001",),
+            follow_on_disposition="Use the existing startup summary.",
         ),
         SurfaceRecord(
-            surface_id="bridge-role-scan",
-            title="Bridge role-actionable scan",
-            sot_class="Dispatcher/TAFE bridge state plus numbered files",
-            routine_command=(
-                "groundtruth-kb/.venv/Scripts/python.exe .codex/skills/bridge/helpers/scan_bridge.py "
-                "--role prime-builder --compact --format json"
-            ),
-            read_mode=READ_MODE_COMPACT_FLAG,
-            expected_default="Routine role scans should return current/actionable counts and latest paths only.",
-            coverage_refs=("WI-4947", "DELIB-202665119", "bridge/gtkb-envelope-sharding-compact-query-modes-002.md"),
-            governing_specs=("GOV-FILE-BRIDGE-AUTHORITY-001", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            follow_on_disposition="Already covered by WI-4947 compact query work; no duplicate implementation.",
-            notes="The full mode remains available for archival investigation.",
-        ),
-        SurfaceRecord(
-            surface_id="dispatcher-status",
-            title="Dispatcher health and selection status",
-            sot_class="Dispatcher daemon state",
-            routine_command="groundtruth-kb/.venv/Scripts/gt.exe bridge dispatch status --json",
-            read_mode=READ_MODE_GAP,
-            expected_default="Routine dispatcher reads need a compact status route separating health rollup from raw config detail.",
-            coverage_refs=("DCL-SESSION-STARTUP-TOKEN-BUDGET-001",),
-            governing_specs=("SPEC-INTAKE-46594e", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            follow_on_disposition=(
-                "Follow-on: add --compact or --startup to gt bridge dispatch status, preserving full JSON behind the "
-                "existing archival route."
-            ),
-            notes="Live help exposes only --json; the current JSON payload includes config, health rollup, and selections.",
-        ),
-        SurfaceRecord(
-            surface_id="transcript-inventory-manifest",
-            title="Transcript/session inventory",
-            sot_class="Harness-local transcript metadata",
-            routine_command="groundtruth-kb/.venv/Scripts/gt.exe session envelope show --harness-name codex",
+            surface_id="native-work-items",
+            title="Bounded work-item reads",
+            sot_class="Native work items",
+            routine_command="gt backlog list --limit 20 --json",
             read_mode=READ_MODE_COMPACT_DEFAULT,
-            expected_default="Routine session reads should expose envelope metadata and must not load transcript content.",
-            coverage_refs=("WI-4946", "DELIB-202665127", "scripts/wrap_capture_transcript.py"),
-            governing_specs=("SPEC-INTAKE-46594e", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            archival_command="groundtruth-kb/.venv/Scripts/python.exe scripts/wrap_capture_transcript.py --session-id <id>",
-            follow_on_disposition="No new work; keep transcript content out of routine startup/session surfaces.",
-            notes="wrap_capture_transcript.py is manifest-only; full transcript content is deferred outside routine reads.",
+            expected_default="Limit routine queue reads; inspect the selected work item separately.",
+            coverage_refs=("groundtruth-kb/src/groundtruth_kb/cli_authority.py",),
+            governing_specs=("GOV-STANDING-BACKLOG-001",),
+            follow_on_disposition="Use current native records and explicit list limits.",
+        ),
+        SurfaceRecord(
+            surface_id="native-projects",
+            title="Bounded project reads",
+            sot_class="Native projects",
+            routine_command="gt projects list --limit 20 --json",
+            read_mode=READ_MODE_COMPACT_DEFAULT,
+            expected_default="Limit the project list and read the selected project record for current state.",
+            coverage_refs=("groundtruth-kb/src/groundtruth_kb/cli_authority.py",),
+            governing_specs=("GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001",),
+            follow_on_disposition="Project authorization is a field on the current project record.",
         ),
         SurfaceRecord(
             surface_id="advisory-state-report",
@@ -208,18 +138,6 @@ def default_registry() -> tuple[SurfaceRecord, ...]:
             governing_specs=("DCL-ADVISORY-ROUTING-001", "GOV-STANDING-BACKLOG-001"),
             follow_on_disposition="Read current native state; the owner selects any advisory follow-up.",
             notes="No candidate ledger, file-bridge scan, automatic promotion or disposition inference.",
-        ),
-        SurfaceRecord(
-            surface_id="envelope-sharding-surface",
-            title="Session/activity envelope sharding taxonomy",
-            sot_class="Harness equivalence envelope config",
-            routine_command="groundtruth-kb/.venv/Scripts/gt.exe benchmarks activity-envelope-load --json",
-            read_mode=READ_MODE_COMPACT_DEFAULT,
-            expected_default="Routine envelope checks should report estimates/classifications, not full startup payload bodies.",
-            coverage_refs=("WI-4946", "DELIB-202665127"),
-            governing_specs=("SPEC-INTAKE-46594e", "DCL-SESSION-STARTUP-TOKEN-BUDGET-001"),
-            follow_on_disposition="No new work; taxonomy baseline already covers payload class separation.",
-            notes="This links sharding-baseline coverage rather than duplicating it.",
         ),
     )
 
@@ -237,18 +155,12 @@ def classify_command(command: str) -> str:
         " status ",
         " list ",
         " search ",
-        " envelope show ",
-        " activity-envelope-load ",
         " --limit ",
         "manifest",
     )
     if any(marker in lowered for marker in bounded_markers):
         return COMMAND_KIND_BOUNDED
     return COMMAND_KIND_UNCLASSIFIED
-
-
-def _is_wi4947_duplicate(surface: SurfaceRecord) -> bool:
-    return bool(WI4947_REFS.intersection(surface.coverage_refs))
 
 
 def validate_registry(registry: tuple[SurfaceRecord, ...]) -> tuple[str, ...]:
@@ -309,8 +221,6 @@ def audit_registry(registry: tuple[SurfaceRecord, ...] | None = None) -> tuple[A
             status = STATUS_INVALID
         elif surface.read_mode == READ_MODE_GAP:
             status = STATUS_GAP
-        elif _is_wi4947_duplicate(surface):
-            status = STATUS_COVERED_DUPLICATE
         elif surface.read_mode == READ_MODE_ARCHIVAL_EXPLICIT:
             status = STATUS_ARCHIVAL_EXPLICIT
         else:
@@ -324,10 +234,6 @@ def rows_as_json(rows: tuple[AuditRow, ...]) -> dict[str, Any]:
     for row in rows:
         counts[row.status] = counts.get(row.status, 0) + 1
     return {
-        "bridge_id": BRIDGE_ID,
-        "work_item_id": WORK_ITEM_ID,
-        "project_id": PROJECT_ID,
-        "project_authorization": PAUTH_ID,
         "summary": counts,
         "rows": [row.as_dict() for row in rows],
     }
@@ -345,19 +251,14 @@ def render_markdown_report(rows: tuple[AuditRow, ...], *, generated_at: str) -> 
     payload = rows_as_json(rows)
     counts = payload["summary"]
     gap_rows = [row for row in rows if row.status == STATUS_GAP]
-    duplicate_rows = [row for row in rows if row.status == STATUS_COVERED_DUPLICATE]
 
     lines = [
-        "# Harness Equivalence Phase 3 SoT Compactness Audit",
+        "# Native Read-Surface Compactness Report",
         "",
         f"Generated: `{generated_at}`",
-        f"Bridge: `{BRIDGE_ID}`",
-        f"Project: `{PROJECT_ID}`",
-        f"Work Item: `{WORK_ITEM_ID}`",
-        f"Project Authorization: `{PAUTH_ID}`",
         "",
-        "This read-only audit classifies large source-of-truth read surfaces by routine compactness. "
-        "It preserves existing compact-query coverage as coverage, not as new work.",
+        "This read-only report describes the declared native read routes. "
+        "Its command classification is lexical; it does not execute the routes or measure their payloads.",
         "",
         "## Summary",
         "",
@@ -412,30 +313,14 @@ def render_markdown_report(rows: tuple[AuditRow, ...], *, generated_at: str) -> 
     else:
         lines.append("No compactness gaps identified.")
 
-    lines.extend(["## Existing Coverage / No Duplicate Work", ""])
-    if duplicate_rows:
-        for row in duplicate_rows:
-            lines.append(
-                f"- `{row.surface.surface_id}` is covered by {_join(row.surface.coverage_refs)}; "
-                f"disposition: {row.surface.follow_on_disposition}"
-            )
-    else:
-        lines.append("No duplicate-coverage surfaces identified.")
-
     lines.extend(
         [
             "",
-            "## Citation Correction",
-            "",
-            "`DELIB-20260701-ENVELOPE-SHARDING-EXECUTE-RETIRE` is not used as evidence in this report. "
-            "Envelope-sharding compactness context is cited through `DELIB-202665119` and `DELIB-202665127`.",
-            "",
             "## Verification Notes",
             "",
-            "- Registry validation requires unique surface ids, governing specs, compact signals for compact-flag routes, "
-            "and follow-on dispositions for every gap.",
-            "- Gap rows are report-backed evidence only; this helper does not mutate MemBase, bridge state, dispatcher state, "
-            "or source-of-truth data.",
+            "- Validation requires unique surface IDs, governing specifications, compact signals for compact-flag routes, "
+            "and a proposed correction for every declared gap.",
+            "- The report does not mutate canonical records or dispatch work.",
             "",
         ]
     )

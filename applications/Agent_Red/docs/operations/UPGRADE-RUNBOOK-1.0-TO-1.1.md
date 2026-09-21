@@ -247,7 +247,7 @@ This is the **primary upgrade path** — use the automated script for all routin
 ╔══════════════════════════════════════════════════════════════╗
 ║  UPGRADE COMPLETE                                           ║
 ║  Image: acragentredeastus2.azurecr.io/api-gateway:v1.1.0   ║
-║  Tier 0: PASSED (17/17)                                     ║
+║  Tier 0: PASSED (18/18)                                     ║
 ║  Tier 1: PASSED (16/16)                                     ║
 ║  Duration: 4m 32s                                           ║
 ╚══════════════════════════════════════════════════════════════╝
@@ -314,7 +314,7 @@ Migrations are backward-compatible — the running v1.0 app is unaffected. New f
 python -m pytest tests/regression/test_upgrade_regression.py -x -q -m tier0 --tb=short
 ```
 
-**All 17 Tier 0 tests must pass.** If any fail, stop — investigate current production issues before proceeding.
+**All 18 Tier 0 tests must pass.** If any fail, stop — investigate current production issues before proceeding.
 
 ### Step 4: Build and Push New Image (3-5 min)
 
@@ -460,7 +460,7 @@ az cosmosdb restore \
 
 ### Test Inventory (43 Tests, 3 Tiers)
 
-#### Tier 0: Blocking (17 tests) — `pytest -m tier0`
+#### Tier 0: Blocking (18 tests) — `pytest -m tier0`
 
 These tests **must all pass** before and after any deployment. A single Tier 0 failure is an immediate rollback trigger.
 
@@ -479,7 +479,8 @@ These tests **must all pass** before and after any deployment. A single Tier 0 f
 | T0-11 | Assets | `/widget.js` returns 200 | Widget bundle served |
 | T0-12 | Assets | `/admin/standalone/` returns 200 | Standalone admin served |
 | T0-13 | Assets | `/admin/shopify/` returns 200 | Shopify admin served |
-| T0-14 | Assets | `/docs` returns 200 | OpenAPI docs served |
+| T0-13b | Assets | `/admin/provider/` returns 200 | Provider console served |
+| T0-14 | Assets | `/openapi.json` returns 200 with application paths | OpenAPI document served |
 | T0-15 | Tenant | `/api/tenants/lookup` returns 200 | Tenant lookup operational |
 | T0-16 | Tenant | Lookup returns valid JSON | Response format correct |
 | T0-17 | Tenant | `/api/checkout/session` reachable | Checkout flow operational |
@@ -634,9 +635,11 @@ curl -s https://agent-red-staging-gateway.<staging-domain>/health
 #### 2. Seed Test Data
 
 ```bash
-python scripts/provision_tenant_one.py --environment staging
+# Select the staging COSMOS_DB_ENDPOINT, COSMOS_DB_KEY and COSMOS_DB_DATABASE
+# in the environment before running these commands from the repository root.
+SEED_TENANT_ID=test-staging-001 python scripts/provision_tenant_one.py --provision
 python scripts/seed_knowledge_base.py --load --tenant-id test-staging-001
-python scripts/seed_demo_data.py --environment staging
+SEED_TENANT_ID=test-staging-001 python scripts/seed_demo_data.py --seed
 ```
 
 #### 3. Verify v1.0.0 Baseline
@@ -646,7 +649,7 @@ PROD_URL=https://agent-red-staging-gateway.<staging-domain> \
 python -m pytest tests/regression/test_upgrade_regression.py -x -q -m tier0 --tb=short
 ```
 
-All 17 Tier 0 tests must pass.
+All 18 Tier 0 tests must pass.
 
 #### 4. Apply Migrations
 

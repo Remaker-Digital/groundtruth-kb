@@ -92,12 +92,12 @@ def test_register_persists_optional_fields(db: Any) -> None:
         harness_type="antigravity",
         reviewer_precedence=2,
         invocation_surfaces={"interactive": "antigravity", "headless": "gemini -p"},
-        capabilities_ref="config/agent-control/harness-capability-registry.toml",
+        capabilities_ref="infrastructure/antigravity/installed.json",
     )
     assert record["harness_name"] == "antigravity"
     assert record["harness_type"] == "antigravity"
     assert record["reviewer_precedence"] == 2
-    assert record["capabilities_ref"].endswith("harness-capability-registry.toml")
+    assert record["capabilities_ref"] == "infrastructure/antigravity/installed.json"
     assert _decode(record["role"]) == []
     assert _decode(record["invocation_surfaces"]) == {
         "interactive": "antigravity",

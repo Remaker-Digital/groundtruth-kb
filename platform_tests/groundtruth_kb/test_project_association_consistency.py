@@ -3,100 +3,18 @@
 from __future__ import annotations
 
 import json
-import os
-import socket
-import subprocess
-import sys
-import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import UTC, datetime
-from pathlib import Path
 
-import groundtruth_kb
 import pytest
-from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.native_authority import MembershipMove
 from groundtruth_kb.postgres_kernel import TABLE_SPECS, PostgresKernelError, PostgresTransaction
 
-from platform_tests.groundtruth_kb.test_native_authority_service import (
-    history_count,
-    put,
-    seed,
-    work_fields,
-)
-from platform_tests.groundtruth_kb.test_native_authority_service import (
-    native as native,
-)
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-
-@pytest.fixture
-def membership_cli(native, tmp_path):
-    service, client, _, service_name = native
-    seed(client)
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        port = listener.getsockname()[1]
-    url = f"http://127.0.0.1:{port}"
-    sentinel = tmp_path / "groundtruth.db"
-    sentinel.write_bytes(b"Native membership must never open or amend this SQLite substitute.")
-    server = tmp_path / "server.toml"
-    server.write_text(f'[groundtruth]\nproject_root="."\n[postgresql]\nservice="{service_name}"\n', encoding="utf-8")
-    config = tmp_path / "groundtruth.toml"
-    config.write_text(
-        f'[groundtruth]\nproject_root="."\nauthority_url="{url}"\ndb_path="groundtruth.db"\n', encoding="utf-8"
-    )
-    base_env = dict(os.environ, PYTHONPATH=str(Path(groundtruth_kb.__file__).resolve().parent.parent))
-    base_env.pop("GT_AUTHORITY_URL", None)
-    base_env["GT_PROJECT_ROOT"] = str(tmp_path)
-    base_env["GT_DB_PATH"] = str(sentinel)
-    client_env = {k: v for k, v in base_env.items() if not k.startswith(("PG", "GT_POSTGRES_"))}
-    flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-
-    def cli(*args):
-        return subprocess.run(
-            [sys.executable, "-m", "groundtruth_kb", "--config", str(config), *args],
-            cwd=tmp_path,
-            env=client_env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=30,
-            creationflags=flags,
-        )
-
-    original = sentinel.read_bytes()
-    with (tmp_path / "service.log").open("wb") as log:
-        process = subprocess.Popen(
-            [sys.executable, "-m", "groundtruth_kb", "--config", str(server), "service", "serve", "--port", str(port)],
-            cwd=tmp_path,
-            env=base_env,
-            stdout=log,
-            stderr=log,
-            creationflags=flags,
-        )
-
-        def stop():
-            if process.poll() is None:
-                process.terminate()
-                process.wait(timeout=15)
-
-        try:
-            deadline = time.monotonic() + 30
-            http = AuthorityClient(url, timeout=1)
-            while True:
-                try:
-                    http.request("GET", "/v1/status")
-                    break
-                except AuthorityClientError:
-                    if process.poll() is not None or time.monotonic() >= deadline:
-                        pytest.fail("Native membership authority did not start; inspect service.log")
-                    time.sleep(0.1)
-            yield service, client, cli, stop
-        finally:
-            stop()
-            assert sentinel.read_bytes() == original
 
 
 def creation(cli, path, *, project=None, **fields):

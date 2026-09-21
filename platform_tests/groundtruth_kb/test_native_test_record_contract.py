@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, seed
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 
 @pytest.mark.parametrize(

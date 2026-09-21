@@ -7,9 +7,9 @@ import pytest
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 from psycopg import Cursor, sql
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

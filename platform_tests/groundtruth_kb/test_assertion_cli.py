@@ -5,104 +5,23 @@ from __future__ import annotations
 import json
 import os
 import re
-import socket
 import sqlite3
 import subprocess
 import sys
-import threading
-import time
 from pathlib import Path
 
 import groundtruth_kb
 import pytest
-import uvicorn
 from click.testing import CliRunner
 from groundtruth_kb import assertions
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.cli import main
 from groundtruth_kb.db import KnowledgeDB
-from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put
+from platform_tests.groundtruth_kb.native_fixtures import assertion_source as assertion_source
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-
-@pytest.fixture(params=["absent", "stale"])
-def assertion_source(request, monkeypatch, tmp_path):
-    """Current native input wins over absent or contradictory local SQLite data."""
-    for name in ("GT_DB_PATH", "GT_PROJECT_ROOT", "GT_AUTHORITY_URL"):
-        monkeypatch.delenv(name, raising=False)
-    (tmp_path / "effect.py").write_text("value = 1\n", encoding="utf-8")
-    database = tmp_path / "selected.db"
-    config = tmp_path / "groundtruth.toml"
-    settings = '[groundtruth]\ndb_path = "selected.db"\nproject_root = "."\nauthority_url = "http://127.0.0.1:8765"\n'
-    if request.param == "stale":
-        with sqlite3.connect(database) as connection:
-            connection.execute(
-                "CREATE TABLE specifications (id TEXT, version INTEGER, title TEXT, status TEXT, "
-                "assertions TEXT, constraints TEXT, priority TEXT)"
-            )
-            connection.execute("CREATE VIEW current_specifications AS SELECT * FROM specifications")
-            connection.execute(
-                "INSERT INTO specifications VALUES (?,?,?,?,?,?,?)",
-                (
-                    "SPEC-1",
-                    99,
-                    "Conflicting local copy",
-                    "active",
-                    json.dumps([{"type": "file_exists", "file": "missing.py"}]),
-                    "null",
-                    "P1",
-                ),
-            )
-    service, client, _, _ = request.getfixturevalue("native")
-    calls = []
-    original_request = AuthorityClient.request
-
-    def transport(_self, method, path, *, body=None, query=None):
-        calls.append((method, path))
-        return original_request(_self, method, path, body=body, query=query)
-
-    monkeypatch.setattr(AuthorityClient, "request", transport)
-
-    def record(ident, fields, version=0):
-        response = put(client, "specifications", ident, fields, expected_version=version)
-        assert response.status_code == 200, response.text
-
-    def snapshot():
-        with service.kernel.transaction(read_only=True) as tx:
-            tx.cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname=%s ORDER BY tablename", (tx.schema,))
-            tables = [r["tablename"] for r in tx.cursor.fetchall()]
-            records = {}
-            for name in tables:
-                tx.cursor.execute(
-                    sql.SQL("SELECT * FROM {}.{}").format(sql.Identifier(tx.schema), sql.Identifier(name))
-                )
-                records[name] = sorted(
-                    json.dumps(dict(row), default=str, sort_keys=True) for row in tx.cursor.fetchall()
-                )
-            return records, database.read_bytes() if database.is_file() else None
-
-    with socket.socket() as listener:
-        listener.bind(("127.0.0.1", 0))
-        port = listener.getsockname()[1]
-        settings = settings.replace("http://127.0.0.1:8765", f"http://127.0.0.1:{port}")
-        config.write_text(settings, encoding="utf-8")
-        server = uvicorn.Server(uvicorn.Config(client.app, host="127.0.0.1", port=port, log_level="error"))
-        worker = threading.Thread(target=lambda: server.run(sockets=[listener]), daemon=True)
-        worker.start()
-        deadline = time.monotonic() + 10
-        try:
-            while not server.started and worker.is_alive() and time.monotonic() < deadline:
-                time.sleep(0.01)
-            assert server.started, "Disposable assertion authority did not start"
-            yield config, record, snapshot, calls
-        finally:
-            server.should_exit = True
-            worker.join(10)
-            assert not worker.is_alive()
 
 
 @pytest.mark.parametrize("behavior_required", [False, True])
@@ -246,7 +165,7 @@ def test_missing_definitions_remain_unassessed_and_cannot_make_a_corpus_pass(ass
     assert snapshot() == before
 
 
-@pytest.mark.parametrize("changed_field", ["authority_url", "project_root"])
+@pytest.mark.parametrize("changed_field", ["authority_url", "project_root", "application_scope"])
 def test_assertion_configuration_changes_invalidate_the_observation(assertion_source, monkeypatch, changed_field):
     config, record, snapshot, calls = assertion_source
     record(
@@ -264,6 +183,9 @@ def test_assertion_configuration_changes_invalidate_the_observation(assertion_so
         text = config.read_text(encoding="utf-8")
         if changed_field == "authority_url":
             text = re.sub(r'authority_url = "[^"]+"', 'authority_url = "http://127.0.0.1:1"', text)
+        elif changed_field == "application_scope":
+            # The marker-derived default moves from gtkb_platform to application:Alpha during evaluation.
+            (config.parent / "application.toml").write_text('[application]\nname = "Alpha"\n', encoding="utf-8")
         else:
             decoy = config.parent / "decoy"
             decoy.mkdir()
@@ -275,6 +197,99 @@ def test_assertion_configuration_changes_invalidate_the_observation(assertion_so
     monkeypatch.setitem(assertions._RUNNERS, "grep", change_configuration)
     result = CliRunner().invoke(main, ["--config", str(config), "assert", "--spec", "SPEC-1", "--json"])
     assert result.exit_code == 1 and "assertion_configuration_changed" in result.output, result.output
+    assert snapshot() == before and all(method == "GET" for method, _ in calls)
+
+
+def _scoped_corpus(record):
+    """Four active records: platform-scoped, Alpha-scoped, unscoped (null) and Beta-scoped (its check fails)."""
+    effect = [{"type": "file_exists", "file": "effect.py"}]
+    fields = {"title": "Scoped", "status": "active", "assertions": effect}
+    record("SPEC-PLAT", {**fields, "application_scope": "gtkb_platform"})
+    record("SPEC-ALPHA", {**fields, "application_scope": "application:Alpha"})
+    record("SPEC-NULL", fields)
+    failing = [{"type": "file_exists", "file": "missing.py"}]
+    record("SPEC-BETA", {**fields, "application_scope": "application:Beta", "assertions": failing})
+
+
+def test_selected_scope_evaluates_its_records_with_the_unscoped_ones_and_excludes_other_scopes(assertion_source):
+    config, record, snapshot, calls = assertion_source
+    _scoped_corpus(record)
+    before = snapshot()
+    result = CliRunner().invoke(main, ["--config", str(config), "assert", "--scope", "application:Alpha", "--json"])
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert [row["spec_id"] for row in report["details"]] == ["SPEC-ALPHA", "SPEC-NULL"]
+    assert report["application_scope"] == "application:Alpha"
+    assert report["total_specs"] == 2
+    assert (report["scoped_specs"], report["unscoped_specs"], report["excluded_specs"]) == (1, 1, 2)
+    assert report["aggregate_result"] == "PASS" and report["failed"] == 0
+    platform = CliRunner().invoke(main, ["--config", str(config), "assert", "--scope", "gtkb_platform", "--json"])
+    assert platform.exit_code == 0, platform.output
+    report = json.loads(platform.output)
+    assert [row["spec_id"] for row in report["details"]] == ["SPEC-NULL", "SPEC-PLAT"]
+    assert (report["scoped_specs"], report["unscoped_specs"], report["excluded_specs"]) == (1, 1, 2)
+    text = CliRunner().invoke(main, ["--config", str(config), "assert", "--scope", "gtkb_platform"])
+    assert text.exit_code == 0, text.output
+    assert "Scope:             gtkb_platform" in text.output
+    assert "Unscoped (null) records evaluated with it: 1" in text.output
+    assert "Other-scope records excluded:              2" in text.output
+    assert snapshot() == before and all(method == "GET" for method, _ in calls)
+
+
+def test_default_scope_derives_from_the_application_marker_else_the_platform_scope(assertion_source):
+    config, record, snapshot, calls = assertion_source
+    _scoped_corpus(record)
+    before = snapshot()
+    result = CliRunner().invoke(main, ["--config", str(config), "assert", "--json"])
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert report["application_scope"] == "gtkb_platform"
+    assert [row["spec_id"] for row in report["details"]] == ["SPEC-NULL", "SPEC-PLAT"]
+    marker = config.parent / "application.toml"
+    marker.write_text('[application]\nname = "Alpha"\n', encoding="utf-8")
+    result = CliRunner().invoke(main, ["--config", str(config), "assert", "--json"])
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    assert report["application_scope"] == "application:Alpha"
+    assert [row["spec_id"] for row in report["details"]] == ["SPEC-ALPHA", "SPEC-NULL"]
+    explicit = CliRunner().invoke(main, ["--config", str(config), "assert", "--scope", "gtkb_platform", "--json"])
+    assert explicit.exit_code == 0 and json.loads(explicit.output)["application_scope"] == "gtkb_platform"
+    marker.write_text("[application]\n", encoding="utf-8")
+    reads = len(calls)
+    unnamed = CliRunner().invoke(main, ["--config", str(config), "assert", "--json"])
+    assert unnamed.exit_code == 1 and "invalid_application_scope" in unnamed.output, unnamed.output
+    assert "must name the registered application" in unnamed.output
+    assert len(calls) == reads and snapshot() == before
+
+
+@pytest.mark.parametrize("scope", ["agent_red_application", "application:", "platform", ""])
+def test_an_invalid_scope_is_refused_before_any_read(assertion_source, scope):
+    config, record, snapshot, calls = assertion_source
+    record("SPEC-1", {"title": "Effect", "status": "active", "assertions": [{"type": "file_exists", "file": "a.py"}]})
+    before = snapshot()
+    reads = len(calls)
+    listing = sorted(config.parent.iterdir())
+    result = CliRunner().invoke(main, ["--config", str(config), "assert", "--scope", scope, "--json"])
+    assert result.exit_code == 1 and "invalid_application_scope" in result.output, result.output
+    assert len(calls) == reads and snapshot() == before and sorted(config.parent.iterdir()) == listing
+
+
+def test_an_explicitly_selected_specification_is_evaluated_whatever_its_scope(assertion_source):
+    config, record, snapshot, calls = assertion_source
+    _scoped_corpus(record)
+    before = snapshot()
+    result = CliRunner().invoke(
+        main, ["--config", str(config), "assert", "--spec", "SPEC-BETA", "--scope", "application:Alpha", "--json"]
+    )
+    assert result.exit_code == 1, result.output
+    report = json.loads(result.output)
+    assert report["aggregate_result"] == "FAIL" and [row["spec_id"] for row in report["details"]] == ["SPEC-BETA"]
+    assert report["application_scope"] == "application:Alpha"
+    assert (report["scoped_specs"], report["unscoped_specs"], report["excluded_specs"]) == (0, 0, 0)
+    unscoped = CliRunner().invoke(main, ["--config", str(config), "assert", "--spec", "SPEC-NULL", "--json"])
+    assert unscoped.exit_code == 0, unscoped.output
+    report = json.loads(unscoped.output)
+    assert (report["scoped_specs"], report["unscoped_specs"], report["excluded_specs"]) == (0, 1, 0)
     assert snapshot() == before and all(method == "GET" for method, _ in calls)
 
 

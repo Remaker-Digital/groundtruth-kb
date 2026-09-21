@@ -59,8 +59,8 @@ SCAN_ROOTS = (
     "tests",
     "config",
     "tools",
-    ".claude/rules",
-    ".claude/skills",
+    ".harness-baseline-configuration/rules",
+    ".agents/skills",
 )
 SCAN_ROOT_FILES = ("CLAUDE.md", "AGENTS.md")
 
@@ -136,7 +136,7 @@ def check_git_uncommitted(project_root: Path) -> list[dict]:
 def check_git_untracked_in_tracked_dirs(project_root: Path) -> list[dict]:
     output = _run_git(["ls-files", "--others", "--exclude-standard"], project_root)
     findings: list[dict] = []
-    governed_dirs = ("bridge/", "memory/", "scripts/", ".claude/")
+    governed_dirs = ("bridge/", "memory/", "scripts/", ".harness-baseline-configuration/", ".agents/skills/")
     for line in output.splitlines():
         if not line:
             continue

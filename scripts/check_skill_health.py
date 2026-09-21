@@ -2,8 +2,7 @@
 """Skill-health static checker — Slice 0 of the skill-modernization umbrella.
 
 Read-only detector over GroundTruth-KB skill markdown for the CLI-bypass
-anti-patterns the umbrella targets (per ``DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE``:
-deterministic plumbing belongs in services, not in session markdown):
+anti-patterns the umbrella targets:
 
 1. ``fenced_python``  — fenced ```python blocks embedded in a skill body.
 2. ``db_mutation``    — inline DB-mutation snippets a skill instructs the agent
@@ -15,16 +14,9 @@ deterministic plumbing belongs in services, not in session markdown):
 4. ``index_write`` — direct ``bridge/INDEX.md`` mutation/restoration
    instructions that are NOT routed through governed helper language.
 
-The checker is strictly read-only: it never mutates skill files and never opens
-the MemBase database. It emits a JSON report plus a markdown summary under
-``.gtkb-state/skill-health/<run-id>/`` (in-root, regenerable runtime evidence per
-``ADR-ISOLATION-APPLICATION-PLACEMENT-001``).
-
-Authority: bridge ``gtkb-skill-modernization-slice-0-skill-health-checker``
-(Codex GO at ``-002``); WI-3451; PAUTH
-``PAUTH-PROJECT-GTKB-SKILL-MODERNIZATION-SKILL-MODERNIZATION-SLICE-0-SKILL-HEALTH-CHECKER``;
-specs ``GOV-ARTIFACT-ORIENTED-GOVERNANCE-001``,
-``ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001``.
+The checker reports findings on stdout and creates no files or database.
+Current formal anchors: GOV-ARTIFACT-ORIENTED-GOVERNANCE-001 and
+ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -38,8 +30,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-DEFAULT_SKILL_ROOTS: tuple[str, ...] = (".claude/skills", ".codex/skills")
-RUNTIME_OUTPUT_PREFIX = ".gtkb-state/skill-health"
+DEFAULT_SKILL_ROOTS: tuple[str, ...] = (".agents/skills",)
 
 # --- Detection patterns ------------------------------------------------------
 
@@ -217,19 +208,6 @@ def render_summary(report: Report) -> str:
     return "\n".join(lines)
 
 
-def write_run_outputs(run_id: str, report: Report, project_root: Path) -> Path:
-    """Write ``report.json`` + ``summary.md`` under ``.gtkb-state/skill-health/<run-id>/``.
-
-    Returns the run output directory. This is the only path the checker writes;
-    it never mutates skill files or the database.
-    """
-    out_dir = (project_root / RUNTIME_OUTPUT_PREFIX / run_id).resolve()
-    out_dir.mkdir(parents=True, exist_ok=True)
-    (out_dir / "report.json").write_text(json.dumps(report.to_dict(), indent=2) + "\n", encoding="utf-8")
-    (out_dir / "summary.md").write_text(render_summary(report), encoding="utf-8")
-    return out_dir
-
-
 def _default_run_id() -> str:
     return datetime.now(UTC).strftime("run-%Y%m%dT%H%M%SZ")
 
@@ -240,9 +218,9 @@ def main(argv: list[str] | None = None) -> int:
         "--skills-root",
         action="append",
         dest="skill_roots",
-        help="Skill root to scan (repeatable). Defaults to .claude/skills + .codex/skills.",
+        help="Skill root to scan (repeatable). Defaults to the shared authored .agents/skills.",
     )
-    parser.add_argument("--run-id", default=None, help="Run id for the output directory.")
+    parser.add_argument("--run-id", default=None, help="Run label included in the report.")
     parser.add_argument(
         "--project-root",
         default=None,
@@ -254,11 +232,6 @@ def main(argv: list[str] | None = None) -> int:
         help="Advisory mode: report findings but always exit 0.",
     )
     parser.add_argument("--json", action="store_true", help="Print the JSON report to stdout.")
-    parser.add_argument(
-        "--no-write",
-        action="store_true",
-        help="Do not write the .gtkb-state run outputs (in-memory only).",
-    )
     args = parser.parse_args(argv)
 
     project_root = Path(args.project_root).resolve() if args.project_root else Path(__file__).resolve().parents[1]
@@ -268,17 +241,10 @@ def main(argv: list[str] | None = None) -> int:
 
     report = run(roots, run_id, generated_at, project_root)
 
-    if not args.no_write:
-        out_dir = write_run_outputs(run_id, report, project_root)
-        rel_out = out_dir.relative_to(project_root).as_posix() if out_dir.is_relative_to(project_root) else str(out_dir)
-    else:
-        rel_out = "(not written: --no-write)"
-
     if args.json:
         print(json.dumps(report.to_dict(), indent=2))
     else:
         print(render_summary(report))
-        print(f"\nrun outputs: {rel_out}")
 
     return exit_code_for(report, args.warn_only)
 

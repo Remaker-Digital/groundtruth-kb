@@ -27,7 +27,7 @@ def _load(name: str, rel: str):
     return module
 
 
-_SSW = _load("scanner_safe_writer_under_test", ".claude/hooks/scanner-safe-writer.py")
+_SSW = _load("scanner_safe_writer_under_test", ".harness-baseline-configuration/hooks/scanner-safe-writer.py")
 
 
 def _names(content: str) -> list[str]:

@@ -86,7 +86,8 @@ def test_cursor_hook_adapter_uses_create_no_window_for_inner_hooks() -> None:
     assert "CREATE_NO_WINDOW" in source
     assert "creationflags" in source
     assert "_windows_no_window_creationflags" in source
-    assert "subprocess.run([sys.executable, str(target), *sys.argv[2:]], **run_kwargs)" in source
+    # M15: inner hooks start bytecode-free so authored baseline hooks leave no cache behind.
+    assert 'subprocess.run([sys.executable, "-B", str(target), *sys.argv[2:]], **run_kwargs)' in source
 
 
 def _run_adapter(
@@ -189,12 +190,12 @@ def test_adapter_preserves_real_native_gate_refusal(tmp_path: Path, monkeypatch)
 
 @pytest.mark.timeout(300)
 def test_adapter_resolves_relative_target_from_non_repo_cwd(tmp_path: Path, generated_harness_root) -> None:
-    from platform_tests.scripts.test_sot_read_discipline_hook import SUBSTITUTE, registry
+    from platform_tests.scripts.sot_hook_fixtures import SUBSTITUTE, registry
 
     root = tmp_path / "projected-copy"
     shutil.copytree(generated_harness_root, root)
     registry(root)
-    hook = Path(".cursor/hooks/sot-read-discipline.py")
+    hook = Path(".harness-baseline-configuration/hooks/sot-read-discipline.py")
     adapter = root / "scripts/cursor_hook_adapter.py"
     payload = {"tool_name": "Read", "cwd": str(root), "tool_input": {"path": str(root / SUBSTITUTE)}}
     completed = _run_adapter(hook, payload, cwd=tmp_path, adapter=adapter)
@@ -208,13 +209,13 @@ def test_adapter_resolves_relative_target_from_non_repo_cwd(tmp_path: Path, gene
 
 @pytest.mark.timeout(300)
 def test_cursor_shell_adapter_preserves_event_cwd_for_registered_reads(tmp_path, generated_harness_root):
-    from platform_tests.scripts.test_sot_read_discipline_hook import registry
+    from platform_tests.scripts.sot_hook_fixtures import registry
 
     root = tmp_path / "projected-copy"
     shutil.copytree(generated_harness_root, root)
     registry(root)
     (root / "derived").mkdir()
-    hook = Path(".cursor/hooks/sot-read-discipline.py")
+    hook = Path(".harness-baseline-configuration/hooks/sot-read-discipline.py")
     adapter = root / "scripts/cursor_hook_adapter.py"
     payload = {"tool_name": "Shell", "cwd": str(root / "derived"), "tool_input": {"command": "cat status.txt"}}
     blocked = _run_adapter(hook, payload, cwd=tmp_path, adapter=adapter)

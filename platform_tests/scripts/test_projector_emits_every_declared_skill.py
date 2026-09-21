@@ -18,6 +18,12 @@ missing 40 skills, because the missing skills were never managed. A test that
 asserts "no drift" would have passed throughout. These assertions compare the
 plan against the BASELINE instead, which is the only place the shortfall is
 visible.
+
+M15 stage 1 (owner ruling D15 as amended by R3; D34 R2/R14): the one skills source
+is `[baseline] skills_root` (`.agents/skills`). A `pointer_stubs` profile renders
+one pointer stub per baseline skill under its `skills_stub_dir`; an `agents_skills`
+profile renders nothing for skills because the host discovers the source directly,
+so for it the shortfall would be a planned copy, not a missing one.
 """
 
 from __future__ import annotations
@@ -39,9 +45,10 @@ def _profiles() -> dict:
 
 
 def _baseline_skill_names() -> set[str]:
+    """Depth one under the declared skills root, the projector's own glob (stub contract)."""
     profiles = _profiles()
-    base = PROJECT_ROOT / profiles["baseline"]["root"] / "skills"
-    return {p.parent.name for p in base.rglob("SKILL.md")}
+    base = PROJECT_ROOT / profiles["baseline"]["skills_root"]
+    return {p.parent.name for p in base.glob("*/SKILL.md")}
 
 
 def _projected_skill_names(harness: str, skills_dir: str) -> set[str]:
@@ -54,25 +61,34 @@ def _projected_skill_names(harness: str, skills_dir: str) -> set[str]:
     }
 
 
-def _harnesses_with_skills() -> list[tuple[str, str]]:
+def _harnesses_with_skills() -> list[tuple[str, str, str | None]]:
     out = []
     for name, profile in _profiles()["harnesses"].items():
         if profile.get("status") == "profile_pending":
             continue
-        if profile.get("skills_dir"):
-            out.append((name, profile["skills_dir"]))
+        out.append((name, profile.get("skills_discovery"), profile.get("skills_stub_dir")))
     return sorted(out)
 
 
-@pytest.mark.parametrize(("harness", "skills_dir"), _harnesses_with_skills())
-def test_every_harness_projects_every_baseline_skill(harness: str, skills_dir: str) -> None:
+@pytest.mark.parametrize(("harness", "discovery", "stub_dir"), _harnesses_with_skills())
+def test_every_harness_projects_every_baseline_skill(harness: str, discovery: str, stub_dir: str | None) -> None:
     """Exact baseline coverage also proves parity without repeating every pair of renders."""
     baseline = _baseline_skill_names()
     assert baseline, "baseline declares no skills; the fixture is wrong, not the projector"
-    projected = _projected_skill_names(harness, skills_dir)
-    assert projected == baseline, (
-        f"{harness}: missing skills {sorted(baseline - projected)}; extra skills {sorted(projected - baseline)}"
-    )
+    assert discovery in {"pointer_stubs", "agents_skills"}, f"{harness}: undeclared skills_discovery {discovery!r}"
+    if discovery == "pointer_stubs":
+        assert stub_dir, f"{harness}: pointer_stubs without skills_stub_dir"
+        projected = _projected_skill_names(harness, stub_dir)
+        assert projected == baseline, (
+            f"{harness}: missing skills {sorted(baseline - projected)}; extra skills {sorted(projected - baseline)}"
+        )
+        return
+    assert stub_dir is None, f"{harness}: agents_skills declares a stub tree {stub_dir!r}"
+    plan = project_harness.build_plan(harness)
+    assert not plan.gaps, f"{harness}: projector gaps {plan.gaps}"
+    config_dir = _profiles()["harnesses"][harness]["config_dir"]
+    copies = sorted(rel for rel in plan.writes if rel.startswith(f"{config_dir}/skills/"))
+    assert copies == [], f"{harness}: the host reads .agents/skills natively; planned skill output {copies}"
 
 
 def test_every_declared_profile_key_is_read_by_the_projector() -> None:

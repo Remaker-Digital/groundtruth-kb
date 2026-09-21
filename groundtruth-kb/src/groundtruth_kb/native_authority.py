@@ -15,7 +15,7 @@ from typing import Annotated, Any, Literal, NoReturn
 from uuid import uuid4
 
 from psycopg import sql
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from groundtruth_kb.isolation.registry_check import (
     ApplicationRegistryError,
@@ -34,6 +34,12 @@ from groundtruth_kb.postgres_kernel import (
 from groundtruth_kb.project.sot_registry import registry_path_observations
 
 Identifier = Annotated[str, Field(min_length=1, max_length=256, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
+# Imported obsolete project relationships carry historical identities that
+# concatenated untruncated components; several exceed the ordinary length. The
+# formal-link addresses keep the same lexical rule without that cap so every
+# existing row can be read, retired status-only and read back. Request fields
+# and every other domain keep the ordinary identifier.
+FormalLinkIdentifier = Annotated[str, Field(min_length=1, pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$")]
 Text = Annotated[str, Field(min_length=1)]
 Version = Annotated[int, Field(ge=0, lt=2_147_483_647)]
 Scope = Annotated[str, Field(pattern=r"^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$")]
@@ -70,6 +76,16 @@ class SpecFields(Request):
     source_paths: list[str] | None = None
     parent: Identifier | None = None
     application_scope: Scope | None = None
+    # `true` asserts that the implementation is verified now (the service stamps the time; a client
+    # timestamp is refused by this contract, as retired_at is); `null` clears the marker.
+    implementation_verified_at: bool | None = None
+
+    @field_validator("implementation_verified_at")
+    @classmethod
+    def _assertion_or_clear(cls, value: bool | None) -> bool | None:
+        if value is False:
+            raise ValueError("implementation_verified_at accepts true (assert now) or null (clear)")
+        return value
 
 
 class SpecMutation(Mutation):
@@ -168,6 +184,10 @@ class ProjectAuthorizationChange(Mutation):
     authorization: Literal["authorized", "not authorized"]
 
 
+class ProjectRetirement(Mutation):
+    """Status-only retirement of one active program or execution project; nothing else can travel with it."""
+
+
 class ProjectFormalLinkFields(Request):
     project_id: Identifier | None = None
     artifact_ref: Identifier | None = None
@@ -214,6 +234,10 @@ class WorkItemMutation(Mutation):
     fields: WorkItemFields
 
 
+class WorkItemRetirement(Mutation):
+    """Status-only retirement of one open work item; nothing else can travel with it."""
+
+
 class MembershipMove(Mutation):
     source_project_id: Identifier
     destination_project_id: Identifier
@@ -244,7 +268,7 @@ FILTERS = {
     "test-plans": {"status"},
     "test-phases": {"plan_id"},
     "project-dependencies": {"status", "dependent_project_id", "prerequisite_project_id", "affected_gate"},
-    "project-formal-links": {"status", "project_id"},
+    "project-formal-links": {"status", "project_id", "artifact_type"},
     "deliberations": {"source_type", "spec_id", "work_item_id"},
 }
 
@@ -382,6 +406,20 @@ def _work_evidence(tx: PostgresTransaction, state: dict[str, Any]) -> None:
         _error("test_phase_required", "The executable test must belong to an active test plan phase")
 
 
+def _verification_evidence(tx: PostgresTransaction, spec_id: str) -> list[str]:
+    """Executable tests of one specification that sit in a phase of an active test plan.
+
+    The `_work_evidence` rule mirrored for implementation verification (owner ruling D17, WI-7861):
+    a test counts when its ``spec_id`` is this specification, it identifies executable work
+    (``test_file``) and an active plan phase lists it.
+    """
+    return [
+        test["id"]
+        for test in _related(tx, "tests", spec_id=spec_id)
+        if test.get("test_file") and _test_phases(tx, test["id"])
+    ]
+
+
 def _execution_project(tx: PostgresTransaction, project_id: str) -> dict[str, Any]:
     project = _required(tx, "projects", project_id, lock=True)
     if project["kind"] != "project":
@@ -389,6 +427,84 @@ def _execution_project(tx: PostgresTransaction, project_id: str) -> dict[str, An
     if project["status"] != "active":
         _error("project_closed", "Membership cannot change in a closed project")
     return project
+
+
+def _open_dependants(tx: PostgresTransaction, work_item_id: str) -> list[str]:
+    """Open work items whose ``depends_on_work_items`` names this one, in code-point id order.
+
+    ``depends_on_work_items`` is the sole writable predecessor list (DCL-STANDING-BACKLOG-DB-SCHEMA-001);
+    ``blocks_work_items`` is imported legacy data with no native writer, reader or derived view and is not
+    consulted. Closed dependants (any resolution other than ``open``) never block, and a legacy non-array
+    JSONB value simply does not match.
+    """
+    tx.cursor.execute(
+        sql.SQL(
+            "SELECT id FROM {}.work_items WHERE id<>%s AND resolution_status='open' "
+            "AND depends_on_work_items @> jsonb_build_array(%s::text)"
+        ).format(sql.Identifier(tx.schema)),
+        (work_item_id, work_item_id),
+    )
+    return sorted(row["id"] for row in tx.cursor.fetchall())
+
+
+def _active_attempts(
+    tx: PostgresTransaction, *, work_item_id: str | None = None, project_id: str | None = None
+) -> list[str]:
+    """Identifiers of the active bridge attempts on one work item or on one project, in code-point id order.
+
+    The bridge's own predicate (``disposition='active'``). A VERIFIED member keeps its attempt active until
+    the project commit, so an active attempt marks reviewed-but-uncommitted work as well as work in progress.
+    """
+    named = {
+        column: value
+        for column, value in (("work_item_id", work_item_id), ("project_id", project_id))
+        if value is not None
+    }
+    if len(named) != 1:
+        _error("invalid_query", "Active attempts are selected by exactly one work item or one project")
+    ((column, value),) = named.items()
+    tx.cursor.execute(
+        sql.SQL("SELECT id FROM {}.bridge_attempts WHERE {}=%s AND disposition='active'").format(
+            sql.Identifier(tx.schema), sql.Identifier(column)
+        ),
+        (value,),
+    )
+    return sorted(row["id"] for row in tx.cursor.fetchall())
+
+
+def _open_members(tx: PostgresTransaction, project: dict[str, Any]) -> dict[str, list[str]]:
+    """Members that keep a project or program open: open work with an active membership, active child projects.
+
+    A closed member's active membership is its preserved current parent (GOV-WORK-ITEM-TERMINAL-STATE-001,
+    GOV-STANDING-BACKLOG-001) and never blocks. A program has no memberships and an execution project has
+    no children, so one of the two lists is empty by construction.
+    """
+    memberships = _related(tx, "project_work_item_memberships", project_id=project["id"], status="active")
+    return {
+        "work_item_ids": sorted(
+            row["work_item_id"]
+            for row in memberships
+            if _required(tx, "work_items", row["work_item_id"])["resolution_status"] == "open"
+        ),
+        "project_ids": sorted(
+            row["id"] for row in _related(tx, "projects", parent_project_id=project["id"], status="active")
+        ),
+    }
+
+
+def _active_dependants(tx: PostgresTransaction, project_id: str) -> list[dict[str, Any]]:
+    """Active dependencies of active projects that require this prerequisite to reach a state other than retired.
+
+    The ``unreachable_dependency`` rule of amend_dependency seen from the prerequisite's side: a retired
+    prerequisite can never reach ``active`` or ``verified``. A dependency that requires ``retired`` is met by
+    the retirement, and a closed dependent project no longer waits.
+    """
+    return [
+        row
+        for row in _related(tx, "project_dependencies", prerequisite_project_id=project_id, status="active")
+        if row["required_prerequisite_state"] != "retired"
+        and _required(tx, "projects", row["dependent_project_id"])["status"] == "active"
+    ]
 
 
 def _project_commit(tx: PostgresTransaction, project_id: str) -> str | None:
@@ -519,7 +635,14 @@ class AuthorityService:
         if domain not in DOMAINS or set(filters or {}) - FILTERS[domain]:
             _error("invalid_query", "Unknown domain or unsupported filter")
         if domain == "project-formal-links":
-            filters = {**(filters or {}), "artifact_type": "spec"}
+            requested = (filters or {}).get("artifact_type", "spec")
+            if requested not in {"spec", "bridge_thread", "completion_guard"}:
+                _error(
+                    "invalid_query",
+                    "Formal links are listed by spec, bridge_thread or completion_guard",
+                    artifact_type=requested,
+                )
+            filters = {**(filters or {}), "artifact_type": requested}
         with self.kernel.transaction(read_only=True) as tx:
             records = tx.list(DOMAINS[domain], filters=filters, after=after, limit=limit, search=search)
         return {"records": records, "next_after": records[-1]["id"] if len(records) == limit else None}
@@ -685,6 +808,15 @@ class AuthorityService:
     def amend_specification(
         self, record_id: str, request: SpecMutation, *, project_root: Path | None = None
     ) -> dict[str, Any]:
+        """Create or amend one specification; ``retired_at`` and ``implementation_verified_at`` are service-stamped.
+
+        ``implementation_verified_at: true`` asserts that the implementation is verified now. The service
+        refuses it with ``verification_evidence_required`` unless at least one test of this specification
+        has a ``test_file`` and sits in an active test-plan phase (the ``_work_evidence`` mirror, owner
+        ruling D17); with evidence it stamps its own clock, so the response differs from the request by
+        design. ``null`` clears the marker without evidence. R26 (``gt kb reconcile --provisionals``) reads
+        the stamped column.
+        """
         fields = request.fields.model_dump(exclude_unset=True)
         with self.kernel.transaction() as tx:
             current = tx.get("specifications", {"id": record_id}, lock=True)
@@ -703,12 +835,35 @@ class AuthorityService:
             # A retirement time is an observed event, not client-invented metadata.
             if fields.get("status") == "retired":
                 fields["retired_at"] = datetime.now(UTC).isoformat()
+            # So is a verification time: the request asserts it, the evidence rule admits it, the service stamps it.
+            if fields.get("implementation_verified_at") is True:
+                if not _verification_evidence(tx, record_id):
+                    _error(
+                        "verification_evidence_required",
+                        "Implementation verification requires an executable test of this specification "
+                        "in an active test plan phase",
+                        id=record_id,
+                    )
+                fields["implementation_verified_at"] = datetime.now(UTC).isoformat()
             return _write(tx, "specifications", record_id, fields, request, defaults={"status": "active"})
 
     def amend_test(self, record_id: str, request: TestMutation, *, project_root: Path | None = None) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             fields = request.fields.model_dump(exclude_unset=True)
             current = tx.get("tests", {"id": record_id}, lock=True)
+            # Execution belongs to the previous selector, scope and acceptance definition.
+            # The existing kernel history preserves that prior row; authors cannot forge results.
+            definition_fields = (
+                "test_file",
+                "test_class",
+                "test_function",
+                "test_type",
+                "expected_outcome",
+                "spec_id",
+                "application_scope",
+            )
+            if current and any(key in fields and fields[key] != current.get(key) for key in definition_fields):
+                fields.update(last_result=None, last_executed_at=None, last_executed_on=None)
             scope = fields.get("application_scope", current.get("application_scope") if current else None)
             try:
                 validate_application_scope(project_root, scope)
@@ -812,6 +967,65 @@ class AuthorityService:
             if current["authorization"] == request.authorization:
                 return current
             return _write(tx, "projects", record_id, {"authorization": request.authorization}, request)
+
+    def retire_project(self, record_id: str, request: ProjectRetirement) -> dict[str, Any]:
+        """Retire one active program or execution project by status only, with history (owner ruling D32).
+
+        Exactly one field changes (``status`` -> ``retired``) at version+1 with one history row carrying the
+        actor and reason. Kind, authorization, parent, dates, ``completed_at`` (the commit date of a verified
+        project only), every membership row (a closed member's active membership is its preserved parent),
+        every formal link, every dependency row and every child project are untouched: retiring a project
+        never erases a parent or collectively rewrites sibling results (GOV-WORK-ITEM-TERMINAL-STATE-001,
+        GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001). Open members are refused, not retired with it, and
+        retirement is not implementation verification (GOV-STANDING-BACKLOG-001). An already-closed project
+        is refused rather than re-closed. Programs are retirable; a retired program keeps its children and
+        cannot acquire new ones (amend_project refuses a non-active program parent).
+        """
+        with self.kernel.transaction() as tx:
+            current = _required(tx, "projects", record_id, lock=True)
+            if current["version"] != request.expected_version:
+                _error(
+                    "cas_conflict",
+                    "Read the current project before retiring it",
+                    id=record_id,
+                    expected=request.expected_version,
+                    actual=current["version"],
+                )
+            if current["status"] != "active":
+                _error(
+                    "project_closed",
+                    "A closed project keeps its terminal state; retirement is not a second closure",
+                    id=record_id,
+                    status=current["status"],
+                )
+            if record_id == "PROJECT-GTKB-NEW-WORK-INTAKE":
+                _error("project_structure_frozen", "The standing intake project is not retirable", id=record_id)
+            members = _open_members(tx, current)
+            if members["work_item_ids"] or members["project_ids"]:
+                _error(
+                    "members_open",
+                    "Retire or re-home the open members first; retirement never closes them collectively",
+                    id=record_id,
+                    **members,
+                )
+            attempts = _active_attempts(tx, project_id=record_id)
+            if attempts:
+                _error(
+                    "attempt_active",
+                    "An active bridge attempt holds reviewed or in-progress work of this project",
+                    id=record_id,
+                    attempt_ids=attempts,
+                )
+            dependants = _active_dependants(tx, record_id)
+            if dependants:
+                _error(
+                    "dependants_open",
+                    "Active projects still require this prerequisite to reach a state a retired project cannot",
+                    id=record_id,
+                    dependency_ids=sorted(row["id"] for row in dependants),
+                    dependent_project_ids=sorted({row["dependent_project_id"] for row in dependants}),
+                )
+            return _write(tx, "projects", record_id, {"status": "retired"}, request)
 
     def amend_project_formal_link(self, record_id: str, request: ProjectFormalLinkMutation) -> dict[str, Any]:
         """Amend formal roots or retire obsolete links without changing authorization."""
@@ -1027,6 +1241,57 @@ class AuthorityService:
                 ),
             )
             return {"work_item_id": record_id, "membership": updated}
+
+    def retire_work_item(self, record_id: str, request: WorkItemRetirement) -> dict[str, Any]:
+        """Retire one open work item by status only, with history (owner ruling D32).
+
+        Exactly one field changes (``resolution_status`` -> ``retired``) at version+1 with one history row
+        carrying the actor and reason. Stage, title, evidence links (an evidence gap stays visible), the
+        predecessor list, notes, the active parent membership and every sibling are untouched: active
+        membership describes the current parent, including for closed work, and siblings are never retired
+        collectively (GOV-WORK-ITEM-TERMINAL-STATE-001). Already-terminal work is refused rather than
+        re-closed; open dependants are refused rather than re-pointed; an active bridge attempt is refused
+        because its later VERIFIED delivery would overwrite the terminal label. Retirement is not
+        implementation verification (GOV-STANDING-BACKLOG-001). The response is the work-item read shape.
+        """
+        with self.kernel.transaction() as tx:
+            current = _required(tx, "work_items", record_id, lock=True)
+            if current["version"] != request.expected_version:
+                _error(
+                    "cas_conflict",
+                    "Read the current work item before retiring it",
+                    id=record_id,
+                    expected=request.expected_version,
+                    actual=current["version"],
+                )
+            if current["resolution_status"] != "open":
+                _error(
+                    "work_item_frozen",
+                    "Reviewed or closed work keeps its terminal state; retirement is not a reopen or a second closure",
+                    id=record_id,
+                    resolution_status=current["resolution_status"],
+                )
+            membership = _current_parent(tx, record_id)
+            # Same lock order as the bridge (work, then project): effects and finalization serialize with this.
+            _execution_project(tx, membership["project_id"])
+            attempts = _active_attempts(tx, work_item_id=record_id)
+            if attempts:
+                _error(
+                    "attempt_active",
+                    "An active bridge attempt holds this work; conclude or abandon it before retirement",
+                    id=record_id,
+                    attempt_ids=attempts,
+                )
+            dependants = _open_dependants(tx, record_id)
+            if dependants:
+                _error(
+                    "dependants_open",
+                    "Open work still depends on this item; retire or re-point the dependants first",
+                    id=record_id,
+                    dependant_work_item_ids=dependants,
+                )
+            row = _write(tx, "work_items", record_id, {"resolution_status": "retired"}, request)
+            return {"work_item": row, **_membership_facts(tx, row)}
 
     def task_context(
         self,

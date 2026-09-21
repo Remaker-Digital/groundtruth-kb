@@ -3,7 +3,7 @@
 # Rendered by the harness projector into each harness's native
 # registration form (per-harness event names, matcher vocabulary,
 # interpreter and path syntax). Scripts live in the baseline hooks/
-# directory and are projected alongside this manifest.
+# directory and are invoked there by every host; only the registration is rendered.
 #
 # schema: [[hook]] event = neutral lifecycle event; intents = neutral
 # tool-intent tokens; script = hook script basename under hooks/;

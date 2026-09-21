@@ -5,19 +5,15 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 
-# replace the hand-maintained _CANONICAL_STATUS_TOKENS literal with:
-from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES
+from groundtruth_kb.bridge.vocabulary import ACCEPTED_ON_READ
 
 __all__ = [
     "BridgeHeaderBlock",
     "ExpectedDocument",
-    "candidate_is_archived",
     "classify_committed_archive_verdicts",
-    "load_acknowledged_archived_slugs",
     "parse_bridge_header_block",
     "scan_expected_documents",
     "status_from_bridge_file",
@@ -26,23 +22,11 @@ __all__ = [
 
 _BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
 _TERMINAL_STATUS_TOKENS = frozenset({"VERIFIED", "WITHDRAWN", "SUPERSEDED"})
-_NON_TERMINAL_STATUS_TOKENS = frozenset(
-    {"NEW", "REVISED", "GO", "NO-GO", "VERDICT-REJECTED", "ADVISORY", "READY", "NOT-READY"}
-)
-_EXTRA_STATUS_TOKENS = frozenset({"BLOCKED"})
-_CANONICAL_STATUS_TOKENS = _TERMINAL_STATUS_TOKENS | _NON_TERMINAL_STATUS_TOKENS | _EXTRA_STATUS_TOKENS
-# DCL-NO-ACTION-STATUS-SEMANTICS-001 v2: historical artifacts retain the
-# obsolete spelling on disk, but every reader reconstructs the one canonical
-# correction state.  New-output acceptance is deliberately owned by writers,
-# not by this compatibility reader.
-_STATUS_SYNONYMS: dict[str, str] = {"NO-ACTION": "VERDICT-REJECTED"}
 _LEADING_MARKER_RE = re.compile(r"^[#>*\-\s`]+")
 _STATUS_TOKEN_RE = re.compile(r"^([A-Z][A-Z-]*)")
 _INIT_PREFIX = "::init"
 _OPEN_PREFIX = "::open"
 _HEADER_BLOCK_MAX_LINES = 5
-_ACKNOWLEDGED_CONFIG_REL = "config/governance/tafe-acknowledged-archived-bridges.toml"
-_IMPLEMENTATION_SIBLING_SUFFIX = "-implementation"
 _ARCHIVE_DIR_REL = "archive/bridge-terminal-verdicts"
 _DOCUMENT_FIELD_RE = re.compile(r"^Document:\s*(?P<slug>.+)$", re.MULTILINE)
 _VERSION_FIELD_RE = re.compile(r"^Version:\s*(?P<version>\d+)$", re.MULTILINE)
@@ -90,8 +74,8 @@ def _line_status_token(line: str) -> str | None:
     match = _STATUS_TOKEN_RE.match(stripped)
     if match is None:
         return None
-    token = _STATUS_SYNONYMS.get(match.group(1), match.group(1))
-    if token in _CANONICAL_STATUS_TOKENS:
+    token = match.group(1)
+    if token in ACCEPTED_ON_READ:
         return token
     return None
 
@@ -124,10 +108,7 @@ def parse_bridge_header_block(text: str, *, max_lines: int = _HEADER_BLOCK_MAX_L
         token = _line_status_token(line)
         if token is not None and status is None:
             status = token
-            # A bare synonym token reports its canonical form so
-            # ``status_line_exact`` stays true. A decorated line is kept
-            # verbatim so the decorated-verdict malformation path is intact.
-            status_line = token if _LEADING_MARKER_RE.sub("", line.strip()) in _STATUS_SYNONYMS else line
+            status_line = line
     return BridgeHeaderBlock(
         status=status,
         status_line=status_line,
@@ -138,83 +119,19 @@ def parse_bridge_header_block(text: str, *, max_lines: int = _HEADER_BLOCK_MAX_L
 
 
 def status_from_bridge_text(text: str) -> str | None:
-    """Return the canonical status token from a bridge file body."""
+    """Return the observed status spelling, including inert historical statuses."""
 
     return parse_bridge_header_block(text).status
 
 
-def test_parser_reads_every_canonical_status() -> None:
-    for status in CANONICAL_STATUSES:
-        assert _line_status_token(status) == status
-
-
 def status_from_bridge_file(path: Path) -> str | None:
-    """Return the canonical status token in a numbered bridge file."""
+    """Return the observed status spelling in a numbered bridge file."""
 
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return None
     return status_from_bridge_text(text)
-
-
-def _classify_candidate(latest_file_text: str) -> str:
-    parsed = parse_bridge_header_block(latest_file_text)
-    if parsed.status in _TERMINAL_STATUS_TOKENS:
-        return "archived"
-    return "lost"
-
-
-def _read_latest_text(doc: ExpectedDocument, project_root: Path) -> str | None:
-    try:
-        return (project_root / doc.files[-1]).read_text(encoding="utf-8", errors="replace")
-    except OSError:
-        return None
-
-
-def load_acknowledged_archived_slugs(project_root: Path) -> frozenset[str]:
-    """Load owner-acknowledged archived bridge slugs, returning empty on absence."""
-
-    config_path = project_root / _ACKNOWLEDGED_CONFIG_REL
-    try:
-        text = config_path.read_text(encoding="utf-8")
-    except OSError:
-        return frozenset()
-    try:
-        data = tomllib.loads(text)
-    except tomllib.TOMLDecodeError:
-        return frozenset()
-    entries = data.get("acknowledged", [])
-    if not isinstance(entries, list):
-        return frozenset()
-    slugs: set[str] = set()
-    for entry in entries:
-        if isinstance(entry, dict):
-            slug = entry.get("slug")
-            if isinstance(slug, str) and slug:
-                slugs.add(slug)
-    return frozenset(slugs)
-
-
-def candidate_is_archived(
-    slug: str,
-    expected_docs: dict[str, ExpectedDocument],
-    acknowledged: frozenset[str],
-    project_root: Path,
-) -> bool:
-    """Return true when a non-current bridge-thread candidate is archived."""
-
-    latest_text = _read_latest_text(expected_docs[slug], project_root)
-    if latest_text is not None and _classify_candidate(latest_text) == "archived":
-        return True
-
-    sibling = expected_docs.get(f"{slug}{_IMPLEMENTATION_SIBLING_SUFFIX}")
-    if sibling is not None:
-        sibling_text = _read_latest_text(sibling, project_root)
-        if sibling_text is not None and _classify_candidate(sibling_text) == "archived":
-            return True
-
-    return slug in acknowledged
 
 
 def _git_blob_hash(project_root: Path, file_path: str) -> str | None:

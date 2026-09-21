@@ -168,10 +168,3 @@ def test_goose_session_id_resolves_when_sole() -> None:
     env = {"GOOSE_SESSION_ID": "goose-session-123"}
     assert resolve_session_id(None, order=BRIDGE_WORK_INTENT_ORDER, environ=env) == "goose-session-123"
     assert resolve_session_id(None, order=MARKER_CONTINUITY_ORDER, environ=env) == "goose-session-123"
-
-
-def test_default_harness_ids_include_goose_g() -> None:
-    """W0.1 (WI-5839): goose is registered in DEFAULT_HARNESS_IDS as identity G."""
-    from scripts.harness_identity import DEFAULT_HARNESS_IDS
-
-    assert DEFAULT_HARNESS_IDS.get("goose") == "G"

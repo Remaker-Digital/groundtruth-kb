@@ -1,40 +1,9 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Default-deny state locations (WI-6739, ADR-REGISTRY-DISCOVERY-001).
+"""Check permitted state locations without reviving retired state roots.
 
-GT-KB stores state in exactly two places: defined source of truth, and
-per-harness configuration (``DELIB-20260821032900``). Nothing enumerated where
-state was permitted to live, and no gate objected when a new state location
-appeared. Every session object purged under WI-6738 was a new state location
-that no mechanism questioned at creation.
-
-This check converts that one-sentence policy into a mechanical gate: any state
-directory *or state file* under a scanned root that matches no registered
-permitted location is a violation.
-
-Design decisions, each traceable to a recorded owner decision rather than
-inferred here:
-
-* **Permitted locations extend the existing SoT registry.** ``DELIB-20260821053502``
-  superseded the original plan for a separate ``state-locations.toml``. The
-  earlier rationale -- that the SoT registry was "scoped to SoT artifacts, not
-  state paths" -- was false: it already registers ``.gtkb-state/``,
-  ``.claude/session/``, ``harness-state/harness-registry.json`` and others.
-
-* **Files count, not only directories.** Owner decision, 2026-08-21.
-  ``.claude/session`` holds zero directories and a dozen-plus loose files, and
-  those files *are* the remaining session-object population. A directories-only
-  rule is not a narrower rule; it is blind to an entire state root.
-
-* **Classification is by longest-prefix match on the path, never by parent
-  directory.** ``harness-state/`` legitimately contains per-harness
-  configuration (``harness-registry.json``, ``harness-identities.json``,
-  ``active-workspace.md``) *and* illegitimate per-harness session state
-  (``session-envelope-archive/``, ``session-lifecycle-guard.json``). A
-  parent-directory rule cannot separate them; longest-prefix can.
-
-The check reads the registry at run time and never caches it
-(``GOV-SOURCE-OF-TRUTH-FRESHNESS-001``). ``doctor.py`` requires no edit: this
-module is discovered by ``pkgutil`` through ``project.checks.__init__``.
+Registration permits ordinary state locations under the closed scan roots.
+It cannot make a retired location valid. The check reads the current registry
+and is discovered through the existing doctor check registry.
 """
 
 from __future__ import annotations
@@ -45,19 +14,12 @@ from pathlib import Path
 from groundtruth_kb.project.checks import register_check
 from groundtruth_kb.project.doctor import ToolCheck
 
-#: Closed set of state roots. Deliberately not a whole-tree walk: these are the
-#: trees that hold runtime state, and scanning everything would classify source
-#: directories as state.
-STATE_ROOTS: tuple[str, ...] = (
+STATE_ROOTS: tuple[str, ...] = (".claude/session", ".groundtruth")
+FORBIDDEN_ROOTS: tuple[str, ...] = (
     ".gtkb-state",
     "harness-state",
-    ".claude/session",
-    ".groundtruth",
+    ".groundtruth/formal-artifact-approvals",
 )
-
-#: Roots scanned one level deeper, because their real state lives per-harness.
-#: ``harness-state/<harness>/session-envelope-archive`` is invisible at depth 1.
-DEEP_ROOTS: frozenset[str] = frozenset({"harness-state"})
 
 _REGISTRY_RELPATH = "config/registry/sot-artifacts.toml"
 _STORAGE_PATH_RE = re.compile(r'^\s*storage_path\s*=\s*"([^"]+)"', re.MULTILINE)
@@ -80,14 +42,10 @@ def _registered_paths(target: Path) -> set[str]:
 
 
 def _is_permitted(rel_path: str, registered: set[str]) -> bool:
-    """Longest-prefix match: a path is permitted if it or an ancestor is registered.
-
-    Ancestor matching is what makes a registered container meaningful -- a
-    registered ``.groundtruth/formal-artifact-approvals/`` should permit the
-    files inside it. It is also the reason a blanket ``opaque_container``
-    registration on a whole state root defeats this check, which is why WI-6739
-    narrows those rows as part of the same work.
-    """
+    """Permit registered ordinary paths; forbidden roots always take precedence."""
+    normalized = rel_path.replace("\\", "/").strip("/").casefold()
+    if any(normalized == root or normalized.startswith(root + "/") for root in FORBIDDEN_ROOTS):
+        return False
     if rel_path in registered:
         return True
     parts = rel_path.split("/")
@@ -106,17 +64,6 @@ def _scan_root(target: Path, root_name: str, registered: set[str]) -> list[str]:
         return []
     for child in children:
         rel = f"{root_name}/{child.name}"
-        if child.is_dir() and root_name in DEEP_ROOTS:
-            # Descend one level: the per-harness layer is where state hides.
-            try:
-                grandchildren = sorted(child.iterdir(), key=lambda p: p.name)
-            except OSError:
-                continue
-            for grandchild in grandchildren:
-                deep_rel = f"{rel}/{grandchild.name}"
-                if not _is_permitted(deep_rel, registered):
-                    violations.append(deep_rel)
-            continue
         if not _is_permitted(rel, registered):
             violations.append(rel)
     return violations
@@ -124,14 +71,19 @@ def _scan_root(target: Path, root_name: str, registered: set[str]) -> list[str]:
 
 @register_check("state_location_registry")
 def check_state_location_registry(target: Path) -> ToolCheck:
-    """Fail when a state location is not registered as permitted.
-
-    Required check: an unregistered state location is the mechanism by which the
-    session-object model accreted, and a warning would leave that mechanism
-    intact. Both unregistered directories and unregistered loose files are
-    violations, per the owner's granularity decision.
-    """
+    """Reject forbidden roots and unregistered ordinary state locations."""
     name = "State-location default-deny (registered permitted locations)"
+    forbidden = [root for root in FORBIDDEN_ROOTS if (target / root).exists() or (target / root).is_symlink()]
+    if forbidden:
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status="fail",
+            message="forbidden state location(s): "
+            + ", ".join(forbidden)
+            + ". Remove retired state locations; registry membership cannot permit them.",
+        )
     registered = _registered_paths(target)
     if not registered:
         # No registry: report rather than fail. A missing registry is a
@@ -167,6 +119,6 @@ def check_state_location_registry(target: Path) -> ToolCheck:
         message=(
             f"{len(violations)} unregistered state location(s): {shown}. "
             f"Register permitted locations via `gt registry register`, or remove them. "
-            f"GT-KB stores state only in defined SoT and per-harness configuration."
+            f"Retired state locations are always forbidden."
         ),
     )

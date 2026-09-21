@@ -148,11 +148,13 @@ Sources: `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`,
 
 ## Platform and derived surfaces
 
-The canonical harness-neutral baseline is `.harness-baseline-configuration`.
-Named harness configuration is mechanically derived from it. Change baseline or
-projector sources and regenerate; never manually edit a generated configuration
-or load another harness's files as a fallback. Claims about installed capability
-require actual installed behavior, not a directory, source test or registry label.
+Root `AGENTS.md` is the authored shared instruction file. Skills are authored
+once under `.agents/skills`; shared rules, hooks and routing remain under
+`.harness-baseline-configuration`. Named host configurations contain only the
+declared registrations and pointers, plus projector ownership bookkeeping.
+Change authored sources and regenerate; never manually edit generated output or
+load another harness's files as a fallback. Installed capability requires actual
+host behavior, not a directory, source test or registry label.
 
 PostgreSQL behind the CLI and typed services is the canonical storage end state.
 Follow current installation and authority configuration; do not fall back to
@@ -169,6 +171,20 @@ An architectural correction includes the affected formal sources, work topology,
 implementation, tests, rules, skills, projectors and installed consumers. Remove
 contradictory current material as part of that closure. Report partial selections
 and incomplete capabilities precisely; neither implies platform qualification.
+
+Architecture references derive from current typed formal sources and project
+intersections. Load the relevant shared baseline, project delta and architecture
+shards for the assigned task. A generated shard carries no independent authority;
+report missing required coverage instead of assuming an unavailable view is complete.
+
+Use WordPress conventions as informative design material mapped to current formal
+requirements. They add no authority or runtime dependency, and inspecting them must
+not expose credentials or private user content. Size protection for the current
+owner-managed workstation and private LAN: preserve integrity, containment,
+independent review and recovery without assuming an unrelated multitenant threat model.
+
+Reusable code belongs in an integrated, usable, tested and documented path. Resolve
+unused code through authorized forward work rather than retaining speculative additions.
 
 Sources: `GOV-SOT-SINGLETON-001`, `GOV-HARNESS-NEUTRAL-BASELINE-001`,
 `REQ-GTKB-HARNESS-BASELINE-PROJECTION-CONTRACT-001`,

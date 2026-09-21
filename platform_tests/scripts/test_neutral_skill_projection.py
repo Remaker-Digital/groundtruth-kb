@@ -1,97 +1,96 @@
-"""Surviving skill-adapter contracts belong to the shared neutral projector."""
+"""Shared authored skills and minimal host pointers preserve discovery and atomicity."""
 
 from __future__ import annotations
 
 import copy
 import json
-import sys
-from pathlib import Path
 
 import pytest
 import yaml
 
-ROOT = Path(__file__).resolve().parents[2]
-sys.path.insert(0, str(ROOT / "scripts" / "harness_projection"))
-import project_harness  # noqa: E402
+from scripts.harness_projection import project_harness
 
-TARGETS = tuple(project_harness.load_profiles()["harnesses"])
+PROFILES = project_harness.load_profiles()
+STUB_HOSTS = tuple(name for name, row in PROFILES["harnesses"].items() if row["skills_discovery"] == "pointer_stubs")
+NATIVE_HOSTS = tuple(name for name, row in PROFILES["harnesses"].items() if row["skills_discovery"] == "agents_skills")
+FRONTMATTER = '---\nname: alpha\ndescription: Example skill.\nargument-hint: "[unit|live] [options]"\nallowed-tools: [Read, Bash]\n---\n'
 
 
-@pytest.fixture(params=TARGETS)
-def projection(request, tmp_path, monkeypatch):
-    name = request.param
-    profiles = copy.deepcopy(project_harness.load_profiles())
-    # This fixture exercises the skill surface. Complete native hook/routing
-    # rendering is covered by the real-baseline all-target acceptance suite.
-    profiles["harnesses"][name]["routing_projection"] = False
-    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
-    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
-    baseline = tmp_path / ".harness-baseline-configuration/skills/alpha"
-    baseline.mkdir(parents=True)
-    (baseline / "SKILL.md").write_bytes(
-        b"\xef\xbb\xbf---\r\nname: alpha\r\ndescription: Example skill.\r\n"
-        b'argument-hint: "[unit|live] [options]"\r\n---\r\n\r\n'
-        b"Run {{HARNESS_SKILLS_DIR}}/alpha/helpers/run.py.\r\n"
-        b"Read {{HARNESS_SKILLS_DIR}}/alpha/references/notes.md.\r\n"
+def seed(root, monkeypatch):
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", root)
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: copy.deepcopy(PROFILES))
+    (root / ".harness-baseline-configuration/hooks").mkdir(parents=True)
+    skill = root / ".agents/skills/alpha"
+    skill.mkdir(parents=True)
+    (skill / "SKILL.md").write_bytes(
+        b"\xef\xbb\xbf"
+        + (FRONTMATTER + "Read .agents/skills/alpha/references/notes.md.\n").replace("\n", "\r\n").encode()
     )
-    (baseline / "helpers").mkdir()
-    (baseline / "helpers/run.py").write_bytes(b"print('example')\r\n")
-    (baseline / "references").mkdir()
-    (baseline / "references/notes.md").write_bytes(b"Canonical reference.\r\n")
-    destination = tmp_path / profiles["harnesses"][name]["skills_dir"] / "alpha"
-    return name, tmp_path, baseline, destination
+    (skill / "helpers").mkdir()
+    (skill / "helpers/run.py").write_bytes(b"print('example')\r\n")
+    (skill / "references").mkdir()
+    (skill / "references/notes.md").write_bytes(b"Authored reference.\r\n")
+    return skill
+
+
+@pytest.fixture(params=STUB_HOSTS)
+def projection(request, tmp_path, monkeypatch):
+    source = seed(tmp_path, monkeypatch)
+    name = request.param
+    destination = tmp_path / PROFILES["harnesses"][name]["skills_stub_dir"] / "alpha"
+    return name, tmp_path, source, destination
 
 
 def snapshots(root):
     return {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
 
 
-def test_neutral_skill_complete_render_is_native_and_repeatable(projection):
-    name, root, baseline, destination = projection
-    original = snapshots(root)
-    plan = project_harness.build_plan(name)
-    assert not plan.gaps
-    assert snapshots(root) == original
-    assert project_harness.run(name, "write") == 0
-    rendered = (destination / "SKILL.md").read_bytes()
-    assert rendered.startswith(b"---\n")
-    assert b"\r" not in rendered
-    parsed = yaml.safe_load(rendered.decode().split("---", 2)[1])
-    assert parsed == {"name": "alpha", "description": "Example skill.", "argument-hint": "[unit|live] [options]"}
-    assert f"{destination.relative_to(root).as_posix()}/helpers/run.py" in rendered.decode()
-    assert f"{destination.relative_to(root).as_posix()}/references/notes.md" in rendered.decode()
-    assert (baseline / "SKILL.md").read_bytes().startswith(b"\xef\xbb\xbf")
-    for path in destination.rglob("*"):
-        if path.is_file():
-            content = path.read_bytes()
-            assert b"\r" not in content
-            assert all(line == line.rstrip() for line in content.decode().splitlines())
-    manifest_path = next(p for p in plan.writes if p.endswith("/.projection-manifest.json"))
-    assert set(json.loads((root / manifest_path).read_text(encoding="utf-8"))["paths"]) == set(plan.writes)
+def test_pointer_preserves_frontmatter_and_never_copies_body_or_resources(projection):
+    name, root, source, destination = projection
     before = snapshots(root)
+    plan = project_harness.build_plan(name)
+    assert not plan.gaps, plan.gaps
+    assert snapshots(root) == before
+    assert project_harness.run(name, "write") == 0
+    rendered = (destination / "SKILL.md").read_text(encoding="utf-8")
+    assert rendered.startswith(FRONTMATTER)
+    assert yaml.safe_load(rendered.split("---", 2)[1])["allowed-tools"] == ["Read", "Bash"]
+    assert ".agents/skills/alpha/SKILL.md" in rendered
+    assert "Read .agents/skills/alpha/references/notes.md." not in rendered
+    assert sorted(p.name for p in destination.iterdir()) == ["SKILL.md"]
+    assert (source / "SKILL.md").read_bytes() == before[".agents/skills/alpha/SKILL.md"]
+    manifest_path = next(p for p in plan.writes if p.endswith("/.projection-manifest.json"))
+    manifest = json.loads((root / manifest_path).read_text(encoding="utf-8"))
+    assert set(manifest["paths"]) == set(plan.writes)
+    after = snapshots(root)
     assert project_harness.run(name, "write") == 0
     assert project_harness.run(name, "check") == 0
-    assert snapshots(root) == before
+    assert snapshots(root) == after
 
 
-@pytest.mark.parametrize("relative", ["SKILL.md", "helpers/run.py", "references/notes.md"])
-def test_neutral_skill_resource_drift_is_read_only_and_refresh_repairs(projection, relative):
-    name, root, _, destination = projection
+def test_body_and_helper_edits_do_not_change_registration_bytes(projection):
+    name, root, source, _ = projection
     assert project_harness.run(name, "write") == 0
-    target = destination / relative
-    original = target.read_bytes()
-    target.unlink()
-    missing = snapshots(root)
-    assert project_harness.run(name, "check") == 1
-    assert snapshots(root) == missing
+    first = dict(project_harness.build_plan(name).writes)
+    (source / "SKILL.md").write_text(FRONTMATTER + "Changed body read in place.\n", encoding="utf-8")
+    (source / "helpers/run.py").write_text("print('changed')\n", encoding="utf-8")
+    (source / "references/notes.md").unlink()
+    assert project_harness.build_plan(name).writes == first
+    assert project_harness.run(name, "check") == 0
+
+
+def test_frontmatter_edit_changes_pointer_and_check_is_read_only(projection):
+    name, root, source, destination = projection
     assert project_harness.run(name, "write") == 0
-    assert target.read_bytes() == original
-    target.write_bytes(original.replace(b"\n", b"\r\n"))
+    old = (destination / "SKILL.md").read_bytes()
+    (source / "SKILL.md").write_text(
+        FRONTMATTER.replace("Example skill.", "New discovery description.") + "Body.\n", encoding="utf-8"
+    )
     before = snapshots(root)
     assert project_harness.run(name, "check") == 1
     assert snapshots(root) == before
     assert project_harness.run(name, "write") == 0
-    assert target.read_bytes() == original
+    assert (destination / "SKILL.md").read_bytes() != old
 
 
 @pytest.mark.parametrize(
@@ -105,9 +104,9 @@ def test_neutral_skill_resource_drift_is_read_only_and_refresh_repairs(projectio
         "name: alpha\ndescription: [Example]\n",
     ],
 )
-def test_neutral_skill_invalid_frontmatter_refuses_before_output(projection, frontmatter):
-    name, root, baseline, _ = projection
-    (baseline / "SKILL.md").write_text(f"---\n{frontmatter}---\n\nBody.\n", encoding="utf-8")
+def test_invalid_frontmatter_refuses_before_output(projection, frontmatter):
+    name, root, source, _ = projection
+    (source / "SKILL.md").write_text(f"---\n{frontmatter}---\nBody.\n", encoding="utf-8")
     before = snapshots(root)
     assert project_harness.run(name, "write") == 2
     assert snapshots(root) == before
@@ -121,43 +120,33 @@ def test_neutral_skill_invalid_frontmatter_refuses_before_output(projection, fro
         "---\nname: alpha\ndescription Example\n---\n",
     ],
 )
-def test_neutral_skill_invalid_source_refuses_before_output(projection, text):
-    name, root, baseline, _ = projection
-    (baseline / "SKILL.md").write_text(text, encoding="utf-8")
+def test_invalid_source_refuses_before_output(projection, text):
+    name, root, source, _ = projection
+    (source / "SKILL.md").write_text(text, encoding="utf-8")
     before = snapshots(root)
     assert project_harness.run(name, "write") == 2
     assert snapshots(root) == before
 
 
-@pytest.mark.parametrize("relative", ["helpers/run.py", "references/notes.md"])
-def test_neutral_skill_retired_resource_cleanup_preserves_unlisted_work(projection, relative):
-    name, root, baseline, destination = projection
+def test_retired_skill_pointer_cleanup_preserves_unlisted_work(projection):
+    name, root, source, destination = projection
     assert project_harness.run(name, "write") == 0
-    foreign = destination / "helpers/local.py"
-    foreign.write_bytes(b"Local work must survive refresh.\n")
-    (baseline / relative).unlink()
-    source = baseline / "SKILL.md"
-    text = source.read_text(encoding="utf-8-sig")
-    source.write_text(
-        "\n".join(line for line in text.splitlines() if relative not in line) + "\n",
-        encoding="utf-8",
-    )
+    foreign = destination / "local.txt"
+    foreign.write_bytes(b"Unlisted work must survive.\n")
+    (source / "SKILL.md").unlink()
     before = snapshots(root)
     assert project_harness.run(name, "check") == 1
     assert snapshots(root) == before
     assert project_harness.run(name, "write") == 0
-    assert not (destination / relative).exists()
-    assert foreign.read_bytes() == b"Local work must survive refresh.\n"
-    assert project_harness.run(name, "check") == 0
+    assert not (destination / "SKILL.md").exists()
+    assert foreign.read_bytes() == b"Unlisted work must survive.\n"
 
 
-def test_neutral_skill_failed_replace_preserves_target_and_foreign_temporary(projection, monkeypatch):
+def test_failed_replace_preserves_target_and_foreign_temporary(projection, monkeypatch):
     name, root, _, destination = projection
     assert project_harness.run(name, "write") == 0
-    target = destination / "SKILL.md"
-    target.write_bytes(b"Local bytes must survive a failed replacement.\n")
-    foreign = destination / ".SKILL.md.tmp"
-    foreign.write_bytes(b"Independent in-progress bytes.\n")
+    (destination / "SKILL.md").write_bytes(b"Preserve until atomic replacement.\n")
+    (destination / ".SKILL.md.tmp").write_bytes(b"Independent temporary work.\n")
     before = snapshots(root)
 
     def fail_replace(source, destination):
@@ -167,3 +156,12 @@ def test_neutral_skill_failed_replace_preserves_target_and_foreign_temporary(pro
     with pytest.raises(OSError, match="injected replacement failure"):
         project_harness.run(name, "write")
     assert snapshots(root) == before
+
+
+@pytest.mark.parametrize("name", NATIVE_HOSTS)
+def test_native_skill_hosts_emit_no_skill_tree(name, tmp_path, monkeypatch):
+    source = seed(tmp_path, monkeypatch)
+    plan = project_harness.build_plan(name)
+    assert not plan.gaps, plan.gaps
+    assert not [path for path in plan.writes if "/skills/" in path]
+    assert (source / "helpers/run.py").read_bytes() == b"print('example')\r\n"

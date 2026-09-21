@@ -1,21 +1,9 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Regression guard for WI-3326 phantom-spec-citation re-point in SessionStart payload.
+"""Retained init sources cite existing formal contracts, never phantom IDs.
 
-Authority: bridge/gtkb-wi3326-sessionstart-phantom-spec-citation-repoint-006.md (GO).
-Specs: DCL-INIT-KEYWORD-STARTUP-DISCLOSURE-RELAY-001,
-SPEC-CANONICAL-INIT-KEYWORD-SYNTAX-001,
-DCL-INIT-KEYWORD-CONSISTENT-ASSERTION-001.
-
-WI-3326 defect: the SQLite-era startup generator (retired 2026-09),
-workstream_focus.py, and _session_init_keyword.py cited three
-planned-but-never-created spec IDs in the SessionStart payload. This guard asserts:
-  (a) None of the phantom IDs appear in any of the eight approved target paths.
-  (b) Each real replacement ID is present in the appropriate source file.
-  (c) The three real replacement IDs exist in live current_specifications (ensuring
-      the re-point targets are real specs, not future phantoms themselves).
-
-Phantom IDs are split across concatenations to avoid triggering the no-phantom
-rg scan that targets this file itself as one of the eight approved paths.
+The retired startup generator and focus helper no longer participate in session
+initialization. These assertions cover the surviving init helper and its tests.
+Phantom IDs are split below so the scanner does not match its own patterns.
 """
 
 from __future__ import annotations
@@ -38,23 +26,14 @@ _REAL_IDS = (
 )
 
 # Source files whose SessionStart payload citation strings are guarded.
-_SOURCE_FILES = (
-    _ROOT / "scripts" / "workstream_focus.py",
-    _ROOT / "scripts" / "_session_init_keyword.py",
-)
+_SOURCE_FILES = (_ROOT / "scripts" / "_session_init_keyword.py",)
 
-# The approved target paths from the GO'd bridge proposal that still exist
-# (test_workstream_focus_hook_parity.py was retired with the hook copies; the
-# startup generator and its suite were retired with the legacy startup batch).
+# Surviving authored sources and regression tests.
 _ALL_TARGET_FILES = (
-    _ROOT / "scripts" / "workstream_focus.py",
     _ROOT / "scripts" / "_session_init_keyword.py",
     _ROOT / "platform_tests" / "scripts" / "test_session_self_initialization_spec_citation_existence.py",
-    _ROOT / "platform_tests" / "hooks" / "test_workstream_focus.py",
     _ROOT / "platform_tests" / "scripts" / "test_session_init_keyword_matching.py",
 )
-
-_DB_PATH = _ROOT / "groundtruth.db"
 
 
 def _read(path: Path) -> str:

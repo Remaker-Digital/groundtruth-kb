@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Git pre-commit guardrail â€” Hardcoded Credential & FQDN Scanner.
+Git pre-commit guardrail — Hardcoded Credential & FQDN Scanner.
 
 Scans staged files for hardcoded environment-specific values:
   - Azure Container Apps FQDNs
@@ -12,15 +12,14 @@ SPEC-0058: All transient keys, values, URLs, and variables that change
 between builds or tenant environments MUST NOT be hardcoded.
 
 Exit 0: No violations found (or only excluded files)
-Exit 1: Hardcoded values detected â€” commit blocked
+Exit 1: Hardcoded values detected — commit blocked
 
-Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
 
 import re
 import subprocess
 import sys
-
 
 # ---------------------------------------------------------------------------
 # Detection patterns
@@ -75,7 +74,7 @@ EXCLUDED = [
     re.compile(r"CLAUDE-REFERENCE\.md$"),
     re.compile(r"CLAUDE-ARCHITECTURE\.md$"),
     re.compile(r"CLAUDE_ARCHIVE\.md$"),
-    re.compile(r"\.claude/hooks/"),
+    re.compile(r"\.harness-baseline-configuration/hooks/"),
     re.compile(r"wiki/"),
     re.compile(r"docs-site/"),
     re.compile(r"container-load-results/"),

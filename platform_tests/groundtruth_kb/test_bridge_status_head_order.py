@@ -9,7 +9,7 @@ import pytest
 from groundtruth_kb.bridge.native import parse_authored_message
 from groundtruth_kb.bridge.versioned_files import status_from_bridge_file
 
-from platform_tests.groundtruth_kb.test_native_bridge import authored
+from platform_tests.groundtruth_kb.bridge_fixtures import authored
 
 MARKER_INIT = "::init gtkb lo"
 MARKER_OPEN = "::open build"

@@ -8,7 +8,9 @@ Anchored specifications:
 - SPEC-SEC-ALLOWLIST-001
 
 The scanner never returns raw matched values. Every finding carries only a
-provider class, path, line, description, severity, and short SHA-256 fingerprint.
+provider class, path, line, description, severity, and short SHA-256 fingerprint,
+plus (in process only, never in ``to_json_dict``) the SHA-256 identity of its
+whole line, which the commit gate compares with its synthetic allowlist.
 """
 
 from __future__ import annotations
@@ -21,7 +23,7 @@ from pathlib import Path
 
 from groundtruth_kb.secrets.allowlist import Allowlist
 from groundtruth_kb.secrets.patterns import PRODUCTION_PATTERNS, PatternEntry, Severity
-from groundtruth_kb.secrets.redaction import fingerprint
+from groundtruth_kb.secrets.redaction import fingerprint, line_identity
 
 
 @dataclass(frozen=True)
@@ -34,6 +36,9 @@ class Finding:
     description: str
     ref: str | None = None
     object_id: str | None = None
+    # Full SHA-256 of the flagged line's text (see redaction.line_identity). In-process
+    # only: to_json_dict omits it, so a report never carries a hash of a real secret line.
+    line_sha256: str | None = None
 
 
 @dataclass
@@ -41,6 +46,9 @@ class ScanResult:
     findings: list[Finding] = field(default_factory=list)
     paths_scanned: int = 0
     mode: str = "paths"
+    # Relative POSIX paths whose content was actually scanned, in scan order. The commit
+    # gate uses it to decide which allowlist entries were in scope (staged) or are stale.
+    scanned_paths: list[str] = field(default_factory=list)
 
     @property
     def fail_on_severities(self) -> list[Severity]:
@@ -161,11 +169,14 @@ def _scan_text(
 ) -> list[Finding]:
     findings: list[Finding] = []
     for line_index, line in enumerate(text.splitlines(), start=1):
+        identity: str | None = None
         for entry in patterns:
             for match in entry.pattern.finditer(line):
                 matched_value = match.group(0)
                 if allowlist.matches(matched_value, relative_posix):
                     continue
+                if identity is None:
+                    identity = line_identity(line)
                 findings.append(
                     Finding(
                         provider_class=entry.name,
@@ -174,6 +185,7 @@ def _scan_text(
                         line=line_index,
                         fingerprint_prefix=fingerprint(matched_value),
                         description=entry.description,
+                        line_sha256=identity,
                     )
                 )
     return findings
@@ -198,6 +210,7 @@ def scan_paths(
         if _should_skip_relative_path(relative_posix):
             continue
         result.paths_scanned += 1
+        result.scanned_paths.append(relative_posix)
         try:
             text = absolute.read_text(encoding="utf-8", errors="replace")
         except OSError:
@@ -312,6 +325,7 @@ def scan_staged(
             raise GitScanError("staged_scan_invalid: invalid object identity")
         content = git_bytes(["cat-file", "blob", object_id])
         result.paths_scanned += 1
+        result.scanned_paths.append(relative_posix)
         result.findings.extend(
             _scan_text(
                 content.decode("utf-8", errors="replace"),
@@ -364,6 +378,7 @@ def scan_range(
         text = blob_content.decode("utf-8", errors="replace")
         for relative_posix in blob_paths[blob_id]:
             result.paths_scanned += 1
+            result.scanned_paths.append(relative_posix)
             findings_by_path[relative_posix] = _scan_text(
                 text,
                 relative_posix=relative_posix,
@@ -443,6 +458,7 @@ def scan_all_refs(
             continue
         ref_name, relative_posix = blob_targets[blob_id]
         result.paths_scanned += 1
+        result.scanned_paths.append(relative_posix)
         text = blob_content.decode("utf-8", errors="replace")
         findings = _scan_text(
             text,
@@ -460,6 +476,7 @@ def scan_all_refs(
                 description=finding.description,
                 ref=ref_name,
                 object_id=blob_id,
+                line_sha256=finding.line_sha256,
             )
             for finding in findings
         )

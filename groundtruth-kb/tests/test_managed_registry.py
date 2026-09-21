@@ -1,19 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for :mod:`groundtruth_kb.project.managed_registry`.
+"""Managed metadata schema, retained authored hooks and native registrations.
 
-Covers:
-
-- parse / roundtrip / schema-validation of ``templates/managed-artifacts.toml``
-- lifecycle-axis invariants (``managed ⊆ initial``, ``doctor_required ⊆ initial``)
-- lifecycle-matrix tests (scaffold × profile, upgrade × profile)
-- doctor-axis parity per profile
-- settings-registration parity (exact retained event-to-hook matrix)
-- Condition 2 composite-ID trio (Codex GO at
-  ``bridge/gtkb-managed-artifact-registry-008.md``).
-
-The registry is the single source of truth for scaffold, upgrade, and
-doctor lifecycle behavior. These tests treat the TOML file as the spec
-and the loader as the executable contract.
+The baseline and projector supply source content and derivation. The managed
+registry carries lifecycle metadata and does not create third hook/rule/skill copies.
 """
 
 from __future__ import annotations
@@ -55,26 +44,13 @@ def _registry_records() -> list[ManagedArtifact]:
 def test_registry_total_matches_current_manifest() -> None:
     """Current registry excludes retired capture, stubs and event notification."""
     records = _registry_records()
-    assert len(records) == 37
+    assert len(records) == 13
 
 
-def test_bridge_skill_records_are_managed_for_dual_agent_profiles() -> None:
-    """The bridge skill template is scaffolded and upgrade-managed as Tier A."""
-    expected_targets = {
-        ".claude/skills/gtkb-bridge/SKILL.md",
-        ".claude/skills/gtkb-bridge/helpers/scan_bridge.py",
-        ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py",
-    }
-
-    scaffold_targets = {
-        r.target_path for r in artifacts_for_scaffold("dual-agent", class_="skill") if isinstance(r, FileArtifact)
-    }
-    upgrade_targets = {
-        r.target_path for r in artifacts_for_upgrade("dual-agent", class_="skill") if isinstance(r, FileArtifact)
-    }
-
-    assert expected_targets <= scaffold_targets
-    assert expected_targets <= upgrade_targets
+def test_shared_skills_are_not_third_copy_managed_artifacts() -> None:
+    for profile in ("local-only", "dual-agent", "dual-agent-webapp"):
+        assert artifacts_for_scaffold(profile, class_="skill") == []
+        assert artifacts_for_upgrade(profile, class_="skill") == []
 
 
 def test_registry_ids_are_unique() -> None:
@@ -197,60 +173,17 @@ def test_scaffold_dual_agent_webapp_matches_dual_agent() -> None:
     assert a == b
 
 
-def test_upgrade_local_only_manages_retained_hook() -> None:
-    """local-only upgrade manages 1 hook plus 5 rules and 1 skill.
-
-    Post-canonical-terminology-surface: local-only upgrade-managed rules grew
-    from 1 to 3 because both new canonical-terminology records have
-    ``managed_profiles`` covering all three profiles.
-    Post gtkb-session-start-orientation-gate: +1 rule, +1 skill.
-    """
+def test_upgrade_local_only_requires_no_copied_hook_rule_or_skill() -> None:
     managed = artifacts_for_upgrade("local-only")
-    hooks = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "hook"}
-    assert hooks == set()
-    rules = {r.target_path for r in managed if isinstance(r, FileArtifact) and r.class_ == "rule"}
-    assert rules == {
-        ".claude/rules/prime-builder.md",
-        ".claude/rules/canonical-terminology.md",
-        ".claude/rules/canonical-terminology.toml",
-        ".claude/rules/canonical-terminology-policy.toml",
-        ".claude/rules/session-start-orientation.md",
-    }
-    # 1 skill (baseline-audit); no settings or gitignore for local-only
-    skills = [r for r in managed if r.class_ == "skill"]
-    assert len(skills) == 1
-    assert skills[0].id == "skill.baseline-audit.skill-md"
-    assert [r for r in managed if r.class_ == "settings-hook-registration"] == []
-    assert [r for r in managed if r.class_ == "gitignore-pattern"] == []
+    assert not [
+        r for r in managed if r.class_ in {"hook", "rule", "skill", "settings-hook-registration", "gitignore-pattern"}
+    ]
 
 
-def test_upgrade_dual_agent_manages_full_set_including_gap_28_rules() -> None:
-    """dual-agent upgrade includes the 3 Gap 2.8 bridge rules + canonical-terminology pair.
-
-    Post-canonical-terminology-surface: dual-agent upgrade-managed rules grew
-    from 8 to 10 with the addition of ``canonical-terminology.{md,toml}``.
-    """
-    managed_rule_paths = {
-        r.target_path for r in artifacts_for_upgrade("dual-agent", class_="rule") if isinstance(r, FileArtifact)
-    }
-    # The 5 pre-C1 managed rules
-    assert ".claude/rules/prime-builder.md" in managed_rule_paths
-    assert ".claude/rules/loyal-opposition.md" in managed_rule_paths
-    assert ".claude/rules/bridge-poller-canonical.md" in managed_rule_paths
-    assert ".claude/rules/prime-bridge-collaboration-protocol.md" in managed_rule_paths
-    assert ".claude/rules/report-depth.md" in managed_rule_paths
-    # The 3 Gap 2.8 rules added by C1
-    assert ".claude/rules/file-bridge-protocol.md" in managed_rule_paths
-    assert ".claude/rules/bridge-essential.md" in managed_rule_paths
-    assert ".claude/rules/deliberation-protocol.md" in managed_rule_paths
-    # The 2 canonical-terminology rules added post-C1
-    assert ".claude/rules/canonical-terminology.md" in managed_rule_paths
-    assert ".claude/rules/canonical-terminology.toml" in managed_rule_paths
-    # +1: canonical-terminology-policy added by Slice 1 of GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL
-    assert ".claude/rules/canonical-terminology-policy.toml" in managed_rule_paths
-    # +1: session-start-orientation (gtkb-session-start-orientation-gate)
-    assert ".claude/rules/session-start-orientation.md" in managed_rule_paths
-    assert len(managed_rule_paths) == 12
+def test_rules_are_read_from_the_baseline_without_managed_copies() -> None:
+    for profile in ("local-only", "dual-agent", "dual-agent-webapp"):
+        assert artifacts_for_scaffold(profile, class_="rule") == []
+        assert artifacts_for_upgrade(profile, class_="rule") == []
 
 
 # ---------------------------------------------------------------------------
@@ -288,19 +221,9 @@ def test_doctor_hooks_dual_agent_matches_prior_hardcoded() -> None:
         }, f"doctor hook set mismatch for {profile!r}: {hook_names}"
 
 
-def test_doctor_rules_bridge_profiles_are_three() -> None:
-    """For bridge profiles, doctor requires the 3 Gap 2.8 bridge rules."""
+def test_doctor_has_no_required_projected_rule_files() -> None:
     for profile in ("dual-agent", "dual-agent-webapp"):
-        rule_names = {
-            r.target_path.split("/")[-1]
-            for r in artifacts_for_doctor(profile, class_="rule")
-            if isinstance(r, FileArtifact)
-        }
-        assert rule_names == {
-            "file-bridge-protocol.md",
-            "bridge-essential.md",
-            "deliberation-protocol.md",
-        }
+        assert artifacts_for_doctor(profile, class_="rule") == []
 
 
 def test_doctor_rules_local_only_is_empty() -> None:
@@ -340,25 +263,15 @@ def test_managed_registry_settings_registration_managed_profiles_match_hook_arti
 # ---------------------------------------------------------------------------
 
 
-def test_condition2_composite_ids_exist_and_resolve() -> None:
-    """Three canonical scanner-safe-writer IDs exist, are unique, and resolve via loader."""
+def test_scanner_composite_pairs_authored_hook_and_registration() -> None:
     hook = find_artifact_by_id("hook.scanner-safe-writer")
     settings = find_artifact_by_id("settings.hook.scanner-safe-writer.pretooluse")
-    gitignore = find_artifact_by_id("gitignore.hook-logs")
-
-    assert isinstance(hook, FileArtifact)
-    assert hook.class_ == "hook"
-    assert hook.target_path == ".claude/hooks/scanner-safe-writer.py"
-
+    assert isinstance(hook, FileArtifact) and hook.class_ == "hook"
+    assert hook.target_path == hook.template_path == ".harness-baseline-configuration/hooks/scanner-safe-writer.py"
     assert isinstance(settings, SettingsHookRegistration)
-    assert settings.event == "PreToolUse"
-    assert settings.hook_filename == "scanner-safe-writer.py"
-
-    assert isinstance(gitignore, GitignorePattern)
-    assert gitignore.pattern == ".claude/hooks/*.log"
-
-    # Uniqueness — all three IDs are distinct.
-    assert len({hook.id, settings.id, gitignore.id}) == 3
+    assert settings.event == "PreToolUse" and settings.hook_filename == "scanner-safe-writer.py"
+    with pytest.raises(KeyError):
+        find_artifact_by_id("gitignore.hook-logs")
 
 
 def test_condition2_doctor_composite_uses_registry_ids(tmp_path, monkeypatch) -> None:
@@ -377,7 +290,6 @@ def test_condition2_doctor_composite_uses_registry_ids(tmp_path, monkeypatch) ->
             target_settings_path="custom/settings.json",
             hook_filename="check.py",
         ),
-        "gitignore.hook-logs": replace(find_artifact_by_id("gitignore.hook-logs"), pattern="custom/*.log"),
     }
     reads = []
 
@@ -392,7 +304,6 @@ def test_condition2_doctor_composite_uses_registry_ids(tmp_path, monkeypatch) ->
     (tmp_path / "custom/settings.json").write_text(
         json.dumps({"hooks": {"PreToolUse": [{"hooks": [{"command": "python custom/check.py"}]}]}}), encoding="utf-8"
     )
-    (tmp_path / ".gitignore").write_text("custom/*.log\n", encoding="utf-8")
     assert doctor._check_scanner_safe_writer_drift(tmp_path, "dual-agent").status == "pass"
     assert set(reads) == set(records)
     hook.unlink()
@@ -409,3 +320,26 @@ def test_find_artifact_by_id_raises_on_unknown() -> None:
     """Unknown id raises KeyError."""
     with pytest.raises(KeyError):
         find_artifact_by_id("hook.does-not-exist")
+
+
+def test_retained_hook_metadata_uses_authored_sources_and_one_pair_per_registration() -> None:
+    records = _registry_records()
+    hooks = {r.id: r for r in records if isinstance(r, FileArtifact) and r.class_ == "hook"}
+    assert set(hooks) == {
+        "hook.destructive-gate",
+        "hook.credential-scan",
+        "hook.kb-not-markdown",
+        "hook.scanner-safe-writer",
+    }
+    assert all(
+        row.target_path == row.template_path and row.target_path.startswith(".harness-baseline-configuration/hooks/")
+        for row in hooks.values()
+    )
+    registrations = [r for r in records if isinstance(r, SettingsHookRegistration)]
+    assert len(registrations) == 4
+    assert all(
+        sum(row.target_path.endswith("/" + reg.hook_filename) for row in hooks.values()) == 1 for reg in registrations
+    )
+    ids = {r.id for r in records}
+    assert "hook.bridge-compliance-gate" not in ids
+    assert not any("bridge-compliance" in ident for ident in ids)

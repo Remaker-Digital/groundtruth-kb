@@ -275,8 +275,9 @@ def test_gtconfigerror_is_public_api():
 
     assert "GTConfigError" in groundtruth_kb.__all__
     assert groundtruth_kb.GTConfigError is config_mod.GTConfigError
-    # And the count grew from 15 → 16
-    assert len(groundtruth_kb.__all__) == 16
+    # 15 -> 16 when GTConfigError was exported; 16 -> 12 when c103 (owner ruling D23, 2026-09-18) removed the
+    # KnowledgeDB / get_depth / get_parent_id / spec_sort_key re-exports of the frozen groundtruth_kb.db schema
+    assert len(groundtruth_kb.__all__) == 12
 
 
 # ---------------------------------------------------------------------------

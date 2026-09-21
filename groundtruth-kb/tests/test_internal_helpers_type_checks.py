@@ -36,7 +36,6 @@ def _clean_subprocess_env() -> dict[str, str]:
 
 INTERNAL_HELPER_FILES = [
     "src/groundtruth_kb/seed.py",
-    "src/groundtruth_kb/web/app.py",
     "src/groundtruth_kb/reconciliation.py",
     "src/groundtruth_kb/spec_scaffold.py",
     "src/groundtruth_kb/project/scaffold.py",

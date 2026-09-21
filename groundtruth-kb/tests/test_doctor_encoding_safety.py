@@ -98,8 +98,8 @@ def test_boundary_check_fails_rather_than_aborting(tmp_path: Path) -> None:
     A check that swallowed the error and returned ``pass`` would also not raise,
     and that is the false-PASS outcome DELIB-202667656 forbids.
     """
-    (tmp_path / ".claude" / "rules").mkdir(parents=True)
-    (tmp_path / ".claude" / "rules" / "project-root-boundary.md").write_bytes(INVALID_UTF8)
+    (tmp_path / ".harness-baseline-configuration" / "rules").mkdir(parents=True)
+    (tmp_path / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md").write_bytes(INVALID_UTF8)
 
     result = _check_harness_local_scratchpad_boundary(tmp_path)
 
@@ -113,10 +113,12 @@ def test_boundary_check_passes_on_valid_input(tmp_path: Path) -> None:
     DELIB-202667656 required proof that a decode-safety change 'preserves the
     real warning/finding set' rather than masking or inventing findings.
     """
-    (tmp_path / ".claude" / "rules").mkdir(parents=True)
+    (tmp_path / ".harness-baseline-configuration" / "rules").mkdir(parents=True)
     body = "\n".join(doctor._HARNESS_SCRATCHPAD_REQUIRED_TERMS)
     (tmp_path / "AGENTS.md").write_text(body, encoding="utf-8")
-    (tmp_path / ".claude" / "rules" / "project-root-boundary.md").write_text(body, encoding="utf-8")
+    (tmp_path / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md").write_text(
+        body, encoding="utf-8"
+    )
 
     result = _check_harness_local_scratchpad_boundary(tmp_path)
 
@@ -125,9 +127,10 @@ def test_boundary_check_passes_on_valid_input(tmp_path: Path) -> None:
 
 
 def test_metadata_freshness_check_fails_rather_than_aborting(tmp_path: Path) -> None:
-    """Preserve strict UTF-8 diagnostics through the current provider-local reader."""
+    """Preserve strict UTF-8 diagnostics through the authored routing reader (R6 (ii))."""
     (tmp_path / ".api-harness" / "alibaba-cloud-studio").mkdir(parents=True)
-    (tmp_path / ".api-harness" / "alibaba-cloud-studio" / "routing.toml").write_bytes(INVALID_UTF8)
+    (tmp_path / ".harness-baseline-configuration").mkdir()
+    (tmp_path / ".harness-baseline-configuration" / "routing.toml").write_bytes(INVALID_UTF8)
 
     result = _check_provider_routing(tmp_path, "alibaba-cloud-studio")
 

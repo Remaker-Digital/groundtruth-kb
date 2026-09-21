@@ -30,10 +30,6 @@ AUTHOR_METADATA_LINE_RE = re.compile(
     r"^(?P<key>author_[a-z0-9_]+):\s*(?P<value>.*?)\s*$",
     re.IGNORECASE | re.MULTILINE,
 )
-WAIVER_RE = re.compile(
-    r"^document_author_provenance_waiver:\s*(?P<value>DELIB-[A-Z0-9_.-]+\s+.+)$",
-    re.IGNORECASE | re.MULTILINE,
-)
 PLACEHOLDER_VALUES: frozenset[str] = frozenset(
     {
         "",
@@ -55,7 +51,7 @@ PLACEHOLDER_VALUES: frozenset[str] = frozenset(
 )
 DEFAULT_GOVERNED_SURFACES: tuple[str, ...] = (
     "bridge/**/*.md",
-    ".claude/rules/**/*.md",
+    ".harness-baseline-configuration/rules/**/*.md",
     "independent-progress-assessments/**/*.md",
     "memory/**/*.md",
     "docs/**/*.md",
@@ -84,7 +80,6 @@ class ValidationResult:
     metadata: dict[str, str]
     missing_fields: tuple[str, ...]
     invalid_fields: tuple[str, ...]
-    waiver: str | None = None
 
     @property
     def gaps(self) -> tuple[str, ...]:
@@ -112,16 +107,7 @@ def parse_author_metadata(text: str) -> dict[str, str]:
     }
 
 
-def find_waiver(text: str) -> str | None:
-    match = WAIVER_RE.search(text)
-    if not match:
-        return None
-    value = match.group("value").strip()
-    return value if metadata_value_is_valid(value) else None
-
-
 def validate_author_metadata(text: str) -> ValidationResult:
-    waiver = find_waiver(text)
     metadata = parse_author_metadata(text)
     missing: list[str] = []
     invalid: list[str] = []
@@ -131,11 +117,10 @@ def validate_author_metadata(text: str) -> ValidationResult:
         elif not metadata_value_is_valid(metadata[field]):
             invalid.append(f"{field} (placeholder/invalid)")
     return ValidationResult(
-        is_valid=bool(waiver) or (not missing and not invalid),
+        is_valid=not missing and not invalid,
         metadata=metadata,
         missing_fields=tuple(missing),
         invalid_fields=tuple(invalid),
-        waiver=waiver,
     )
 
 

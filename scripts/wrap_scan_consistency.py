@@ -38,7 +38,7 @@ EXIT_ERROR = 2
 
 BRIDGE_NUMBERED_FILE_PATTERN = re.compile(r"^[A-Za-z0-9_.-]+-\d{3}\.md$")
 MEMORY_INDEX_REF_PATTERN = re.compile(r"\[[^\]]+\]\(([A-Za-z0-9_./-]+\.md)\)")
-RULE_REF_PATTERN = re.compile(r"`(\.claude/rules/[A-Za-z0-9_./-]+\.md)`")
+RULE_REF_PATTERN = re.compile(r"`(\.harness-baseline-configuration/rules/[A-Za-z0-9_./-]+\.md)`")
 
 
 def _project_root() -> Path:
@@ -164,7 +164,7 @@ def check_claude_md_cites_missing_rule(project_root: Path) -> list[dict]:
                             cited_path=ref,
                         )
                     )
-    rules_dir = project_root / ".claude" / "rules"
+    rules_dir = project_root / ".harness-baseline-configuration" / "rules"
     if rules_dir.is_dir():
         for rule in rules_dir.glob("*.md"):
             for line_no, line in enumerate(rule.read_text(encoding="utf-8").splitlines(), 1):

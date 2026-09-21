@@ -1,9 +1,9 @@
-"""The terminology check verifies projected guidance, never prompt-file term content.
+"""The terminology check verifies authored guidance, never prompt-file term content.
 
 Carries the retained duties of the legacy canonical-terminology doctor cases:
-the projected configuration and primer are present for a selected harness,
+the authored configuration and primer are present for a selected harness,
 the primer teaches the native retrieval route, a missing or malformed
-projection is a required failure, and the retired prompt-file term contract
+source is a required failure, and the retired prompt-file term contract
 is refused rather than evaluated.
 """
 
@@ -32,9 +32,10 @@ def test_baseline_configuration_carries_no_prompt_file_term_contract() -> None:
     assert config["config"]["defaults"]["primer_path"].endswith("canonical-terminology.md")
 
 
-def test_projected_guidance_passes_and_the_native_doctor_reports_it(native_application) -> None:
+def test_authored_host_guidance_passes_and_the_native_doctor_reports_it(native_application) -> None:
     native_application.stage_baseline()
-    target = native_application.scaffold("Alpha", profile="dual-agent", harnesses=("claude",))
+    native_application.scaffold("Alpha", profile="dual-agent", harnesses=("claude",))
+    target = native_application.host
     check = _check_canonical_terminology(target, "dual-agent")
     assert check.status == "pass" and check.required and "gt terms" in check.message
     report = inspect_native_application(native_application.client, "PROJECT-Alpha", native_application.host)
@@ -56,29 +57,31 @@ def test_without_a_selected_harness_the_check_is_informational(native_applicatio
 
 def test_missing_primer_or_configuration_is_a_required_failure(native_application) -> None:
     native_application.stage_baseline()
-    target = native_application.scaffold("Alpha", profile="dual-agent", harnesses=("claude",))
-    primer = target / ".claude/rules/canonical-terminology.md"
+    native_application.scaffold("Alpha", profile="dual-agent", harnesses=("claude",))
+    target = native_application.host
+    primer = target / ".harness-baseline-configuration/rules/canonical-terminology.md"
     primer.write_text("# Read current terminology\n\nSee the glossary file.\n", encoding="utf-8")
     check = _check_canonical_terminology(target, "dual-agent")
     assert check.status == "fail" and "gt terms" in check.message
     primer.unlink()
     check = _check_canonical_terminology(target, "dual-agent")
     assert check.status == "fail" and check.found is False and "upgrade" in check.message
-    (target / ".claude/rules/canonical-terminology.toml").unlink()
+    (target / ".harness-baseline-configuration/rules/canonical-terminology.toml").unlink()
     check = _check_canonical_terminology(target, "dual-agent")
     assert check.status == "fail" and "canonical-terminology.toml" in check.message
 
 
-def test_the_checkout_projection_passes_the_check() -> None:
+def test_the_checkout_authored_guidance_passes_the_check() -> None:
     checkout = Path(__file__).resolve().parents[2]
     check = _check_canonical_terminology(checkout, "dual-agent")
     assert check.status == "pass", check.message
 
 
-def test_a_stale_projection_with_the_retired_contract_warns_instead_of_counting_terms(native_application) -> None:
+def test_stale_authored_guidance_warns_instead_of_counting_terms(native_application) -> None:
     native_application.stage_baseline()
-    target = native_application.scaffold("Alpha", profile="dual-agent", harnesses=("claude",))
-    config = target / ".claude/rules/canonical-terminology.toml"
+    native_application.scaffold("Alpha", profile="dual-agent", harnesses=("claude",))
+    target = native_application.host
+    config = target / ".harness-baseline-configuration/rules/canonical-terminology.toml"
     config.write_text(
         config.read_text(encoding="utf-8").replace(
             '[config.profiles.dual-agent]\nmissing_severity = "ERROR"',

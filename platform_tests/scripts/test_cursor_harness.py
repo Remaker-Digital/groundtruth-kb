@@ -30,8 +30,8 @@ def cursor_with_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     harness = _load_harness()
     monkeypatch.chdir(tmp_path)
     for name in ("bridge", "proposal-review", "verify"):
-        source = _REPO_ROOT / ".harness-baseline-configuration" / "skills" / f"gtkb-{name}" / "SKILL.md"
-        target = tmp_path / ".cursor" / "skills" / name / "SKILL.md"
+        source = _REPO_ROOT / ".agents" / "skills" / f"gtkb-{name}" / "SKILL.md"
+        target = tmp_path / ".agents" / "skills" / f"gtkb-{name}" / "SKILL.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(source.read_bytes())
     return harness
@@ -57,7 +57,7 @@ def test_skill_route_alias_verification_resolves(cursor_with_skills) -> None:
 def test_skill_route_non_aliased_resolves(cursor_with_skills) -> None:
     """A real skill name resolves directly (no alias needed)."""
     harness = cursor_with_skills
-    content = harness._skill_system_prompt("proposal-review")
+    content = harness._skill_system_prompt("gtkb-proposal-review")
     assert content is not None
 
 
@@ -519,38 +519,38 @@ def test_timeout_redacts_and_truncates_partial_output(
 
 
 @pytest.mark.parametrize("route", ["../.codex/skills/review", "../../peer", "/absolute", "C:/peer"])
-def test_skill_route_refuses_paths_outside_own_projection(route, cursor_with_skills):
+def test_skill_route_refuses_paths_outside_shared_source(route, cursor_with_skills):
     with pytest.raises(cursor_with_skills.CursorHarnessError, match="invalid skill route"):
         cursor_with_skills._skill_system_prompt(route)
 
 
-def test_missing_own_skill_never_falls_back_to_peer_projection(cursor_with_skills):
+def test_missing_shared_skill_never_falls_back_to_peer_projection(cursor_with_skills):
     harness = cursor_with_skills
-    own = Path.cwd() / ".cursor" / "skills" / "verify" / "SKILL.md"
+    own = Path.cwd() / ".agents" / "skills" / "gtkb-verify" / "SKILL.md"
     own.unlink()
     for peer in (".codex", ".claude"):
-        target = Path.cwd() / peer / "skills" / "verify" / "SKILL.md"
+        target = Path.cwd() / peer / "skills" / "gtkb-verify" / "SKILL.md"
         target.parent.mkdir(parents=True)
         target.write_text("Peer-only instruction", encoding="utf-8")
-    with pytest.raises(harness.CursorHarnessError, match="refresh this harness's projection"):
+    with pytest.raises(harness.CursorHarnessError, match="shared authored skill source"):
         harness._skill_system_prompt("verification")
 
 
-def test_own_skill_junction_cannot_load_another_harness(tmp_path, monkeypatch):
+def test_shared_skill_junction_cannot_load_another_harness(tmp_path, monkeypatch):
     harness = _load_harness()
     monkeypatch.chdir(tmp_path)
     if harness.os.name != "nt":
         pytest.skip("Windows NTFS junction boundary")
-    peer = tmp_path / ".codex" / "skills" / "verify"
+    peer = tmp_path / ".codex" / "skills" / "gtkb-verify"
     peer.mkdir(parents=True)
     (peer / "SKILL.md").write_text("Peer-only instruction", encoding="utf-8")
-    own = tmp_path / ".cursor" / "skills"
+    own = tmp_path / ".agents" / "skills"
     own.mkdir(parents=True)
-    link = own / "verify"
+    link = own / "gtkb-verify"
     subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(peer)], check=True, capture_output=True)
     try:
-        with pytest.raises(harness.CursorHarnessError, match="leaves this harness's skill directory"):
-            harness._skill_system_prompt("verify")
+        with pytest.raises(harness.CursorHarnessError, match="leaves the shared authored skill directory"):
+            harness._skill_system_prompt("gtkb-verify")
         assert (peer / "SKILL.md").read_text(encoding="utf-8") == "Peer-only instruction"
     finally:
         link.rmdir()

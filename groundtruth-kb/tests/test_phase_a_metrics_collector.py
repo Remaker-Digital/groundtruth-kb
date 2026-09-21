@@ -341,3 +341,44 @@ def test_fixture_exists_and_is_readable(fixture_name: str) -> None:
     path = FIXTURES / fixture_name
     assert path.exists(), f"missing fixture: {fixture_name}"
     path.read_text(encoding="utf-8")
+
+
+def test_cli_default_reads_selected_root_runtime_denials(tmp_path, monkeypatch, capsys) -> None:
+    log = tmp_path / ".groundtruth" / "runtime" / "gate-denials.jsonl"
+    log.parent.mkdir(parents=True)
+    log.write_bytes((FIXTURES / "canonical_only.log").read_bytes())
+    monkeypatch.setenv("GTKB_PROJECT_ROOT", str(tmp_path))
+    monkeypatch.delenv("GTKB_GATE_DENIALS_PATH", raising=False)
+    monkeypatch.chdir(tmp_path / ".groundtruth")
+
+    assert cpm.main([]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert Path(report["log_path"]) == log
+    assert report["total_deny_events"] == 3
+    assert report["by_catalog_source"] == {"canonical": 3}
+
+
+@pytest.mark.parametrize("absolute", [False, True])
+def test_cli_runtime_log_override_matches_emitter(tmp_path, monkeypatch, capsys, absolute) -> None:
+    log = tmp_path / "selected.jsonl"
+    log.write_bytes((FIXTURES / "fallback_only.log").read_bytes())
+    monkeypatch.setenv("GTKB_PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setenv("GTKB_GATE_DENIALS_PATH", str(log) if absolute else "selected.jsonl")
+
+    assert cpm.main([]) == 0
+    report = json.loads(capsys.readouterr().out)
+    expected = cpm.collect_metrics(log)
+    assert Path(report["log_path"]) == log
+    assert report["total_deny_events"] == expected["total_deny_events"] > 0
+    assert report["by_catalog_source"] == expected["by_catalog_source"]
+
+
+def test_cli_explicit_log_path_overrides_runtime_defaults(tmp_path, monkeypatch, capsys) -> None:
+    monkeypatch.setenv("GTKB_PROJECT_ROOT", str(tmp_path))
+    monkeypatch.setenv("GTKB_GATE_DENIALS_PATH", "not-the-selected-log.jsonl")
+    log = FIXTURES / "canonical_only.log"
+
+    assert cpm.main(["--log-path", str(log)]) == 0
+    report = json.loads(capsys.readouterr().out)
+    assert Path(report["log_path"]) == log
+    assert report["total_deny_events"] == 3

@@ -5,14 +5,13 @@ Pins the MEMORY.md + topic-file reconciliation of
 ``PROJECT-GTKB-PLATFORM-SOT-CONSOLIDATION`` so it cannot silently regress:
 
 - WI-4347 (retire): the 51 classifier RETIRE-bucket ephemera files are absent.
-- WI-4347 (preserve) + GOV-08: the PRESERVE anchors still exist.
+- GOV-08: the retained operational pointers exist; historical session notes are removed.
 - WI-4346: ``memory/MEMORY.md`` is an index-only operational notepad
   (index headings present, bulky session-state log removed, under an
   index-size threshold) per GOV-SOURCE-OF-TRUTH-FRESHNESS-001 +
   GOV-STANDING-BACKLOG-001 (no backlog/content store in MEMORY.md).
 
-Source: ``bridge/gtkb-platform-sot-consolidation-slice-8-memory-reconciliation-001.md``
-(GO at ``-002``); owner authorization ``DELIB-20265460``.
+Current duties follow GOV-SOURCE-OF-TRUTH-FRESHNESS-001 and GOV-STANDING-BACKLOG-001.
 """
 
 from __future__ import annotations
@@ -77,18 +76,10 @@ RETIRED = [
     "memory/topics/session_s262_summary.md",
 ]
 
-# WI-4347 PRESERVE anchors — representative durable files that MUST remain.
+# Current operational pointers; none carries canonical authority or session progress.
 PRESERVE_ANCHORS = [
     "memory/MEMORY.md",
-    "memory/CLAUDE_ARCHIVE.md",
     "memory/release-readiness.md",
-    "memory/pending-owner-decisions.md",
-    "memory/project_external_resource_registry.md",
-    "memory/gt-cli-invocation-harness-b.md",
-    "memory/feedback/feedback_bridge_protocol.md",
-    "memory/feedback/feedback_production_deploy_approval.md",
-    "memory/topics/reference_sarah_scenario.md",
-    "memory/topics/canonical_vocabulary.md",
 ]
 
 # The owner's retention rule keeps session notes out of the index, so "## Recent Sessions" is not a heading here.
@@ -108,7 +99,7 @@ def test_retired_ephemera_absent() -> None:
 
 
 def test_preserved_files_present() -> None:
-    """WI-4347 + GOV-08: durable PRESERVE anchors are retained."""
+    """GOV-08: current non-authoritative operational pointers remain available."""
     missing = [p for p in PRESERVE_ANCHORS if not (ROOT / p).exists()]
     assert not missing, f"preserve-anchor files were removed: {missing}"
 

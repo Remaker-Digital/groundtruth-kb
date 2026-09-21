@@ -72,27 +72,15 @@ enforces this declaration by verifying the required rule surfaces carry the
 non-authority language and by failing when those surfaces regress to granting
 positive authority to harness-local scratchpads.
 
-## Sandbox Output Exception
+## Sandbox Output (retired exception)
 
-GT-KB rehearsal-class operations may emit runtime output to a path outside `E:\GT-KB` only when ALL of the following hold:
-
-1. The path is declared in a current owner-approved, in-root manifest field. The former out-of-root report-directory manifest is retired and no longer grants active authority.
-2. The path matches a sandbox-allowlist pattern enforced by Rule M2 in `scripts/rehearse/_common.py`. Current allowlist (per `_OUTPUT_DIR_ALLOWLIST_DESC` source constant): "C:/temp/agent-red-rehearsal* or /tmp/agent-red-rehearsal* (extend _OUTPUT_DIR_ALLOWLIST_PATTERNS for additional sandbox paths)".
-3. The output is regenerable evidence (preview artifacts, classification manifests, dry-run DBs), not canonical project state.
-4. The output is documented in the bridge proposal that authorizes the operation, and the bridge passes Codex review with the path explicit.
-
-Authority: `DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001`.
-
-Provenance: `DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE` and the manifest §3.3 owner decision recorded at S311 (commit `12538b97` context). The manifest surface named there is retired; a new owner-approved in-root manifest is required before this exception can be used for new operations.
-
-Outputs covered by this exception remain outside the scope of GT-KB canonical state, audit history, release evidence, regression tests (except as preview-evidence inputs), and dependency closure.
-
-Owner approval is per-manifest, not per-run; adding new sandbox paths requires:
-
-1. A code change to `_OUTPUT_DIR_ALLOWLIST_PATTERNS` in `scripts/rehearse/_common.py` (which extends the executable allowlist).
-2. An owner-approved manifest update through the bridge protocol (which exercises the new pattern under owner review).
-3. Synchronized update of this rule's allowlist citation to keep rule text and source code aligned (verified by platform_tests/scripts/test_rehearse_isolation.py asserting `_OUTPUT_DIR_ALLOWLIST_DESC` equals the rule-text quotation).
-
+The former Sandbox Output Exception (`DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001`,
+retired) allowed rehearsal-class operations to emit regenerable output outside
+`E:\GT-KB` under an owner-approved rehearsal manifest and the executable
+allowlist in `scripts/rehearse/_common.py`. The rehearsal wrapper, its manifest
+and that allowlist are retired, so no operation can satisfy the exception and
+it grants nothing. No rehearsal-class output exception remains; this section
+is retained as history only and is not an authority carrier.
 
 ## SQLite Snapshot Output (retired exception)
 
@@ -113,9 +101,10 @@ executables (registry-enumerated harness CLIs) that are installed outside E:\GT-
 their own toolchains (npm-global, user-install, system package managers) when ALL
 of the following hold:
 
-1. The executable is an AI coding harness enumerated in the harness registry
-   (harness-state/harness-registry.json) via an invocation_surfaces.*.argv entry.
-   Only registry-enumerated harness command names are eligible.
+1. The executable belongs to a current canonical harness installation record,
+   read through the native `gt harness show <id>` CLI or authority service,
+   with an invocation_surfaces.*.argv entry. Only command names declared by
+   those current records are eligible; generated files confer no eligibility.
 2. Resolution uses one of: (a) ambient PATH resolution provided by the launching
    context (the mechanism by which registered harnesses are already dispatched), or (b) a
    location configured in the in-root platform env source-of-truth (.env.local)

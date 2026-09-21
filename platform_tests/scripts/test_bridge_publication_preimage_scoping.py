@@ -10,10 +10,10 @@ from __future__ import annotations
 import pytest
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put, work_fields
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

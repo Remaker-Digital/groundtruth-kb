@@ -3,117 +3,27 @@
 from __future__ import annotations
 
 import json
-import subprocess
 from pathlib import Path
 
 import pytest
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put, work_fields
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim, deliver
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import (
+    base,
+    commit_product,
+    git,
+    integration,
+    post,
+    two_members,
+    verify,
+)
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-
-def git(root, *args, check=True):
-    result = subprocess.run(
-        [
-            "git",
-            "-C",
-            str(root),
-            "-c",
-            "user.name=Qualification",
-            "-c",
-            "user.email=qualification@example.invalid",
-            *args,
-        ],
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-    )
-    if check:
-        assert result.returncode == 0, result.stderr
-    return result
-
-
-def base(root):
-    return git(root, "rev-parse", "HEAD").stdout.strip()
-
-
-def integration(root):
-    return Path(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir").stdout.strip()).parent
-
-
-def verify(client, contexts, root, number, path, **proposal_fields):
-    document = f"chain-{number}"
-    work = f"WI-{number}"
-    deliver(
-        client,
-        contexts,
-        document,
-        "pb1",
-        1,
-        "NEW",
-        work_item_id=work,
-        target_paths=json.dumps([path]),
-        **proposal_fields,
-    )
-    deliver(client, contexts, document, "lo1", 2, "GO", work_item_id=work)
-    reserved = claim(client, document, "pb2", 2, "READY", work_item_id=work)
-    assert reserved.status_code == 200, reserved.text
-    fence = {"native_context_id": "pb2", "fence": reserved.json()["fence"]}
-    opened = client.post(f"/v1/bridge/{document}/worktree", json=fence)
-    assert opened.status_code == 200, opened.text
-    checkout = opened.json()
-    (Path(checkout["path"]) / path).write_text(f"result = {number + 1}\n", encoding="utf-8")
-    published = client.post(
-        f"/v1/bridge/{document}/publish-work", json={**fence, "expected_artifacts": checkout["artifact_preimages"]}
-    )
-    assert published.status_code == 200, published.text
-    assert (root / path).read_text() == f"result = {number + 1}\n"
-    assert (integration(root) / path).read_text() != f"result = {number + 1}\n"
-    ready = client.post(
-        f"/v1/bridge/{document}/deliver",
-        json={**fence, "content": authored(contexts["pb2"], document, 3, "READY", **{"Work Item": work})},
-    )
-    assert ready.status_code == 200, ready.text
-    artifacts = client.get(f"/v1/bridge/{document}/artifacts").json()
-    deliver(
-        client, contexts, document, "lo2", 4, "VERIFIED", work_item_id=work, verified_artifacts=json.dumps(artifacts)
-    )
-
-
-def post(client, action, **body):
-    return client.post(
-        f"/v1/projects/PROJECT-1/{action}",
-        json={
-            "native_context_id": "lo3",
-            "expected_version": 1,
-            **body,
-        },
-    )
-
-
-def two_members(bridge):
-    _, client, contexts, root = bridge
-    parent = base(root)
-    assert (
-        put(client, "work-items", "WI-2", work_fields(title="Second artifact"), project_id="PROJECT-1").status_code
-        == 200
-    )
-    verify(client, contexts, root, 1, "code.py")
-    assert post(client, "prepare-commit").json()["error"]["code"] == "project_not_fully_verified"
-    verify(client, contexts, root, 2, "second.py")
-    return client, contexts, root, parent
-
-
-def commit_product(root):
-    git(root, "add", "--", "code.py", "second.py", "tests/test_effect.py")
-    git(root, "commit", "-m", "Complete the qualified project (WI-1) (WI-2)")
-    return git(root, "rev-parse", "HEAD").stdout.strip()
 
 
 @pytest.mark.parametrize("initial,changed", [("100644", "100755"), ("100755", "100644")])

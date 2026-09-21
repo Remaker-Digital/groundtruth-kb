@@ -24,11 +24,9 @@ Two intentional precedence policies:
   resolve ``GTKB_BRIDGE_POLLER_RUN_ID`` before any ambient parent harness
   session; remaining order preserves the live-Claude-Code-first behavior. A
   full permutation of ``SESSION_ID_ENV_VARS``.
-- ``MARKER_CONTINUITY_ORDER`` (``GTKB_SESSION_ID``-first): the session-role
-  marker surfaces -- ``scripts/workstream_focus.py`` (marker writer) and
-  ``groundtruth-kb/src/groundtruth_kb/project/doctor.py`` (doctor marker
-  resolver) -- so an inherited/dispatched GT-KB session id wins over ambient
-  harness env. A documented SUBSET of ``SESSION_ID_ENV_VARS`` (intentionally
+- ``MARKER_CONTINUITY_ORDER`` (``GTKB_SESSION_ID``-first): a legacy marker
+  ordering constant retained for remaining callers. It is not the native
+  session binding or role authority. This subset intentionally
   excludes ``GTKB_BRIDGE_POLLER_RUN_ID``, ``GTKB_INHERITED_SESSION_ID`` and
   ``ANTIGRAVITY_SESSION_ID`` to preserve the current marker-continuity
   behavior).
@@ -112,12 +110,8 @@ MARKER_CONTINUITY_ORDER: tuple[str, ...] = (
 # concurrent sessions on a workstation, which produced cross-session clobber
 # (WI-4463) and mid-context vanish (advisory Defect 2). The fix keys the marker
 # per session: ``.claude/session/role-<sanitized_session_id>.json``. This
-# module is the single home for the per-session path + sanitizer so the writer
-# (scripts/workstream_focus.py), the WI-4534 guard reader
-# (scripts/bridge_work_intent_registry.py), the resolver
-# (the former role resolver is retired), and the SessionStart sweeper
-# (scripts/session_start_dispatch_core.py) cannot drift apart. Parity tests
-# bind every consumer to these helpers.
+# Legacy marker path helpers remain here for remaining callers. Native session
+# identity and role resolution use the canonical session binding.
 #
 # stdlib-only (re + pathlib), no import-time side effects: the hook-safe
 # contract above still holds.

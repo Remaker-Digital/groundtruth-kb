@@ -51,10 +51,16 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
+
+from upgrade_verification import api_call  # noqa: E402
 
 from scripts.deploy_config import ENVIRONMENTS  # noqa: E402
-from upgrade_verification import api_call  # noqa: E402
+
+# Evidence pair of the DEFECT work items this pipeline records (WI-7860, owner ruling D17): the governing
+# specification and this pipeline's own executable test; the native writer refuses creation without both.
+DEFECT_SOURCE_SPEC_ID = "SPEC-1615"
+DEFECT_SOURCE_TEST_ID = "TEST-2941"
+DEFECT_ACTOR = "deploy-pipeline"
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -773,9 +779,9 @@ def phase_15_enforce_scaling(args: argparse.Namespace) -> PhaseResult:
     # at module load time. The shared library is cheap to import (no side effects).
     from lib.scaling_enforcement import enforce_all_scaling
     from lib.scaling_targets import (
-        get_scaling_targets,
-        SCALING_CONFIG,
         RESOURCE_GROUP,
+        SCALING_CONFIG,
+        get_scaling_targets,
     )
 
     def _shell_runner(cmd: str, timeout: int) -> tuple[int, str]:
@@ -1388,9 +1394,10 @@ def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
 # DEFECT work item creation on failure
 # ---------------------------------------------------------------------------
 def _create_defect_work_item(results: list[PhaseResult], args: argparse.Namespace) -> str | None:
-    """Create a DEFECT work item in the KB for the first failed phase.
+    """Record a DEFECT work item on the native authority for the first failed phase.
 
-    Delegates to the shared _defect_reporter module (SPEC-1617).
+    Delegates to the shared _defect_reporter module (WI-7860, owner ruling D17). A refused or
+    unreachable authority raises ``DefectReportError`` out of this function: nothing is warned past.
     """
     from scripts._defect_reporter import create_defect
 
@@ -1411,12 +1418,16 @@ def _create_defect_work_item(results: list[PhaseResult], args: argparse.Namespac
             f"First failure: Phase {first_fail.phase} ({first_fail.name}): "
             f"{first_fail.detail}"
         ),
-        source_spec_id="SPEC-1615",
+        source_spec_id=DEFECT_SOURCE_SPEC_ID,
+        source_test_id=DEFECT_SOURCE_TEST_ID,
+        actor=DEFECT_ACTOR,
+        reason=(
+            f"Automated deploy pipeline ({DEFECT_SOURCE_SPEC_ID}) failed Phase {first_fail.phase} "
+            f"({first_fail.name}) for {args.env} {args.version}"
+        ),
         component="infrastructure_automation",
-        changed_by="deploy-pipeline",
     )
-    if wi_id:
-        log("INFO", f"  Created DEFECT work item: {wi_id}")
+    log("INFO", f"  Created DEFECT work item: {wi_id}")
     return wi_id
 
 

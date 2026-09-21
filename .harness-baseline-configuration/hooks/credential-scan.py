@@ -207,7 +207,7 @@ _EXCLUDED_PATHS = [
     re.compile(r"CLAUDE-ARCHITECTURE\.md$"),
     re.compile(r"CLAUDE_ARCHIVE\.md$"),
     # Hook files themselves
-    re.compile(r"{{HARNESS_HOOKS_DIR}}[/\\]"),
+    re.compile(r"\.harness-baseline-configuration[/\\]hooks[/\\]"),
     # Wiki and docs (reference material)
     re.compile(r"wiki[/\\]"),
     re.compile(r"docs-site[/\\]"),

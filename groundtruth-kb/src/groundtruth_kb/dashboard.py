@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import base64
 import contextlib
-import ctypes
 import hashlib
 import json
 import logging
@@ -21,8 +20,8 @@ import tarfile
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
-from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -30,17 +29,58 @@ from typing import Any, TypedDict
 
 import yaml
 
-from groundtruth_kb import dashboard_link, get_templates_dir
+from groundtruth_kb import dashboard_link, get_templates_dir, job_containment
 from groundtruth_kb.config import GTConfig
 
 logger = logging.getLogger(__name__)
 
 
-class _ProcessIdentity(TypedDict):
+_ProcessIdentity = job_containment.ProcessIdentity
+
+
+class _LaunchedProcess(TypedDict):
+    role: str
     pid: int
     created_at: str
     executable: str
 
+
+class DashboardStopError(RuntimeError):
+    """The dashboard could not be stopped cleanly; the message names the process and the reason."""
+
+
+class DashboardIdentityError(DashboardStopError):
+    """The process a record names is not the process that was launched; nothing was signalled."""
+
+
+class DashboardTerminationRefused(DashboardStopError):
+    """The termination request failed (taskkill non-zero with the process still running, or the job refused it)."""
+
+
+class DashboardTerminationUnconfirmed(DashboardStopError):
+    """The termination request was accepted but a held process handle stayed unsignalled within the wait."""
+
+
+LAUNCH_RECORD_NAME = "dashboard-launch.json"
+DASHBOARD_JOB_PREFIX = "Local\\gtkb-dashboard-"
+CREATE_SUSPENDED = job_containment.CREATE_SUSPENDED
+# Grafana launch environment pins (conf/defaults.ini of the pinned 13.2.1 release: [analytics], [plugins], [news],
+# [log]). The background plugin installer (preinstall + preinstall_auto_update) reached grafana.com during a
+# production start and wrote plugin updates into the Grafana home; every check, download and update path the
+# server itself initiates is off, plugin administration from the UI is off, the embedded signing key is used
+# without retrieval, and Grafana logs to its console only so the launcher's redirect is grafana.log's single writer.
+GRAFANA_LAUNCH_PINS: dict[str, str] = {
+    "GF_ANALYTICS_REPORTING_ENABLED": "false",
+    "GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
+    "GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES": "false",
+    "GF_ANALYTICS_FEEDBACK_LINKS_ENABLED": "false",
+    "GF_PLUGINS_PREINSTALL_DISABLED": "true",
+    "GF_PLUGINS_PREINSTALL_AUTO_UPDATE": "false",
+    "GF_PLUGINS_PLUGIN_ADMIN_ENABLED": "false",
+    "GF_PLUGINS_PUBLIC_KEY_RETRIEVAL_DISABLED": "true",
+    "GF_NEWS_NEWS_FEED_ENABLED": "false",
+    "GF_LOG_MODE": "console",
+}
 
 INCIDENTS_PATH = Path("memory") / "incidents.yaml"
 
@@ -547,6 +587,95 @@ def initialize_database(db_path: Path) -> None:
         conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
 
 
+def _expected_derived_schema() -> dict[str, set[str]]:
+    """Column names per table that ``schema.sql`` creates, derived by executing it in memory."""
+    with sqlite3.connect(":memory:") as conn:
+        conn.executescript(SCHEMA_PATH.read_text(encoding="utf-8"))
+        tables = [
+            str(name)
+            for (name,) in conn.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+            )
+        ]
+        return {table: {str(row[1]) for row in conn.execute(f'PRAGMA table_info("{table}")')} for table in tables}
+
+
+def _derived_schema_mismatch(db_path: Path) -> str | None:
+    """Why the existing derived database cannot carry this package's refresh, or None when it can.
+
+    A legacy or foreign derived schema is no history: a table the current ``schema.sql`` does not create, a table
+    missing an expected column, a NOT NULL column without a default that the refresh never writes (the July-9
+    ``dashboard_metadata.updated_at`` shape), or a file SQLite cannot open, each disqualifies the whole file. Extra
+    columns that are nullable or carry a default are the additive migrations ``_migrate_schema`` applies and are
+    accepted; tables that do not exist yet are created by ``schema.sql``.
+    """
+    expected = _expected_derived_schema()
+    uri = "file:" + urllib.parse.quote(db_path.as_posix(), safe="/:") + "?mode=ro"
+    try:
+        with contextlib.closing(sqlite3.connect(uri, uri=True)) as conn:
+            existing = [
+                str(name)
+                for (name,) in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+                )
+            ]
+            for table in existing:
+                if table not in expected:
+                    return f"carries table {table}, which the current derived schema does not define"
+                info = conn.execute(f'PRAGMA table_info("{table}")').fetchall()
+                columns = {str(row[1]) for row in info}
+                missing = sorted(expected[table] - columns)
+                if missing:
+                    return f"table {table} lacks the expected column(s) {', '.join(missing)}"
+                blocking = sorted(
+                    str(row[1]) for row in info if str(row[1]) not in expected[table] and row[3] and row[4] is None
+                )
+                if blocking:
+                    return (
+                        f"table {table} carries NOT NULL column(s) without a default that the refresh does not "
+                        f"write: {', '.join(blocking)}"
+                    )
+    except sqlite3.DatabaseError as error:
+        return f"is not a database this package can read ({error})"
+    return None
+
+
+def _move_legacy_database_aside(db_path: Path, runtime_root: Path, reason: str) -> Path:
+    """Move a legacy or foreign derived database (and its SQLite sidecars) aside under the runtime root."""
+    stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    runtime_root.mkdir(parents=True, exist_ok=True)
+    target = runtime_root / f"{db_path.name}.legacy-{stamp}"
+    counter = 1
+    while target.exists():
+        target = runtime_root / f"{db_path.name}.legacy-{stamp}-{counter}"
+        counter += 1
+    os.replace(db_path, target)
+    for suffix in ("-wal", "-shm", "-journal"):
+        sidecar = db_path.with_name(db_path.name + suffix)
+        if sidecar.exists():
+            os.replace(sidecar, target.with_name(target.name + suffix))
+    logger.warning(
+        "derived dashboard database %s %s; it was moved aside to %s and is rebuilt from the current schema "
+        "(a legacy or foreign derived schema is no history)",
+        db_path,
+        reason,
+        target,
+    )
+    return target
+
+
+def _ensure_derived_schema(db_path: Path, runtime_root: Path) -> Path | None:
+    """Make ``db_path`` carry the current derived schema; return where a legacy/foreign file was moved, if any."""
+    moved = None
+    if db_path.exists():
+        reason = _derived_schema_mismatch(db_path)
+        if reason is not None:
+            moved = _move_legacy_database_aside(db_path, runtime_root, reason)
+    initialize_database(db_path)
+    _migrate_schema(db_path)
+    return moved
+
+
 def _landing_snapshot_from_model(model: dict[str, Any]) -> dict[str, Any]:
     """Project only this refresh's display values, never model/session/history payloads."""
     snapshot = _snapshot_from_model(model)
@@ -649,8 +778,7 @@ def refresh_database(
         raise ValueError("dashboard_db_must_be_derived")
     started_at = datetime.now(UTC).isoformat()
     probe_live_release_health = model is None and probe_live
-    initialize_database(db_path)
-    _migrate_schema(db_path)
+    moved_aside = _ensure_derived_schema(db_path, runtime_root)
     run_id: int | None = None
     with sqlite3.connect(db_path) as conn:
         cursor = conn.execute(
@@ -685,7 +813,15 @@ def refresh_database(
                 "UPDATE refresh_runs SET completed_at = ?, status = ? WHERE id = ?",
                 (completed_at, "completed", run_id),
             )
-        return {"status": "completed", "run_id": run_id, "started_at": started_at, "completed_at": completed_at}
+        result: dict[str, Any] = {
+            "status": "completed",
+            "run_id": run_id,
+            "started_at": started_at,
+            "completed_at": completed_at,
+        }
+        if moved_aside is not None:
+            result["legacy_database_moved_to"] = str(moved_aside)
+        return result
     except Exception as exc:
         completed_at = datetime.now(UTC).isoformat()
         with sqlite3.connect(db_path) as conn:
@@ -2489,17 +2625,21 @@ class DashboardPaths:
     provisioning_dir: Path
     dashboards_dir: Path
     logs_dir: Path
-    pids_dir: Path
+    launch_record: Path
 
 
 @dataclass(frozen=True)
 class DashboardProcessInfo:
-    """Process IDs and user-facing URLs produced by ``start_dashboard``."""
+    """Process IDs, user-facing URLs and the containing job produced by ``start_dashboard``."""
 
     grafana_pid: int
     refresh_pid: int
     grafana_url: str
     refresh_url: str
+    job: str | None = None
+
+
+StoppedProcess = job_containment.StoppedProcess
 
 
 def resolve_dashboard_paths(
@@ -2524,7 +2664,7 @@ def resolve_dashboard_paths(
         provisioning_dir=provisioning,
         dashboards_dir=dashboards,
         logs_dir=runtime / "logs",
-        pids_dir=runtime / "pids",
+        launch_record=runtime / LAUNCH_RECORD_NAME,
     )
 
 
@@ -2610,9 +2750,11 @@ def initialize_dashboard(
     if schema_only:
         if probe_live:
             raise ValueError("schema_only_cannot_probe_live")
-        initialize_database(paths.db_path)
-        _migrate_schema(paths.db_path)
-        return {"status": "initialized", "refreshed": False}
+        moved_aside = _ensure_derived_schema(paths.db_path, paths.runtime_root)
+        initialized: dict[str, Any] = {"status": "initialized", "refreshed": False}
+        if moved_aside is not None:
+            initialized["legacy_database_moved_to"] = str(moved_aside)
+        return initialized
     result = refresh_dashboard_db(paths, config, probe_live=probe_live)
     write_grafana_assets(paths, config, grafana_port=grafana_port, refresh_port=refresh_port)
     return result
@@ -2833,7 +2975,17 @@ def start_dashboard(
     interval_minutes: int = DEFAULT_REFRESH_INTERVAL_MINUTES,
     config_path: Path | None = None,
 ) -> DashboardProcessInfo:
-    """Start the selected local display, confirming readiness before reporting success."""
+    """Start the selected local display under kill-on-close job containment, confirming readiness first.
+
+    On Windows both launches - the refresh service (a venv redirector and its child) and Grafana (grafana.exe and
+    its plugin children) - are created suspended, placed in one named kill-on-close job for this runtime root and
+    only then resumed, so no descendant ever exists outside the job. The children inherit the job handle, which
+    keeps the job alive exactly as long as one of them lives; ``stop_dashboard`` opens the job by name and ends
+    every member. The launch record under the runtime root names the job and the launched processes for
+    reporting; on Windows it decides nothing about what is signalled. Elsewhere there is no job: the record
+    carries each process's creation identity and ``stop_dashboard`` signals only a process whose identity still
+    matches.
+    """
     if not all(0 < p < 65536 for p in (grafana_port, refresh_port)) or grafana_port == refresh_port:
         raise ValueError("Dashboard ports must be different and in 1..65535")
     if interval_minutes < 1:
@@ -2845,48 +2997,80 @@ def start_dashboard(
     selected = GTConfig.load(config_path=selected_config, discover=False)
     if selected != config:
         raise ValueError("Selected configuration differs from the dashboard launch configuration")
-    refresh_file = paths.pids_dir / "refresh-service.pid"
-    grafana_file = paths.pids_dir / "grafana.pid"
-    refresh_pid, grafana_pid = _read_live_pid(refresh_file), _read_live_pid(grafana_file)
-    for pid, port in ((refresh_pid, refresh_port), (grafana_pid, grafana_port)):
-        if pid is None:
-            with socket.socket() as probe:
-                probe.bind(("127.0.0.1", port))
-    # A launch for the same runtime must use its selected configuration and interval.
-    expected = {
-        "project_root": str(paths.project_root),
-        "runtime_root": str(paths.runtime_root),
-        "dashboard_db": str(paths.db_path),
-        "interval_seconds": interval_minutes * 60,
-        "config_path": str(selected_config),
-        "grafana_port": grafana_port,
-    }
-    if refresh_pid is not None:
-        _wait_dashboard_http(refresh_pid, f"http://127.0.0.1:{refresh_port}/health", expected, timeout=2)
-    if grafana_pid is not None:
-        _wait_dashboard_http(grafana_pid, f"http://127.0.0.1:{grafana_port}/api/health", {"database": "ok"}, timeout=2)
+    record = _read_launch_record(paths.launch_record)
+    job_name = _dashboard_job_name(paths.runtime_root) if sys.platform == "win32" else None
+    job: int | None = None
+    live: dict[str, _LaunchedProcess] = {}
+    if sys.platform == "win32":
+        job = _open_dashboard_job(job_name or "")
+        if job is not None:
+            contained = set(_job_member_pids(job))
+            if record is None or record.get("job") != job_name:
+                _close_handle(job)
+                raise DashboardIdentityError(
+                    f"dashboard job {job_name} is running for {paths.runtime_root} without a matching launch "
+                    "record; run `gt dashboard stop` before starting"
+                )
+            live = {m["role"]: m for m in record["members"] if m["pid"] in contained}
+        elif record is not None:
+            paths.launch_record.unlink()  # nothing runs under this record any more
+            record = None
+    elif record is not None:
+        live = {m["role"]: m for m in record["members"] if _process_identity(m["pid"]) == _identity_of(m)}
+    refresh_pid = live["refresh-service"]["pid"] if "refresh-service" in live else None
+    grafana_pid = live["grafana"]["pid"] if "grafana" in live else None
+    try:
+        for pid, port in ((refresh_pid, refresh_port), (grafana_pid, grafana_port)):
+            if pid is None:
+                with socket.socket() as probe:
+                    probe.bind(("127.0.0.1", port))
+        # A launch for the same runtime must use its selected configuration and interval.
+        expected = {
+            "project_root": str(paths.project_root),
+            "runtime_root": str(paths.runtime_root),
+            "dashboard_db": str(paths.db_path),
+            "interval_seconds": interval_minutes * 60,
+            "config_path": str(selected_config),
+            "grafana_port": grafana_port,
+        }
+        if refresh_pid is not None:
+            _wait_dashboard_http(refresh_pid, f"http://127.0.0.1:{refresh_port}/health", expected, timeout=2)
+        if grafana_pid is not None:
+            _wait_dashboard_http(
+                grafana_pid, f"http://127.0.0.1:{grafana_port}/api/health", {"database": "ok"}, timeout=2
+            )
+    except BaseException:
+        if job is not None:
+            _close_handle(job)
+        raise
     paths.logs_dir.mkdir(parents=True, exist_ok=True)
-    paths.pids_dir.mkdir(parents=True, exist_ok=True)
-    started: list[tuple[subprocess.Popen[bytes], Path, _ProcessIdentity]] = []
+    paths.runtime_root.mkdir(parents=True, exist_ok=True)
+    created_job = False
+    if sys.platform == "win32" and job is None and (refresh_pid is None or grafana_pid is None):
+        job = _create_dashboard_job(job_name or "")
+        created_job = True
+    started: list[tuple[subprocess.Popen[bytes], str, _ProcessIdentity]] = []
 
-    def launch(args: list[str], cwd: Path, env: dict[str, str], record: Path, log_name: str) -> int:
+    def launch(args: list[str], cwd: Path, env: dict[str, str], role: str, log_name: str) -> int:
         # Dashboard children observe HTTP authority and never inherit database credentials or overrides.
         env = {key: value for key, value in env.items() if not key.upper().startswith(("PG", "GT_POSTGRES_"))}
         with (paths.logs_dir / log_name).open("a", encoding="utf-8") as log:
-            process = subprocess.Popen(
-                args,
-                cwd=cwd,
-                env=env,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
+            if job is not None:
+                process = _start_contained(args, cwd, env, log, job)
+            else:
+                process = subprocess.Popen(
+                    args,
+                    cwd=cwd,
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
         identity = _process_identity(process.pid)
         if identity is None:
             process.wait(timeout=5)
             raise RuntimeError(f"Dashboard process exited during launch; inspect {log_name}")
-        started.append((process, record, identity))
-        _write_pid(record, process.pid)
+        started.append((process, role, identity))
         return process.pid
 
     try:
@@ -2914,7 +3098,7 @@ def start_dashboard(
                 ],
                 paths.project_root,
                 os.environ.copy(),
-                refresh_file,
+                "refresh-service",
                 "refresh-service.log",
             )
         _wait_dashboard_http(refresh_pid, f"http://127.0.0.1:{refresh_port}/health", expected)
@@ -2929,8 +3113,7 @@ def start_dashboard(
                     "GF_PATHS_PROVISIONING": str(paths.provisioning_dir),
                     "GF_SERVER_HTTP_PORT": str(grafana_port),
                     "GF_SERVER_HTTP_ADDR": "127.0.0.1",
-                    "GF_ANALYTICS_REPORTING_ENABLED": "false",
-                    "GF_ANALYTICS_CHECK_FOR_UPDATES": "false",
+                    **GRAFANA_LAUNCH_PINS,
                 }
             )
             grafana_pid = launch(
@@ -2942,26 +3125,55 @@ def start_dashboard(
                 ],
                 grafana_bin.parent.parent,
                 grafana_env,
-                grafana_file,
+                "grafana",
                 "grafana.log",
             )
         _wait_dashboard_http(grafana_pid, f"http://127.0.0.1:{grafana_port}/api/health", {"database": "ok"})
-        if _read_live_pid(refresh_file) != refresh_pid or _read_live_pid(grafana_file) != grafana_pid:
-            raise RuntimeError("Dashboard process changed during startup")
-    except Exception:
-        for process, record, identity in reversed(started):
-            if process.poll() is None:
-                if not _terminate_pid(process.pid, identity):
-                    raise RuntimeError("Dashboard startup failed and process cleanup needs inspection") from None
-                process.wait(timeout=10)
-            if record.exists() and _read_pid_record(record) == identity:
-                record.unlink()
+        if started:  # a launch that reused every running member leaves its record as it is
+            members: list[_LaunchedProcess] = list(live.values())
+            for _process, role, identity in started:
+                members.append(
+                    {
+                        "role": role,
+                        "pid": identity["pid"],
+                        "created_at": identity["created_at"],
+                        "executable": identity["executable"],
+                    }
+                )
+            started_at = (record or {}).get("started_at") if live else None
+            _write_launch_record(
+                paths.launch_record,
+                {
+                    "job": job_name,
+                    "members": sorted(members, key=lambda m: m["role"]),
+                    "grafana_port": grafana_port,
+                    "refresh_port": refresh_port,
+                    "interval_seconds": interval_minutes * 60,
+                    "config_path": str(selected_config),
+                    "started_at": started_at or datetime.now(UTC).isoformat(),
+                },
+            )
+    except BaseException:
+        try:
+            if created_job and job is not None:
+                _stop_job(job, job_name or "")
+            else:
+                for process, _role, identity in reversed(started):
+                    if process.poll() is None:
+                        _terminate_pid(process.pid, identity)
+                        process.wait(timeout=10)
+        except (DashboardStopError, OSError, subprocess.TimeoutExpired) as cleanup:
+            raise RuntimeError(f"Dashboard startup failed and process cleanup needs inspection: {cleanup}") from None
         raise
+    finally:
+        if job is not None:
+            _close_handle(job)
     return DashboardProcessInfo(
         grafana_pid=grafana_pid,
         refresh_pid=refresh_pid,
         grafana_url=dashboard_link.grafana_dashboard_url(grafana_port),
         refresh_url=dashboard_link.refresh_service_url(refresh_port),
+        job=job_name,
     )
 
 
@@ -2990,20 +3202,36 @@ def _wait_dashboard_http(pid: int, url: str, expected: dict[str, Any], *, timeou
     raise RuntimeError("Dashboard readiness timed out; inspect dashboard logs")
 
 
-def stop_dashboard(paths: DashboardPaths) -> list[int]:
-    """Stop only the recorded launches; liveness alone never identifies the process."""
-    stopped = []
-    for name in ("grafana.pid", "refresh-service.pid"):
-        path = paths.pids_dir / name
-        pid = _read_live_pid(path)
-        if pid is None:
-            continue
-        expected = _read_pid_record(path)
-        if not _terminate_pid(pid, expected):
-            raise RuntimeError("dashboard process identity changed or termination was not confirmed")
-        if path.exists() and _read_pid_record(path) == expected:
-            path.unlink()
-        stopped.append(pid)
+def stop_dashboard(paths: DashboardPaths) -> list[StoppedProcess]:
+    """End the dashboard launched for this runtime and report exactly what was ended.
+
+    Windows: this runtime's kill-on-close job is opened by name, a handle to every member is held, the job is
+    terminated and the stop waits until every held handle is signalled and the job counts no active process.
+    Nothing outside the job is ever touched and no recorded number decides what is signalled; a member that
+    exited on its own before the stop is reported as ``exited``. Failures are distinguishable:
+    ``DashboardTerminationRefused`` (the job refused termination) and ``DashboardTerminationUnconfirmed``
+    (a member outlived the wait); the launch record is kept for inspection in both cases. Elsewhere the launch
+    record's members are signalled only while their creation identity still matches
+    (``DashboardIdentityError`` otherwise).
+    """
+    record = _read_launch_record(paths.launch_record)
+    stopped: list[StoppedProcess] = []
+    if sys.platform == "win32":
+        job_name = _dashboard_job_name(paths.runtime_root)
+        job = _open_dashboard_job(job_name)
+        if job is not None:
+            try:
+                stopped = _stop_job(job, job_name)
+            finally:
+                _close_handle(job)
+    elif record is not None:
+        for member in record["members"]:
+            if _process_identity(member["pid"]) is None:
+                stopped.append(StoppedProcess(member["pid"], member["executable"], "exited"))
+                continue
+            _terminate_pid(member["pid"], _identity_of(member))
+            stopped.append(StoppedProcess(member["pid"], member["executable"], "signalled"))
+    paths.launch_record.unlink(missing_ok=True)
     return stopped
 
 
@@ -3109,104 +3337,54 @@ def _install_sqlite_plugin(grafana_home: Path) -> None:
         raise ValueError("Installed SQLite plugin identity differs from the pinned version")
 
 
-@contextlib.contextmanager
-def _windows_process(
-    pid: int,
-) -> Iterator[tuple[_ProcessIdentity | None, tuple[ctypes.WinDLL, int] | None]]:
-    """Hold the process object while inspecting identity and, if requested, stopping its tree."""
-    from ctypes import wintypes
-
-    kernel = ctypes.WinDLL("kernel32", use_last_error=True)
-    kernel.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-    kernel.OpenProcess.restype = wintypes.HANDLE
-    kernel.CloseHandle.argtypes = (wintypes.HANDLE,)
-    kernel.GetProcessTimes.argtypes = (wintypes.HANDLE,) + (ctypes.POINTER(wintypes.FILETIME),) * 4
-    kernel.QueryFullProcessImageNameW.argtypes = (
-        wintypes.HANDLE,
-        wintypes.DWORD,
-        wintypes.LPWSTR,
-        ctypes.POINTER(wintypes.DWORD),
-    )
-    kernel.WaitForSingleObject.argtypes = (wintypes.HANDLE, wintypes.DWORD)
-    kernel.WaitForSingleObject.restype = wintypes.DWORD
-    handle: int = kernel.OpenProcess(0x1000 | 0x100000, False, pid)
-    if not handle:
-        error = ctypes.get_last_error()
-        if error == 87:  # no process with this ID
-            yield None, None
-            return
-        raise OSError(error, "dashboard process inspection failed")
-    try:
-        if kernel.WaitForSingleObject(handle, 0) == 0:
-            yield None, None
-            return
-        times = [wintypes.FILETIME() for _ in range(4)]
-        if not kernel.GetProcessTimes(handle, *(ctypes.byref(value) for value in times)):
-            raise OSError(ctypes.get_last_error(), "dashboard process creation time unavailable")
-        size = wintypes.DWORD(32768)
-        name = ctypes.create_unicode_buffer(size.value)
-        if not kernel.QueryFullProcessImageNameW(handle, 0, name, ctypes.byref(size)):
-            raise OSError(ctypes.get_last_error(), "dashboard process image unavailable")
-        record: _ProcessIdentity = {
-            "pid": pid,
-            "created_at": str((times[0].dwHighDateTime << 32) | times[0].dwLowDateTime),
-            "executable": os.path.normcase(name.value),
-        }
-        yield record, (kernel, handle)
-    finally:
-        kernel.CloseHandle(handle)
+if sys.platform == "win32":
+    _kernel32 = job_containment.kernel32
 
 
-def _process_identity(pid: int) -> _ProcessIdentity | None:
-    if type(pid) is not int or pid <= 0:
-        return None
-    if sys.platform == "win32":
-        with _windows_process(pid) as (record, _):
-            return record
-    process = Path("/proc") / str(pid)
-    try:
-        fields = (process / "stat").read_text().rsplit(")", 1)[1].split()
-        if fields[0] == "Z":
-            return None
-        return {"pid": pid, "created_at": fields[19], "executable": str((process / "exe").resolve(strict=True))}
-    except FileNotFoundError:
-        return None
+_close_handle = job_containment.close_handle
+_windows_process = job_containment.windows_process
+_process_identity = job_containment.process_identity
 
 
 def _pid_alive(pid: int) -> bool:
     return _process_identity(pid) is not None
 
 
-def _read_pid_record(path: Path) -> _ProcessIdentity:
+def _identity_of(member: _LaunchedProcess) -> _ProcessIdentity:
+    return {"pid": member["pid"], "created_at": member["created_at"], "executable": member["executable"]}
+
+
+def _read_launch_record(path: Path) -> dict[str, Any] | None:
+    """The launch record under the runtime root, or None when there is none; a malformed record needs inspection."""
+    if not path.exists():
+        return None
     try:
         record = json.loads(path.read_text(encoding="utf-8"))
     except (ValueError, UnicodeError) as error:
-        raise ValueError("dashboard process record requires inspection before reuse") from error
-    if not isinstance(record, dict) or set(record) != {"pid", "created_at", "executable"}:
-        raise ValueError("dashboard process record requires inspection before reuse")
-    pid, created_at, executable = record["pid"], record["created_at"], record["executable"]
-    if not (
-        type(pid) is int
-        and pid > 0
-        and isinstance(created_at, str)
-        and created_at
-        and isinstance(executable, str)
-        and executable
-    ):
-        raise ValueError("dashboard process record requires inspection before reuse")
-    return {"pid": pid, "created_at": created_at, "executable": executable}
+        raise ValueError("dashboard launch record requires inspection before reuse") from error
+    if not isinstance(record, dict) or not isinstance(record.get("members"), list):
+        raise ValueError("dashboard launch record requires inspection before reuse")
+    for member in record["members"]:
+        if not (
+            isinstance(member, dict)
+            and set(member) == {"role", "pid", "created_at", "executable"}
+            and type(member["pid"]) is int
+            and member["pid"] > 0
+            and all(isinstance(member[key], str) and member[key] for key in ("role", "created_at", "executable"))
+        ):
+            raise ValueError("dashboard launch record requires inspection before reuse")
+    return record
 
 
-def _write_pid(path: Path, pid: int) -> None:
-    record = _process_identity(pid)
-    if record is None:
-        raise RuntimeError("dashboard process exited before it could be recorded")
+def _write_launch_record(path: Path, record: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = None
     try:
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=path.parent, delete=False) as stream:
+        with tempfile.NamedTemporaryFile(
+            mode="w", encoding="utf-8", newline="\n", dir=path.parent, delete=False
+        ) as stream:
             temporary = Path(stream.name)
-            json.dump(record, stream)
+            json.dump(record, stream, indent=2, sort_keys=True)
             stream.write("\n")
         os.replace(temporary, path)
     finally:
@@ -3214,37 +3392,104 @@ def _write_pid(path: Path, pid: int) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def _read_live_pid(pid_file: Path) -> int | None:
-    if not pid_file.exists():
-        return None
-    record = _read_pid_record(pid_file)
-    current = _process_identity(record["pid"])
-    if current == record:
-        return record["pid"]
-    # A dead/reused PID no longer identifies this launch. Do not signal its current process.
-    pid_file.unlink(missing_ok=True)
-    return None
+def _dashboard_job_name(runtime_root: Path) -> str:
+    """The session-local kill-on-close job that contains every process launched for this runtime root."""
+    return job_containment.job_name(DASHBOARD_JOB_PREFIX, runtime_root)
+
+
+def _create_dashboard_job(name: str) -> int:
+    """Create the named kill-on-close job with an inheritable handle; refuse a name that already exists."""
+    try:
+        return job_containment.create_job(name, inheritable=True)
+    except job_containment.JobAlreadyExists:
+        raise DashboardIdentityError(
+            f"dashboard job {name} already exists (another launch is in progress or the name is held elsewhere); "
+            "run `gt dashboard stop` and retry"
+        ) from None
+
+
+_open_dashboard_job = job_containment.open_job
+_job_member_pids = job_containment.job_member_pids
+_assign_to_job = job_containment.assign_to_job
+_resume_primary_thread = job_containment.resume_primary_thread
+
+
+def _start_contained(args: list[str], cwd: Path, env: dict[str, str], log: Any, job: int) -> subprocess.Popen[bytes]:
+    """Create a dashboard process suspended, place it in the job, then let it run (groundtruth_kb.job_containment).
+
+    The process inherits the job handle so the job outlives this launcher; a process that cannot be placed in the
+    job or resumed is ended while still suspended and job_containment.ContainmentError is raised. The module-level
+    ``_assign_to_job``/``_resume_primary_thread`` names are passed at call time: they are the seam the tests patch.
+    """
+    return job_containment.start_contained(
+        args,
+        env,
+        job,
+        inherit_job=True,
+        cwd=cwd,
+        stdout=log,
+        stderr=subprocess.STDOUT,
+        assign=_assign_to_job,
+        resume=_resume_primary_thread,
+    )
+
+
+def _stop_job(job: int, name: str, *, timeout: float = 15.0) -> list[StoppedProcess]:
+    """Terminate every member of an open job and confirm each one ended; report what was accounted for."""
+    try:
+        return job_containment.stop_job(job, name, timeout=timeout, members=_job_member_pids)
+    except job_containment.JobTerminationRefused as error:
+        raise DashboardTerminationRefused(str(error)) from error
+    except job_containment.JobTerminationUnconfirmed as error:
+        raise DashboardTerminationUnconfirmed(str(error)) from error
 
 
 def _terminate_pid(pid: int, expected: _ProcessIdentity) -> bool:
+    """End the process tree rooted at ``pid`` if it is still the launched process; True once it is gone.
+
+    Windows: the process is opened and held so its number cannot be reused during the request; ``taskkill /T``
+    ends the tree (a venv redirector's child included) and the held handle decides: a signalled handle confirms
+    termination even when taskkill reports a non-zero exit for a member (logged as a warning with its output).
+    Failures are distinguishable: ``DashboardIdentityError`` (the number now belongs to another process;
+    nothing is signalled), ``DashboardTerminationRefused`` (taskkill failed and the process still runs) and
+    ``DashboardTerminationUnconfirmed`` (taskkill succeeded but the handle stayed unsignalled for 5 s).
+    """
     if sys.platform == "win32":
         with _windows_process(pid) as (current, held):
             if current is None:
                 return True
             if current != expected:
-                return False
+                raise DashboardIdentityError(
+                    f"process {pid} is now {current['executable']} created at {current['created_at']}, not the "
+                    f"launched {expected['executable']} created at {expected['created_at']}; nothing was signalled"
+                )
             if held is None:
                 raise RuntimeError("dashboard process handle unavailable")
-            # The held process handle prevents PID reuse while taskkill addresses
-            # this process tree, including a Windows venv redirector's child.
             result = subprocess.run(
                 ["taskkill", "/PID", str(pid), "/T", "/F"],
                 capture_output=True,
                 timeout=15,
                 creationflags=subprocess.CREATE_NO_WINDOW,
             )
+            output = (result.stdout + result.stderr).decode("utf-8", "replace").strip()
             kernel, handle = held
-            return result.returncode == 0 and kernel.WaitForSingleObject(handle, 5000) == 0
+            if kernel.WaitForSingleObject(handle, 5000) == 0:
+                if result.returncode != 0:
+                    logger.warning(
+                        "taskkill exited %s for dashboard process %s although the process ended: %s",
+                        result.returncode,
+                        pid,
+                        output,
+                    )
+                return True
+            if result.returncode != 0:
+                raise DashboardTerminationRefused(
+                    f"taskkill exited {result.returncode} for dashboard process {pid} and the process still runs: "
+                    f"{output}"
+                )
+            raise DashboardTerminationUnconfirmed(
+                f"taskkill accepted the request for dashboard process {pid} but the process had not ended after 5 s"
+            )
     import signal
 
     if not hasattr(os, "pidfd_open") or not hasattr(signal, "pidfd_send_signal"):
@@ -3254,8 +3499,9 @@ def _terminate_pid(pid: int, expected: _ProcessIdentity) -> bool:
     except ProcessLookupError:
         return True
     try:
-        if _process_identity(pid) != expected:
-            return False
+        current = _process_identity(pid)
+        if current != expected:
+            raise DashboardIdentityError(f"process {pid} is not the launched process; nothing was signalled")
         signal.pidfd_send_signal(descriptor, signal.SIGTERM)
         return True
     finally:

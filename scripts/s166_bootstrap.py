@@ -1,1 +1,0 @@
-exec(open("scripts/s166_gen.py", encoding="utf-8").read())

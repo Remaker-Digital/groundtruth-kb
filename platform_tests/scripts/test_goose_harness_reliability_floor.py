@@ -1,7 +1,8 @@
 """Tests for goose_harness.py integration with the execution reliability floor.
 
 Verifies that the wrapper correctly integrates the guard: exports model
-configuration, records the run window, loads config, and calls evaluate_run.
+configuration, records the run window, loads the canonical floor contract from
+the neutral baseline (refusing to run without it), and calls evaluate_run.
 """
 
 from __future__ import annotations
@@ -10,12 +11,18 @@ import os
 import sys
 from pathlib import Path
 
-SCRIPTS_DIR = Path(__file__).resolve().parents[2] / "scripts"
+import pytest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+SCRIPTS_DIR = PROJECT_ROOT / "scripts"
 if str(SCRIPTS_DIR) not in sys.path:
     sys.path.insert(0, str(SCRIPTS_DIR))
 
+import goose_harness  # noqa: E402
 from goose_execution_guard import ExecutionFloorConfig, export_model_configuration  # noqa: E402
 from goose_harness import (  # noqa: E402
+    FLOOR_CONFIG_RELATIVE_PATH,
+    GooseHarnessError,
     _load_floor_config,
     build_arg_parser,
     build_system_prompt,
@@ -34,6 +41,7 @@ class TestIntegration:
             "GTKB_AUTHOR_MODEL_VERSION",
             "GTKB_AUTHOR_HARNESS_NAME",
             "GTKB_AUTHOR_HARNESS_ID",
+            "GTKB_AUTHOR_IDENTITY",
         ):
             os.environ.pop(key, None)
 
@@ -42,6 +50,8 @@ class TestIntegration:
         assert os.environ.get("GTKB_AUTHOR_MODEL") == "deepseek-v4-pro"
         assert os.environ.get("GTKB_AUTHOR_HARNESS_NAME") == "goose"
         assert os.environ.get("GTKB_AUTHOR_HARNESS_ID") == "G"
+        # The role is never exported: it comes only from the immutable binding.
+        assert "GTKB_AUTHOR_IDENTITY" not in os.environ
 
     def test_export_model_configuration_empty_model(self):
         """Empty model arg does not crash."""
@@ -51,24 +61,51 @@ class TestIntegration:
         assert os.environ.get("GTKB_AUTHOR_MODEL", "") == ""
 
     def test_load_floor_config_returns_config(self, tmp_path):
-        """_load_floor_config returns an ExecutionFloorConfig."""
-        # Set up config directory
-        config_dir = tmp_path / "config" / "agent-control"
-        config_dir.mkdir(parents=True)
-        (config_dir / "goose-execution-floor.toml").write_text("""
+        """_load_floor_config reads the contract from the neutral baseline."""
+        assert FLOOR_CONFIG_RELATIVE_PATH.as_posix() == ".harness-baseline-configuration/goose-execution-floor.toml"
+        floor = tmp_path / FLOOR_CONFIG_RELATIVE_PATH
+        floor.parent.mkdir(parents=True)
+        floor.write_text("""
 schema_version = 1
 [write_verification]
-enabled = true
+enabled = false
 """)
         config = _load_floor_config(tmp_path)
         assert isinstance(config, ExecutionFloorConfig)
-        assert config.write_verification_enabled is True
+        assert config.write_verification_enabled is False
 
-    def test_load_floor_config_missing_file_returns_defaults(self, tmp_path):
-        """Missing config file returns default config."""
-        config = _load_floor_config(tmp_path)
-        assert isinstance(config, ExecutionFloorConfig)
+    def test_load_floor_config_refuses_an_absent_file(self, tmp_path):
+        """No second configuration tree and no silent fallback: an absent contract is refused, naming the path."""
+        (tmp_path / "config").mkdir()
+        with pytest.raises(GooseHarnessError, match="execution floor configuration is absent") as raised:
+            _load_floor_config(tmp_path)
+        assert str(tmp_path / FLOOR_CONFIG_RELATIVE_PATH) in str(raised.value)
+
+    def test_canonical_floor_contract_is_tracked_and_states_the_floor(self):
+        """The checkout carries the contract in the neutral baseline and it resolves to the documented floor."""
+        assert (PROJECT_ROOT / FLOOR_CONFIG_RELATIVE_PATH).is_file()
+        config = _load_floor_config(PROJECT_ROOT)
         assert config.write_verification_enabled is True
+        assert config.write_tool_names == {"write", "write_file", "Write", "Edit"}
+        assert config.intentional_empty_allowlist == set()
+        assert config.leak_patterns == {}
+        assert (config.retry_attempts, config.retry_backoff_seconds) == (0, 0)
+        assert config.provenance_guard_enabled is True
+        assert config.provenance_scan_scope == "run_window"
+
+    def test_main_refuses_before_spawning_goose_when_the_contract_is_absent(self, tmp_path, monkeypatch, capsys):
+        """An absent contract stops the run before any goose process is started."""
+
+        def refuse_spawn(*args, **kwargs):
+            raise AssertionError("goose must not be spawned without the execution floor contract")
+
+        monkeypatch.setattr(goose_harness.subprocess, "run", refuse_spawn)
+        (tmp_path / "groundtruth.toml").write_text("")
+        assert goose_harness.main(["-p", "hello", "--project-root", str(tmp_path)]) == 1
+        captured = capsys.readouterr()
+        assert "goose_harness: execution floor configuration is absent" in captured.err
+        assert str(tmp_path / FLOOR_CONFIG_RELATIVE_PATH) in captured.err
+        assert captured.out == ""
 
     def test_arg_parser_has_required_args(self):
         """The argument parser includes all required arguments."""

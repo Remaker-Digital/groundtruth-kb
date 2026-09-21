@@ -29,8 +29,8 @@ from groundtruth_kb.native_authority import TestPhaseMutation as PhaseMutation
 from groundtruth_kb.postgres_kernel import PostgresKernelError, PostgresTransaction
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+from platform_tests.groundtruth_kb.native_fixtures import put
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 _EXECUTED_AT = "2026-04-04T14:38:03.677803+00:00"

@@ -17,13 +17,10 @@ from groundtruth_kb.project.managed_registry import (
 
 
 def test_scaffold_local_only_id_set_matches_baseline() -> None:
-    """local-only scaffold returns 13 hooks + 4 rules + 3 file-class records (20 total).
+    """local-only scaffold returns the four authored hook identities + 2 file-class records (6 total).
 
-    Baseline post-canonical-terminology (v0.6.1): 14 hooks + 3 rules.
-    Post-Slice-1 GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL: + rule.canonical-terminology-policy.
-    Post-Slice-3 GTKB-ISOLATION-017: + file.readme-quickstart, file.release-readiness-banner.
-    Post-Slice-4 GTKB-ISOLATION-017: + file.upgrade-rehearsal-recipe (retired with the legacy upgrade wrapper, O-7 R18).
-    Post-WI-4628: - retired scheduler hook.
+    M15 (D15/D34, edit-m15-34): rule and skill copy rows, the bridge-compliance pair and session-health are
+    retired; hooks run in place from the baseline and are identified, not copied.
     """
     ids = sorted(a.id for a in artifacts_for_scaffold("local-only"))
     expected = sorted(
@@ -31,15 +28,7 @@ def test_scaffold_local_only_id_set_matches_baseline() -> None:
             "hook.destructive-gate",
             "hook.credential-scan",
             "hook.scanner-safe-writer",
-            "hook.bridge-compliance-gate",
             "hook.kb-not-markdown",
-            "hook.session-health",
-            "rule.prime-builder",
-            "rule.canonical-terminology",
-            "rule.canonical-terminology-config",
-            "rule.canonical-terminology-policy",
-            "rule.session-start-orientation",
-            "skill.baseline-audit.skill-md",
             "file.readme-quickstart",
             "file.release-readiness-banner",
         ]
@@ -48,9 +37,10 @@ def test_scaffold_local_only_id_set_matches_baseline() -> None:
 
 
 def test_scaffold_dual_agent_id_set_matches_baseline() -> None:
-    """The current bridge profile delivers the 37 retained registry records (the rehearsal recipe retired, O-7 R18)."""
+    """The current bridge profile delivers the 13 retained registry records (M15: no rule/skill copies)."""
     ids = sorted(a.id for a in artifacts_for_scaffold("dual-agent"))
-    assert len(ids) == 37
+    assert len(ids) == 13
+    assert not [identifier for identifier in ids if identifier.startswith(("rule.", "skill."))]
     assert "hook._delib_common" not in ids
     # None are ownership-glob.
     for a in artifacts_for_scaffold("dual-agent"):

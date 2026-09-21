@@ -23,20 +23,21 @@ from __future__ import annotations
 from pathlib import Path
 
 _ROOT = Path(__file__).resolve().parents[2]
-# The authored carriers: every neutral baseline rule (the harness projections are generated from them) and every
-# scaffold rule template an initialized application inherits. The phantom must be absent from all of them.
+# The authored carriers: every neutral baseline rule (read on demand by every host) and the remaining
+# template-only scaffold rules (M26.6). The phantom must be absent from all of them.
 _BASELINE_RULES = tuple(sorted((_ROOT / ".harness-baseline-configuration" / "rules").glob("*.md")))
 _SCAFFOLD_FILES = tuple(sorted((_ROOT / "groundtruth-kb" / "templates" / "rules").glob("*.md")))
 _PHANTOM = "GOV-CHAT-DERIVED-SPEC-APPROVAL-001"
 _REPLACEMENT = "GOV-SPEC-CAPTURE-TRANSPARENCY-001"
 # The live record's duty (record owner-stated requirements directly, make the canonical change reviewable, no
 # per-artifact permission round) is stated in the operating model's authority section and the deliberation protocol;
-# those carriers cite it. The scaffold copy of the deliberation protocol carries the citation into applications.
+# those carriers cite it. Applications read the baseline protocol on demand (M15, D15/D34): the former scaffold copy
+# is retired, so no template carries the citation.
 _RULE_FILES = (
     _ROOT / ".harness-baseline-configuration" / "rules" / "operating-model.md",
     _ROOT / ".harness-baseline-configuration" / "rules" / "deliberation-protocol.md",
 )
-_CITING_SCAFFOLD_FILES = (_ROOT / "groundtruth-kb" / "templates" / "rules" / "deliberation-protocol.md",)
+_RETIRED_SCAFFOLD_COPIES = (_ROOT / "groundtruth-kb" / "templates" / "rules" / "deliberation-protocol.md",)
 
 
 def _read(path: Path) -> str:
@@ -61,6 +62,6 @@ def test_phantom_absent_from_scaffold_files() -> None:
     assert not offenders, f"phantom {_PHANTOM} still cited in scaffold: {offenders}"
 
 
-def test_replacement_present_in_scaffold_files() -> None:
-    missing = [str(p) for p in _CITING_SCAFFOLD_FILES if _REPLACEMENT not in _read(p)]
-    assert not missing, f"replacement {_REPLACEMENT} not found in scaffold: {missing}"
+def test_retired_scaffold_copies_are_absent() -> None:
+    present = [str(p) for p in _RETIRED_SCAFFOLD_COPIES if p.exists()]
+    assert not present, f"retired scaffold rule copies present again: {present}"

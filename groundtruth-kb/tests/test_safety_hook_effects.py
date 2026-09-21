@@ -13,13 +13,19 @@ import pytest
 from groundtruth_kb import get_templates_dir
 
 ROOT = Path(__file__).resolve().parents[2]
+SAFETY_HOOKS = ("credential-scan.py", "destructive-gate.py", "kb-not-markdown.py", "scanner-safe-writer.py")
 
 
-@pytest.fixture(params=["baseline", "package"])
-def hooks(request):
-    return (
-        ROOT / ".harness-baseline-configuration/hooks" if request.param == "baseline" else get_templates_dir() / "hooks"
-    )
+@pytest.fixture
+def hooks():
+    # M15 (D15/D34): the authored baseline hooks are the one source; the package copies are retired.
+    return ROOT / ".harness-baseline-configuration/hooks"
+
+
+def test_package_hook_copies_are_retired(hooks):
+    for name in SAFETY_HOOKS:
+        assert (hooks / name).is_file(), name
+        assert not (get_templates_dir() / "hooks" / name).exists(), name
 
 
 def run(hooks, name, payload):

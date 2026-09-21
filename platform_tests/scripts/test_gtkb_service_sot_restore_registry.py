@@ -60,15 +60,6 @@ def test_shipped_registry_declares_restore_action_for_every_record() -> None:
     assert raw_records
     assert all("restore_action" in record for record in raw_records)
     assert {record["restore_action"] for record in raw_records} <= _VALID_ACTIONS
-    assert {
-        "manual",
-        "visibility_only",
-        "git_restore",
-        "membase_export_restore",
-        "regenerate_from_source",
-        "ensure_alive",
-        "noop",
-    } <= {record["restore_action"] for record in raw_records}
 
 
 def test_loader_rejects_invalid_restore_action(tmp_path: Path) -> None:

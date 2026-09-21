@@ -9,20 +9,17 @@ import os
 import socket
 import subprocess
 import sys
-import time
 from pathlib import Path
 
-import groundtruth_kb
 import pytest
-from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native  # noqa: F401
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge  # noqa: F401
-from platform_tests.groundtruth_kb.test_native_bridge import claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver
+from platform_tests.groundtruth_kb.native_fixtures import FLAGS, _serve_authority
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 ROOT = Path(__file__).resolve().parents[2]
 SDK_SOURCE = ROOT / "infrastructure" / "deepseek-sdk"
-FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(300)]
 
 DRIVER = """import { readFileSync, writeFileSync } from 'node:fs';
@@ -188,9 +185,7 @@ def test_sdk_binding_consumer_refuses_unusable_results_and_other_contexts(result
 
 def test_prompt_carries_the_neutral_baseline_binding_facts_and_task(tmp_path):
     launcher = _launcher()
-    baseline = tmp_path / ".harness-baseline-configuration"
-    baseline.mkdir()
-    (baseline / "AGENTS.md").write_text("# GT-KB session instructions\nRead current state.\n", encoding="utf-8")
+    (tmp_path / "AGENTS.md").write_text("# GT-KB session instructions\nRead current state.\n", encoding="utf-8")
     binding = {"native_context_id": "deepseek-sdk-1", "session_context_id": "sc-1", "role": "loyal-opposition"}
     prompt = launcher.build_prompt(tmp_path, binding, "Review the proposal.\n", "doc-1", 2)
     assert prompt.startswith("# GT-KB session instructions")
@@ -205,36 +200,6 @@ def test_prompt_carries_the_neutral_baseline_binding_facts_and_task(tmp_path):
     ):
         assert fact in prompt
     assert "DEEPSEEK_API_KEY" not in prompt
-
-
-def _serve_authority(tmp_path, port):
-    config = tmp_path / "server.toml"
-    config.write_text(
-        '[groundtruth]\nproject_root="."\n[postgresql]\nservice="' + os.environ["GTKB_TEST_POSTGRES_SERVICE"] + '"\n',
-        encoding="utf-8",
-    )
-    env = dict(
-        os.environ, GT_PROJECT_ROOT=str(tmp_path), PYTHONPATH=str(Path(groundtruth_kb.__file__).resolve().parent.parent)
-    )
-    env.pop("GT_AUTHORITY_URL", None)
-    log = (tmp_path / "service.log").open("wb")
-    process = subprocess.Popen(
-        [sys.executable, "-m", "groundtruth_kb", "--config", str(config), "service", "serve", "--port", str(port)],
-        cwd=tmp_path,
-        env=env,
-        stdout=log,
-        stderr=log,
-        creationflags=FLAGS,
-    )
-    http = AuthorityClient(f"http://127.0.0.1:{port}", timeout=1)
-    deadline = time.monotonic() + 25
-    while True:
-        try:
-            http.request("GET", "/v1/status")
-            return process, env
-        except AuthorityClientError:
-            assert process.poll() is None and time.monotonic() < deadline, "Isolated authority failed to start"
-            time.sleep(0.1)
 
 
 def _run_cases(sdk_dir, launcher, *, home, cwd, context, url, root, cases, base_env):

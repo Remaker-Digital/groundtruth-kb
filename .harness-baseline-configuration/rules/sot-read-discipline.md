@@ -2,7 +2,7 @@
 
 Read current requirements, work, dependencies, session attribution and bridge
 state through their canonical CLI/domain services at the decision boundary.
-This generated guidance and other projections carry no independent authority.
+This authored rule points to current formal sources; generated registrations carry no independent authority.
 An allowed file read does not establish that its contents are current.
 
 The governing sources are `GOV-SOURCE-OF-TRUTH-FRESHNESS-001`,
@@ -13,9 +13,8 @@ rule are not proof of current authority.
 
 The authored hook is
 `.harness-baseline-configuration/hooks/sot-read-discipline.py`. The configuration
-projector derives an independent copy at
-`{{HARNESS_HOOKS_DIR}}/sot-read-discipline.py` and its registration from the
-baseline manifest and declared profile. A harness does not import another
+projector derives only a registration naming that authored path, with the
+`--harness <profile>` argument, from the baseline manifest and declared profile. A harness does not import another
 harness's configuration or role state. Edit the baseline and use the projector;
 never repair a generated configuration by hand.
 

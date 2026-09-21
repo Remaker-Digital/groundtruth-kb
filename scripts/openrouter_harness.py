@@ -70,12 +70,13 @@ SKIPPED_SCAN_DIR_NAMES = base.SKIPPED_SCAN_DIR_NAMES
 LOYAL_OPPOSITION_BRIDGE_SKILLS = base.LOYAL_OPPOSITION_BRIDGE_SKILLS
 CANONICAL_TOOLS = base.CANONICAL_TOOLS
 MUTATING_TOOLS = base.MUTATING_TOOLS
-ROUTING_CONFIG_PATH = Path(".api-harness") / "openrouter" / "routing.toml"
+ROUTING_CONFIG_PATH = Path(".harness-baseline-configuration/routing.toml")
+NATIVE_HOOK_SETTINGS_PATH = Path(".api-harness/openrouter/settings.json")
 
-BRIDGE_WRITE_GUARDS = base.projected_guard_paths(base.BRIDGE_WRITE_GUARDS, ROUTING_CONFIG_PATH)
-BRIDGE_EDIT_GUARDS = base.projected_guard_paths(base.BRIDGE_EDIT_GUARDS, ROUTING_CONFIG_PATH)
-WRITE_EDIT_GUARDS = base.projected_guard_paths(base.WRITE_EDIT_GUARDS, ROUTING_CONFIG_PATH)
-BASH_GUARDS = base.projected_guard_paths(base.BASH_GUARDS, ROUTING_CONFIG_PATH)
+BRIDGE_WRITE_GUARDS = base.BRIDGE_WRITE_GUARDS
+BRIDGE_EDIT_GUARDS = base.BRIDGE_EDIT_GUARDS
+WRITE_EDIT_GUARDS = base.WRITE_EDIT_GUARDS
+BASH_GUARDS = base.BASH_GUARDS
 
 # --- OpenRouter adopter specifics (the varying axes) ---
 DEFAULT_ENDPOINT = "https://openrouter.ai/api/v1"
@@ -94,6 +95,7 @@ _OPENROUTER_PROFILE = base.AdopterProfile(
     auth_env_key="OPENROUTER_API_KEY",
     provider_routing_key="openrouter",
     routing_config_path=ROUTING_CONFIG_PATH,
+    native_hook_settings_path=NATIVE_HOOK_SETTINGS_PATH,
     dialect=base.DIALECT_OPENAI_CHAT,
     hook_tier=base.HOOK_TIER_NATIVE_FULL,
     extra_headers=_OPENROUTER_HEADERS,
@@ -228,29 +230,35 @@ def run_tool_loop(
     )
 
 
-def build_system_prompt(skill: str | None, project_root: Path) -> str | None:
-    """Load current neutral bridge instructions without assigning a runtime role."""
+def build_system_prompt(skill: str | None, project_root: Path) -> str:
+    """Load shared root instructions and the selected skill without assigning a role."""
+    root_source = project_root / "AGENTS.md"
+    if not root_source.resolve().is_relative_to(project_root.resolve()):
+        raise OpenRouterHarnessError("Shared root instructions resolve outside the project root")
+    try:
+        root_instructions = root_source.read_text(encoding="utf-8")
+    except (OSError, UnicodeError) as exc:
+        raise OpenRouterHarnessError("Shared root instructions are unavailable: AGENTS.md") from exc
+    if not root_instructions.strip():
+        raise OpenRouterHarnessError("Shared root instructions are unavailable: empty AGENTS.md")
     if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return None
+        return root_instructions
     selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
-    sources = [
-        project_root / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
-        for name in ("gtkb-bridge", selected)
-    ]
+    sources = [project_root / ".agents" / "skills" / name / "SKILL.md" for name in ("gtkb-bridge", selected)]
     try:
         instructions = [path.read_text(encoding="utf-8") for path in sources]
     except (OSError, UnicodeError) as exc:
         raise OpenRouterHarnessError("Current canonical bridge skill instructions are unavailable") from exc
     if any(not text.strip() for text in instructions):
         raise OpenRouterHarnessError("Current canonical bridge skill instructions are unavailable: empty source")
-    return "\n\n".join(instructions)
+    return "\n\n".join([root_instructions, *instructions])
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB OpenRouter harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to OpenRouter.")
-    parser.add_argument("--model", help="Routing model key from .api-harness/openrouter/routing.toml.")
-    parser.add_argument("--skill", help="Skill or task route key from .api-harness/openrouter/routing.toml.")
+    parser.add_argument("--model", help="Routing model key from .harness-baseline-configuration/routing.toml.")
+    parser.add_argument("--skill", help="Skill or task route key from .harness-baseline-configuration/routing.toml.")
     parser.add_argument(
         "--endpoint", default=DEFAULT_ENDPOINT, help="OpenRouter endpoint; default is https://openrouter.ai/api/v1."
     )

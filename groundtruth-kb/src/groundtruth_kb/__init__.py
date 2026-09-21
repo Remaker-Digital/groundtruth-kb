@@ -12,7 +12,6 @@ from pathlib import Path
 from groundtruth_kb.assertion_schema import validate_assertion, validate_assertion_list
 from groundtruth_kb.assertions import format_summary, run_all_assertions, run_single_assertion
 from groundtruth_kb.config import GTConfig, GTConfigError
-from groundtruth_kb.db import KnowledgeDB, get_depth, get_parent_id, spec_sort_key
 from groundtruth_kb.gates import GateRegistry, GovernanceGate, GovernanceGateError
 
 __version__ = "0.7.0rc1"
@@ -39,7 +38,6 @@ def get_templates_dir() -> Path:
 __all__ = [
     "GTConfig",
     "GTConfigError",
-    "KnowledgeDB",
     "GateRegistry",
     "GovernanceGate",
     "GovernanceGateError",
@@ -48,9 +46,6 @@ __all__ = [
     "run_single_assertion",
     "validate_assertion",
     "validate_assertion_list",
-    "spec_sort_key",
-    "get_depth",
-    "get_parent_id",
     "get_templates_dir",
     "__version__",
 ]

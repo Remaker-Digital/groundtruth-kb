@@ -102,17 +102,26 @@ writes: the current specifications are read from the configured
 root. No execution history is written.
 
 ```
-gt assert [--spec <id>] [--triggered-by <label>] [--json]
+gt assert [--spec <id>] [--scope <scope>] [--triggered-by <label>] [--json]
 ```
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `--spec` | string | all current specs | Evaluate one current specification |
+| `--spec` | string | all current specs in scope | Evaluate one current specification, whatever its scope |
+| `--scope` | string | marker-derived | `gtkb_platform` or `application:<name>`; default `application:<name>` from the project root's `application.toml` marker, else `gtkb_platform` |
 | `--triggered-by` | string | `cli` | Label this observation; no execution history is written |
 | `--json` | flag | off | Emit the summary as canonical JSON |
 
-A change of the selected authority or project root during evaluation is
-refused (`assertion_configuration_changed`).
+The selected scope evaluates the current active specifications carrying that
+`application_scope` together with the records carrying no scope (null:
+explicitly unresolved); records of another scope are excluded. The summary
+states `application_scope`, `scoped_specs`, `unscoped_specs` (evaluated
+alongside the selection) and `excluded_specs`, so an observation never
+silently drops or silently absorbs unresolved records. A scope of another
+form is refused before any read (`invalid_application_scope`).
+
+A change of the selected authority, project root or marker-derived scope
+during evaluation is refused (`assertion_configuration_changed`).
 
 **Exit codes:**
 
@@ -129,6 +138,9 @@ gt assert
 
 # Run for a single specification
 gt assert --spec GOV-01
+
+# Evaluate one application's records (plus the unscoped ones) from any root
+gt assert --scope application:Agent_Red --json
 
 # Run with a custom trigger label (for CI pipelines)
 gt assert --triggered-by github-actions
@@ -296,7 +308,11 @@ gt dashboard init [--schema-only] [--db-path <path>] [--runtime-root <path>] [--
 ```
 
 `--schema-only` initializes the derived schema without collecting or
-publishing data. Defaults:
+publishing data. An existing derived database whose schema is not this
+package's (a legacy or foreign table shape, or a file SQLite cannot read) is
+moved aside as `gtkb-dashboard.sqlite.legacy-<UTC stamp>` under the runtime
+root and rebuilt; `init`, `refresh` and the refresh service all apply this
+rule and report the moved path as `legacy_database_moved_to`. Defaults:
 
 - Project root: resolved from `groundtruth.toml`
 - Dashboard DB: `.groundtruth/dashboard/gtkb-dashboard.sqlite`
@@ -342,14 +358,42 @@ Default dashboard URL:
 http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard
 ```
 
+On Windows both launches run inside one named kill-on-close job object for the
+runtime root: each process is created suspended, placed in the job (an
+assignment refused with ERROR_ACCESS_DENIED while the job finishes terminating
+earlier members is retried for up to two seconds) and only then resumed, so the
+refresh service's venv-redirector child and Grafana's plugin children are
+members from their first instruction. The reply names the
+job (`job`) with the two process ids and URLs, and
+`<runtime root>/dashboard-launch.json` records the launch for inspection. A
+second `start` for the same runtime reuses the running members after checking
+their health routes; a job that runs without its launch record is refused
+(`run gt dashboard stop before starting`). Grafana starts with every
+server-initiated network path off (analytics, update and plugin-update checks,
+the preinstall/background plugin installer and its auto-update, plugin
+administration, signing-key retrieval) and logs to its console only, so
+`logs/grafana.log` has one writer. Grafana itself is installed by
+`gt dashboard install` under `<project>/.groundtruth/tools/grafana`.
+
 ### gt dashboard stop
 
-Stop the launches recorded for this runtime by `gt dashboard start`, after
-checking process identity.
+End every process of this runtime's dashboard job and report each one.
 
 ```
 gt dashboard stop [--runtime-root <path>] [--json]
 ```
+
+The reply lists `stopped` entries with `pid`, `executable` and `outcome`
+(`terminated`, or `exited` for a member that ended on its own before the
+request); on Windows that is every member of the job, including redirector
+and plugin children, and nothing outside the job is ever signalled. No pid
+file decides what is stopped. Errors are distinguishable by class and
+message: `DashboardTerminationRefused` (the job, or `taskkill` for a single
+process, refused the request while the process still runs),
+`DashboardTerminationUnconfirmed` (the request was accepted but a held process
+handle stayed unsignalled within the wait) and `DashboardIdentityError` (a
+recorded process is not the launched one; nothing was signalled). After a
+refusal the launch record stays in place for inspection.
 
 ### gt dashboard serve
 
@@ -633,7 +677,7 @@ gt deliberations list [--search <TEXT>] [--source-type <TYPE>] [--spec-id <ID>] 
 |--------|------|---------|-------------|
 | `--search` | text | none | Case-insensitive title substring |
 | `--source-type` | text | none | Exact source type recorded with the deliberation |
-| `--spec-id` / `--work-item-id` | text | none | Records linked to one specification or work item |
+| `--spec-id` / `--work-item-id` | text | none | Records whose primary `spec_id` / `work_item_id` matches; historical relation rows are not searched |
 | `--after` | ID | none | Continue after this record ID |
 | `--limit` | integer | `200` | Maximum records returned |
 | `--json` | flag | off | Emit the records as JSON |
@@ -694,7 +738,7 @@ gt kb reconcile [--orphans] [--stale] [--authority] [--duplicates]
 | `--stale` | flag | off | Run the stale-spec detector. An active spec is stale when its `changed_at` is older than `--stale-days` and another active spec in the same `section` changed within `--activity-days`. |
 | `--authority` | flag | off | Run the authority-conflict detector. Finds active stated-vs-inferred spec pairs in the same `(section, scope)` with overlapping machine assertion targets. |
 | `--duplicates` | flag | off | Run the duplicate-spec detector. Reports active spec pairs whose titles overlap by >=90% of tokens. |
-| `--provisionals` | flag | off | Run the expired-provisional detector. Reports active provisional specs (`authority='provisional'` with a `provisional_until` reference) whose replacement record carries `implementation_verified_at`. |
+| `--provisionals` | flag | off | Run the expired-provisional detector. Reports active provisional specs (`authority='provisional'` with a `provisional_until` reference) whose replacement record carries `implementation_verified_at` (imported, or set through `gt spec record`; see the behavior note). |
 | `--all` | flag | off | Run every detector in the canonical order orphans, stale, authority, duplicates, provisionals. |
 | `--stale-days <N>` | integer | 90 | Staleness threshold in days for `--stale`. |
 | `--activity-days <N>` | integer | 30 | Same-section activity window in days for `--stale`. |
@@ -724,6 +768,17 @@ gt kb reconcile [--orphans] [--stale] [--authority] [--duplicates]
   replacement has shipped is its `implementation_verified_at` timestamp. A
   replacement without it, or a dangling `provisional_until` reference, does
   NOT expire the provisional — it is still load-bearing.
+- **How the marker is set.** `implementation_verified_at` is service-stamped,
+  like `retired_at`: a `gt spec record` fields file (or `PUT
+  /v1/specifications/{id}`) carries `"implementation_verified_at": true` to
+  assert that the implementation is verified now, and the service writes its
+  own clock into the record; `null` clears the marker. A client-supplied
+  timestamp, `false` or any other value is refused as `invalid_request`. The
+  assertion is refused with `verification_evidence_required` (details carry
+  `id`) unless at least one test record with `spec_id` equal to this
+  specification has a `test_file` and is listed by a phase of an active test
+  plan — the same evidence rule work intake applies (WI-7861, owner ruling
+  D17). The refusal writes nothing and leaves the version unchanged.
 
 **Examples:**
 
@@ -863,6 +918,38 @@ gt session show --native-context-id <id> [--json]
 `GET /v1/sessions/binding`. Returns the binding fields listed under `gt
 session bind`. A context without a binding is refused with
 `no_session_binding`. Read-only.
+
+---
+
+### gt session scratch-teardown
+
+Remove exactly this context's disposable scratch directory at close or wrap.
+The service derives `<project root>/scratchpad/<session context id>` from the
+immutable binding of the supplied native context; no path is accepted.
+
+```
+gt session scratch-teardown --native-context-id <id> [--json]
+```
+
+`POST /v1/sessions/scratch-teardown`. The result carries `status`,
+`session_context_id`, `scratch_directory`, `removed` (each removed entry as
+`{"path", "kind"}` relative to the directory, `kind` one of `file`,
+`directory`, `link`; the directory itself is `.`) and `surviving` (entries the
+host refused to delete, with `reason`, `errno` and `winerror`).
+
+- `removed`: the directory and everything below it are gone.
+- `absent`: no directory existed; nothing was created or deleted.
+- `partial`: at least one entry survived (an open handle on Windows, a denied
+  deletion, an interrupted listing). The result adds `recovery_route`, the
+  command exits `1`, and a rerun removes only what remains.
+
+Links are never followed: a link inside the directory is unlinked and its
+target is untouched. Refusals: `no_session_binding` (unbound context),
+`effect_path_redirected` (the scratch root or the context directory is itself
+a symlink or junction; nothing is deleted) and `invalid_scratch_directory`
+(the path is not a directory). Sibling context directories, the registered
+checkout, formal history and the immutable binding are unchanged; the verb is
+idempotent. No session-end hook runs it; the close/wrap procedure does.
 
 ---
 
@@ -1135,15 +1222,23 @@ Formal relationships between an execution project and its specifications
 retiring a link preserves the project's authorization.
 
 ```
-gt projects formal-links list [--status active|retired] [--project-id <id>] [--limit <n>] [--after <id>] [--json]
+gt projects formal-links list [--status active|retired] [--project-id <id>] [--artifact-type spec|bridge_thread|completion_guard] [--limit <n>] [--after <id>] [--json]
 gt projects formal-links show <LINK_ID> [--history] [--json]
 gt projects formal-links record --id <LINK_ID> --fields-file <json> --expected-version <n> --actor <name> --change-reason <text> [--json]
 ```
 
-`list` accepts `--status` and `--project-id` and returns only specification
-links; `--search` is refused (`invalid_query`). Text rows read `<project> ->
-<spec> [<status>]`. `show` also resolves obsolete `bridge_thread` and
-`completion_guard` relationships; any other link kind is `not_found`.
+`list` accepts `--status`, `--project-id` and `--artifact-type` (default
+`spec`; `bridge_thread` and `completion_guard` list the obsolete imported
+relationships; any other kind is `invalid_query`); `--search` is refused
+(`invalid_query`). Text rows read `<project> -> <spec> [<status>]` for
+specification links and `<project> -> <kind>:<ref> [<status>]` for obsolete
+kinds. `show` also resolves obsolete `bridge_thread` and `completion_guard`
+relationships; any other link kind is `not_found`. Imported obsolete
+relationships may carry historical identities longer than the ordinary
+256-character identifier: `show`, `show --history` and `record` address a
+formal link by its exact identity under the same lexical rule without that
+length cap, so every existing row can be read, retired and read back. Every
+other record address and every request field keeps the ordinary limit.
 
 `record` fields: `project_id`, `artifact_ref` (specification ID), `status`
 (`active`, `retired`), `notes`. A link names an execution project and a
@@ -1191,6 +1286,62 @@ and `intake_not_authorizable` (`PROJECT-GTKB-NEW-WORK-INTAKE` stays
 
 ---
 
+### gt projects retire
+
+Retire one active program or execution project by status only, with
+history. Authorization, memberships, formal links, dependencies and child
+projects are preserved; retirement is not verification
+(`GOV-STANDING-BACKLOG-001`: the reason names the surviving work, or that
+no residual work remains).
+
+```
+gt projects retire --id <PROJECT_ID> --reason <text> --expected-version <n> --actor <name> [--json]
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--id` | string | *required* | Active program or execution project to retire |
+| `--reason` | string | *required* | Change reason recorded with the retired version |
+| `--expected-version` | integer >= 1 | *required* | Current project version |
+| `--actor` | string | *required* | Attribution recorded with the retired version |
+| `--json` | flag | off | Emit the retired project record as JSON |
+
+`POST /v1/projects/<id>/retire`. Exactly one field changes: `status` becomes
+`retired` at the next version, with `--actor` and `--reason` recorded in the
+version history (`gt projects show <id> --history`); `--reason` is this
+verb's spelling of the change reason the other lifecycle verbs take as
+`--change-reason`. `kind`, `authorization`, `parent_project_id`,
+`completed_at` (recorded only by a verified project commit), every work-item
+membership (a closed member's active membership is its preserved parent),
+every formal link, every project dependency and a program's child projects
+are untouched, and `gt projects show` keeps listing them; nothing is retired
+collectively. A retired program acquires no new child projects
+(`gt projects record` refuses a non-active `parent_project_id`). The
+command prints the retired project record.
+
+Refusals, checked in this order, leave the record and its history
+unchanged: `not_found`; `cas_conflict` (details `id`, `expected`,
+`actual`); `project_closed` (details `id`, `status`) for a project that is
+already `retired`, `cancelled` or `verified`, so re-retiring is never a
+silent no-op; `project_structure_frozen` for
+`PROJECT-GTKB-NEW-WORK-INTAKE`, the standing intake destination, which is
+not retirable; `members_open` (details `id`, `work_item_ids`,
+`project_ids`) while open members exist: open work items holding an active
+membership in the project, or active child projects of a program (closed
+members never block); `attempt_active` (details `id`, `attempt_ids`) while
+a bridge attempt on a member is active, including a VERIFIED cohort held
+for its project commit; `dependants_open` (details `id`, `dependency_ids`,
+`dependent_project_ids`) while an active dependency of an active project
+requires this project to reach a state other than `retired`. Retire,
+resolve or re-home the open members first (`gt backlog retire`,
+`gt projects move-item`), retire the dependency (`gt projects dependencies
+record`), then retry with the re-read version. Usage errors (a missing
+option, `--expected-version` below 1) exit 2 without a request; service
+refusals exit 1 with the code and its details; an unreachable authority
+exits 1 with `authority_unavailable`.
+
+---
+
 ### gt projects readiness
 
 Explain whether the project's exact prerequisite outcomes are available at a
@@ -1222,6 +1373,59 @@ gt backlog readiness <WORK_ITEM_ID> [--json]
 `changed_paths`) and `accepted_change_paths`. The bridge evaluates the same
 readiness before a NEW, REVISED, GO, READY or VERIFIED artifact and refuses
 those effects with `work_item_dependencies_unsatisfied`. Read-only.
+
+---
+
+### gt backlog retire
+
+Retire one open work item by status only, with history. Its parent
+membership, links, notes and evidence are preserved; retirement is not
+implementation verification (`GOV-STANDING-BACKLOG-001`: the reason names
+the surviving work, or that no residual work remains).
+
+```
+gt backlog retire --id <WORK_ITEM_ID> --reason <text> --expected-version <n> --actor <name> [--json]
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--id` | string | *required* | Open work item to retire |
+| `--reason` | string | *required* | Change reason recorded with the retired version |
+| `--expected-version` | integer >= 1 | *required* | Current work-item version |
+| `--actor` | string | *required* | Attribution recorded with the retired version |
+| `--json` | flag | off | Emit the work item with its membership as JSON |
+
+`POST /v1/work-items/<id>/retire`. Exactly one field changes:
+`resolution_status` becomes `retired` at the next version, with `--actor`
+and `--reason` recorded in the version history
+(`gt backlog show <id> --history`); `--reason` is this verb's spelling of
+the change reason the other lifecycle verbs take as `--change-reason`.
+`stage` (no stage transition is implied), title, description,
+`source_spec_id`, `source_test_id`, `depends_on_work_items`,
+`status_detail`, `completion_evidence`, the active membership (the item's
+current parent, preserved for closed work by
+`GOV-WORK-ITEM-TERMINAL-STATE-001`), every other membership row, the parent
+project with its links, and sibling work items are untouched; nothing is
+retired collectively. The readback has the shape of `gt backlog show`:
+`work_item`, `membership`, `memberships`.
+
+Refusals, checked in this order, leave the record, its memberships and its
+history unchanged: `not_found`; `cas_conflict` (details `id`, `expected`,
+`actual`); `work_item_frozen` (details `id`, `resolution_status`) for an
+item already `retired`, `verified`, `resolved`, `wont_fix` or under any
+other non-open label, since terminal work is neither reopened nor closed
+twice; `invalid_membership` when open work does not hold exactly one active
+membership; `program_cannot_contain_work` or `project_closed` for the
+parent's state; `attempt_active` (details `id`, `attempt_ids`) while a
+bridge attempt on the item is active; `dependants_open` (details `id`,
+`dependant_work_item_ids`) while open dependants exist: other work items
+with `resolution_status = "open"` whose `depends_on_work_items` names this
+item (`blocks_work_items` is imported legacy data and is not consulted;
+closed dependants never block). Retire or resolve the dependants first, or
+re-home the item with `gt projects move-item`, then retry with the re-read
+version. Usage errors (a missing option, `--expected-version` below 1) exit
+2 without a request; service refusals exit 1 with the code and its details;
+an unreachable authority exits 1 with `authority_unavailable`.
 
 ---
 
@@ -1753,6 +1957,13 @@ is refused). Its stdout and stderr are passed through and its exit code is
 returned. Generated harness directories are never edited by hand; change the
 baseline and re-project.
 
+The rendered roots (`.agent`, `.claude`, `.codex`, `.cursor`, `.goose` and
+`.api-harness`) are gitignored and untracked (owner ruling D14, 2026-09-17), so
+a fresh checkout or an install carries no projections. Run `gt harness project
+<HARNESS>` for every profile in `scripts/harness_projection/profiles.toml` (all
+eight) after a checkout or install, before any harness works in that checkout;
+`--check` then reports drift of the installed output against the baseline.
+
 ---
 
 ## Service Commands
@@ -1823,8 +2034,19 @@ Checks, in hook order: `secret-scan` (`scripts/scan_secrets.py --staged`),
 `commit-pathspec-safety` (`scripts/check_commit_pathspec_safety.py
 --staged`), `projection-drift` (`scripts/check_projection_drift.py
 --staged`) and `powershell-syntax`, a parse of the staged `.ps1` files that
-passes as skipped when no PowerShell executable is found. Exit `1` when any
+passes as skipped when no PowerShell executable is found. `secret-scan` refuses
+candidate-high findings in the staged blobs; a finding whose exact line is attested
+in `config/governance/secret-scan-allowlist.toml` (path plus SHA-256 of the line, read
+from the index) is reported as `allowlisted (synthetic)` instead, and an attested line
+that changed makes its entry stale, which also fails the check. Exit `1` when any
 hard check failed or was inconclusive, otherwise `0`.
+
+The projector roots (`.agent`, `.claude`, `.codex`, `.cursor`, `.goose`,
+`.api-harness`) are gitignored and refused as postimages by
+`commit-pathspec-safety` (owner ruling D14, 2026-09-17): rendered output never
+enters a commit, deletions of historical tracked copies pass, and
+`config/governance/` carries no derived files (the timer inventory derives to
+`.groundtruth/derived/`, a non-product prefix the same check refuses).
 
 ---
 
@@ -2040,6 +2262,15 @@ Output: `changed`, `before_sha256`, `catalog_sha256`, `reload_behavior =
 "next_operation"`, `control_count`. Operations read the artifact afresh at
 their own boundary; no running process is signalled.
 
+A concurrent governed writer is refused (`writer_busy`). The cooperative
+writer mutex is an OS byte lock on
+`<Git metadata directory>/gtkb-operational-controls.lock` (the checkout's
+`.git` directory, or the linked worktree's `gitdir:` target, beside the
+registry lock), never a file under `config/governance/`, so a write leaves
+no untracked file in the registry-covered tree; a selected root without Git
+metadata is refused (`writer_unavailable`) before the current artifact is
+read.
+
 ---
 
 ### gt registry inspect
@@ -2209,7 +2440,7 @@ gt [--config <path>] [--version]
 ├── application
 │   ├── inspect --host-root [--json]
 │   └── register <NAME> --host-root [--json]
-├── assert [--spec] [--triggered-by] [--json]
+├── assert [--spec] [--scope] [--triggered-by] [--json]
 ├── authority
 │   ├── resolve <SUBJECT> [--scope] [--json]
 │   └── status [--scope] [--json]
@@ -2217,6 +2448,7 @@ gt [--config <path>] [--version]
 │   ├── list [--status] [--priority] [--search] [--limit] [--after] [--json]
 │   ├── readiness <WORK_ITEM_ID> [--json]
 │   ├── record --id --fields-file --expected-version --actor --change-reason [--project-id] [--json]
+│   ├── retire --id --reason --expected-version --actor [--json]
 │   └── show <WORK_ITEM_ID> [--history] [--json]
 ├── bridge
 │   ├── abandon <DOCUMENT> --native-context-id --expected-version --reason [--json]
@@ -2301,7 +2533,7 @@ gt [--config <path>] [--version]
 │   │   ├── record --id --fields-file --expected-version --actor --change-reason [--json]
 │   │   └── show <DEPENDENCY_ID> [--history] [--json]
 │   ├── formal-links
-│   │   ├── list [--status] [--project-id] [--limit] [--after] [--json]
+│   │   ├── list [--status] [--project-id] [--artifact-type] [--limit] [--after] [--json]
 │   │   ├── record --id --fields-file --expected-version --actor --change-reason [--json]
 │   │   └── show <LINK_ID> [--history] [--json]
 │   ├── list [--status] [--kind] [--repository-ref] [--search] [--limit] [--after] [--json]
@@ -2310,6 +2542,7 @@ gt [--config <path>] [--version]
 │   ├── prepare-commit <PROJECT_ID> --native-context-id --expected-version [--json]
 │   ├── readiness <PROJECT_ID> [--gate] [--json]
 │   ├── record --id --fields-file --expected-version --actor --change-reason [--kind] [--json]
+│   ├── retire --id --reason --expected-version --actor [--json]
 │   ├── set-authorization <PROJECT_ID> --authorization --expected-version --actor --change-reason [--json]
 │   └── show <PROJECT_ID> [--history] [--json]
 ├── push
@@ -2404,6 +2637,7 @@ primary interface._
 | `gt backlog list` | List current work-item records in deterministic ID order. |
 | `gt backlog readiness` | Explain whether this item's reviewed or committed predecessors are available. |
 | `gt backlog record` | Apply a version-checked work-item amendment (`--project-id` for new work) and return canonical readback. |
+| `gt backlog retire` | Retire one open work item by status only with history; its parent membership, links and notes are preserved; open dependants are refused. |
 | `gt backlog show` | Read one current work-item record, including its project membership. |
 
 ### gt bridge
@@ -2469,7 +2703,7 @@ primary interface._
 | `gt dashboard refresh` | Refresh native observations and derived display assets without selecting work. |
 | `gt dashboard serve` | Serve the installed display on loopback, refreshing the selected native authority. |
 | `gt dashboard start` | Start the local display and Grafana, returning only after readiness checks. |
-| `gt dashboard stop` | Stop the launches recorded for this runtime after checking process identity. |
+| `gt dashboard stop` | End every process of this runtime's dashboard job and report each one. |
 
 ### gt db
 
@@ -2553,6 +2787,7 @@ primary interface._
 | `gt projects prepare-commit` | Prepare the complete project Git commit and materialize the verifying checkout. |
 | `gt projects readiness` | Explain whether the project's exact prerequisite outcomes are available. |
 | `gt projects record` | Apply a version-checked program or project amendment and return canonical readback. |
+| `gt projects retire` | Retire one active program or project by status only with history; memberships and links are preserved; open members are refused. |
 | `gt projects set-authorization` | Apply the owner's explicit ordering choice; existing bridge chains continue. |
 | `gt projects show` | Read one current program or project record, including its planning relationships. |
 
@@ -2604,6 +2839,7 @@ primary interface._
 | Command | Description |
 | --- | --- |
 | `gt session bind` | Return the initialization outcome and immutable binding for the received marker. |
+| `gt session scratch-teardown` | Remove exactly this context's disposable scratch directory; a partial outcome exits 1. |
 | `gt session show` | Resolve the supplied native context, with no fallback to another session. |
 
 ### gt spec

@@ -1,22 +1,12 @@
 #!/usr/bin/env python3
-"""Deterministic obsolete-reference-purge check (WI-4795).
+"""Read-only native obsolete-reference-purge diagnostics (WI-4795).
 
-Operationalizes ``DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001``: for each
-retirement-class artifact in the evaluation window, verify a linked
-obsolete-reference-purge work item exists.
-
-Phase 1 = WARN (advisory): the standalone CLI always exits 0; the doctor
-surface (``_check_obsolete_reference_purge`` in
-``groundtruth_kb.project.doctor``) returns ``warning`` -- never ``fail`` --
-for unpaired retirements. Phase 2 (a blocking FAIL gate at the
-cutover/verification boundary) is a separate future thread, gated on
-Slice-1 feedback, mirroring ``gtkb-adr-dcl-clause-test-enforcement``.
-
-Read-only. Performs no MemBase mutation.
-
-Source: bridge thread ``gtkb-obsolete-reference-purge-deterministic-check``
-(Loyal Opposition GO at -002); owner directive
-``DELIB-OWNER-OBSOLETE-REFERENCE-PURGE-DIRECTIVE-20260624``.
+DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001 retains the Phase-1 advisory:
+unpaired in-window retirement-class artifacts warn. Current specifications,
+work items and project memberships come from native service GETs. Project-name
+fields on work items and historical bridge messages establish no relationship.
+The CLI exits 0 for a completed advisory evaluation, and an unavailable native
+inspection is an error. This module makes no canonical writes.
 """
 
 from __future__ import annotations
@@ -28,14 +18,21 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
+
+from groundtruth_kb.authority_client import (
+    AuthorityClient,
+    AuthorityClientError,
+    configured_authority_client,
+    page_records,
+)
 
 # Forward-looking obligation effective date. The obligation is a STANDING
 # completion obligation on significant changes going FORWARD (per
 # ADR-OBSOLETE-REFERENCE-PURGE-OBLIGATION-001); retirement-class artifacts whose
 # latest change predates this date are outside the Phase-1 window, because
 # retroactively flagging the entire historical corpus of retired specs would
-# flood WARN with un-actionable noise. Loyal Opposition confirmed this boundary
-# as correct for Phase 1 (GO at -002, Positive Confirmations).
+# flood WARN with un-actionable noise. The retained Phase-1 window is advisory.
 OBLIGATION_EFFECTIVE_DATE = "2026-06-24"
 
 RETIRE_SPEC_PREFIX = "RETIRE-SPEC-"
@@ -115,7 +112,9 @@ def is_retirement_class(spec: dict[str, Any]) -> tuple[bool, str]:
     return False, ""
 
 
-def paired_work_item(spec_id: str, work_items: list[dict[str, Any]]) -> str | None:
+def paired_work_item(
+    spec_id: str, work_items: list[dict[str, Any]], *, purge_member_ids: set[str] | None = None
+) -> str | None:
     """Return a linked obsolete-reference-purge work item id, or ``None``.
 
     Detection is intentionally inclusive (favor PASS) so a Phase-1 advisory does
@@ -131,30 +130,42 @@ def paired_work_item(spec_id: str, work_items: list[dict[str, Any]]) -> str | No
         description_lower = description.lower()
         if "purges:" in description_lower and spec_id.lower() in description_lower:
             return work_item_id
-        project = str(work_item.get("project_name", "")).upper()
-        if PURGE_PROJECT_MARKER in project and spec_id in description:
+        if work_item_id in (purge_member_ids or set()) and spec_id in description:
             return work_item_id
     return None
-
-
-def _load_knowledge_db_cls(project_root: Path) -> Any:
-    from groundtruth_kb.db import KnowledgeDB  # noqa: PLC0415
-
-    return KnowledgeDB
 
 
 def evaluate(
     project_root: Path,
     *,
     obligation_effective_date: str | None = None,
+    client: AuthorityClient | None = None,
 ) -> dict[str, Any]:
-    """Evaluate retirement/purge pairing over the project's MemBase. Read-only."""
-    knowledge_db_cls = _load_knowledge_db_cls(project_root)
-    db = knowledge_db_cls(project_root / "groundtruth.db")
+    """Evaluate retirement/purge pairing over current native records. Read-only."""
+    reader = client if client is not None else configured_authority_client(project_root)
     window_start = _window_start(obligation_effective_date)
 
-    specs = db.list_specs()
-    work_items = db.list_work_items()
+    specs = page_records(reader, "/v1/specifications")
+    work_items = page_records(reader, "/v1/work-items")
+    purge_member_ids: set[str] = set()
+    for project in page_records(reader, "/v1/projects"):
+        if project.get("kind") != "project" or not any(
+            PURGE_PROJECT_MARKER in str(project.get(key) or "").upper() for key in ("id", "name")
+        ):
+            continue
+        project_id = project["id"]
+        detail = reader.request("GET", "/v1/projects/" + quote(project_id, safe=""))
+        members = detail.get("memberships") if isinstance(detail, dict) else None
+        if not isinstance(members, list) or any(
+            not isinstance(member, dict)
+            or member.get("project_id") != project_id
+            or member.get("status") != "active"
+            or not isinstance(member.get("work_item_id"), str)
+            or not member["work_item_id"].strip()
+            for member in members
+        ):
+            raise AuthorityClientError("invalid_response", f"Project {project_id} memberships are malformed")
+        purge_member_ids.update(member["work_item_id"] for member in members)
 
     findings: list[Finding] = []
     for spec in specs:
@@ -165,7 +176,7 @@ def evaluate(
         if not in_window(changed_at, window_start=window_start):
             continue
         spec_id = str(spec.get("id", ""))
-        pair = paired_work_item(spec_id, work_items)
+        pair = paired_work_item(spec_id, work_items, purge_member_ids=purge_member_ids)
         findings.append(
             Finding(
                 artifact_id=spec_id,
@@ -193,9 +204,10 @@ def unpaired_retirement_class_artifacts(
     project_root: Path,
     *,
     obligation_effective_date: str | None = None,
+    client: AuthorityClient | None = None,
 ) -> list[dict[str, Any]]:
     """Doctor-surface helper: the unpaired retirement-class findings (may be empty)."""
-    return evaluate(project_root, obligation_effective_date=obligation_effective_date)["unpaired"]
+    return evaluate(project_root, obligation_effective_date=obligation_effective_date, client=client)["unpaired"]
 
 
 def main(argv: list[str] | None = None) -> int:

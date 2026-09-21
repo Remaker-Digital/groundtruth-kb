@@ -88,7 +88,7 @@ def test_insert_and_get_roundtrip(db: KnowledgeDB) -> None:
         authority_level="platform_core",
         scope="platform",
         accepted_synonyms=["Knowledge Database"],
-        source_authority=".claude/rules/operating-model.md §2",
+        source_authority=".harness-baseline-configuration/rules/operating-model.md §2",
         changed_by="test",
         change_reason="initial seed",
     )

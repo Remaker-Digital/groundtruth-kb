@@ -11,19 +11,11 @@ from groundtruth_kb.bridge.native import NativeBridgeService
 from groundtruth_kb.native_authority import Mutation, SpecMutation, _related, _write
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, work_fields
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_bridge import claim, deliver
-from platform_tests.groundtruth_kb.test_native_project_dependencies import project
-from platform_tests.groundtruth_kb.test_native_project_finalization import (
-    base,
-    commit_product,
-    git,
-    integration,
-    post,
-    verify,
-)
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver
+from platform_tests.groundtruth_kb.finalization_fixtures import base, commit_product, git, integration, post, verify
+from platform_tests.groundtruth_kb.native_fixtures import history_count, project, put, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

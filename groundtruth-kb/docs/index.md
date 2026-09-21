@@ -21,7 +21,7 @@ engineering decisions.
 
 ```mermaid
 flowchart TB
-    L1["Layer 1<br/>Core Knowledge DB<br/>gt init / seed / assert / serve"]
+    L1["Layer 1<br/>Core Knowledge DB<br/>gt init / seed / assert"]
     Bridge["Optional<br/>File Bridge Setup<br/>Prime Builder + Loyal Opposition"]
     L2["Layer 2<br/>Project Scaffold<br/>gt project init / upgrade"]
     L3["Layer 3<br/>Workstation Doctor<br/>gt project doctor"]
@@ -54,16 +54,16 @@ gt dashboard init
 
 See the [Start Here](start-here.md) guide for a complete walkthrough, or the
 [CTO Evaluation Guide](cto-evaluation.md) for the pip install and dashboard
-path. The [Bootstrap Guide](bootstrap.md) is a 10-step technical reference.
+path. The [Bootstrap Guide](bootstrap.md) is a 9-step technical reference.
 
 ## Tooling
 
-The pip package includes the CLI, project scaffolding, web UI entrypoint, and
-`gt dashboard` commands for a local Grafana operations dashboard.
+The pip package includes the CLI, project scaffolding, and `gt dashboard`
+commands for a local Grafana operations dashboard.
 
-- **CLI** (`gt`) — init, seed, assert, summary, history, config, serve, project management
-- **Web UI** — read-only dashboard with branding, filtering, and assertion results
-- **Python API** — direct database access for automation and CI/CD
+- **CLI** (`gt`) — init, seed, assert, summary, history, config, project management
+- **Operations Dashboard** (`gt dashboard`) — local Grafana operations dashboard: init, install, start, stop, refresh, serve
+- **Automation and CI/CD** — `gt assert --triggered-by github-actions` and the `--json` envelopes of the `gt` record verbs (`gt spec list --json`, `gt spec show <ID> --json`)
 - **Project Scaffolding** — three profiles for different team configurations
 - **CI Templates** — test, build, and deploy workflow templates
 - **Process Templates** — CLAUDE.md, MEMORY.md, hooks, and rules

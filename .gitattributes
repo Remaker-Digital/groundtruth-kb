@@ -43,15 +43,16 @@
 .agent/skills/** text eol=lf
 .api-harness/skills/** text eol=lf
 .claude/skills/** text eol=lf
-config/agent-control/** text eol=lf
 groundtruth-kb/templates/hooks/** text eol=lf
 groundtruth-kb/templates/skills/** text eol=lf
 .harness-baseline-configuration/hooks/** text eol=lf
 .claude/hooks/** text eol=lf
 
-# Harness projection roots and the neutral baseline are projector outputs
-# written with LF. Normalize them so a checkout matches the projector byte
-# for byte and `--check` stays green after checkout (owner decision, 2026-09-07).
+# Harness projection roots are projector outputs written with LF; since owner
+# ruling D14 (2026-09-17) they are gitignored and untracked, so a checkout
+# carries none of them and these rules act only on a historical or force-added
+# copy. The neutral baseline stays tracked and LF so the projector's inputs
+# match byte for byte and `--check` stays green after checkout.
 .claude/** text eol=lf
 .goose/** text eol=lf
 .codex/** text eol=lf
@@ -59,3 +60,6 @@ groundtruth-kb/templates/skills/** text eol=lf
 .agent/** text eol=lf
 .api-harness/** text eol=lf
 .harness-baseline-configuration/** text eol=lf
+# The one skills source (owner ruling D15/D34, 2026-09-19): tracked, LF, read
+# in place by the hosts and by the projector's pointer-stub renderer.
+.agents/** text eol=lf

@@ -606,145 +606,43 @@ sequenceDiagram
 
 ## 6. Verification Plan Skeleton
 
-The doctor / verification surface is split into two modes. Live mode
-is explicit opt-in; it is not the default because live checks call
-Azure APIs that require credentials and produce external state
-effects.
+This section is a planning checklist for an adopting project's linked tests.
+It does not add an Azure readiness mode to `gt project doctor`. The current
+doctor takes an explicit canonical project and host root; see the
+[CLI reference](cli.md#gt-project-doctor).
 
-### 6.1 Offline Mode (default)
+### 6.1 Checks without Azure API calls
 
-`gt project doctor --readiness azure-enterprise` (offline is implied
-when `--live` is absent).
+Verify current canonical specifications and ADRs against the declared readiness
+categories. Check workflow and infrastructure source files against their
+applicable assertions, including identity configuration, secret references and
+deployment requirements. Native authority reads still require the configured
+host service; "without Azure API calls" does not mean a local database fallback.
 
-Offline mode checks:
+### 6.2 Checks against a deployed environment
 
-- Every category in Section 4 has at least one spec present in the
-  local MemBase.
-- Every ADR template in Section 5 has a recorded ADR instance (or an
-  explicit waiver spec).
-- The CI workflow file uses OIDC federation (text scan, not runtime
-  test).
-- The IaC skeleton references Key Vault for secrets (text scan).
-- No static `AZURE_CREDENTIALS` JSON secret appears in the recommended
-  CI path.
-- Assertions configured for each readiness category pass.
+An adopting project's separately specified tests can compare the selected
+environment with its current requirements: identity and subscription context,
+resource existence, access grants, managed identities, diagnostics, budgets and
+deployed version. Define the target, allowed effects, required access and
+evidence before executing a live operation. This taxonomy supplies no Azure
+API runner and no doctor `--live` flag.
 
-Offline mode is the one adopters run in CI and at session start. It
-produces a `fail` / `warn` / `pass` summary per category.
+### 6.3 Verification evidence
 
-### 6.2 Live Mode (`--live` opt-in)
+The project's test plan defines its executable selectors, expected results and
+evidence format. Record the exact inputs, command, target and observed results.
+Do not describe a planned JSON format or an unimplemented check as measured
+coverage. Where the release process requires them, associate Git and image
+identities, infrastructure-plan evidence and assertion results with that release.
 
-`gt project doctor --readiness azure-enterprise --live`
+## 7. Implementation sequencing
 
-Live mode additionally checks:
-
-- `az login` context matches the expected subscription(s).
-- Resource groups named in the IaC skeleton exist.
-- Key Vault access policies / RBAC grants are present.
-- Managed identity is assigned to the compute target.
-- Diagnostic settings point at the expected Log Analytics workspace.
-- Budgets are configured at the expected subscription / resource-group
-  level.
-- Deployed image tag matches the expected version.
-
-Live mode requires explicit opt-in. It is designed for pre-deploy
-gates and periodic drift checks, not for routine session-start runs.
-
-### 6.2.1 Offline And Live Verification Split
-
-```mermaid
-flowchart LR
-    subgraph Offline["Offline doctor<br/>safe default"]
-        Files["Docs, specs, ADRs"]
-        Workflows["Workflow YAML"]
-        IaCText["IaC text"]
-        Assertions["Local assertions"]
-    end
-
-    subgraph Live["Live doctor<br/>explicit --live"]
-        AzLogin["Azure login context"]
-        RG["Resource groups"]
-        KV["Key Vault/RBAC"]
-        Diag["Diagnostics"]
-        Budget["Budgets"]
-        Deploy["Deployment health"]
-    end
-
-    Files --> Result["Readiness result JSON"]
-    Workflows --> Result
-    IaCText --> Result
-    Assertions --> Result
-    AzLogin --> Result
-    RG --> Result
-    KV --> Result
-    Diag --> Result
-    Budget --> Result
-    Deploy --> Result
-```
-
-### 6.3 Verification Evidence Artifact
-
-Both modes produce a machine-readable result artifact (JSON) that can
-be attached to a deployment's evidence bundle. The artifact names each
-category, severity, and either the passing assertion or the failure
-detail. The exact schema is defined in a later child bridge.
-
-### 6.4 Deployment Evidence Bundle
-
-```mermaid
-flowchart TD
-    Commit["Git commit SHA"]
-    Image["Container image digest"]
-    Plan["IaC plan hash"]
-    Approval["Environment approval"]
-    Assert["gt assert result"]
-    Doctor["Azure readiness doctor JSON"]
-    Bundle["Deploy evidence bundle"]
-
-    Commit --> Bundle
-    Image --> Bundle
-    Plan --> Bundle
-    Approval --> Bundle
-    Assert --> Bundle
-    Doctor --> Bundle
-
-    Bundle --> Audit["Audit/procurement evidence"]
-    Bundle --> Release["Release record"]
-```
-
-## 7. Child-Bridge Preview (NOT authorized by this taxonomy)
-
-> **Explicit disclaimer:** The child-bridge list below is a
-> **dependency preview only**. Each child bridge requires its own
-> bridge proposal and GO before any implementation begins. Approval of
-> this taxonomy does **NOT** authorize implementation of any child
-> bridge. The list is here so downstream sequencing is visible.
-
-The Codex INSIGHTS report (Phase 2-6) maps to these child bridges:
-
-1. **`gtkb-azure-spec-scaffold`** — implements `gt scaffold specs
-   --profile azure-enterprise` (or equivalent) to generate per-category
-   spec skeletons from this taxonomy.
-2. **`gtkb-azure-adr-template-activation`** — activates the per-category
-   ADR template and the assertion harness that verifies instance ADRs
-   were answered.
-3. **`gtkb-azure-iac-skeletons`** — adds Terraform (or Bicep)
-   skeleton modules for Container Apps / ACR / Key Vault / managed
-   identity / diagnostics. Preserves the current `starter` stub
-   behavior; adds a separate profile rather than replacing.
-4. **`gtkb-azure-cicd-gates`** — adds the OIDC-based deploy workflow,
-   IaC validation job, environment approval gate, and drift-detection
-   schedule.
-5. **`gtkb-azure-doctor-offline`** — implements the offline verification
-   mode (Section 6.1).
-6. **`gtkb-azure-doctor-live`** — implements the live verification mode
-   (Section 6.2), behind the explicit `--live` opt-in.
-7. **`gtkb-azure-operational-docs`** — the enterprise readiness guide,
-   owner decision checklist, and Prime/Loyal-Opposition protocol
-   extensions.
-
-Dependency ordering: 1 and 2 first, then 3 and 4 in parallel, then 5,
-then 6, then 7 as docs wrap-up.
+Read the adopting project's current work items, dependencies and linked formal
+records to sequence implementation. The historical child-bridge names from the
+initial taxonomy are not current routing or authorization. Application-specific
+scaffolds, deployment workflows and verification checks require their own
+defined work and evidence under the project's normal lifecycle.
 
 ## 8. Source Material and Citations
 
@@ -797,152 +695,37 @@ Summary:
 - **Azure cost optimization** — financial targets, cost models, cost
   data review, spending guardrails.
 
-## 9. MemBase Registration Status
+## 9. Canonical records for an adopting project
 
-The following entries are registered in the local MemBase (the adopting
-project's `groundtruth.db`) when this taxonomy is adopted:
+This document is a reference taxonomy, not evidence that records were created.
+Read the selected project's current formal links and native specification
+records to determine which categories and ADRs are represented. A filename or
+an identifier illustrated here does not prove that a record exists or is active.
 
-1. **ADR template spec** — type `architecture_decision`, ID
-   `ADR-TEMPLATE-AZURE-CATEGORY-DECISION`. Records the template shape
-   defined in Section 5.
-2. **Verification plan spec** — type `requirement`, ID
-   `SPEC-AZURE-READINESS-VERIFICATION`. Records the offline/live
-   verification skeleton defined in Section 6.
-3. **Taxonomy document entry** — document category `taxonomy`,
-   ID `DOC-AZURE-READINESS-TAXONOMY`, with `source_path` pointing at
-   this file.
+Author or amend required specifications through `gt spec record` with the live
+expected version, actor and reason, then read back the returned record and its
+project relationship. Native specifications use `active`, `superseded` and
+`retired` lifecycle values. PostgreSQL behind the host's native service carries
+canonical state; an adopter's local file is not a replacement authority.
 
-These entries are **local MemBase state** — they live in the adopting
-project's local SQLite database, which is ignored by git (`.gitignore`
-line 3). They are not shipped as part of the GT-KB package. The
-bridge's post-implementation report captures the exact `db.insert_spec`
-and `db.insert_document` calls run against the GT-KB repository's local
-MemBase, along with the returned IDs and versions, as evidence of
-local-state sync. They are not git-verifiable artifacts — they are
-verified by querying the local DB.
+`gt scaffold specs --project-id <PROJECT> --profile minimal` or `--profile full`
+provides the supported generic specification scaffold. Inspect its dry run and
+the [current CLI contract](cli.md#gt-scaffold-specs) before applying it. It does
+not implement the former Azure-specific specification/ADR templates, automatic
+taxonomy-document registration or the retired ADR-completeness command.
 
-Downstream adopters register their own instance ADRs and verification
-specs by running the same kind of inserts against their own MemBase.
-Child bridges may add tracked seed/migration artifacts if any registration
-needs to be reproducible from git history alone; that is an explicit
-child-bridge scope decision, not something this taxonomy commits to.
+For Azure-specific requirements, use the categories and questions in this
+reference to author the actual project records and linked executable tests.
+An unresolved owner question remains unresolved; a placeholder is not an answer,
+an assertion pass or implementation evidence.
 
-### 9.1 Populated by D1 (`gtkb-azure-spec-scaffold`)
+## 10. Scope of this reference
 
-When an adopter runs `gt scaffold specs --profile azure-enterprise --apply`
-against their own MemBase, the D1 scaffold populates the following 16 artifacts:
-
-**13 category specs** (one per §4 category, all `type='requirement'`,
-`authority='inferred'`, `status='specified'`):
-
-- `SPEC-AZURE-LANDING-ZONE-001`
-- `SPEC-AZURE-IDENTITY-001`
-- `SPEC-AZURE-TENANCY-001`
-- `SPEC-AZURE-COST-001`
-- `SPEC-AZURE-COMPLIANCE-001`
-- `SPEC-AZURE-NETWORKING-001`
-- `SPEC-AZURE-CICD-001`
-- `SPEC-AZURE-OBSERVABILITY-001`
-- `SPEC-AZURE-COMPUTE-001`
-- `SPEC-AZURE-DATA-001`
-- `SPEC-AZURE-SECRETS-001`
-- `SPEC-AZURE-DR-001`
-- `SPEC-AZURE-DOCTOR-001`
-
-**1 ADR template spec** (`type='architecture_decision'`):
-- `ADR-TEMPLATE-AZURE-CATEGORY-DECISION`
-
-**1 verification plan spec** (`type='requirement'`):
-- `SPEC-AZURE-READINESS-VERIFICATION`
-
-**1 taxonomy document** (`category='taxonomy'`, via `db.insert_document()`):
-- `DOC-AZURE-READINESS-TAXONOMY`
-
-Each category spec persists its taxonomy-aligned outline (subtopics +
-owner decision placeholders + automatable assertion pointers) in the
-`description` field. Each has at least one automatable assertion or an
-explicit `owner_decision_placeholder` assertion per INSIGHTS Phase 2
-verification clause.
-
-Idempotence: re-running `--apply` skips pre-existing artifacts (matched by
-handle for specs; by id for the taxonomy document). No artifact is
-promoted to version 2 on re-run.
-
-Downstream child bridges:
-- **D2 (`gtkb-azure-adr-template-activation`)** activates instance-ADR
-  creation per category + the assertion harness that verifies adopter
-  ADR answers.
-- **D3-D6** add IaC skeletons, CI/CD gates, and offline/live doctor
-  implementation.
-
-### 9.2 Populated by D2 (`gtkb-azure-adr-template-activation`)
-
-When an adopter runs `gt scaffold adrs --profile azure-enterprise --apply`
-against their own MemBase, the D2 scaffold populates 13 instance-ADR
-skeletons (one per §4 category):
-
-- `ADR-AZURE-LANDING-ZONE-001`
-- `ADR-AZURE-IDENTITY-001`
-- `ADR-AZURE-TENANCY-001`
-- `ADR-AZURE-COST-001`
-- `ADR-AZURE-COMPLIANCE-001`
-- `ADR-AZURE-NETWORKING-001`
-- `ADR-AZURE-CICD-001`
-- `ADR-AZURE-OBSERVABILITY-001`
-- `ADR-AZURE-COMPUTE-001`
-- `ADR-AZURE-DATA-001`
-- `ADR-AZURE-SECRETS-001`
-- `ADR-AZURE-DR-001`
-- `ADR-AZURE-DOCTOR-001`
-
-Each skeleton (`type='architecture_decision'`, `authority='inferred'`)
-carries the 9-question template from §5.1 with `<<ADOPTER-ANSWER-REQUIRED>>`
-placeholders in the Decision, Rationale, and Rejected alternatives sections.
-
-To verify that an adopter has answered all 13 ADRs, run:
-
-```
-gt check adrs --profile azure-enterprise
-```
-
-Exit code 0 only when all 13 have: (a) all 9 required headings present,
-AND (b) non-empty, non-placeholder content in Decision, Rationale, and
-Rejected alternatives. Add `--json` to emit machine-readable output
-suitable for CI consumption.
-
-## 10. Constraints and Non-Goals
-
-### 10.1 Preserved defaults
-
-- The `starter` cloud-provider behavior remains unchanged. Projects
-  that do not declare an Azure readiness tier keep their current
-  Terraform stub output and workstation-only doctor checks.
-- Existing tests that protect the `# stub` Terraform output (at
-  `tests/test_scaffold_smoke.py` around the Azure scaffold smoke
-  assertions) continue to hold.
-
-### 10.2 Out of scope
-
-- **No Azure resource template authoring in this bridge.** Terraform,
-  Bicep, and compute-target module skeletons are deferred to the
-  `gtkb-azure-iac-skeletons` child bridge.
-- **No `gt scaffold specs --profile azure-enterprise` implementation.**
-  Deferred to `gtkb-azure-spec-scaffold`.
-- **No CI workflow changes.** The OIDC federation workflow, environment
-  approval, and drift detection are deferred to `gtkb-azure-cicd-gates`.
-- **No doctor offline/live code changes.** Deferred to
-  `gtkb-azure-doctor-offline` and `gtkb-azure-doctor-live`.
-- **No instance ADR creation.** The ADR template is in scope; specific
-  owner decisions (landing zone, tenancy, compute target) are deferred
-  to the project that adopts a readiness tier.
-- **No Azure API integration or Azure-specific Python dependency.** No
-  runtime Azure SDK is added as a result of this taxonomy.
-
-### 10.3 Additive, not disruptive
-
-Everything in this taxonomy is additive to the existing GT-KB method
-layer. No existing spec, test, or generated artifact is silently
-re-scoped by the act of committing this taxonomy document.
+This taxonomy explains readiness categories and candidate verification concerns.
+It creates no project, authorization, resource, seed record, dashboard or test
+result. It adds no Azure SDK or deployment runner. Current project specifications
+and their reviewed work determine the applicable implementation and operations;
+historical scaffold and child-bridge descriptions do not override them.
 
 ## 11. Glossary
 
@@ -955,11 +738,11 @@ re-scoped by the act of committing this taxonomy document.
   own and modify; GT-KB generates it but does not operate it.
 - **Instance ADR** — an ADR that answers the questions raised by an
   ADR template for a specific project.
-- **Offline check** — a verification that runs without calling Azure
-  APIs, using only local specs, workflow files, and IaC text.
+- **Offline check** — a verification that makes no Azure API calls, using
+  current canonical records and the selected workflow and infrastructure files.
 - **Live check** — a verification that calls Azure APIs to compare
-  declared readiness against deployed state. Requires explicit
-  `--live` opt-in.
+  declared readiness against deployed state within the explicitly selected
+  target and allowed operation.
 
 ---
 

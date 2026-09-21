@@ -6,11 +6,11 @@ import json
 
 import pytest
 
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put, seed, work_fields
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_project_association_consistency import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import membership_cli as membership_cli
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

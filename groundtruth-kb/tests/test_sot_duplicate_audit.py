@@ -52,73 +52,6 @@ def _write_registry(root: Path, extra_records: str = "") -> None:
     )
 
 
-def _write_groundtruth_toml(root: Path) -> Path:
-    config = root / "groundtruth.toml"
-    config.write_text(
-        f'[groundtruth]\ndb_path = "{(root / "groundtruth.db").as_posix()}"\nproject_root = "{root.as_posix()}"\n',
-        encoding="utf-8",
-    )
-    return config
-
-
-def _write_dispatch_duplicate(root: Path) -> None:
-    (root / "config" / "dispatcher").mkdir(parents=True, exist_ok=True)
-    (root / "harness-state").mkdir(parents=True, exist_ok=True)
-    (root / "config" / "dispatcher" / "rules.toml").write_text(
-        """
-[harnesses.A]
-can_fire_events = true
-can_receive_dispatch = true
-dispatch_availability = 75
-dispatch_cost = 20
-dispatch_quality = 95
-""".lstrip(),
-        encoding="utf-8",
-    )
-    (root / "harness-state" / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "harnesses": [
-                    {
-                        "id": "A",
-                        "can_fire_events": True,
-                        "can_receive_dispatch": True,
-                        "dispatch_availability": 75,
-                        "dispatch_cost": 20,
-                        "dispatch_quality": 95,
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
-def test_audit_classifies_dispatch_duplicate_as_existing_wi5012_violation(tmp_path: Path) -> None:
-    _write_registry(
-        tmp_path,
-        _registry_record("harness-registry", "harness-state/harness-registry.json", domain="harness_state"),
-    )
-    _write_dispatch_duplicate(tmp_path)
-
-    report = run_duplicate_sot_audit(tmp_path)
-
-    assert report.coverage_complete is True
-    duplicate = next(
-        candidate for candidate in report.candidates if candidate.candidate_id == "duplicate-dispatch-harness-fields"
-    )
-    assert duplicate.classification == "duplicate_sot_violation"
-    assert duplicate.remediation_work_item_id == "WI-5012"
-    assert duplicate.remediation_status == "existing_covering_work_item"
-    assert duplicate.duplicated_fields == (
-        "can_fire_events",
-        "can_receive_dispatch",
-        "dispatch_availability",
-        "dispatch_cost",
-        "dispatch_quality",
-    )
-
-
 def test_audit_accepts_machine_checkable_derived_cache(tmp_path: Path) -> None:
     _write_registry(tmp_path, _registry_record("authority-json", "authority.json"))
     (tmp_path / "authority.json").write_text('{"answer": 42}\n', encoding="utf-8")
@@ -180,3 +113,20 @@ def test_audit_rejects_incomplete_derived_cache_contract(tmp_path: Path) -> None
     assert cache.classification == "duplicate_sot_violation"
     assert "read_only" in cache.duplicated_fields
     assert cache.remediation_work_item_id is None
+
+
+@pytest.mark.parametrize("storage", ["ordinary-missing.json", ".gtkb-state/missing.json"])
+def test_unresolved_registered_artifact_makes_coverage_incomplete(tmp_path, storage):
+    _write_registry(tmp_path, _registry_record("missing", storage))
+    report = run_duplicate_sot_audit(tmp_path)
+    assert report.registry_membership_complete is True
+    assert report.coverage_complete is False
+    assert report.missing_registry_artifacts[0]["storage_path"] == storage
+    assert not (tmp_path / storage).exists()
+
+
+def test_retired_audit_output_has_no_census_exemption(tmp_path):
+    path = tmp_path / ".gtkb-state/sot-singleton-audit/report.json"
+    path.parent.mkdir(parents=True)
+    path.write_text("{}", encoding="utf-8")
+    assert path.relative_to(tmp_path).as_posix() in sot_audit._iter_persistent_files(tmp_path)

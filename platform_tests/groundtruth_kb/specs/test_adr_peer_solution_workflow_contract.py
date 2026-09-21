@@ -59,16 +59,9 @@ def test_current_architecture_information_and_evidence_contract(formal_record):
     assert constraints["separate_ipr_cvr_gate"] is False
 
 
-@pytest.mark.parametrize(
-    "harness",
-    [
-        name
-        for name, profile in projector.load_profiles()["harnesses"].items()
-        if profile.get("status") != "profile_pending"
-    ],
-)
-def test_registered_projector_preserves_architecture_authoring_and_audit_guidance(harness):
-    """Whole authored body preservation is derivation evidence, not a host test."""
+@pytest.mark.parametrize("harness", sorted(projector.load_profiles()["harnesses"]))
+def test_registered_projector_points_to_architecture_authoring_and_audit_guidance(harness):
+    """The authored bodies retain the native writer duty; pointers only enable host discovery."""
     profiles = projector.load_profiles()["harnesses"]
     plan = projector.build_plan(harness)
     assert plan.writes and not plan.gaps, plan.gaps
@@ -77,9 +70,13 @@ def test_registered_projector_preserves_architecture_authoring_and_audit_guidanc
         ("gtkb-adr", "# Architecture decision authoring"),
         ("gtkb-arch-audit", "# Architecture evidence review"),
     ):
-        source = root / ".harness-baseline-configuration" / "skills" / skill / "SKILL.md"
+        source = root / ".agents/skills" / skill / "SKILL.md"
         body = source.read_text(encoding="utf-8").split(heading, 1)[1].strip()
-        rendered = plan.writes[f"{profiles[harness]['skills_dir']}/{skill}/SKILL.md"]
-        assert body in rendered
-        assert "gt spec show" in rendered
-        assert "KnowledgeDB(" not in rendered
+        assert "gt spec show" in body and "KnowledgeDB(" not in body
+        outputs = {path: text for path, text in plan.writes.items() if path.endswith(f"/{skill}/SKILL.md")}
+        if profiles[harness]["skills_discovery"] == "agents_skills":
+            assert outputs == {}
+        else:
+            path = profiles[harness]["skills_stub_dir"] + f"/{skill}/SKILL.md"
+            assert set(outputs) == {path}
+            assert f".agents/skills/{skill}/SKILL.md" in outputs[path] and body not in outputs[path]

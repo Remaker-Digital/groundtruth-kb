@@ -21,9 +21,9 @@ import groundtruth_kb
 import pytest
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_bridge import claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 from scripts.check_harness_parity import _commands, _load_projector, _references_script, _registration_events
 
 ROOT = Path(__file__).resolve().parents[2]

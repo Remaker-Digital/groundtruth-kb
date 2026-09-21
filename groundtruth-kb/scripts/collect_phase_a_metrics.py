@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Phase A metrics collector for scanner-safe-writer deny records.
 
-Consumes ``.claude/hooks/scanner-safe-writer.log`` (JSONL, schema v1) and
+Consumes ``.groundtruth/runtime/gate-denials.jsonl`` (JSONL, schema v1) and
 emits aggregated metrics to stdout in JSON (default, stable automation
 contract) or Markdown (human presentation) format.
 
@@ -39,13 +39,14 @@ from __future__ import annotations
 import argparse
 import datetime
 import json
+import os
 import sys
 from collections import Counter
 from pathlib import Path
 from typing import Any, TextIO
 
 SCHEMA_VERSION_SUPPORTED = 1
-DEFAULT_LOG_PATH = Path(".claude/hooks/scanner-safe-writer.log")
+DEFAULT_LOG_PATH = Path(".groundtruth/runtime/gate-denials.jsonl")
 
 _UNKNOWN_SESSION = "(unknown)"
 
@@ -299,6 +300,13 @@ def format_markdown(report: dict[str, Any]) -> str:
 
 
 def main(argv: list[str] | None = None) -> int:
+    # Match the authored scanner hook's no-payload runtime-root and log overrides.
+    default_log_path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH") or DEFAULT_LOG_PATH)
+    if not default_log_path.is_absolute():
+        runtime_root = Path(os.environ.get("GTKB_PROJECT_ROOT") or "").expanduser()
+        if not runtime_root.is_absolute():
+            runtime_root = Path(__file__).resolve().parents[2]
+        default_log_path = runtime_root.resolve() / default_log_path
     parser = argparse.ArgumentParser(
         description=(
             "Collect Phase A metrics from a scanner-safe-writer JSONL deny log. "
@@ -309,8 +317,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--log-path",
         type=Path,
-        default=DEFAULT_LOG_PATH,
-        help=f"Path to deny log (default: {DEFAULT_LOG_PATH})",
+        default=default_log_path,
+        help=f"Path to deny log (default: {default_log_path}; explicit path overrides runtime settings)",
     )
     parser.add_argument(
         "--format",

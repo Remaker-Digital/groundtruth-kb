@@ -1,410 +1,13 @@
-"""WI-3342 Slice B (IP-6) — harness-registry reader-migration regression tests.
-
-Spec-derived tests for ``REQ-HARNESS-REGISTRY-001`` (phased reader migration of
-harness role/identity consumers from the legacy harness-state JSON files to the
-DB-backed registry projection) and FR9 (the single-prime-builder role
-partition that IP-RECON restores), plus ``DELIB-2079`` Q7 (phased migration,
-legacy JSON retired last).
-
-Three concerns, per ``bridge/gtkb-harness-registry-reader-migration-005.md``
-IP-6 and the ``-006`` GO:
-
-* Part B — migrated readers resolve harness role/identity from the registry
-  projection ``harness-state/harness-registry.json`` (the foundational loaders
-  ``scripts.harness_roles.load_role_assignments`` /
-  ``scripts.harness_identity.load_harness_identities``, and migrated raw-reader
-  sites), plus a golden-value comparison against pre-migration role resolution.
-* IP-RECON agreement — a deliberately-inverted ``harnesses`` table reconciled
-  against an authoritative ``role-assignments.json`` yields corrected
-  current-version rows, a regenerated projection, and projection-reader
-  accessors that all resolve harness A = loyal-opposition / B = prime-builder
-  with the FR9 single-prime-builder partition intact.
-* Part C — a no-direct-read scan asserts no *executing* read of
-  ``role-assignments.json`` / ``harness-identities.json`` remains under
-  ``scripts/``, ``.claude/hooks/``, ``.codex/gtkb-hooks/``, and
-  ``groundtruth-kb/src/groundtruth_kb/``, distinguishing executing reads from
-  comments, docstrings, and static string constants, with the named exclusion
-  allowlist.
-
-All fixtures use isolated ``tmp_path`` roots; the real ``E:\\GT-KB\\groundtruth.db``
-and ``harness-state/`` are never read or written.
-
-Copyright (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
-All rights reserved.
-Licensed under AGPL-3.0-or-later.
-"""
+"""Prevent production readers from reviving retired file-backed harness authority."""
 
 from __future__ import annotations
 
 import ast
-import json
-import sys
 from pathlib import Path
 
 import pytest
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]
-if str(_REPO_ROOT) not in sys.path:
-    sys.path.insert(0, str(_REPO_ROOT))
-
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
-from groundtruth_kb.harness_projection import (  # noqa: E402
-    generate_harness_projection,
-    read_roles,
-)
-
-from scripts.harness_identity import (  # noqa: E402
-    load_harness_identities,
-    resolved_harness_id,
-)
-from scripts.harness_projection_reader import (  # noqa: E402
-    harness_by_id,
-    id_for_name,
-    load_harness_projection,
-    role_set_for_id,
-)
-from scripts.harness_roles import (  # noqa: E402
-    ROLE_LOYAL_OPPOSITION,
-    ROLE_PRIME_BUILDER,
-    load_role_assignments,
-)
-
-# ---------------------------------------------------------------------------
-# Fixtures: an isolated groundtruth.db registry + generated projection.
-# ---------------------------------------------------------------------------
-
-
-def _seed_registry(root: Path, harnesses: dict[str, tuple[str, list[str]]]) -> KnowledgeDB:
-    """Seed an isolated groundtruth.db ``harnesses`` table + generated projection.
-
-    ``harnesses`` maps each durable harness id to ``(harness_name, role_set)``.
-    Returns the open ``KnowledgeDB`` so callers can append further versions.
-    """
-    db = KnowledgeDB(db_path=root / "groundtruth.db")
-    for harness_id, (harness_name, role_set) in harnesses.items():
-        db.insert_harness(
-            id=harness_id,
-            harness_name=harness_name,
-            harness_type=harness_name,
-            role=list(role_set),
-            changed_by="test",
-            change_reason="WI-3342 IP-6 reader-migration fixture",
-            status="active",
-        )
-    generate_harness_projection(db, root)
-    return db
-
-
-# ===========================================================================
-# Part B — migrated readers resolve role/identity from the registry projection.
-# ===========================================================================
-
-
-def test_load_role_assignments_resolves_role_from_projection(tmp_path: Path) -> None:
-    """IP-3 foundational loader: ``load_role_assignments`` resolves harness roles
-    from the DB-backed registry projection, not the legacy role-assignments.json.
-
-    The legacy file is intentionally absent; resolution still succeeds.
-    """
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    assert not (tmp_path / "harness-state" / "role-assignments.json").exists()
-
-    document = load_role_assignments(tmp_path)
-    assert document["harnesses"]["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
-    assert document["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
-
-
-def test_load_harness_identities_resolves_identity_from_projection(
-    tmp_path: Path,
-) -> None:
-    """IP-3 foundational loader: ``load_harness_identities`` resolves harness
-    identities from the registry projection, not harness-identities.json.
-    """
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    assert not (tmp_path / "harness-state" / "harness-identities.json").exists()
-
-    document = load_harness_identities(tmp_path)
-    assert document["harnesses"]["codex"]["id"] == "A"
-    assert document["harnesses"]["claude"]["id"] == "B"
-
-
-def test_resolved_harness_id_resolves_from_projection(tmp_path: Path) -> None:
-    """A raw-reader-adjacent site: ``resolved_harness_id`` (the identity
-    resolution used across migrated call sites) resolves the durable harness id
-    from the registry projection.
-    """
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    assert resolved_harness_id(tmp_path, harness_name="codex") == "A"
-    assert resolved_harness_id(tmp_path, harness_name="claude") == "B"
-
-
-def test_projection_reader_accessors_resolve_from_projection(tmp_path: Path) -> None:
-    """The DB-independent projection reader accessors (the IP-1 keyed accessors
-    every migrated dict-shaped reader funnels through) resolve role/identity
-    from the projection document.
-    """
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    document = load_harness_projection(tmp_path)
-
-    assert harness_by_id(document, "A")["harness_name"] == "codex"
-    assert role_set_for_id(document, "A") == {ROLE_LOYAL_OPPOSITION}
-    assert role_set_for_id(document, "B") == {ROLE_PRIME_BUILDER}
-    assert id_for_name(document, "codex") == "A"
-    assert id_for_name(document, "claude") == "B"
-
-
-def test_read_roles_preserves_projection_bytes(tmp_path: Path) -> None:
-    """Canonical role reads must not rewrite the hot-path registry projection."""
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    registry_path = tmp_path / "harness-state" / "harness-registry.json"
-    before = registry_path.read_bytes()
-
-    document = read_roles(tmp_path)
-
-    assert [record["id"] for record in document["harnesses"]] == ["A", "B"]
-    assert registry_path.read_bytes() == before
-
-
-def test_generate_harness_projection_preserves_bytes_when_only_timestamp_differs(tmp_path: Path) -> None:
-    """No-op refreshes must not dirty the projection just to update generated_at."""
-    db = _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    registry_path = tmp_path / "harness-state" / "harness-registry.json"
-    document = json.loads(registry_path.read_text(encoding="utf-8"))
-    document["generated_at"] = "2000-01-01T00:00:00Z"
-    sentinel = (json.dumps(document, indent=2, sort_keys=True) + "\n").replace("\n", "\r\n").encode("utf-8")
-    registry_path.write_bytes(sentinel)
-
-    generate_harness_projection(db, tmp_path)
-
-    assert registry_path.read_bytes() == sentinel
-
-
-def test_golden_value_role_resolution_matches_pre_migration(tmp_path: Path) -> None:
-    """Golden-value: post-migration role resolution equals the pre-migration
-    expected values.
-
-    Pre-migration, ``load_role_assignments`` resolved harness A -> codex ->
-    loyal-opposition and harness B -> claude -> prime-builder from the legacy
-    ``harness-state/role-assignments.json``. Post-migration the same resolution
-    is served from the registry projection; the resolved role map must be
-    byte-identical to the pre-migration golden values.
-    """
-    # Pre-migration golden role map (the durable owner-set assignment:
-    # codex=A=loyal-opposition, claude=B=prime-builder).
-    golden = {"A": [ROLE_LOYAL_OPPOSITION], "B": [ROLE_PRIME_BUILDER]}
-
-    _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_LOYAL_OPPOSITION]),
-            "B": ("claude", [ROLE_PRIME_BUILDER]),
-        },
-    )
-    document = load_role_assignments(tmp_path)
-    resolved = {hid: record["role"] for hid, record in document["harnesses"].items()}
-    assert resolved == golden
-
-
-# ===========================================================================
-# IP-RECON — registry/projection reconciliation against the authoritative
-# role-assignments.json (the -005 post-GO scope addition).
-# ===========================================================================
-
-
-def _authoritative_role_assignments(root: Path, role_map: dict[str, list[str]]) -> Path:
-    """Write an authoritative legacy ``harness-state/role-assignments.json``.
-
-    IP-RECON derives the corrected roles from this still-authoritative file;
-    the file is NOT modified by the reconciliation.
-    """
-    path = root / "harness-state" / "role-assignments.json"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(
-            {
-                "schema_version": 1,
-                "harnesses": {hid: {"role": roles} for hid, roles in role_map.items()},
-            }
-        ),
-        encoding="utf-8",
-    )
-    return path
-
-
-def _reconcile_registry_to_role_assignments(db: KnowledgeDB, root: Path, role_assignments_path: Path) -> None:
-    """Reconcile the DB ``harnesses`` registry to the authoritative role file.
-
-    Mirrors the IP-RECON step: for each harness, the corrected role is derived
-    from ``harness-state/role-assignments.json`` (NOT a hand-typed constant);
-    an append-only ``insert_harness`` version carries the corrected role with
-    every other column forwarded verbatim from the harness's current row; the
-    polluted rows are retained; the projection is then regenerated through the
-    generator. The authoritative role file is not modified.
-    """
-    authoritative = json.loads(role_assignments_path.read_text(encoding="utf-8"))
-    authoritative_harnesses = authoritative.get("harnesses", {})
-    for harness_id, record in sorted(authoritative_harnesses.items()):
-        corrected_role = list(record.get("role", []))
-        current = db.get_harness(harness_id)
-        assert current is not None, f"harness {harness_id} absent from registry"
-        # Forward every column verbatim from the current row; correct only role.
-        current_role = current.get("role")
-        if isinstance(current_role, str):
-            try:
-                current_role = json.loads(current_role)
-            except json.JSONDecodeError:
-                current_role = None
-        if sorted(current_role or []) == sorted(corrected_role):
-            continue
-        invocation = current.get("invocation_surfaces")
-        if isinstance(invocation, str):
-            try:
-                invocation = json.loads(invocation)
-            except json.JSONDecodeError:
-                invocation = None
-        db.insert_harness(
-            id=harness_id,
-            harness_name=str(current.get("harness_name") or harness_id),
-            harness_type=str(current.get("harness_type") or harness_id),
-            role=corrected_role,
-            changed_by="harness-registry-reconciliation",
-            change_reason=(
-                "WI-3342 IP-RECON: correct IP-2 smoke-test role pollution; "
-                "role derived from authoritative role-assignments.json"
-            ),
-            status=str(current.get("status") or "registered"),
-            reviewer_precedence=current.get("reviewer_precedence"),
-            invocation_surfaces=invocation,
-            capabilities_ref=current.get("capabilities_ref"),
-        )
-    generate_harness_projection(db, root)
-
-
-def test_ip_recon_reconciles_inverted_registry_to_authoritative_role_file(
-    tmp_path: Path,
-) -> None:
-    """IP-RECON agreement: a deliberately-INVERTED ``harnesses`` table reconciled
-    against the authoritative ``role-assignments.json`` yields corrected
-    current-version rows, a regenerated projection, and projection-reader
-    accessors that all resolve harness A = loyal-opposition / B = prime-builder.
-
-    Reproduces the post-GO-discovered inversion (IP-2 transitional-mirror
-    smoke-test pollution) and the IP-RECON closure.
-    """
-    # Authoritative role file: the correct owner-set assignment.
-    role_file = _authoritative_role_assignments(
-        tmp_path,
-        {"A": [ROLE_LOYAL_OPPOSITION], "B": [ROLE_PRIME_BUILDER]},
-    )
-
-    # Deliberately-inverted registry: A=prime-builder, B=loyal-opposition.
-    db = _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_PRIME_BUILDER]),
-            "B": ("claude", [ROLE_LOYAL_OPPOSITION]),
-        },
-    )
-    # Pre-reconciliation: the registry (and projection) are inverted vs the
-    # authoritative role file.
-    assert json.loads(db.get_harness("A")["role"]) == [ROLE_PRIME_BUILDER]
-    assert json.loads(db.get_harness("B")["role"]) == [ROLE_LOYAL_OPPOSITION]
-
-    # Run the reconciliation (derive corrected roles from the role file).
-    _reconcile_registry_to_role_assignments(db, tmp_path, role_file)
-
-    # (1) Corrected current-version DB rows.
-    assert json.loads(db.get_harness("A")["role"]) == [ROLE_LOYAL_OPPOSITION]
-    assert json.loads(db.get_harness("B")["role"]) == [ROLE_PRIME_BUILDER]
-    # Append-only history preserved: the polluted version is retained, the
-    # corrected version is appended on top.
-    assert db.get_harness("A")["version"] >= 2
-    assert db.get_harness("B")["version"] >= 2
-
-    # (2) The regenerated projection agrees with the authoritative role file.
-    document = load_harness_projection(tmp_path)
-    assert role_set_for_id(document, "A") == {ROLE_LOYAL_OPPOSITION}
-    assert role_set_for_id(document, "B") == {ROLE_PRIME_BUILDER}
-
-    # (3) The projection-reader accessors and the foundational loader all
-    # resolve the corrected assignment.
-    role_document = load_role_assignments(tmp_path)
-    assert role_document["harnesses"]["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
-    assert role_document["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
-
-    # FR9 single-prime-builder partition: exactly one prime-builder harness.
-    primes = [hid for hid in ("A", "B") if ROLE_PRIME_BUILDER in role_set_for_id(document, hid)]
-    assert primes == ["B"]
-
-    # IP-RECON does NOT modify the authoritative role-assignments.json.
-    after = json.loads(role_file.read_text(encoding="utf-8"))
-    assert after["harnesses"]["A"]["role"] == [ROLE_LOYAL_OPPOSITION]
-    assert after["harnesses"]["B"]["role"] == [ROLE_PRIME_BUILDER]
-
-
-def test_ip_recon_audit_trail_distinguishes_corrective_writes(tmp_path: Path) -> None:
-    """IP-RECON preserves append-only history and stamps the corrective writes
-    with a distinguishable ``changed_by`` so the audit trail separates the
-    correction from the IP-2 smoke-test pollution.
-    """
-    role_file = _authoritative_role_assignments(
-        tmp_path,
-        {"A": [ROLE_LOYAL_OPPOSITION], "B": [ROLE_PRIME_BUILDER]},
-    )
-    db = _seed_registry(
-        tmp_path,
-        {
-            "A": ("codex", [ROLE_PRIME_BUILDER]),
-            "B": ("claude", [ROLE_LOYAL_OPPOSITION]),
-        },
-    )
-    _reconcile_registry_to_role_assignments(db, tmp_path, role_file)
-
-    # The current (corrected) version carries the reconciliation attribution.
-    conn = db._get_conn()
-    for harness_id in ("A", "B"):
-        row = conn.execute("SELECT changed_by FROM current_harnesses WHERE id = ?", (harness_id,)).fetchone()
-        assert row[0] == "harness-registry-reconciliation"
-        # The polluted version is retained in history (>= 2 versions total).
-        count = conn.execute("SELECT COUNT(*) FROM harnesses WHERE id = ?", (harness_id,)).fetchone()[0]
-        assert count >= 2
-
 
 # ===========================================================================
 # Part C — no-direct-read scan: no executing read of the legacy harness JSON.
@@ -414,35 +17,24 @@ def test_ip_recon_audit_trail_distinguishes_corrective_writes(tmp_path: Path) ->
 # harness-state JSON files (the migrated reader surfaces).
 _SCAN_ROOTS = (
     "scripts",
+    ".harness-baseline-configuration/hooks",
     ".claude/hooks",
     ".codex/gtkb-hooks",
     "groundtruth-kb/src/groundtruth_kb",
 )
 
-# The two legacy harness-state JSON filenames retired by the WI-3342 migration.
-_LEGACY_JSON_FILENAMES = ("role-assignments.json", "harness-identities.json")
-
-# Exclusion allowlist (paths relative to the repo root, POSIX form):
-#   * scripts/rehearse/_dashboard_regen.py
-#     reference the legacy filenames only as static, non-executing string
-#     constants; they are allowlisted per the IP-6 named-allowlist contract.
-_SCAN_ALLOWLIST = frozenset(
-    {
-        "scripts/rehearse/_dashboard_regen.py",
-    }
-)
+# Retired role, identity and combined registry projections.
+_LEGACY_JSON_FILENAMES = ("role-assignments.json", "harness-identities.json", "harness-registry.json")
 
 # Attribute calls that constitute an executing read of a path.
 _READ_ATTRS = frozenset({"read_text", "read_bytes"})
 
 
 def _legacy_python_files() -> list[Path]:
-    """Every ``*.py`` under the scan roots, excluding the allowlist."""
+    """Every production Python file under authored and projected scan roots."""
     files: list[Path] = []
     for root in _SCAN_ROOTS:
         for path in sorted((_REPO_ROOT / root).rglob("*.py")):
-            if path.as_posix().replace(_REPO_ROOT.as_posix() + "/", "") in _SCAN_ALLOWLIST:
-                continue
             files.append(path)
     return files
 
@@ -528,16 +120,10 @@ def _executing_reads_of_legacy_json(tree: ast.AST) -> list[tuple[int, str]]:
 
 
 def test_no_executing_read_of_legacy_harness_json() -> None:
-    """No executing read of ``role-assignments.json`` / ``harness-identities.json``
-    remains in migrated production code.
+    """Installation metadata and session roles resolve through native services.
 
-    Regression coverage for ``REQ-HARNESS-REGISTRY-001`` (phased reader
-    migration) and ``DELIB-2079`` Q7: after IP-3/IP-4/IP-5 every production
-    reader resolves harness role/identity from the registry projection
-    ``harness-state/harness-registry.json``; the legacy files are no longer
-    read at runtime. The scan distinguishes executing reads from comments,
-    docstrings, and static string constants, and honours the named exclusion
-    allowlist.
+    Historical names in comments, docstrings and inert strings do not count as
+    executing readers. No compatibility reader is allowed to reopen these files.
     """
     offenders: dict[str, list[tuple[int, str]]] = {}
     for path in _legacy_python_files():
@@ -552,9 +138,8 @@ def test_no_executing_read_of_legacy_harness_json() -> None:
             offenders[path.as_posix()] = findings
 
     assert not offenders, (
-        "Executing read(s) of a legacy harness-state JSON file found in migrated "
-        "production code (every reader must resolve from the registry projection "
-        "harness-state/harness-registry.json):\n"
+        "Executing reads of retired harness authority files remain; "
+        "use the native installation or session service:\n"
         + "\n".join(
             f"  {path}: " + ", ".join(f"line {ln}: {expr}" for ln, expr in finds)
             for path, finds in sorted(offenders.items())
@@ -562,7 +147,8 @@ def test_no_executing_read_of_legacy_harness_json() -> None:
     )
 
 
-def test_no_direct_read_scan_detects_a_planted_executing_read(tmp_path: Path) -> None:
+@pytest.mark.parametrize("filename", _LEGACY_JSON_FILENAMES)
+def test_no_direct_read_scan_detects_a_planted_executing_read(tmp_path: Path, filename: str) -> None:
     """The no-direct-read scan's detector is not vacuous.
 
     A planted module that executes a read of ``role-assignments.json`` — both
@@ -575,7 +161,7 @@ def test_no_direct_read_scan_detects_a_planted_executing_read(tmp_path: Path) ->
     offender.write_text(
         "from pathlib import Path\n"
         "import json\n"
-        "ROLE_PATH = Path('harness-state') / 'role-assignments.json'\n"
+        f"ROLE_PATH = Path('harness-state') / {filename!r}\n"
         "def read_inline(root: Path):\n"
         "    return json.loads((root / 'harness-identities.json').read_text())\n"
         "def read_via_constant():\n"

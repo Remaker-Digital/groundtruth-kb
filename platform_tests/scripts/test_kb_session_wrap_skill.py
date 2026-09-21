@@ -14,7 +14,7 @@ import pytest
 from scripts.harness_projection import project_harness as projector
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = PROJECT_ROOT / ".harness-baseline-configuration/skills/gtkb-session-wrap"
+SKILL_ROOT = PROJECT_ROOT / ".agents/skills/gtkb-session-wrap"
 SKILL = SKILL_ROOT / "SKILL.md"
 PROFILES = projector.load_profiles()["harnesses"]
 
@@ -41,28 +41,28 @@ def test_canonical_wrap_skill_requires_knowledge_collection() -> None:
         assert retired not in text
 
 
-@pytest.mark.parametrize("harness", [name for name, p in PROFILES.items() if p.get("status") != "profile_pending"])
-def test_projector_preserves_wrap_skill_and_its_own_linked_resources(harness: str) -> None:
-    plan = projector.build_plan(harness)
-    assert plan.writes and not plan.gaps, plan.gaps
-    skills_dir = PROFILES[harness]["skills_dir"]
-    own = skills_dir + "/gtkb-session-wrap/"
-    projected = plan.writes[own + "SKILL.md"]
-    companion = plan.writes[skills_dir + "/gtkb-session-wrap-scan/SKILL.md"]
+@pytest.mark.parametrize("harness", sorted(PROFILES))
+def test_projector_points_to_authored_wrap_and_companion_resources(harness: str) -> None:
     companion_source = SKILL_ROOT.parent / "gtkb-session-wrap-scan/SKILL.md"
-    companion_body = companion_source.read_text(encoding="utf-8").split("# Read-only wrap orientation", 1)[1]
-    assert companion_body.strip() in companion
+    companion = companion_source.read_text(encoding="utf-8")
     assert "../gtkb-session-wrap/references/audit-checklist.md" in companion
     assert "wrap_capture_transcript.py" not in companion and "S000" not in companion
-    body = SKILL.read_text(encoding="utf-8").split("# Close and wrap", 1)[1]
-    assert body.strip() in projected
+    source = SKILL.read_text(encoding="utf-8")
     for name in ("audit-checklist.md", "handoff-template.md"):
-        reference = "references/" + name
-        assert reference in projected
-        expected = (SKILL_ROOT / reference).read_text(encoding="utf-8").strip()
-        assert expected in plan.writes[own + reference]
-    for peer in {p["config_dir"] for p in PROFILES.values()} - {PROFILES[harness]["config_dir"]}:
-        assert peer + "/" not in projected
+        assert "references/" + name in source
+        assert (SKILL_ROOT / "references" / name).is_file()
+    plan = projector.build_plan(harness)
+    assert plan.writes and not plan.gaps, plan.gaps
+    for skill in ("gtkb-session-wrap", "gtkb-session-wrap-scan"):
+        outputs = {path: text for path, text in plan.writes.items() if f"/{skill}/" in path}
+        if PROFILES[harness]["skills_discovery"] == "agents_skills":
+            assert outputs == {}
+        else:
+            path = PROFILES[harness]["skills_stub_dir"] + f"/{skill}/SKILL.md"
+            assert set(outputs) == {path}
+            assert f".agents/skills/{skill}/SKILL.md" in outputs[path]
+            authored = (SKILL_ROOT.parent / skill / "SKILL.md").read_text(encoding="utf-8")
+            assert authored.split("---", 2)[2].strip() not in outputs[path]
 
 
 def test_handoff_template_is_gtkb_specific_and_self_contained() -> None:

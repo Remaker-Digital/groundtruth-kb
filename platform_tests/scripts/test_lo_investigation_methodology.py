@@ -8,12 +8,9 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 
-# The neutral baseline rule is the authored carrier; the scaffold template is its byte-identical copy
-# (test_template_rules_follow_the_baseline.py) and the harness projections are generated from it.
-RULE_SURFACES = (
-    Path(".harness-baseline-configuration/rules/loyal-opposition.md"),
-    Path("groundtruth-kb/templates/rules/loyal-opposition.md"),
-)
+# The neutral baseline rule is the one authored carrier (M15, D15/D34: the byte-identical scaffold copy is
+# retired; hosts read the rule on demand from the baseline).
+RULE_SURFACES = (Path(".harness-baseline-configuration/rules/loyal-opposition.md"),)
 
 METHODOLOGY_ANCHORS = (
     "read source, inspect artifacts, run the required tests and use current cli queries or diagnostics",
@@ -27,7 +24,6 @@ METHODOLOGY_ANCHORS = (
 
 IMPLEMENTATION_TARGETS = (
     Path(".harness-baseline-configuration/rules/loyal-opposition.md"),
-    Path("groundtruth-kb/templates/rules/loyal-opposition.md"),
     Path("platform_tests/scripts/test_lo_investigation_methodology.py"),
     Path(
         ".groundtruth/formal-artifact-approvals/"

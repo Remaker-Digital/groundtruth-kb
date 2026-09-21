@@ -6,7 +6,7 @@ Implements the spec-to-test mapping in
 - ``DELIB-20260619-HARNESS-SCRATCHPAD-NON-AUTHORITY``.
 - ``ADR-ISOLATION-APPLICATION-PLACEMENT-001``.
 - ``DCL-VERIFIED-SPEC-DERIVED-TESTING-MANDATORY-001``.
-- ``.claude/rules/project-root-boundary.md``.
+- ``.harness-baseline-configuration/rules/project-root-boundary.md``.
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 """
@@ -18,10 +18,7 @@ from pathlib import Path
 from groundtruth_kb.project.doctor import _check_harness_local_scratchpad_boundary
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-BOUNDARY_DOCS = (
-    PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md",
-    PROJECT_ROOT / ".claude" / "rules" / "project-root-boundary.md",
-)
+BOUNDARY_DOCS = (PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md",)
 REQUIRED_BOUNDARY_TERMS = (
     "Harness-local scratchpads",
     "non-authoritative",
@@ -57,7 +54,7 @@ promoted into governed in-root artifacts before it is cited.
 
 def _write_boundary_project(tmp_path: Path, *, agents_text: str, rule_text: str) -> Path:
     """Create the two boundary surfaces consumed by the doctor check."""
-    rules_dir = tmp_path / ".claude" / "rules"
+    rules_dir = tmp_path / ".harness-baseline-configuration" / "rules"
     rules_dir.mkdir(parents=True)
     (tmp_path / "AGENTS.md").write_text(agents_text, encoding="utf-8")
     (rules_dir / "project-root-boundary.md").write_text(rule_text, encoding="utf-8")
@@ -83,7 +80,9 @@ def test_live_doctor_check_passes_for_current_boundary_docs() -> None:
 
 def test_external_harness_exception_remains_executable_only() -> None:
     """The scratchpad boundary must not broaden the external-harness exception."""
-    rule_text = (PROJECT_ROOT / ".claude" / "rules" / "project-root-boundary.md").read_text(encoding="utf-8")
+    rule_text = (PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md").read_text(
+        encoding="utf-8"
+    )
 
     assert "External Harness Executable Resolution Exception remains executable-only" in rule_text
     assert "not reading, writing" in rule_text

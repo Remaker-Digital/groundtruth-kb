@@ -15,9 +15,8 @@ import pytest
 from groundtruth_kb.authority_client import AuthorityClientError
 from groundtruth_kb.harness_diagnostic import SCHEMA_ID, collect_harness_diagnostic, diagnose_harness
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, bind, history_count, put, register
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
@@ -36,36 +35,6 @@ class ReadClient:
             error = result.json()["error"]
             raise AuthorityClientError(error["code"], error["message"])
         return result.json()
-
-
-def register(client, identifier="A", *, active=True):
-    row = put(
-        client,
-        "harnesses",
-        identifier,
-        {
-            "harness_name": "harness-" + identifier,
-            "harness_type": "test",
-            "capabilities_ref": "public-declared-capabilities",
-            "invocation_surfaces": {
-                "headless": {
-                    "argv": ["runner", "--model", "private-model", "private-prompt"],
-                    "env": {"TOKEN": "private-credential"},
-                },
-                "private-surface-content": {"role": "loyal-opposition", "output": "private-generated-text"},
-            },
-        },
-    )
-    assert row.status_code == 200, row.text
-    if active:
-        assert put(client, "harnesses", identifier, {"status": "active"}, expected_version=1).status_code == 200
-
-
-def bind(client, name, role):
-    response = client.post("/v1/sessions/bind", json={"native_context_id": name, "init_command": "::init gtkb " + role})
-    assert response.status_code == 200, response.text
-    assert response.json()["status"] == "init_requested"
-    return response.json()["binding"]
 
 
 def test_unknown_harness_returns_structured_error_without_mutation(native):
@@ -225,6 +194,10 @@ def test_ordinary_cli_and_direct_adapter_read_the_same_native_authority(native, 
     try:
         config = tmp_path / "groundtruth.toml"
         config.write_text(f'[groundtruth]\nauthority_url="http://127.0.0.1:{port}"\n', encoding="utf-8")
+        foreign = tmp_path / "unrelated.bin"
+        foreign.write_bytes(b"independent local work\x00")
+        local_before = {path: path.read_bytes() for path in (config, foreign)}
+        paths_before = {path.relative_to(tmp_path) for path in tmp_path.rglob("*") if path.is_file()}
         env = dict(env, PYTHONIOENCODING="utf-8")
         env.pop("GT_AUTHORITY_URL", None)
 
@@ -267,6 +240,8 @@ def test_ordinary_cli_and_direct_adapter_read_the_same_native_authority(native, 
         process.wait(timeout=15)
         offline = gt("A")
         assert offline.returncode == 1 and json.loads(offline.stdout)["errors"] == ["harness_authority_unavailable"]
+        assert {path: path.read_bytes() for path in local_before} == local_before
+        assert {path.relative_to(tmp_path) for path in tmp_path.rglob("*") if path.is_file()} == paths_before
     finally:
         if process.poll() is None:
             process.terminate()

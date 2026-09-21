@@ -16,7 +16,12 @@ What problem does this solve? Why is it needed?
 
 ## Proposed Solution
 
-How should this work? Include any relevant details.
+How should this work? Explain the approach and its tradeoffs.
+
+## Scope
+
+Which GT-KB platform surface, hosted application, or adopter is affected?
+For engineering-method feedback, include the `method-feedback` label.
 
 ## Alternatives Considered
 

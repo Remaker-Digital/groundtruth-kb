@@ -40,7 +40,7 @@ def _write_cursor_shim(root: Path) -> None:
     scripts.mkdir(exist_ok=True)
     (scripts / "cursor_harness.py").write_text("# fixture shim\n", encoding="utf-8")
     for name in ("bridge", "proposal-review", "verify"):
-        path = root / ".cursor" / "skills" / name / "SKILL.md"
+        path = root / ".agents" / "skills" / ("gtkb-" + name) / "SKILL.md"
         path.parent.mkdir(parents=True)
         path.write_text("Current own-harness instruction fixture.", encoding="utf-8")
 
@@ -104,7 +104,7 @@ def test_readiness_refuses_missing_or_empty_own_instructions(
 ) -> None:
     native_harness_record(tmp_path, _cursor_record())
     _write_cursor_shim(tmp_path)
-    own = tmp_path / ".cursor" / "skills" / "verify" / "SKILL.md"
+    own = tmp_path / ".agents" / "skills" / "gtkb-verify" / "SKILL.md"
     if missing:
         own.unlink()
     else:

@@ -3,7 +3,8 @@
 
 This script runs the local checks that must pass before a build can be treated
 as a serious production-release candidate. It intentionally does not deploy,
-push images, call live services, or mutate external infrastructure.
+push images or mutate external infrastructure. Read-only checks use the
+configured native authority; current source and runtime qualification remain separate.
 """
 
 from __future__ import annotations
@@ -343,16 +344,6 @@ def _check_isolation_program_backstop() -> None:
     _run([sys.executable, "scripts/isolation_program_backstop.py"], timeout=60)
 
 
-def _check_no_window_spawn_audit() -> None:
-    script_path = PROJECT_ROOT / "scripts" / "windows_no_window_spawn_audit.py"
-    if not script_path.is_file():
-        raise GateFailure("No-window spawn audit script is missing: scripts/windows_no_window_spawn_audit.py")
-    # WI-5071 reintroduction guard (DELIB-20260707): the audit exits 1 when any
-    # release-runtime launch site lacks a Windows no-window disposition, which
-    # _run() converts into a GateFailure.
-    _run([sys.executable, "scripts/windows_no_window_spawn_audit.py"], timeout=120)
-
-
 def _python_gates(skip_pip_audit: bool = False) -> None:
     _run(
         [
@@ -380,7 +371,6 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
     _run([sys.executable, "scripts/check_harness_parity.py", "--all"], timeout=120)
     _run([sys.executable, "scripts/check_environment_isolation.py"], timeout=60)
     _run([sys.executable, "scripts/check_session_overlay_policy.py"], timeout=60)
-    _run([sys.executable, "scripts/check_scoped_service_boundary.py"], timeout=60)
     _check_isolation_program_backstop()
     _run(
         [
@@ -398,23 +388,21 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
             "platform_tests/scripts/test_dora_001b_track2_ingest.py",
             "platform_tests/scripts/test_check_environment_isolation.py",
             "platform_tests/scripts/test_release_candidate_gate.py",
+            "platform_tests/scripts/test_windows_subprocess.py",
             "platform_tests/scripts/test_collect_dev_environment_inventory.py",
             "platform_tests/scripts/test_check_dev_environment_inventory_drift.py",
-            "platform_tests/scripts/test_gtkb_scoped_client.py",
             "platform_tests/scripts/test_gtkb_dashboard_control_plane.py",
             "platform_tests/scripts/test_gtkb_overlay.py",
             "platform_tests/scripts/test_groundtruth_governance_adoption.py",
             "platform_tests/scripts/test_codex_hook_parity.py",
             "platform_tests/scripts/test_run_spec_derived_tests.py",
             "platform_tests/scripts/test_memory_md_ceiling.py",
-            "platform_tests/scripts/test_command_registry_tracking.py",
             "platform_tests/scripts/test_wrap_capture_transcript.py",
             "platform_tests/scripts/test_wrap_scan_hygiene.py",
             "platform_tests/scripts/test_wrap_scan_consistency.py",
             "platform_tests/scripts/test_gitignore_session_snapshots.py",
             "platform_tests/scripts/test_wrap_scan_hygiene_skip_dirs.py",
             "platform_tests/scripts/test_wrap_scan_consistency_allowlist.py",
-            "platform_tests/scripts/test_rehearse_isolation.py",
             "platform_tests/scripts/test_isolation_program_backstop.py",
             "applications/Agent_Red/tests/integrations/test_cosmos_schema_extensions.py",
             "applications/Agent_Red/tests/integrations/test_action_executor.py",
@@ -422,8 +410,8 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
             "applications/Agent_Red/tests/integrations/test_usage_consumption.py",
             "applications/Agent_Red/tests/integrations/test_shopify_billing.py",
             "applications/Agent_Red/tests/unit/test_stripe_webhooks.py",
-            "platform_tests/hooks/test_formal_artifact_approval_gate.py",
-            "platform_tests/hooks/test_workstream_focus.py",
+            "platform_tests/scripts/test_session_role_resolution.py",
+            "platform_tests/groundtruth_kb/test_native_session_context.py",
             "-q",
             "--tb=short",
         ],
@@ -445,16 +433,34 @@ def _python_gates(skip_pip_audit: bool = False) -> None:
             "--override-ini=testpaths=tests",
             str(upstream_root / "tests" / "test_spec_event_surfacer.py"),
             str(upstream_root / "tests" / "test_managed_registry.py"),
-            str(upstream_root / "tests" / "test_scaffold_settings.py"),
-            str(upstream_root / "tests" / "test_scaffold_project.py"),
-            str(upstream_root / "tests" / "test_upgrade.py"),
-            str(upstream_root / "tests" / "test_settings_merge_drift.py"),
             str(upstream_root / "tests" / "test_doctor.py"),
             "-q",
             "--tb=short",
         ],
         timeout=180,
     )
+
+    # Native lifecycle tests retain the retired scaffold/settings/upgrade duties.
+    # Keep modules separate so the real hook/commit callback family runs alone.
+    for module, limit in (
+        ("groundtruth-kb/tests/test_native_application_scaffold.py", 600),
+        ("groundtruth-kb/tests/test_native_application_upgrade.py", 600),
+        ("groundtruth-kb/tests/adopter/test_init_scaffolds_adopter_owned_paths.py", 180),
+        ("platform_tests/groundtruth_kb/test_native_application_initialized_hooks.py", 1200),
+    ):
+        suite_root = upstream_root if module.startswith("groundtruth-kb/") else PROJECT_ROOT
+        _run(
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                f"--rootdir={suite_root}",
+                str(PROJECT_ROOT / module),
+                "-q",
+                "--tb=short",
+            ],
+            timeout=limit,
+        )
 
 
 def _frontend_gates() -> None:
@@ -513,7 +519,6 @@ def main() -> int:
         _check_tracked_secret_scan()
         _check_standing_backlog_health()
         _check_registered_application_roots()
-        _check_no_window_spawn_audit()
         if not args.skip_dev_inventory:
             _check_dev_environment_inventory(args.dev_inventory_max_age_hours)
         if not args.skip_dev_inventory_drift:

@@ -15,7 +15,7 @@ from pathlib import Path
 import pytest
 from groundtruth_kb.project.registry_control_plane import load_registry_snapshot
 
-from platform_tests.scripts.test_sot_read_discipline_hook import registry, run_hook
+from platform_tests.scripts.sot_hook_fixtures import registry, run_hook
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_HOOKS = PROJECT_ROOT / ".harness-baseline-configuration" / "hooks"

@@ -169,8 +169,8 @@ def _skill_system_prompt(skill: str | None, *, project_root: Path | None = None)
         return None
     if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", skill):
         raise CursorHarnessError("invalid skill route")
-    names = ("bridge", _SKILL_ROUTE_ALIASES[skill]) if skill in _SKILL_ROUTE_ALIASES else (skill,)
-    skills_root = (project_root or Path.cwd()) / ".cursor" / "skills"
+    names = ("gtkb-bridge", "gtkb-" + _SKILL_ROUTE_ALIASES[skill]) if skill in _SKILL_ROUTE_ALIASES else (skill,)
+    skills_root = (project_root or Path.cwd()) / ".agents" / "skills"
     instructions = []
     for name in names:
         skill_path = skills_root / name / "SKILL.md"
@@ -179,15 +179,15 @@ def _skill_system_prompt(skill: str | None, *, project_root: Path | None = None)
             or skills_root.is_junction()
             or not skill_path.resolve().is_relative_to(skills_root.absolute())
         ):
-            raise CursorHarnessError("skill route leaves this harness's skill directory")
+            raise CursorHarnessError("skill route leaves the shared authored skill directory")
         try:
             content = skill_path.read_text(encoding="utf-8")
             if not content.strip():
-                raise CursorHarnessError(f"empty skill route {name!r}; refresh this harness's projection")
+                raise CursorHarnessError(f"empty skill route {name!r}; check the shared authored skill source")
             instructions.append(content)
         except (OSError, UnicodeError) as exc:
             raise CursorHarnessError(
-                f"unknown or unreadable skill route {name!r}; refresh this harness's projection"
+                f"unknown or unreadable skill route {name!r}; check the shared authored skill source"
             ) from exc
     return "\n\n".join(instructions)
 
@@ -269,6 +269,10 @@ def _cursor_agent_env(*, project_root: Path) -> dict[str, str]:
     """Build the Cursor Agent subprocess environment without logging secrets."""
 
     env = os.environ.copy()
+    # The Cursor host supplies its own native context to the hooks; an inherited
+    # GT-KB context identity is never passed on, and no role is exported.
+    for name in ("GTKB_AUTHOR_SESSION_CONTEXT_ID", "GTKB_NATIVE_CONTEXT_ID"):
+        env.pop(name, None)
     try:
         env_values = load_env_local(check_only=True, env_file=project_root / ".env.local")
     except Exception:  # noqa: BLE001  # intentional-catch: auth injection must never block launch

@@ -1,6 +1,7 @@
 """Baseline artifact exclusion and fail-closed render (WI-7112, TEST-12546).
 
-Binds TEST-12546 to executable selectors. Covers the half of WI-7112 that
+Component cases of WI-5960/TEST-11985 carry the absorbed WI-7112/TEST-12546
+duty; they establish no separate binding or result for TEST-12546. Cover the cases that
 `is_projection_junk` did not: nested harness-config trees, projector output that
 has leaked into source, and artifact classes the projector does not recognize.
 
@@ -100,24 +101,51 @@ def test_legitimate_baseline_content_is_not_excluded(engine, tmp_path):
         assert not engine.is_projection_junk(planted, src_root), f"{rel} was wrongly excluded"
 
 
-def test_unrecognized_artifact_class_is_named_in_a_gap(engine):
-    """Fail-closed must identify WHAT was unrecognized, per the GO condition.
+def test_stub_renderer_reads_only_skill_manifests(engine, tmp_path):
+    """D15 (D34 R2): nothing is copied, so no artifact class can multiply through a copy loop.
 
-    The projector's gap list already fails the render; the requirement this
-    covers is that the message names the offending material rather than only
-    reporting that something was wrong.
+    The WI-7112 guard fenced a recursive copy of every file under the baseline's
+    skills/rules/hooks surfaces. Stage 1 of M15 deletes those surfaces: the only
+    skill output is a pointer stub per depth-one ``<skills_root>/<name>/SKILL.md``,
+    rendered from the frontmatter block alone. Helper files, reference files,
+    nested manifests and stray artifacts never reach a projection, whatever their
+    class, and the silent latin-1 round-trip of the original defect stays absent.
+    The former TEST-12546 duty is consolidated in TEST-11985. These component
+    assertions do not discharge its complete receiving qualification.
     """
     source = ENGINE_PATH.read_text(encoding="utf-8")
-    marker = "unrecognized artifact class"
-    assert marker in source, "fail-closed gap for unrecognized artifact classes is absent"
-    block = source[source.index(marker) - 600 : source.index(marker) + 400]
-    assert "plan.gaps.append" in block, "the unrecognized-class branch does not append a gap"
-    assert "offending" in block, "the gap message does not name the offending path"
-    assert "artifact_class" in block, "the gap message does not name the artifact class"
-    # The silent latin-1 round-trip was the defect; it must not survive anywhere.
+    for retired in ('profile["skills_dir"]', 'profile["rules_dir"]', 'profile["hooks_dir"]', "deferred_rules"):
+        assert retired not in source, f"a copy surface still reads {retired}"
+    assert "unrecognized artifact class" not in source, "the copy loop's fail-closed branch outlived the copy loop"
     assert 'read_bytes().decode("latin-1")' not in source, (
         "the silent latin-1 copy still runs for unrecognized artifact classes"
     )
+    renderer = source[source.index("def render_skill_stubs(") :]
+    renderer = renderer[: renderer.index("\ndef ", 1)]
+    assert 'glob("*/SKILL.md")' in renderer and "rglob(" not in renderer
+
+    skills_root = tmp_path / ".agents/skills"
+    for rel, text in {
+        "alpha/SKILL.md": "---\nname: alpha\ndescription: Alpha.\n---\n\nOnly the source carries this body.\n",
+        "alpha/helpers/run.py": "print('helper-only-source')\n",
+        "alpha/references/notes.md": "reference\n",
+        "alpha/nested/beta/SKILL.md": "---\nname: beta\ndescription: Beta.\n---\n",
+        "alpha/artifact.bin": "\x00binary",
+        "notes.md": "stray\n",
+        "gamma/README.md": "no manifest\n",
+    }.items():
+        path = skills_root / rel
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    profile = {"name": "claude", "config_dir": ".claude", "skills_stub_dir": ".claude/skills"}
+    plan = engine.Plan()
+    engine.render_skill_stubs(profile, skills_root, "stamp", plan)
+    assert not plan.gaps, plan.gaps
+    assert set(plan.writes) == {".claude/skills/alpha/SKILL.md"}
+    stub = plan.writes[".claude/skills/alpha/SKILL.md"]
+    assert stub.startswith("---\nname: alpha\ndescription: Alpha.\n---\n")
+    assert "Only the source carries this body." not in stub and "helper-only-source" not in stub
+    assert "Read and follow `.agents/skills/alpha/SKILL.md`" in stub
 
 
 @pytest.mark.parametrize(

@@ -47,7 +47,6 @@ def test_groundtruth_adopter_profile_is_pinned() -> None:
     assert config["project"]["profile"] == "dual-agent"
     assert config["project"]["cloud_provider"] == "azure"
     assert config["project"]["scaffold_version"] == "0.7.0rc1"
-    assert config["scoped_service"]["application_id"] == "agent-red"
 
 
 def test_release_candidate_gate_runs_governance_adoption_tests() -> None:
@@ -55,8 +54,8 @@ def test_release_candidate_gate_runs_governance_adoption_tests() -> None:
 
     assert "tests/scripts/test_groundtruth_governance_adoption.py" in gate
     assert "tests/scripts/test_codex_hook_parity.py" in gate
-    assert "tests/hooks/test_formal_artifact_approval_gate.py" in gate
-    assert "tests/hooks/test_workstream_focus.py" in gate
+    assert "platform_tests/scripts/test_session_role_resolution.py" in gate
+    assert "platform_tests/groundtruth_kb/test_native_session_context.py" in gate
     assert "scripts/check_harness_parity.py" in gate
 
 

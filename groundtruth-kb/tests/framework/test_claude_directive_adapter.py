@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-HOOK_PATH = REPO_ROOT / ".claude" / "hooks" / "directive-enforcement-adapter.py"
+HOOK_PATH = REPO_ROOT / ".harness-baseline-configuration" / "hooks" / "directive-enforcement-adapter.py"
 
 
 def test_pre_tool_use_allow() -> None:

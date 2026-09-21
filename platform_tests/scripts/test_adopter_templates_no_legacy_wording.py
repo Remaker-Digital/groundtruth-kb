@@ -1,34 +1,7 @@
-"""Adopter templates and golden fixtures carry no retired-substrate authority wording.
+"""Adopter templates and scaffold fixtures contain no retired authority claims.
 
-WI-6018 / `bridge/gtkb-d3-adopter-templates-purge` (GO at `-006`).
-
-CENSUS CRITERION (owner decision, 2026-08-15). The approved proposal asserted a
-flat "zero legacy-wording matches" across the template tree. That criterion is
-unsatisfiable as written: ``templates/rules/bridge-poller-canonical.md`` and
-``templates/bridge-os-poller-setup-prompt.md`` are deprecation stubs whose
-*subject* is the retired poller, and whose retained content includes a real
-archive path (``archive/smart-poller-2026-05-09/``) and real record identifiers
-(``DELIB-S337-SMART-POLLER-RETIREMENT-2026-05-09``). The GO simultaneously
-required those stubs to keep their retention sentence and their Slice 4
-Open Follow-On section 7 reference.
-
-The owner resolved this by adopting the semantic GT-KB's own baseline already
-uses: purge retired-substrate *authority claims*, keep accurate history.
-Concretely, and mechanically:
-
-* ``TAFE`` must not appear at all. It names a retired coordination substrate and
-  never appears in the purged baseline tree.
-* ``smart poller`` / ``OS poller`` may appear, but only as past-tense history,
-  archive paths, or record identifiers — which is exactly what the two
-  deprecation stubs and the retirement narrative require.
-
-METHOD (per ``WI-6327``). The census walks the filesystem and matches
-case-insensitively. ``git grep`` is tracked-only and would miss untracked files;
-``test_census_is_filesystem_based`` demonstrates that difference rather than
-asserting it.
-
-Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC.
-All rights reserved.
+The census checks current authored inputs, including untracked files. Historical
+formal records are outside these template and fixture directories.
 """
 
 from __future__ import annotations
@@ -48,14 +21,9 @@ TEXT_SUFFIXES = {".md", ".py", ".toml", ".json", ".txt"}
 #: Retired coordination substrate. Never legitimate in an adopter template.
 TAFE_RE = re.compile(r"TAFE", re.IGNORECASE)
 
-#: Retired poller mechanisms. Legitimate only as history / paths / record ids.
-POLLER_RE = re.compile(r"(?:smart[\s-]poller|\bOS[\s-]poller)", re.IGNORECASE)
 
 #: Purge artifact: the replacement term accidentally doubled.
 DOUBLED_TERM_RE = re.compile(r"\b(bridge[\s-]state)\b\s+bridge[\s-]state\b", re.IGNORECASE)
-
-POLLER_CANONICAL = TEMPLATE_ROOT / "rules" / "bridge-poller-canonical.md"
-POLLER_SETUP_PROMPT = TEMPLATE_ROOT / "bridge-os-poller-setup-prompt.md"
 
 
 def _text_files(root: Path) -> list[Path]:
@@ -157,44 +125,6 @@ def test_settled_replacement_term_is_adopted() -> None:
 
 
 # --------------------------------------------------------------------------
-# Retention contract (the F1 narrowing: inverted, not dropped)
-# --------------------------------------------------------------------------
-
-
-def test_poller_templates_retained() -> None:
-    """Both poller templates still exist. The narrowing retained them."""
-    assert POLLER_CANONICAL.is_file(), f"missing retained template: {POLLER_CANONICAL}"
-    assert POLLER_SETUP_PROMPT.is_file(), f"missing retained template: {POLLER_SETUP_PROMPT}"
-
-
-def test_poller_templates_carry_no_tafe() -> None:
-    """The retained stubs describe retired mechanisms without naming TAFE."""
-    for path in (POLLER_CANONICAL, POLLER_SETUP_PROMPT):
-        assert not TAFE_RE.search(_read(path)), f"TAFE reference retained in {path.name}"
-
-
-def test_poller_history_is_permitted_and_present() -> None:
-    """Poller history is retained, not purged.
-
-    Guards the opposite failure from the one above: a later slice that strips the
-    deprecation stub's subject matter would leave a stub that no longer explains
-    what was retired.
-    """
-    text = _read(POLLER_CANONICAL)
-    assert POLLER_RE.search(text), (
-        "bridge-poller-canonical.md no longer references the mechanism it deprecates; "
-        "historical references are retained deliberately"
-    )
-
-
-def test_retention_contract_text_preserved() -> None:
-    """The retention sentence and its follow-on reference survive the purge."""
-    text = _read(POLLER_CANONICAL)
-    assert "two release cycles" in text, "retention sentence removed from bridge-poller-canonical.md"
-    assert "Open Follow-On" in text, "Slice 4 Open Follow-On reference removed"
-
-
-# --------------------------------------------------------------------------
 # Census method (WI-6327)
 # --------------------------------------------------------------------------
 
@@ -205,28 +135,18 @@ def test_census_is_case_insensitive() -> None:
         assert TAFE_RE.search(f"prefix {probe} suffix"), f"census missed case variant {probe!r}"
 
 
-def test_census_is_filesystem_based(tmp_path: Path) -> None:
-    """The filesystem census sees an untracked file; a tracked-only census does not.
-
-    Demonstrated rather than asserted, per the GO's expectation that an assertion
-    never observed failing is not yet evidence. An untracked file is written into
-    the template tree, both censuses run, and the tracked-only census is shown to
-    miss what the filesystem census finds.
-    """
-    probe = TEMPLATE_ROOT / "_census_probe_untracked.md"
-    assert not probe.exists(), "probe path unexpectedly present; refusing to overwrite"
-    probe.write_text("# probe\n\nTAFE-backed bridge state\n", encoding="utf-8")
-    try:
-        fs_hits = _census(TEMPLATE_ROOT, TAFE_RE)
-        tracked_hits = _git_tracked_census(TEMPLATE_ROOT, "TAFE")
-        rel = probe.relative_to(PROJECT_ROOT).as_posix()
-
-        assert rel in fs_hits, "filesystem census failed to see an untracked file"
-        assert rel not in tracked_hits, (
-            "tracked-only census unexpectedly saw an untracked file; "
-            "the negative control is not demonstrating the WI-6327 defect"
-        )
-    finally:
-        probe.unlink(missing_ok=True)
-
-    assert not probe.exists(), "census probe was not cleaned up"
+def test_census_is_filesystem_based(tmp_path: Path, monkeypatch) -> None:
+    """An untracked fixture is visible to the filesystem census, not Git grep."""
+    subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True, capture_output=True)
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    tracked = templates / "ordinary.md"
+    tracked.write_text("Ordinary current guidance", encoding="utf-8")
+    subprocess.run(["git", "-C", str(tmp_path), "add", "templates/ordinary.md"], check=True, capture_output=True)
+    probe = templates / "untracked.md"
+    probe.write_text("Retired TAFE-backed authority", encoding="utf-8")
+    monkeypatch.setitem(globals(), "PROJECT_ROOT", tmp_path)
+    fs_hits = _census(templates, TAFE_RE)
+    tracked_hits = _git_tracked_census(templates, "TAFE")
+    assert fs_hits == {"templates/untracked.md": 1}
+    assert tracked_hits == {}

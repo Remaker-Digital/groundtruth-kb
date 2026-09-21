@@ -68,8 +68,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
 
 - **Package-level contributor guide:** [`groundtruth-kb/CONTRIBUTING.md`](groundtruth-kb/CONTRIBUTING.md)
 - **New-adopter walkthrough:** [`groundtruth-kb/docs/start-here.md`](groundtruth-kb/docs/start-here.md)
-- **Harness governance & roles:** [`AGENTS.md`](AGENTS.md), [`.claude/rules/`](.claude/rules/)
-- **Security policy:** [`SECURITY.md`](SECURITY.md)
+- **Harness governance & roles:** [`AGENTS.md`](AGENTS.md), [`.harness-baseline-configuration/rules/`](.harness-baseline-configuration/rules/)
 
 ## License of contributions
 

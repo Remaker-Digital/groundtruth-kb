@@ -38,39 +38,6 @@ def _write_registry(root: Path, records: str) -> None:
     registry.write_text(records, encoding="utf-8")
 
 
-def _write_dispatch_duplicate(root: Path) -> None:
-    (root / "config" / "dispatcher").mkdir(parents=True, exist_ok=True)
-    (root / "harness-state").mkdir(parents=True, exist_ok=True)
-    (root / "config" / "dispatcher" / "rules.toml").write_text(
-        """
-[harnesses.A]
-can_fire_events = true
-can_receive_dispatch = true
-dispatch_availability = 75
-dispatch_cost = 20
-dispatch_quality = 95
-""".lstrip(),
-        encoding="utf-8",
-    )
-    (root / "harness-state" / "harness-registry.json").write_text(
-        json.dumps(
-            {
-                "harnesses": [
-                    {
-                        "id": "A",
-                        "can_fire_events": True,
-                        "can_receive_dispatch": True,
-                        "dispatch_availability": 75,
-                        "dispatch_cost": 20,
-                        "dispatch_quality": 95,
-                    }
-                ]
-            }
-        ),
-        encoding="utf-8",
-    )
-
-
 def _violations(root: Path) -> dict[str, sot_audit.AuditCandidate]:
     report = run_duplicate_sot_audit(root)
     return {c.candidate_id: c for c in report.candidates if c.classification != "registered_sot"}
@@ -181,27 +148,16 @@ def test_duplicate_guard_fails_uncovered_invalid_derived_cache(tmp_path: Path, m
     assert "read_only" in result.message
 
 
-def test_duplicate_guard_fails_on_known_covered_dispatch_duplicate(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    _write_registry(
-        tmp_path,
-        _registry_record("harness-registry", "harness-state/harness-registry.json", domain="harness_state"),
-    )
-    _write_dispatch_duplicate(tmp_path)
-
-    violation = _violations(tmp_path)["duplicate-dispatch-harness-fields"]
-    assert violation.classification == "duplicate_sot_violation"
-    assert set(violation.paths) == {"config/dispatcher/rules.toml", "harness-state/harness-registry.json"}
-    result = _guard_with_complete_membership(tmp_path, monkeypatch)
-
-    assert result.status == "fail"
-    assert result.required is True
-    assert "persistent duplicate-SoT violation" in result.message
-    assert "duplicate-dispatch-harness-fields" in result.message
-
-
 def test_run_doctor_bridge_profile_wires_duplicate_guard() -> None:
     source = inspect.getsource(doctor_mod.run_doctor)
 
     assert "_check_sot_duplicate_guard(target)" in source
+
+
+@pytest.mark.parametrize("storage", ["ordinary-missing.json", ".gtkb-state/missing.json"])
+def test_duplicate_guard_refuses_missing_artifact_with_complete_membership(tmp_path, monkeypatch, storage):
+    _write_registry(tmp_path, _registry_record("missing", storage))
+    result = _guard_with_complete_membership(tmp_path, monkeypatch)
+    assert result.status == "fail" and result.required is True
+    assert "baseline incomplete" in result.message
+    assert "missing_registry_artifacts=1" in result.message

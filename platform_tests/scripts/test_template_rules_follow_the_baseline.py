@@ -1,4 +1,4 @@
-"""Scaffold rule templates are copies of the neutral baseline rules, never a second authored carrier."""
+"""No scaffold rule template duplicates a neutral baseline rule (M15, D15/D34); the template-only set is named."""
 
 from __future__ import annotations
 
@@ -9,19 +9,19 @@ import pytest
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_RULES = REPO_ROOT / ".harness-baseline-configuration" / "rules"
 TEMPLATE_RULES = REPO_ROOT / "groundtruth-kb" / "templates" / "rules"
-# Rules that exist only as scaffold templates today; a new template-only rule is a finding to explain here.
-TEMPLATE_ONLY = {"bridge-poller-canonical.md", "prime-bridge-collaboration-protocol.md", "session-start-orientation.md"}
+# Rules that exist only as scaffold templates (retained for M26.6, design R-C8); a new template-only rule is a
+# finding to explain here.
+TEMPLATE_ONLY = {"prime-bridge-collaboration-protocol.md", "session-start-orientation.md"}
 
 
 def _shared_rule_names() -> list[str]:
     return sorted(path.name for path in TEMPLATE_RULES.glob("*.md") if (BASELINE_RULES / path.name).is_file())
 
 
-def test_every_shared_rule_template_is_byte_identical_to_the_baseline_rule() -> None:
-    names = _shared_rule_names()
-    assert names, "no shared rule templates found"
-    diverged = [name for name in names if (TEMPLATE_RULES / name).read_bytes() != (BASELINE_RULES / name).read_bytes()]
-    assert diverged == [], f"scaffold rule templates diverged from the neutral baseline: {diverged}"
+def test_no_rule_template_duplicates_a_baseline_rule() -> None:
+    """D15/D34: the baseline rule is read on demand; a template copy of it would be a second authored carrier."""
+    assert _shared_rule_names() == []
+    assert BASELINE_RULES.is_dir() and any(BASELINE_RULES.glob("*.md"))
 
 
 def test_template_only_rules_are_the_named_set() -> None:

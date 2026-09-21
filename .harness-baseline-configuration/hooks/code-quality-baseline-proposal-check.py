@@ -9,13 +9,11 @@ delegate's verdicts and reasons are untouched.
 
 import io
 import json
-import os
 import sys
 from pathlib import Path
 
 from groundtruth_kb.hooks.code_quality_baseline_proposal_check import main as _delegate
 
-ROOT = Path(os.environ.get("{{HARNESS_PROJECT_DIR_VAR}}") or os.getcwd()).resolve()
 HOOKS = Path(__file__).resolve().parent
 if str(HOOKS) not in sys.path:
     sys.path.insert(0, str(HOOKS))
@@ -30,9 +28,10 @@ def main() -> int:
         return _delegate() or 0
 
     try:
+        from _hook_context import resolve_root
         from _shell_payload import expand_shell_payload
 
-        candidates = expand_shell_payload(payload, ROOT)
+        candidates = expand_shell_payload(payload, resolve_root(payload))
     except Exception:
         candidates = [payload]
 

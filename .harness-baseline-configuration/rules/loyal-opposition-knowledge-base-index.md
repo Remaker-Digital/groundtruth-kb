@@ -6,12 +6,12 @@ Purpose: index of Loyal Opposition rules maintained for the reviewing harness an
 > `explicit_query` — use it on demand when navigating Loyal Opposition surfaces. Do not
 > load wholesale at base session startup.
 
-## Active Rules under `{{HARNESS_RULES_DIR}}/`
+## Active Rules under `.harness-baseline-configuration/rules/`
 
 - `session-bootstrap.md`
 - `standing-priorities.md`
 - `groundtruth-kb-vision.md`
-- `role-way-of-working.md`
+- `way-of-working.md`
 - `review-operating-contract.md`
 - `loyal-opposition-runbook.md`
 - `loyal-opposition-knowledge-base-index.md` (this file)
@@ -30,9 +30,9 @@ Purpose: index of Loyal Opposition rules maintained for the reviewing harness an
 ## Global Baseline (session start)
 
 - Project root `AGENTS.md` defines default Loyal Opposition operating contract.
-- `{{HARNESS_RULES_DIR}}/canonical-terminology.md` — core primer subset only at startup;
+- `.harness-baseline-configuration/rules/canonical-terminology.md` — core primer subset only at startup;
   full corpus and activity-specific terms load on `::open <activity>`.
-- `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md` — bridge statuses, gates, claim/preflight.
+- `.harness-baseline-configuration/rules/file-bridge-protocol.md` — bridge statuses, gates, claim/preflight.
 - `session-bootstrap.md` — deterministic restart guide (Phase A global; Phase B
   defers activity-only surfaces).
 
@@ -43,12 +43,13 @@ Activity-specific surfaces load on demand from the baseline rules directory:
 | Surface | Open with |
 |---|---|
 | `standing-priorities.md`, `groundtruth-kb-vision.md` | `::open project` |
-| `role-way-of-working.md` | `::open deliberation` |
+| `way-of-working.md` | `::open deliberation` |
 | `review-operating-contract.md`, `loyal-opposition-runbook.md` | `::open build` or `::open test` |
 | `loyal-opposition-review-checklists.md`, `template-code-review.md`, `template-decision-memo.md` | `::open test` (substantial review work) |
 
-`{{HARNESS_SKILLS_DIR}}/` adapters are generated from the canonical baseline skill source; no separate adapter
-load is required at startup when the canonical skill source is unchanged.
+Skills are authored once under `.agents/skills/` and read there. Hosts that need
+registrations receive frontmatter-preserving pointer stubs; load the authored skill
+body and its helpers on demand, never a copied provider-specific skill body.
 
 ## Legacy Startup-Loaded Rules note (retired 2026-07-01)
 

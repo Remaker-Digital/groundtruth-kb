@@ -15,7 +15,7 @@ import pytest
 from groundtruth_kb.bridge.native import parse_authored_message
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 
-from platform_tests.groundtruth_kb.test_native_bridge import authored
+from platform_tests.groundtruth_kb.bridge_fixtures import authored
 
 
 def message(status="NEW", **fields):

@@ -3,8 +3,8 @@
 Per `bridge/gtkb-canonical-terminology-system-context-model-001-005.md`
 (Codex GO at `-006`):
 
-- Markdown/TOML at ``.claude/rules/canonical-terminology.md`` and
-  ``.claude/rules/canonical-terminology.toml`` remain the startup-readable
+- Markdown/TOML at ``.harness-baseline-configuration/rules/canonical-terminology.md`` and
+  ``.harness-baseline-configuration/rules/canonical-terminology.toml`` remain the startup-readable
   authority for fresh agents and scaffold templates. Phase 1 does NOT change
   what fresh agents read at startup.
 - This module provides a structured backing registry over MemBase's
@@ -460,7 +460,7 @@ _HEADING_RE = re.compile(r"^###\s+(.+?)\s*$", re.MULTILINE)
 
 
 def parse_markdown_glossary(markdown_text: str) -> list[dict[str, str]]:
-    """Parse ``.claude/rules/canonical-terminology.md`` into a list of term
+    """Parse ``.harness-baseline-configuration/rules/canonical-terminology.md`` into a list of term
     dicts. Each dict has ``id`` (slug-form, uppercase), ``canonical_term``
     (display form), and ``definition`` (the prose immediately following the
     heading until the next ``### `` heading or the end of the section).

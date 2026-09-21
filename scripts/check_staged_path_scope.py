@@ -2,15 +2,14 @@
 """Check that git staged files do not exceed the declared scope (WI-6690).
 
 Prevents cross-session index contamination during concurrent multi-agent operation.
-Refuses commits whose staged set exceeds declared paths; passes on exact matches
-and valid subsets; warns and passes when no declared scope is present.
+Compares staged paths with explicitly supplied paths. Reports exact matches,
+valid subsets and excess paths; warns when no comparison scope is supplied.
 """
 
 from __future__ import annotations
 
 import argparse
 import fnmatch
-import json
 import os
 import subprocess
 import sys
@@ -50,55 +49,7 @@ def resolve_declared_scope(
         normalized = [_normalize_path(p) for p in explicit_paths]
         return normalized, "explicit argument (--expect-paths)"
 
-    packet_file = project_root / ".gtkb-state" / "implementation-authorizations" / "current.json"
-    if packet_file.is_file():
-        try:
-            data = json.loads(packet_file.read_text(encoding="utf-8"))
-            globs = (
-                data.get("target_path_globs")
-                or data.get("implementation_start", {}).get("target_path_globs")
-                or data.get("target_paths")
-            )
-            if not globs and "project_authorization" in data:
-                tc_list = data["project_authorization"].get("target_classifications", [])
-                globs = [tc["path"] for tc in tc_list if isinstance(tc, dict) and "path" in tc]
-
-            if globs and isinstance(globs, list):
-                bridge_id = data.get("bridge_id") or data.get("implementation_start", {}).get("bridge_id") or "unknown"
-                normalized = [_normalize_path(str(p)) for p in globs]
-                return normalized, f"active packet ({packet_file.name}, bridge_id={bridge_id})"
-        except Exception as exc:
-            print(f"WARN [check_staged_path_scope]: Error reading {packet_file}: {exc}", file=sys.stderr)
-
     return None, "none"
-
-
-def find_path_contributor(project_root: Path, extra_path: str) -> str | None:
-    """Attempt to identify which other bridge authorization claims this extra path."""
-    by_bridge_dir = project_root / ".gtkb-state" / "implementation-authorizations" / "by-bridge"
-    if by_bridge_dir.is_dir():
-        for f in by_bridge_dir.glob("*.json"):
-            try:
-                data = json.loads(f.read_text(encoding="utf-8"))
-                globs = (
-                    data.get("target_path_globs")
-                    or data.get("implementation_start", {}).get("target_path_globs")
-                    or data.get("target_paths")
-                    or []
-                )
-                for pattern in globs:
-                    if matches_declared_pattern(extra_path, _normalize_path(str(pattern))):
-                        bridge_id = data.get("bridge_id", f.stem)
-                        wi = (
-                            data.get("work_intent_claim", {}).get("work_item_id")
-                            or data.get("implementation_start", {}).get("work_intent_claim", {}).get("work_item_id")
-                            or data.get("project_authorization", {}).get("work_item_id")
-                        )
-                        wi_str = f" ({wi})" if wi else ""
-                        return f"thread '{bridge_id}'{wi_str}"
-            except Exception:
-                continue
-    return None
 
 
 def matches_declared_pattern(staged_path: str, declared_pattern: str) -> bool:
@@ -132,8 +83,8 @@ def check_staged_scope(
 
     if declared_paths is None:
         return 0, (
-            f"WARN staged-path scope: {len(staged_paths)} file(s) staged, but no declared scope found; "
-            "allowing undeclared commit."
+            f"WARN staged-path scope: {len(staged_paths)} file(s) staged, but no explicit paths supplied; "
+            "comparison not performed."
         )
 
     extra_paths: list[str] = []
@@ -160,9 +111,7 @@ def check_staged_scope(
         lines.append(f"  + {dp}")
     lines.append("Staged paths outside declared scope (cross-session contamination risk):")
     for ep in extra_paths:
-        owner = find_path_contributor(project_root, ep)
-        owner_info = f" [likely from {owner}]" if owner else ""
-        lines.append(f"  - {ep}{owner_info}")
+        lines.append(f"  - {ep}")
     lines.append("Remedy: Unstage extra files using 'git restore --staged <file>' before committing.")
 
     return 1, "\n".join(lines)
@@ -174,7 +123,7 @@ def main() -> int:
         "--expect-paths",
         nargs="*",
         default=None,
-        help="Explicit expected file paths (overrides packet scope).",
+        help="Explicit expected file paths for comparison.",
     )
     parser.add_argument(
         "--project-root",

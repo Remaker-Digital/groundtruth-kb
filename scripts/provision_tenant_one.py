@@ -15,7 +15,7 @@ Usage:
     # Also seed the knowledge base:
     python scripts/provision_tenant_one.py --provision --seed-kb
 
-Requires Azure credentials in .env.local:
+Requires Azure credentials in applications/Agent_Red/.env.local or the environment:
     COSMOS_DB_ENDPOINT, COSMOS_DB_KEY, COSMOS_DB_DATABASE
 
 (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
@@ -30,19 +30,18 @@ import logging
 import os
 import secrets
 import sys
-import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
-# Add project root to path
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-if str(PROJECT_ROOT) not in sys.path:
-    sys.path.insert(0, str(PROJECT_ROOT))
+REPO_ROOT = Path(__file__).resolve().parents[1]
+APP_ROOT = REPO_ROOT / "applications" / "Agent_Red"
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
-# Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+from scripts._env import load_env_local  # noqa: E402 - standalone script bootstrap
 
-load_env_local()
+if str(APP_ROOT) not in sys.path:
+    sys.path.insert(0, str(APP_ROOT))
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -52,13 +51,6 @@ logger = logging.getLogger(__name__)
 # Defaults are the canonical Remaker Digital test tenant.
 # See REPEATABLE-PROCEDURES.md §7.4 for documented-default policy.
 # ---------------------------------------------------------------------------
-
-TENANT_ID = os.environ.get("SEED_TENANT_ID", "remaker-digital-001")
-SHOP_DOMAIN = os.environ.get("SEED_SHOP_DOMAIN", "blanco-9939.myshopify.com")
-CUSTOMER_EMAIL = os.environ.get("SEED_CUSTOMER_EMAIL", "mike@remakerdigital.com")
-TIER = os.environ.get("SEED_TIER", "professional")
-BILLING_CHANNEL = os.environ.get("SEED_BILLING_CHANNEL", "shopify")
-INTERVAL = os.environ.get("SEED_INTERVAL", "month")
 
 
 def generate_api_key() -> str:
@@ -94,17 +86,24 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
     )
     from src.multi_tenant.repository import TenantRepository
 
+    TENANT_ID = os.environ.get("SEED_TENANT_ID", "remaker-digital-001")
+    SHOP_DOMAIN = os.environ.get("SEED_SHOP_DOMAIN", "blanco-9939.myshopify.com")
+    CUSTOMER_EMAIL = os.environ.get("SEED_CUSTOMER_EMAIL", "mike@remakerdigital.com")
+    TIER = os.environ.get("SEED_TIER", "professional")
+    BILLING_CHANNEL = os.environ.get("SEED_BILLING_CHANNEL", "shopify")
+    INTERVAL = os.environ.get("SEED_INTERVAL", "month")
+
     # Generate credentials
     api_key = generate_api_key()
     widget_key = generate_widget_key(TENANT_ID)
-    now = datetime.now(timezone.utc).isoformat()
+    now = datetime.now(UTC).isoformat()
 
     tenant_doc = TenantDocument(
         id=TENANT_ID,
         tenant_id=TENANT_ID,
         status=TenantStatus.ACTIVE,
-        billing_channel=BillingChannel.SHOPIFY,
-        tier=TenantTier.PROFESSIONAL,
+        billing_channel=BillingChannel(BILLING_CHANNEL),
+        tier=TenantTier(TIER),
         interval=INTERVAL,
         addons=[],
         shopify_shop_domain=SHOP_DOMAIN,
@@ -112,8 +111,8 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
         consent_status=ConsentStatus.GRANTED,
         api_key_hash=hash_key(api_key),
         widget_key_hash=hash_key(widget_key),
-        rate_limit_rpm=50,
-        max_concurrent=10,
+        rate_limit_rpm=None,
+        max_concurrent=None,
         created_at=now,
         updated_at=now,
     )
@@ -127,11 +126,11 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
     print(f"  Shop domain:    {SHOP_DOMAIN}")
     print(f"  Tier:           {TIER}")
     print(f"  Channel:        {BILLING_CHANNEL}")
-    print(f"  Status:         active")
+    print("  Status:         active")
     print(f"  Email:          {CUSTOMER_EMAIL}")
-    print(f"  Consent:        granted")
-    print(f"  Rate limit:     50 rpm")
-    print(f"  Concurrency:    10")
+    print("  Consent:        granted")
+    print("  Rate limit:     tier default")
+    print("  Concurrency:    tier default")
     print()
     print("-" * 65)
     print("  CREDENTIALS (save these — they cannot be retrieved later)")
@@ -151,158 +150,152 @@ async def provision(dry_run: bool = True, seed_kb: bool = False) -> None:
 
     # Initialize Cosmos DB connection
     cosmos = get_cosmos_manager()
-    await cosmos.initialize()
-
-    from src.multi_tenant.repository import DocumentConflictError
-
-    repo = TenantRepository()
     try:
-        await repo.create(TENANT_ID, tenant_doc)
-        print("[OK] Tenant document created in Cosmos DB.")
-    except (DocumentConflictError, Exception) as e:
-        if "Conflict" in str(e) or "409" in str(e) or "already exists" in str(e):
+        await cosmos.initialize()
+
+        from src.multi_tenant.repository import DocumentConflictError
+
+        repo = TenantRepository()
+        try:
+            await repo.create(TENANT_ID, tenant_doc)
+            print("[OK] Tenant document created in Cosmos DB.")
+        except DocumentConflictError:
             print(f"[SKIP] Tenant {TENANT_ID} already exists. Updating...")
             await repo.upsert(TENANT_ID, tenant_doc)
             print("[OK] Tenant document updated (upsert).")
-        else:
-            print(f"[ERROR] Failed to create tenant: {e}")
-            raise
 
-    # Also create a default preferences document
-    from src.multi_tenant.cosmos_schema import PreferencesDocument
-    from src.multi_tenant.repository import PreferencesRepository
+        # Also create a default preferences document
+        from src.multi_tenant.cosmos_schema import PreferencesDocument
+        from src.multi_tenant.repository import PreferencesRepository
 
-    prefs_repo = PreferencesRepository()
-    prefs_doc = PreferencesDocument(
-        id=f"{TENANT_ID}:1",
-        tenant_id=TENANT_ID,
-        version=1,
-        is_current=True,
-        # Brand & tone
-        brand_name="Agent Red",
-        brand_voice="helpful, professional, and knowledgeable",
-        # Languages
-        primary_language="en",
-        additional_languages=[],
-        # Response style
-        response_length="standard",
-        formality_level="balanced",
-        # Business policies
-        return_policy="Agent Red subscriptions can be cancelled at any time. Monthly subscriptions end at the close of the current billing period. Annual subscriptions are non-refundable but can be cancelled to prevent renewal.",
-        shipping_info="Agent Red is a cloud-hosted SaaS product. No shipping required. Access is provisioned immediately upon subscription activation.",
-        # Escalation rules
-        escalation_threshold=0.7,
-        escalation_keywords=["speak to a person", "human agent", "manager", "refund", "cancel subscription"],
-        # Memory & privacy
-        memory_enabled=True,
-        # Custom instructions
-        custom_instructions=(
-            "You are the Agent Red AI assistant on the Agent Red Customer Experience "
-            "storefront. Your role is to help visitors and merchants understand "
-            "Agent Red's features, pricing, setup process, and competitive advantages. "
-            "You are a live demonstration of the product itself — your responses showcase "
-            "Persistent Customer Memory, fail-closed safety validation, and the six-agent "
-            "pipeline. When asked about competitors, be factual and specific about Agent Red's "
-            "advantages (4-21x cheaper, 4.7x faster P50, lightweight 15-20KB widget) without "
-            "disparaging other products. For returning visitors, reference their previous "
-            "interactions to demonstrate the memory capability."
-        ),
-        # Widget appearance — visual
-        widget_primary_color="#ff3621",
-        widget_background_color="#141414",
-        widget_position="bottom-right",
-        widget_offset_x=20,
-        widget_offset_y=20,
-        widget_agent_display_name="Agent Red AI",
-        widget_agent_title="Customer Experience Assistant",
-        widget_show_branding=True,
-        widget_mobile_enabled=True,
-        widget_dark_mode=True,
-        # Widget behavior
-        widget_offline_message="We're currently offline, but our AI assistant is available 24/7. Leave a message and we'll follow up!",
-        widget_auto_open=True,
-        widget_auto_open_delay=5,
-        widget_offline_behavior="ai_only",
-        widget_chat_rating_enabled=True,
-        widget_sound_enabled=True,
-        widget_file_upload_enabled=False,
-        # Widget content
-        widget_header_text="Agent Red Support",
-        widget_input_placeholder="Ask about features, pricing, or setup...",
-        widget_page_rules=[],
-        # Metadata
-        created_at=now,
-        created_by="provision_tenant_one.py",
-    )
+        prefs_repo = PreferencesRepository()
+        prefs_doc = PreferencesDocument(
+            id=f"{TENANT_ID}:1",
+            tenant_id=TENANT_ID,
+            version=1,
+            is_current=True,
+            # Brand & tone
+            brand_name="Agent Red",
+            brand_voice="helpful, professional, and knowledgeable",
+            # Languages
+            primary_language="en",
+            additional_languages=[],
+            # Response style
+            response_length="standard",
+            formality_level="balanced",
+            # Business policies
+            return_policy="Agent Red subscriptions can be cancelled at any time. Monthly subscriptions end at the close of the current billing period. Annual subscriptions are non-refundable but can be cancelled to prevent renewal.",
+            shipping_info="Agent Red is a cloud-hosted SaaS product. No shipping required. Access is provisioned immediately upon subscription activation.",
+            # Escalation rules
+            escalation_threshold=0.7,
+            escalation_keywords=["speak to a person", "human agent", "manager", "refund", "cancel subscription"],
+            # Memory & privacy
+            memory_enabled=True,
+            # Custom instructions
+            custom_instructions=(
+                "You are the Agent Red AI assistant on the Agent Red Customer Experience "
+                "storefront. Your role is to help visitors and merchants understand "
+                "Agent Red's features, pricing, setup process, and competitive advantages. "
+                "You are a live demonstration of the product itself — your responses showcase "
+                "Persistent Customer Memory, fail-closed safety validation, and the six-agent "
+                "pipeline. When asked about competitors, be factual and specific about Agent Red's "
+                "advantages (4-21x cheaper, 4.7x faster P50, lightweight 15-20KB widget) without "
+                "disparaging other products. For returning visitors, reference their previous "
+                "interactions to demonstrate the memory capability."
+            ),
+            # Widget appearance — visual
+            widget_primary_color="#ff3621",
+            widget_background_color="#141414",
+            widget_position="bottom-right",
+            widget_offset_x=20,
+            widget_offset_y=20,
+            widget_agent_display_name="Agent Red AI",
+            widget_agent_title="Customer Experience Assistant",
+            widget_show_branding=True,
+            widget_mobile_enabled=True,
+            widget_dark_mode=True,
+            # Widget behavior
+            widget_offline_message="We're currently offline, but our AI assistant is available 24/7. Leave a message and we'll follow up!",
+            widget_auto_open=True,
+            widget_auto_open_delay=5,
+            widget_offline_behavior="ai_only",
+            widget_chat_rating_enabled=True,
+            widget_sound_enabled=True,
+            widget_file_upload_enabled=False,
+            # Widget content
+            widget_header_text="Agent Red Support",
+            widget_input_placeholder="Ask about features, pricing, or setup...",
+            widget_page_rules=[],
+            # Metadata
+            created_at=now,
+            created_by="provision_tenant_one.py",
+        )
 
-    try:
-        await prefs_repo.create(TENANT_ID, prefs_doc)
-        print("[OK] Preferences document created.")
-    except (DocumentConflictError, Exception) as e:
-        if "Conflict" in str(e) or "409" in str(e) or "already exists" in str(e):
+        try:
+            await prefs_repo.create(TENANT_ID, prefs_doc)
+            print("[OK] Preferences document created.")
+        except DocumentConflictError:
             await prefs_repo.upsert(TENANT_ID, prefs_doc)
             print("[OK] Preferences document updated (upsert).")
-        else:
-            print(f"[ERROR] Failed to create preferences: {e}")
 
-    # Create superadmin team member for the tenant owner
-    from src.multi_tenant.auth import generate_user_api_key, hash_api_key
-    from src.multi_tenant.cosmos_schema import TeamMemberDocument, TeamMemberRole
-    from src.multi_tenant.repository import TeamMemberRepository
+        # Create superadmin team member for the tenant owner
+        from src.multi_tenant.auth import generate_user_api_key, hash_api_key
+        from src.multi_tenant.cosmos_schema import TeamMemberDocument, TeamMemberRole
+        from src.multi_tenant.repository import TeamMemberRepository
 
-    team_repo = TeamMemberRepository()
-    superadmin_email = CUSTOMER_EMAIL
-    superadmin_member_id = f"{TENANT_ID}:{superadmin_email}"
-    superadmin_api_key = generate_user_api_key(TENANT_ID)
-    superadmin_key_hash = hash_api_key(superadmin_api_key)
-    superadmin_key_prefix = superadmin_api_key[:12] + "..."
+        team_repo = TeamMemberRepository()
+        superadmin_email = CUSTOMER_EMAIL
+        superadmin_member_id = f"{TENANT_ID}:{superadmin_email}"
+        superadmin_api_key = generate_user_api_key(TENANT_ID)
+        superadmin_key_hash = hash_api_key(superadmin_api_key)
+        superadmin_key_prefix = superadmin_api_key[:12] + "..."
 
-    superadmin_doc = TeamMemberDocument(
-        id=superadmin_member_id,
-        tenant_id=TENANT_ID,
-        email=superadmin_email,
-        display_name="Owner",
-        role=TeamMemberRole.SUPERADMIN,
-        is_active=True,
-        escalation_categories=[],
-        max_concurrent_conversations=0,
-        user_api_key_hash=superadmin_key_hash,
-        user_api_key_prefix=superadmin_key_prefix,
-        created_at=now,
-        updated_at=now,
-        last_login_at=None,
-        invited_by="system",
-    )
+        superadmin_doc = TeamMemberDocument(
+            id=superadmin_member_id,
+            tenant_id=TENANT_ID,
+            email=superadmin_email,
+            display_name="Owner",
+            role=TeamMemberRole.SUPERADMIN,
+            is_active=True,
+            escalation_categories=[],
+            max_concurrent_conversations=0,
+            user_api_key_hash=superadmin_key_hash,
+            user_api_key_prefix=superadmin_key_prefix,
+            created_at=now,
+            updated_at=now,
+            last_login_at=None,
+            invited_by="system",
+        )
 
-    try:
-        await team_repo.create(TENANT_ID, superadmin_doc)
-        print("[OK] Superadmin team member created.")
-    except (DocumentConflictError, Exception) as e:
-        if "Conflict" in str(e) or "409" in str(e) or "already exists" in str(e):
+        try:
+            await team_repo.create(TENANT_ID, superadmin_doc)
+            print("[OK] Superadmin team member created.")
+        except DocumentConflictError:
             await team_repo.upsert(TENANT_ID, superadmin_doc)
             print("[OK] Superadmin team member updated (upsert).")
-        else:
-            print(f"[ERROR] Failed to create superadmin: {e}")
 
-    print()
-    print("-" * 65)
-    print("  SUPERADMIN USER API KEY (save this — shown only once)")
-    print("-" * 65)
-    print()
-    print(f"  Email:          {superadmin_email}")
-    print(f"  Role:           superadmin")
-    print(f"  User API Key:   {superadmin_api_key}")
-    print(f"  Key Prefix:     {superadmin_key_prefix}")
-    print()
-
-    # Optionally seed knowledge base
-    if seed_kb:
-        print("Seeding knowledge base...")
         print()
-        from scripts.seed_knowledge_base import TOTAL_ARTICLES, load_to_cosmos
-
-        await load_to_cosmos(tenant_id=TENANT_ID)
+        print("-" * 65)
+        print("  SUPERADMIN USER API KEY (save this — shown only once)")
+        print("-" * 65)
         print()
+        print(f"  Email:          {superadmin_email}")
+        print("  Role:           superadmin")
+        print(f"  User API Key:   {superadmin_api_key}")
+        print(f"  Key Prefix:     {superadmin_key_prefix}")
+        print()
+
+        # Optionally seed knowledge base
+        if seed_kb:
+            print("Seeding knowledge base...")
+            print()
+            from scripts.seed_knowledge_base import load_to_cosmos
+
+            await load_to_cosmos(tenant_id=TENANT_ID)
+            print()
+
+    finally:
+        await cosmos.close()
 
     print("=" * 65)
     print("  PROVISIONING COMPLETE")
@@ -333,6 +326,7 @@ async def main() -> None:
         help="Also seed the knowledge base with 32 Agent Red articles",
     )
     args = parser.parse_args()
+    load_env_local(env_file=APP_ROOT / ".env.local")
 
     dry_run = not args.provision
     await provision(dry_run=dry_run, seed_kb=args.seed_kb)

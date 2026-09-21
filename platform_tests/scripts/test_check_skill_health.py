@@ -35,7 +35,7 @@ def _make_skill(tmp_path: Path, rel: str, body: str) -> Path:
 
 def test_detects_inline_db_mutation() -> None:
     text = f"## Step 3\n{_PY_FENCE}\nwi = db.insert_work_item(id='WI-1')\n{_FENCE_CLOSE}\n"
-    findings = chk.scan_text(text, ".claude/skills/x/SKILL.md")
+    findings = chk.scan_text(text, ".agents/skills/x/SKILL.md")
     assert any(f.finding_type == "db_mutation" for f in findings)
 
 
@@ -72,20 +72,17 @@ def test_clean_skill_passes() -> None:
 # --- run() + report + read-only behavior ------------------------------------
 
 
-def test_emits_structured_report(tmp_path: Path) -> None:
+def test_emits_structured_report(tmp_path: Path, capsys) -> None:
     _make_skill(
         tmp_path,
-        ".claude/skills/dirty/SKILL.md",
+        ".agents/skills/dirty/SKILL.md",
         f"{_PY_FENCE}\ndb.insert_test(id='T')\n{_FENCE_CLOSE}\n",
     )
-    report = chk.run([".claude/skills"], "run-test", "2026-05-29T00:00:00+00:00", tmp_path)
-    out_dir = chk.write_run_outputs("run-test", report, tmp_path)
-
-    report_json = out_dir / "report.json"
-    assert report_json.is_file()
-    assert (out_dir / "summary.md").is_file()
-
-    data = json.loads(report_json.read_text(encoding="utf-8"))
+    before = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
+    assert chk.main(["--project-root", str(tmp_path), "--run-id", "run-test", "--json", "--warn-only"]) == 0
+    data = json.loads(capsys.readouterr().out)
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")) == before
+    assert data["run_id"] == "run-test"
     for field in ("run_id", "generated_at", "skills_scanned", "findings_by_type", "findings"):
         assert field in data
     assert data["findings"], "expected at least one finding for the dirty fixture"
@@ -94,16 +91,19 @@ def test_emits_structured_report(tmp_path: Path) -> None:
             assert field in finding
 
 
-def test_checker_is_read_only(tmp_path: Path) -> None:
+def test_checker_is_read_only(tmp_path: Path, capsys) -> None:
     skill = _make_skill(
         tmp_path,
-        ".claude/skills/x/SKILL.md",
+        ".agents/skills/x/SKILL.md",
         f"{_PY_FENCE}\ndb.insert_work_item(id='W')\n{_FENCE_CLOSE}\n",
     )
     before_bytes = skill.read_bytes()
     before_mtime = skill.stat().st_mtime_ns
 
-    chk.run([".claude/skills"], "run-ro", "2026-05-29T00:00:00+00:00", tmp_path)
+    before_paths = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
+    assert chk.main(["--project-root", str(tmp_path), "--run-id", "run-ro"]) == 1
+    assert "# Skill-Health Checker Summary" in capsys.readouterr().out
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")) == before_paths
 
     assert skill.read_bytes() == before_bytes
     assert skill.stat().st_mtime_ns == before_mtime
@@ -117,17 +117,17 @@ def test_checker_is_read_only(tmp_path: Path) -> None:
 def test_warn_only_exit_zero(tmp_path: Path) -> None:
     _make_skill(
         tmp_path,
-        ".claude/skills/x/SKILL.md",
+        ".agents/skills/x/SKILL.md",
         f"{_PY_FENCE}\ndb.insert_work_item(id='W')\n{_FENCE_CLOSE}\n",
     )
-    report = chk.run([".claude/skills"], "run-x", "2026-05-29T00:00:00+00:00", tmp_path)
+    report = chk.run([".agents/skills"], "run-x", "2026-05-29T00:00:00+00:00", tmp_path)
     assert report.findings
     assert chk.exit_code_for(report, warn_only=True) == 0
     assert chk.exit_code_for(report, warn_only=False) == 1
 
 
 def test_clean_tree_exit_zero(tmp_path: Path) -> None:
-    _make_skill(tmp_path, ".claude/skills/clean/SKILL.md", "Use `gt backlog add` to capture work.\n")
-    report = chk.run([".claude/skills"], "run-clean", "2026-05-29T00:00:00+00:00", tmp_path)
+    _make_skill(tmp_path, ".agents/skills/clean/SKILL.md", "Use `gt backlog add` to capture work.\n")
+    report = chk.run([".agents/skills"], "run-clean", "2026-05-29T00:00:00+00:00", tmp_path)
     assert report.findings == []
     assert chk.exit_code_for(report, warn_only=False) == 0

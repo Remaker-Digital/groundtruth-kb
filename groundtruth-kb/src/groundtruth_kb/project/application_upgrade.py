@@ -135,6 +135,15 @@ def _baseline_hook_scripts(host: Path, profiles_payload: Path) -> set[str]:
     }
 
 
+def _baseline_hooks_root(profiles_payload: Path) -> str:
+    """The baseline hooks directory every managed registration names (profiles.toml [baseline] hooks_root)."""
+    baseline = tomllib.loads(profiles_payload.read_text(encoding="utf-8"))["baseline"]
+    hooks_root = baseline.get("hooks_root")
+    if not isinstance(hooks_root, str) or not hooks_root:
+        raise ValueError("The host's harness profiles declare no baseline hooks_root")
+    return hooks_root
+
+
 def _selected_application(options: UpgradeOptions) -> tuple[dict[str, Any], Path]:
     host = options.gt_kb_root.absolute()
     if host.resolve(strict=True) != host or not host.is_dir():
@@ -297,6 +306,7 @@ def plan_upgrade(options: UpgradeOptions) -> UpgradePlan:
     removes: list[str] = []
     profiles = _profiles(host)
     scripts = _baseline_hook_scripts(host, host / "scripts/harness_projection/profiles.toml")
+    hooks_root = _baseline_hooks_root(host / "scripts/harness_projection/profiles.toml")
     harnesses = tuple(dict.fromkeys(options.harnesses)) or projected_harnesses(host, target)
     registrations: dict[str, tuple[str, ...]] = {}
     for harness in harnesses:
@@ -317,9 +327,7 @@ def plan_upgrade(options: UpgradeOptions) -> UpgradePlan:
         hooks_path = profile.get("hooks_json_path")
         if isinstance(hooks_path, str) and hooks_path in writes:
             markers = tuple(
-                marker
-                for marker in (str(profile.get("hooks_dir") or ""), str(profile.get("stdin_adapter") or ""), *scripts)
-                if marker
+                marker for marker in (hooks_root, str(profile.get("stdin_adapter") or ""), *scripts) if marker
             )
             registrations[hooks_path] = markers
     registry = _merged_registry(target, options.application, writes)

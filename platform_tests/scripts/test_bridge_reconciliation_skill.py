@@ -12,7 +12,7 @@ from groundtruth_kb.cli import main
 from groundtruth_kb.config import GTConfig
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CANONICAL_SKILL = REPO_ROOT / ".harness-baseline-configuration/skills/gtkb-bridge-reconciliation/SKILL.md"
+CANONICAL_SKILL = REPO_ROOT / ".agents/skills/gtkb-bridge-reconciliation/SKILL.md"
 
 
 @pytest.mark.parametrize("native", [False, True])

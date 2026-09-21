@@ -23,8 +23,10 @@ def make_root(tmp_path: Path) -> Path:
     root = tmp_path / "repo"
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
+    (root / "AGENTS.md").write_text("Shared root instructions.\n", encoding="utf-8")
     (root / oh.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
-    (root / oh.ROUTING_CONFIG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
+    (root / oh.NATIVE_HOOK_SETTINGS_PATH.parent).mkdir(parents=True, exist_ok=True)
+    (root / oh.NATIVE_HOOK_SETTINGS_PATH).write_text('{"hooks": {}}', encoding="utf-8")
     (root / oh.ROUTING_CONFIG_PATH.parent / "hooks").mkdir(parents=True)
     (root / "scripts").mkdir()
     for guard in {*oh.BRIDGE_WRITE_GUARDS, *oh.BRIDGE_EDIT_GUARDS, *oh.WRITE_EDIT_GUARDS, *oh.BASH_GUARDS}:
@@ -47,7 +49,7 @@ default_model = "fixture-full"
         encoding="utf-8",
     )
     for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
-        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
+        relative = Path(".agents") / "skills" / name / "SKILL.md"
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((Path(__file__).resolve().parents[2] / relative).read_bytes())
@@ -73,7 +75,7 @@ def test_missing_own_native_settings_refuses_before_any_model_request(tmp_path):
 @pytest.mark.parametrize("outcome", ["stop_refusal", "provider_failure"])
 def test_ollama_native_stop_lifecycle_bounds_continuation_and_preserves_original_error(tmp_path, outcome):
     root = make_root(tmp_path)
-    settings = root / oh.ROUTING_CONFIG_PATH.parent / "settings.json"
+    settings = root / oh.NATIVE_HOOK_SETTINGS_PATH
     settings.write_text(
         json.dumps(
             {
@@ -480,6 +482,7 @@ def test_main_threads_skill_and_preserves_generous_runtime_limits(
     assert oh.main(["-p", "review", "--skill", "bridge-review"]) == 0
     assert capsys.readouterr().out.strip() == "done"
     assert captured["skill"] == "bridge-review"
+    assert captured["system_prompt"].startswith("Shared root instructions.\n")
     assert captured["max_turns"] == 600
     assert captured["timeout"] == 900
     assert captured["session_timeout"] == 3600
@@ -611,6 +614,9 @@ def test_bridge_review_system_prompt_loads_current_canonical_skills(tmp_path: Pa
     assert text == "done"
     system_message = calls[0]["messages"][0]
     assert system_message["role"] == "system"
+    assert system_message["content"].index("Shared root instructions.") < system_message["content"].index(
+        "gt bridge deliver"
+    )
     assert calls[0]["messages"][1] == {"role": "user", "content": "review bridge item"}
     assert "Loyal Opposition" in system_message["content"]
     assert "bridge/INDEX.md" not in system_message["content"]
@@ -620,13 +626,13 @@ def test_bridge_review_system_prompt_loads_current_canonical_skills(tmp_path: Pa
     assert "PublishBridgeVerdict" not in system_message["content"]
 
 
-def test_system_prompt_is_only_for_lo_bridge_skills(tmp_path: Path):
+def test_system_prompt_includes_root_with_extra_bodies_only_for_lo_bridge_skills(tmp_path: Path):
     root = make_root(tmp_path)
 
     assert oh.build_system_prompt("bridge-review", root) is not None
     assert oh.build_system_prompt("verification", root) is not None
-    assert oh.build_system_prompt("implementation", root) is None
-    assert oh.build_system_prompt(None, root) is None
+    assert oh.build_system_prompt("implementation", root) == "Shared root instructions.\n"
+    assert oh.build_system_prompt(None, root) == "Shared root instructions.\n"
 
 
 def test_prompt_requires_native_readback_and_complete_project_finalization(tmp_path: Path):

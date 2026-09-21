@@ -2,15 +2,17 @@
 """PreToolUse adapter for checkout containment and command checks."""
 
 import json
-import os
 import sys
 from pathlib import Path
 
 from groundtruth_kb.enforcement import check_bash_command, check_path_boundary
 
+HOOKS = Path(__file__).resolve().parent
+if str(HOOKS) not in sys.path:
+    sys.path.insert(0, str(HOOKS))
 
-def _project_root_from_env() -> Path:
-    return Path(os.environ.get("{{HARNESS_PROJECT_DIR_VAR}}") or os.getcwd()).resolve()
+# The authored sibling module requires the installation-relative path setup above.
+from _hook_context import resolve_root  # noqa: E402
 
 
 def emit_deny(reason: str) -> None:
@@ -42,14 +44,7 @@ def main() -> None:
 
     tool_name = payload.get("tool_name", "")
     tool_input = payload.get("tool_input", {})
-    cwd = payload.get("cwd") or str(_project_root_from_env())
-    project_root = Path(cwd).resolve()
-
-    # Find the nearest groundtruth.toml to resolve canonical root
-    for candidate in (project_root, *project_root.parents):
-        if (candidate / "groundtruth.toml").is_file():
-            project_root = candidate
-            break
+    project_root = resolve_root(payload)
 
     # 1. Handle command execution (bash, run_command, command, etc.)
     if tool_name.lower() in {"bash", "powershell", "run_command"}:

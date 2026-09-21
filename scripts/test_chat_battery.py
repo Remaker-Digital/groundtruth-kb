@@ -15,153 +15,168 @@ import os
 import sys
 import time
 from pathlib import Path
-
-# Force UTF-8 output on Windows
-if sys.platform == "win32":
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+from urllib.parse import urlsplit
 
 # ---------------------------------------------------------------------------
 # Auto-load .env.local (transient credentials must never be hardcoded)
 # ---------------------------------------------------------------------------
 # Load .env.local (shared loader — R7 refactoring)
-from scripts._env import load_env_local
+REPO_ROOT = Path(__file__).resolve().parents[1]
+APP_ROOT = REPO_ROOT / "applications/Agent_Red"
+sys.path.insert(0, str(REPO_ROOT))
 
-load_env_local()
+from scripts._env import load_env_local  # noqa: E402 - standalone script bootstrap
 
-# Default per REPEATABLE-PROCEDURES.md §7.4 — .env.local takes precedence
-API = os.environ.get(
-    "PROD_URL",
-    "",  # SPEC-0058: No hardcoded FQDNs
-)
-WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
-if not WIDGET_KEY:
-    sys.exit("ERROR: PREVIEW_WIDGET_KEY not set. Load .env.local or set env var.")
+API = ""
+WIDGET_KEY = ""
 
 
 async def chat(message: str, conv_id: str | None = None) -> tuple[str, str, list[str]]:
-    """Send a message and get the streamed response.
+    """Return the persisted reply to this message, plus confirmed stream appendices."""
+    import codecs
 
-    Returns (response_text, conversation_id, stages).
-    """
     import aiohttp
 
     headers = {"X-Widget-Key": WIDGET_KEY, "Content-Type": "application/json"}
-
     async with aiohttp.ClientSession() as session:
-        # Create conversation if needed
         if not conv_id:
             async with session.post(f"{API}/api/chat/conversations", headers=headers, json={}) as resp:
-                data = await resp.json()
-                conv_id = data["conversation_id"]
+                resp.raise_for_status()
+                conv_id = (await resp.json())["conversation_id"]
 
-        # Send message first, then connect SSE with a small delay.
-        # The SSE manager buffers events per conversation (up to 100),
-        # so events that arrive before the client connects are replayed
-        # via Last-Event-ID.  We use a brief wait between message send
-        # and SSE connect to let the pipeline begin processing.
         async with session.post(
             f"{API}/api/chat/message",
             headers=headers,
             json={"conversation_id": conv_id, "content": message},
         ) as resp:
-            msg_data = await resp.json()
-            if not msg_data.get("accepted"):
-                return f"(message rejected: {msg_data})", conv_id, []
+            resp.raise_for_status()
+            accepted = await resp.json()
+        customer_id = accepted.get("message_id")
+        before_turn = accepted.get("turn_count")
+        if (
+            accepted.get("accepted") is not True
+            or accepted.get("conversation_id") != conv_id
+            or not isinstance(customer_id, str)
+            or not customer_id
+            or type(before_turn) is not int
+        ):
+            raise RuntimeError("Chat acknowledgement did not identify the accepted message")
 
-        # Brief pause then read SSE (buffered events will be replayed)
         await asyncio.sleep(0.5)
-
-        tokens = []
-        stages = []
-        start = time.monotonic()
-        timeout = aiohttp.ClientTimeout(total=40)
-
+        stages, appendix, pending_appendix = [], [], []
+        done_turn = None
+        saw_application_event = False
+        reply_id = None
+        retracted_text = None
+        after_reply = False
+        stream_error = False
+        buffer = ""
+        decoder = codecs.getincrementaldecoder("utf-8")()
         try:
             async with session.get(
                 f"{API}/api/chat/stream/{conv_id}",
                 headers={"X-Widget-Key": WIDGET_KEY},
-                timeout=timeout,
+                timeout=aiohttp.ClientTimeout(total=40),
             ) as resp:
-                # Parse proper SSE format:
-                #   event: token
-                #   id: 6
-                #   data: {"text": "Hello", "sequence": 1}
-                buffer = ""
-                done = False
-                no_data_since = time.monotonic()
-
+                resp.raise_for_status()
                 async for chunk in resp.content.iter_any():
-                    text = chunk.decode("utf-8", errors="replace")
-                    buffer += text
-                    no_data_since = time.monotonic()
-
-                    while "\n" in buffer:
-                        line, buffer = buffer.split("\n", 1)
-                        stripped = line.strip()
-
-                        if not stripped:
-                            continue
-
-                        if stripped.startswith("event: "):
-                            pass  # event type
-                        elif stripped.startswith("id: ") or stripped.startswith("retry: "):
-                            pass
-                        elif stripped.startswith("data: "):
-                            raw = stripped[6:]
-                            if raw == "[DONE]":
-                                done = True
-                                break
-                            try:
-                                d = json.loads(raw)
-                                if "text" in d and "sequence" in d:
-                                    tokens.append(d["text"])
-                                elif "stage" in d:
-                                    stages.append(f"{d['stage']}:{d.get('status', '?')}")
-                                elif "detail" in d:
-                                    tokens.append(f"[ERROR: {d['detail']}]")
-                            except json.JSONDecodeError:
-                                pass
-                        elif stripped.startswith("{"):
-                            try:
-                                d = json.loads(stripped)
-                                if "text" in d and "sequence" in d:
-                                    tokens.append(d["text"])
-                                elif "stage" in d:
-                                    stages.append(f"{d['stage']}:{d.get('status', '?')}")
-                                elif "detail" in d:
-                                    tokens.append(f"[ERROR: {d['detail']}]")
-                            except json.JSONDecodeError:
-                                pass
-
-                    if done:
+                    buffer += decoder.decode(chunk)
+                    buffer = buffer.replace("\r\n", "\n")
+                    while "\n\n" in buffer:
+                        block, buffer = buffer.split("\n\n", 1)
+                        event = ""
+                        data_lines = []
+                        for line in block.splitlines():
+                            if line.startswith("event:"):
+                                event = line[6:].strip()
+                            elif line.startswith("data:"):
+                                data_lines.append(line[5:].lstrip())
+                        if not event and not data_lines:
+                            continue  # SSE heartbeat or comment.
+                        saw_application_event = True
+                        data = json.loads("\n".join(data_lines))
+                        if not isinstance(data, dict):
+                            raise RuntimeError("Invalid chat stream event")
+                        if event == "done":
+                            count = data.get("turn_count")
+                            if data.get("conversation_id") != conv_id or type(count) is not int:
+                                raise RuntimeError("Chat completion does not identify this conversation")
+                            if count <= before_turn:
+                                # The endpoint replays previous turns from its buffer.
+                                stages, appendix, pending_appendix = [], [], []
+                                reply_id = retracted_text = None
+                                after_reply = False
+                                continue
+                            done_turn = count
+                            break
+                        if event == "error":
+                            stream_error = True
+                        elif event == "stage":
+                            stages.append(f"{data['stage']}:{data.get('status', '?')}")
+                        elif event == "validated":
+                            if data.get("conversation_id") != conv_id:
+                                raise RuntimeError("Validated reply belongs to another conversation")
+                            message_id = data.get("message_id")
+                            if not isinstance(message_id, str) or not message_id:
+                                raise RuntimeError("Validated reply has no message identity")
+                            if message_id in {"escalation", "escalation_email_required"}:
+                                if not after_reply:
+                                    raise RuntimeError("Escalation appendix has no confirmed base reply")
+                                appendix.extend(pending_appendix)
+                                pending_appendix = []
+                            else:
+                                reply_id = message_id
+                                after_reply = True
+                                appendix, pending_appendix = [], []
+                        elif event == "retracted":
+                            retracted_text = data.get("fallback_text")
+                            if not isinstance(retracted_text, str):
+                                raise RuntimeError("Retracted reply has no fallback text")
+                            reply_id = None
+                            after_reply = True
+                            appendix, pending_appendix = [], []
+                        elif event == "token" and after_reply:
+                            pending_appendix.append(data["text"])
+                    if done_turn is not None:
                         break
-        except asyncio.TimeoutError:
-            tokens.append("[TIMEOUT]")
+        except TimeoutError as error:
+            raise RuntimeError("Chat stream timed out") from error
+        if stream_error:
+            raise RuntimeError("Chat stream reported an error")
+        if done_turn is None and (saw_application_event or buffer.strip()):
+            raise RuntimeError("Chat stream ended before current-turn completion")
+        if pending_appendix:
+            raise RuntimeError("Chat stream contains an unconfirmed response appendix")
 
-        elapsed = time.monotonic() - start
-        response = "".join(tokens)
-
-        # If we got no tokens, the pipeline may have completed before
-        # our SSE connection.  Wait briefly for persistence, then retrieve
-        # the conversation state to get the response from message history.
-        if not tokens and conv_id:
-            await asyncio.sleep(3)
-            try:
-                async with session.get(
-                    f"{API}/api/chat/conversations/{conv_id}",
-                    headers={"X-Widget-Key": WIDGET_KEY},
-                ) as resp:
-                    if resp.status == 200:
-                        state_data = await resp.json()
-                        for msg in reversed(state_data.get("messages", [])):
-                            if msg.get("role") in ("assistant", "ai"):
-                                response = msg.get("content", "")
-                                break
-            except Exception:
-                pass
-
-        return response, conv_id, stages
+        # A completed-message reconnect can intentionally return an empty stream.
+        # Both that case and normal completion must resolve the exact current reply.
+        async with session.get(f"{API}/api/chat/conversations/{conv_id}", headers={"X-Widget-Key": WIDGET_KEY}) as resp:
+            resp.raise_for_status()
+            state = await resp.json()
+        state_turn = state.get("turn_count")
+        if (
+            state.get("conversation_id") != conv_id
+            or type(state_turn) is not int
+            or state_turn <= before_turn
+            or (done_turn is not None and state_turn != done_turn)
+        ):
+            raise RuntimeError("Persisted conversation does not confirm this completed turn")
+        found_customer = False
+        for item in state.get("messages", []):
+            if item.get("role") == "customer":
+                if found_customer:
+                    break
+                found_customer = item.get("message_id") == customer_id
+            elif found_customer and item.get("role") == "ai":
+                response = item.get("content")
+                if not isinstance(response, str) or not response:
+                    break
+                if reply_id is not None and item.get("message_id") != reply_id:
+                    raise RuntimeError("Validated reply does not match the persisted current reply")
+                if retracted_text is not None and response != retracted_text:
+                    raise RuntimeError("Retracted fallback does not match the persisted current reply")
+                return response + "".join(appendix), conv_id, stages
+        raise RuntimeError("No persisted AI reply follows the acknowledged customer message")
 
 
 def evaluate_response(test_name: str, message: str, response: str, criteria: dict) -> dict:
@@ -182,6 +197,22 @@ def evaluate_response(test_name: str, message: str, response: str, criteria: dic
 
 
 async def main():
+    global API, WIDGET_KEY
+    load_env_local(env_file=APP_ROOT / ".env.local")
+    API = os.environ.get("PROD_URL", "").rstrip("/")
+    WIDGET_KEY = os.environ.get("PREVIEW_WIDGET_KEY", "")
+    target = urlsplit(API)
+    if (
+        target.scheme not in {"http", "https"}
+        or not target.hostname
+        or target.query
+        or target.fragment
+        or target.username is not None
+        or target.password is not None
+        or not WIDGET_KEY
+    ):
+        print("ERROR: PROD_URL and PREVIEW_WIDGET_KEY must identify the selected application")
+        return False
     print("=" * 70)
     print("AGENT RED CHAT QUALITY TEST BATTERY")
     print(f"API: {API}")
@@ -395,5 +426,8 @@ async def main():
 
 
 if __name__ == "__main__":
+    if sys.platform == "win32":
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        sys.stderr.reconfigure(encoding="utf-8", errors="replace")
     success = asyncio.run(main())
     sys.exit(0 if success else 1)

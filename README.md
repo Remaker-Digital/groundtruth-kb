@@ -53,7 +53,7 @@ gt project init my-project
 cd my-project
 
 # Daily operating commands
-gt summary                    # current state of specs, tests, work items
+gt status                     # compact read-only operating status from fresh native reads
 gt backlog list               # the standing backlog
 gt deliberations search "…"   # why was this decided?
 gt project doctor             # health checks across the platform
@@ -66,12 +66,12 @@ gt project doctor             # health checks across the platform
 ## Key components
 
 | Component | What it is |
-|-----------|-----------|
-| **MemBase** | The canonical, append-only knowledge database for governed records — specifications, tests, work items, procedures, documents, environment config. Implemented as `groundtruth.db` (SQLite); every mutation is a new versioned row with `changed_by` / `changed_at` / `change_reason`. See [MEMBASE-4-CLAUDE.md](MEMBASE-4-CLAUDE.md). |
-| **Deliberation Archive** | The design-reasoning tier: a searchable archive of decisions, reviews, and rejected alternatives that answers *why*. Implemented as the `deliberations` table with semantic indexing. |
-| **File bridge protocol** | The dual-agent coordination surface (Prime Builder ↔ Loyal Opposition), versioned markdown under `bridge/`. After WI-4510 Phase-3 cutover, dispatcher/TAFE bridge state is canonical; retired bridge-index artifacts are not live queue authority. See [file-bridge-protocol.md](.harness-baseline-configuration/rules/file-bridge-protocol.md). |
-| **`gt` CLI** | The platform command surface — `gt project init`, `gt summary`, `gt assert`, `gt backlog`, `gt deliberations`, `gt project doctor`, `gt project upgrade`. |
-| **Dashboard** | KPI surface for governance, release-readiness, drift, bridge state, and provider-neutral application-deployment signals. Optional Grafana integration; core surfaces are always available via the CLI. |
+| --- | --- |
+| **Native authority** | PostgreSQL-backed domain services for current formal records, projects, work items and tests. Use the ordinary CLI and typed services for reads, amendments and exact readback; no SQLite or copied-document authority fallback. |
+| **Shared instructions** | Authored root `AGENTS.md`, one `.agents/skills` tree, and baseline rules/hooks/routing. Host projections contain declared registrations, pointers and ownership bookkeeping. See [Harness projection](groundtruth-kb/docs/reference/harness-projection.md). |
+| **Bridge and contexts** | Native agent-authored next-artifact exchange with immutable native context binding and independent review. The owner dispatches until Dispatcher Next is independently qualified and activated. See [Bridge protocol](.harness-baseline-configuration/rules/file-bridge-protocol.md). |
+| **`gt` CLI** | Native work/context, formal, project, bridge and operational command surfaces. Query current help and the exact selected records before an effect. |
+| **Dashboard** | Derived operational and work views. Assess current readiness from canonical readback and the actual installed consumer; a historical feature inventory is not health evidence. |
 
 ---
 
@@ -82,12 +82,11 @@ gt project doctor             # health checks across the platform
 | **New-adopter guide** | [groundtruth-kb/docs/start-here.md](groundtruth-kb/docs/start-here.md) |
 | **Evaluator guide** | [groundtruth-kb/docs/cto-evaluation.md](groundtruth-kb/docs/cto-evaluation.md) |
 | **Package README** | [groundtruth-kb/README.md](groundtruth-kb/README.md) |
-| **MemBase concepts** | [MEMBASE-4-CLAUDE.md](MEMBASE-4-CLAUDE.md) |
-| **Harness governance** | [AGENTS.md](AGENTS.md), [.claude/rules/](.claude/rules/) |
+| **Authority and operating model** | [operating-model.md](.harness-baseline-configuration/rules/operating-model.md) |
+| **Harness governance** | [AGENTS.md](AGENTS.md), [.harness-baseline-configuration/rules/](.harness-baseline-configuration/rules/) |
 | **Release health wiki source** | [groundtruth-kb/docs/wiki/release-health.md](groundtruth-kb/docs/wiki/release-health.md) |
 | **Changelog** | [CHANGELOG.md](CHANGELOG.md) |
 | **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) |
-| **Security policy** | [SECURITY.md](SECURITY.md) |
 
 ---
 

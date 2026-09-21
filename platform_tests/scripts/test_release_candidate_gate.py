@@ -599,7 +599,8 @@ def test_python_gate_runs_canonical_harness_conformance_before_pytest(monkeypatc
     assert "platform_tests/scripts/test_collect_dev_environment_inventory.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_check_dev_environment_inventory_drift.py" in commands[pytest_index]
     assert "platform_tests/scripts/test_gtkb_dashboard_control_plane.py" in commands[pytest_index]
-    assert "platform_tests/hooks/test_workstream_focus.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_session_role_resolution.py" in commands[pytest_index]
+    assert "platform_tests/groundtruth_kb/test_native_session_context.py" in commands[pytest_index]
     assert "applications/Agent_Red/tests/integrations/test_usage_consumption.py" in commands[pytest_index]
 
 
@@ -622,6 +623,8 @@ def test_python_gate_runs_environment_isolation_before_pytest(monkeypatch):
     )
     assert harness_parity_index < env_index < pytest_index
     assert "platform_tests/scripts/test_check_environment_isolation.py" in commands[pytest_index]
+    assert "platform_tests/scripts/test_isolation_program_backstop.py" in commands[pytest_index]
+    assert not any("test_rehearse_" in argument for command in commands for argument in command)
 
 
 def test_python_gate_runs_session_overlay_policy_before_pytest(monkeypatch):
@@ -645,34 +648,6 @@ def test_python_gate_runs_session_overlay_policy_before_pytest(monkeypatch):
     # fails the gate before any test collection can touch it.
     assert env_index < overlay_index < pytest_index
     assert "platform_tests/scripts/test_gtkb_overlay.py" in commands[pytest_index]
-
-
-def test_python_gate_runs_scoped_service_boundary_before_pytest(monkeypatch):
-    """The Phase 4 scoped-service boundary checker must run before pytest.
-
-    The checker validates the ``[scoped_service]`` contract in
-    ``groundtruth.toml``. If it only ran after pytest, configuration drift
-    could still pass the release gate as long as tests were structured
-    around the drift. (Its summary-path guard left with the SQLite-era
-    startup generator; the scoped-client tests remain gate-run.)
-    """
-
-    gate = _load_gate_module()
-    commands = []
-
-    def fake_run(command, *, timeout=300, env=None):
-        commands.append(command)
-
-    monkeypatch.setattr(gate, "_run", fake_run)
-
-    gate._python_gates()
-
-    scoped_index = commands.index([sys.executable, "scripts/check_scoped_service_boundary.py"])
-    pytest_index = next(
-        index for index, command in enumerate(commands) if command[:3] == [sys.executable, "-m", "pytest"]
-    )
-    assert scoped_index < pytest_index
-    assert "platform_tests/scripts/test_gtkb_scoped_client.py" in commands[pytest_index]
 
 
 # ---------------------------------------------------------------------------
@@ -725,6 +700,64 @@ def test_sot_registry_authority_fails_closed_on_membership_gap(monkeypatch):
         gate._check_sot_registry_authority()
 
 
+def test_standing_backlog_health_gate_fails_on_fail_findings(monkeypatch):
+    """Owner ruling D31 (2026-09-19): the transitional groundtruth.db skip guard is gone; the step always
+    evaluates the ported check and a FAIL finding (here: an unreachable configured authority) fails the gate."""
+    gate = _load_gate_module()
+    from groundtruth_kb.project import doctor
+
+    assert "SKIP standing backlog health" not in SCRIPT_PATH.read_text(encoding="utf-8")
+    roots = []
+
+    def fake_check(project_root):
+        roots.append(project_root)
+        return {
+            "status": "fail",
+            "findings": [
+                {
+                    "kind": "missing-evidence",
+                    "severity": "FAIL",
+                    "path": "http://127.0.0.1:12345",
+                    "message": (
+                        "Could not evaluate work-item authorization coverage: authority_unavailable: "
+                        "Service unavailable"
+                    ),
+                }
+            ],
+        }
+
+    monkeypatch.setattr(doctor, "check_standing_backlog_health", fake_check)
+
+    with pytest.raises(gate.GateFailure, match="Standing backlog health: Could not evaluate work-item"):
+        gate._check_standing_backlog_health()
+    assert roots == [gate.PROJECT_ROOT]
+
+
+def test_standing_backlog_health_gate_passes_warn_only_findings(monkeypatch, capsys):
+    gate = _load_gate_module()
+    from groundtruth_kb.project import doctor
+
+    monkeypatch.setattr(
+        doctor,
+        "check_standing_backlog_health",
+        lambda project_root: {
+            "status": "warning",
+            "findings": [
+                {
+                    "kind": "authority-not-configured",
+                    "severity": "WARN",
+                    "path": "groundtruth.toml",
+                    "message": "No authority_url is configured; open work-item authorization coverage is unverified.",
+                }
+            ],
+        },
+    )
+
+    gate._check_standing_backlog_health()
+
+    assert "PASS standing backlog health (1 warning findings)" in capsys.readouterr().out
+
+
 def test_sot_registry_authority_blocks_pruned_release_census(monkeypatch):
     gate = _load_gate_module()
     from groundtruth_kb.project import registry_control_plane
@@ -746,3 +779,74 @@ def test_sot_registry_authority_blocks_pruned_release_census(monkeypatch):
 
     with pytest.raises(gate.GateFailure, match="pruned_envelope_count=2"):
         gate._check_sot_registry_authority()
+
+
+@pytest.mark.parametrize("configuration", ["absent", "invalid", "unavailable"])
+def test_standing_backlog_gate_uses_real_native_doctor_result(tmp_path, monkeypatch, capsys, configuration):
+    from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
+    config = tmp_path / "groundtruth.toml"
+    if configuration == "invalid":
+        config.write_text("[groundtruth\n", encoding="utf-8")
+    elif configuration == "unavailable":
+        config.write_text('[groundtruth]\nauthority_url="http://127.0.0.1:12345"\n', encoding="utf-8")
+
+    def request(*args, **kwargs):
+        assert configuration == "unavailable", "Invalid or absent settings must not contact an authority"
+        raise AuthorityClientError("authority_unavailable", "Fixture native service unavailable")
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    if configuration == "absent":
+        gate._check_standing_backlog_health()
+        assert "PASS standing backlog health (1 warning findings)" in capsys.readouterr().out
+    else:
+        with pytest.raises(gate.GateFailure, match="configuration invalid|authority_unavailable"):
+            gate._check_standing_backlog_health()
+    assert not (tmp_path / "bridge").exists()
+
+
+def test_python_gate_selects_existing_tests_and_retained_windows_launch_contract(monkeypatch):
+    gate = _load_gate_module()
+    commands = []
+    monkeypatch.setattr(gate, "_run", lambda command, **kwargs: commands.append(command))
+    gate._python_gates()
+    selected = [
+        argument
+        for command in commands
+        if command[:3] == [sys.executable, "-m", "pytest"]
+        for argument in command[3:]
+        if argument.endswith(".py")
+    ]
+    assert selected
+    assert "platform_tests/scripts/test_windows_subprocess.py" in selected
+    assert "platform_tests/scripts/test_command_registry_tracking.py" not in selected
+    assert "platform_tests/hooks/test_formal_artifact_approval_gate.py" not in selected
+    relative = {
+        Path(argument).resolve().relative_to(gate.PROJECT_ROOT.resolve()).as_posix()
+        if Path(argument).is_absolute()
+        else Path(argument).as_posix()
+        for argument in selected
+    }
+    assert {
+        "groundtruth-kb/tests/test_native_application_scaffold.py",
+        "groundtruth-kb/tests/test_native_application_upgrade.py",
+        "groundtruth-kb/tests/adopter/test_init_scaffolds_adopter_owned_paths.py",
+        "platform_tests/groundtruth_kb/test_native_application_initialized_hooks.py",
+    } <= relative
+    assert not relative & {
+        "groundtruth-kb/tests/test_scaffold_settings.py",
+        "groundtruth-kb/tests/test_scaffold_project.py",
+        "groundtruth-kb/tests/test_upgrade.py",
+        "groundtruth-kb/tests/test_settings_merge_drift.py",
+    }
+    assert all((gate.PROJECT_ROOT / argument).is_file() for argument in selected)
+
+
+def test_required_release_command_failure_is_not_reported_as_pass(tmp_path, monkeypatch):
+    gate = _load_gate_module()
+    monkeypatch.setattr(gate, "PROJECT_ROOT", tmp_path)
+    with pytest.raises(gate.GateFailure, match="Command failed"):
+        gate._run([sys.executable, "-c", "raise SystemExit(9)"], timeout=10)

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from platform_tests.scripts.test_provider_native_cli_delivery import create_provider_guard_fixtures
+from platform_tests.scripts.provider_fixtures import create_provider_guard_fixtures
 from scripts import ollama_harness, verify_ollama_dispatch
 
 _REPO_ROOT = Path(__file__).resolve().parents[2]

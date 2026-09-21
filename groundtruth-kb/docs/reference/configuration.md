@@ -33,11 +33,11 @@ legal_footer = "Copyright 2026 My Company"
 |-------|------|---------|-------------|
 | `db_path` | path | `./groundtruth.db` | Path to the SQLite MemBase |
 | `project_root` | path | `.` | Root directory of the project (for assertion path resolution) |
-| `app_title` | string | `GroundTruth KB` | Title shown in the web UI header and page title |
-| `brand_mark` | string | `GT` | Short text shown in the web UI navigation |
+| `app_title` | string | `GroundTruth KB` | Application title, reported by `gt config` and used as the Grafana dashboard title |
+| `brand_mark` | string | `GT` | Short brand text; accepted but not displayed by any live command |
 | `brand_color` | string | `#2563eb` | Primary brand color as a hex value |
-| `logo_url` | string | | Optional URL to a logo image for the web UI |
-| `legal_footer` | string | | Copyright or legal text in the web UI footer |
+| `logo_url` | string | | Optional logo image URL; accepted but not displayed by any live command |
+| `legal_footer` | string | | Legal notice recorded in `groundtruth.toml` (written by `gt project init`) |
 
 !!! important "Path resolution"
     Relative paths (`db_path`, `project_root`, `chroma_path`) are resolved
@@ -94,10 +94,11 @@ The `chroma_path` setting has three levels:
    assume ChromaDB is present.
 2. **TOML override:** Set `chroma_path` in `[search]` to an explicit path.
    This is resolved relative to the config file's directory, like all paths.
-3. **Runtime fallback:** When ChromaDB is installed and `chroma_path` is
-   unset, the `KnowledgeDB` lazily creates the index at
-   `<db_dir>/.groundtruth-chroma` on first use. This fallback keeps search
-   data co-located with the database without requiring explicit config.
+3. **Runtime fallback:** When `chroma_path` is unset,
+   `gt project chroma regenerate [--dir <application>]` rebuilds the cache at
+   `<application>/.groundtruth-chroma` from the authority's current records.
+   Without the `[search]` extra the command reports `skipped` (exit `2`); the
+   cache is a derivation and is never read as authority.
 
 !!! note "Requires search extra"
     ChromaDB features require the `[search]` extra:
@@ -150,9 +151,6 @@ overrides the TOML file value.
 | `GT_LOGO_URL` | `logo_url` | `GT_LOGO_URL=https://example.com/logo.png` |
 | `GT_LEGAL_FOOTER` | `legal_footer` | `GT_LEGAL_FOOTER="Copyright 2026 Acme"` |
 | `GT_GOVERNANCE_GATES` | `governance_gates` | `GT_GOVERNANCE_GATES="mod:Gate1,mod:Gate2"` |
-
-The `PORT` environment variable is also respected by `gt serve` for the
-web UI port (separate from the config system).
 
 ## Config Auto-Discovery
 
@@ -210,8 +208,8 @@ config = GTConfig.load(config_path=Path("path/to/groundtruth.toml"))
 config = GTConfig.load(db_path="/custom/path.db", app_title="Custom Title")
 ```
 
-See [Tooling](../method/10-tooling.md#python-api) for the full Python API
-reference.
+See [`gt config`](cli.md#gt-config) for the resolved values as the CLI
+reports them.
 
 ## Exceptions
 

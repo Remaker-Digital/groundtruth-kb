@@ -88,9 +88,9 @@ PROTECTED_PREFIXES = (
     "groundtruth-kb/tests/",
     "platform_tests/",
     "tests/",
-    ".claude/hooks/",
-    ".claude/rules/",
-    ".codex/gtkb-hooks/",
+    ".harness-baseline-configuration/hooks/",
+    ".harness-baseline-configuration/rules/",
+    ".agents/skills/",
     "config/",
     ".github/",
 )
@@ -98,11 +98,7 @@ ALLOWED_WRITE_PREFIXES = (
     "bridge/",
     "independent-progress-assessments/",
 )
-DIAGNOSTIC_WRITE_PREFIXES = (
-    ".groundtruth/session/snapshots/",
-    ".gtkb-state/",
-)
-DISPATCHER_CONFIG_PATH = "config/dispatcher/rules.toml"
+DIAGNOSTIC_WRITE_PREFIXES = (".groundtruth/session/snapshots/",)
 
 VERSIONED_BRIDGE_FILE_RE = re.compile(r"^bridge/[A-Za-z0-9][A-Za-z0-9_.-]*-\d{3}\.md$")
 BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN = (
@@ -111,15 +107,10 @@ BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN = (
 )
 
 ROOT_MEMBASE_EXACT = frozenset({"groundtruth.db"})
+# Neither retired local-state tree is a permissible direct-write target.
 RUNTIME_AUTHORITY_PREFIXES = (
     "harness-state/",
-    ".gtkb-state/implementation-authorizations/",
-    ".gtkb-state/work-intent/",
-    ".gtkb-state/bridge-poller/",
-    ".gtkb-state/dispatcher-daemon/",
-    ".gtkb-state/dispatch/",
-    ".gtkb-state/git-lifecycle/",
-    ".gtkb-state/modernization-release-candidate/",
+    ".gtkb-state/",
 )
 
 
@@ -200,7 +191,7 @@ def classify_controlled_artifact(
             "groundtruth.db",
         )
     for prefix in RUNTIME_AUTHORITY_PREFIXES:
-        if rel.startswith(prefix):
+        if rel == prefix.rstrip("/") or rel.startswith(prefix):
             return ControlledArtifactClassification(
                 rel,
                 True,
@@ -251,7 +242,6 @@ __all__ = [
     "BRIDGE_STATUS_ARTIFACT_COMMAND_PATTERN",
     "ControlledArtifactClassification",
     "DIAGNOSTIC_WRITE_PREFIXES",
-    "DISPATCHER_CONFIG_PATH",
     "PROTECTED_EXACT",
     "PROTECTED_PREFIXES",
     "RUNTIME_AUTHORITY_PREFIXES",

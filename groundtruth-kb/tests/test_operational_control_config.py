@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import subprocess
 import sys
 from concurrent.futures import ThreadPoolExecutor
@@ -52,6 +53,7 @@ def _bytes(*rows, invariants=None):
 def _write(root, payload):
     path = root / controls.CATALOG_RELATIVE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
+    (root / ".git").mkdir(exist_ok=True)
     path.write_bytes(payload)
     return path
 
@@ -429,9 +431,9 @@ def test_invalid_and_stale_set_preserve_canonical_bytes(tmp_path):
 
 
 def test_competing_writer_refuses_then_releases(tmp_path):
-    path = _write(tmp_path, _pair())
+    _write(tmp_path, _pair())
     snapshot = controls.load_operational_control_catalog(tmp_path)
-    with controls._writer_lock(path), ThreadPoolExecutor(max_workers=1) as pool:
+    with controls._writer_lock(controls._writer_lock_path(tmp_path)), ThreadPoolExecutor(max_workers=1) as pool:
         future = pool.submit(
             controls.set_operational_controls, tmp_path, _pair("4", "7"), expected_sha256=snapshot.catalog_sha256
         )
@@ -581,7 +583,7 @@ def test_writer_mutex_refuses_nonregular_file_before_open(tmp_path, monkeypatch)
 
     path = _write(tmp_path, _pair())
     original = controls.load_operational_control_catalog(tmp_path)
-    mutex = path.with_name(path.name + ".lock")
+    mutex = tmp_path / ".git" / controls.WRITER_LOCK_NAME
     mutex.touch()
     real_lstat = Path.lstat
     real_open = Path.open
@@ -608,6 +610,7 @@ def test_inventory_git_probe_consumer_contract_rejects_invalid_replacement(tmp_p
     original = (root / controls.CATALOG_RELATIVE_PATH).read_bytes()
     path = tmp_path / controls.CATALOG_RELATIVE_PATH
     path.parent.mkdir(parents=True)
+    (tmp_path / ".git").mkdir()
     path.write_bytes(original)
     document = tomlkit.parse(original.decode("utf-8"))
     row = next(r for r in document["controls"] if r["id"] == controls.INVENTORY_GIT_PROBE_CONTROL)
@@ -661,3 +664,132 @@ def test_setter_refuses_invalid_current_artifact_without_erasing_it(tmp_path: Pa
     with pytest.raises(controls.OperationalControlConfigError, match="malformed_catalog"):
         controls.set_operational_controls(tmp_path, _pair(), expected_sha256=expected)
     assert path.read_bytes() == payload
+
+
+def _git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
+    identity = [
+        "-c",
+        "user.email=test@example.com",
+        "-c",
+        "user.name=test",
+        "-c",
+        "commit.gpgsign=false",
+        "-c",
+        "core.autocrlf=false",
+        "-c",
+        "core.safecrlf=false",
+    ]
+    env = {key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")}
+    return subprocess.run(
+        ["git", *identity, "-C", str(root), *args],
+        env=env,
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+
+
+def _junction(link: Path, target: Path) -> bool:
+    """Create a directory link at ``link``; False when the host cannot create one."""
+    if os.name != "nt":
+        os.symlink(target, link, target_is_directory=True)
+        return True
+
+    def quote(path):
+        return "'" + str(path).replace("'", "''") + "'"
+
+    command = f"New-Item -ItemType Junction -Path {quote(link)} -Target {quote(target)} | Out-Null"
+    run = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", command],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    return run.returncode == 0 and link.exists()
+
+
+def _governance_status(root: Path, *flags: str) -> list[str]:
+    run = _git(root, "status", "--porcelain", *flags, "--", "config/governance")
+    assert run.returncode == 0, run.stdout + run.stderr
+    return run.stdout.splitlines()
+
+
+def test_no_op_set_leaves_the_governance_tree_clean_and_locks_in_git_metadata(tmp_path):
+    if shutil.which("git") is None:
+        pytest.skip("git is not on PATH")
+    init = _git(tmp_path, "init")
+    assert init.returncode == 0, init.stdout + init.stderr
+    _write(tmp_path, _pair())
+    for step in (("add", "config/governance"), ("commit", "-m", "fixture")):
+        run = _git(tmp_path, *step)
+        assert run.returncode == 0, run.stdout + run.stderr
+    governance = tmp_path / "config" / "governance"
+    snapshot = controls.load_operational_control_catalog(tmp_path)
+    result = controls.set_operational_controls(tmp_path, _pair(), expected_sha256=snapshot.catalog_sha256)
+    assert result["changed"] is False
+    assert _governance_status(tmp_path) == []
+    assert _governance_status(tmp_path, "--ignored") == []
+    assert list(governance.rglob("*.lock")) == []
+    assert list(governance.glob(".control-update-*")) == []
+    assert (tmp_path / ".git" / controls.WRITER_LOCK_NAME).is_file()
+    changed = controls.set_operational_controls(tmp_path, _pair("4", "7"), expected_sha256=snapshot.catalog_sha256)
+    assert changed["changed"] is True
+    assert _governance_status(tmp_path) == [" M config/governance/operational-controls.toml"]
+    assert list(governance.rglob("*.lock")) == []
+    assert sorted(p.name for p in governance.iterdir()) == ["operational-controls.toml"]
+
+
+def test_writer_lock_resolves_linked_worktree_metadata_from_the_gitdir_file(tmp_path):
+    root = tmp_path / "wt"
+    meta = tmp_path / "meta" / "worktrees" / "wt"
+    meta.mkdir(parents=True)
+    _write(root, _pair())
+    (root / ".git").rmdir()
+    (root / ".git").write_text(f"gitdir: {meta}\n", encoding="utf-8")
+    expected = meta.resolve() / controls.WRITER_LOCK_NAME
+    assert controls._writer_lock_path(root) == expected
+    (root / ".git").write_text("gitdir: ../meta/worktrees/wt\n", encoding="utf-8")
+    assert controls._writer_lock_path(root) == expected
+    snapshot = controls.load_operational_control_catalog(root)
+    result = controls.set_operational_controls(root, _pair("4", "7"), expected_sha256=snapshot.catalog_sha256)
+    assert result["changed"] is True
+    assert (root / controls.CATALOG_RELATIVE_PATH).read_bytes() == _pair("4", "7")
+    assert sorted(p.name for p in (root / "config" / "governance").iterdir()) == ["operational-controls.toml"]
+    assert expected.is_file()
+    assert list(root.rglob("*.lock")) == []
+
+
+def test_writer_refuses_roots_without_git_metadata_before_reading(tmp_path, monkeypatch):
+    path = tmp_path / controls.CATALOG_RELATIVE_PATH
+    path.parent.mkdir(parents=True)
+    path.write_bytes(_pair())
+    expected = "sha256:" + hashlib.sha256(_pair()).hexdigest()
+    real_open = Path.open
+
+    def guarded_open(self, *args, **kwargs):
+        assert self != path, "The catalog was opened before the writer mutex was resolved"
+        return real_open(self, *args, **kwargs)
+
+    def refused(match):
+        with monkeypatch.context() as patch:
+            patch.setattr(Path, "open", guarded_open)
+            with pytest.raises(controls.OperationalControlConfigError, match=match):
+                controls.set_operational_controls(tmp_path, _pair("4", "7"), expected_sha256=expected)
+        assert path.read_bytes() == _pair()
+        assert list(tmp_path.rglob("*.lock")) == []
+
+    refused("writer_unavailable")
+    entry = tmp_path / ".git"
+    entry.write_text("not a worktree pointer\n", encoding="utf-8")
+    refused("writer_unavailable")
+    entry.write_text("gitdir: missing/metadata\n", encoding="utf-8")
+    refused("writer_unavailable")
+    entry.unlink()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    if not _junction(entry, elsewhere):
+        pytest.skip("The host cannot create a directory junction")
+    refused("unsafe_path")

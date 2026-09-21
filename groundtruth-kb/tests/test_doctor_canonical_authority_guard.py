@@ -26,7 +26,7 @@ def test_canonical_authority_guard_passes_clean_authority_carriers(tmp_path: Pat
         "# Topic Note\n\nNOT canonical; canonical knowledge lives in MemBase.\n",
     )
     _write(
-        tmp_path / ".claude" / "rules" / "carrier.md",
+        tmp_path / ".harness-baseline-configuration" / "rules" / "carrier.md",
         "# Rule\n\n**Source:** `DCL-CARRIER-001`; `DELIB-PROVENANCE`.\n",
     )
 
@@ -75,14 +75,14 @@ def test_canonical_authority_guard_flags_imperative_rule_shaped_memory(tmp_path:
 
 def test_canonical_authority_guard_flags_delib_sole_rule_source(tmp_path: Path) -> None:
     _write(
-        tmp_path / ".claude" / "rules" / "sole-delib.md",
+        tmp_path / ".harness-baseline-configuration" / "rules" / "sole-delib.md",
         "# Rule\n\n**Source:** `DELIB-ONLY-AUTHORITY`.\n",
     )
 
     check = doctor_mod._check_canonical_authority_drift(tmp_path)
 
     assert check.status == "fail"
-    assert ".claude/rules/sole-delib.md:3" in check.message
+    assert ".harness-baseline-configuration/rules/sole-delib.md:3" in check.message
     assert "DELIB as sole rule authority" in check.message
 
 

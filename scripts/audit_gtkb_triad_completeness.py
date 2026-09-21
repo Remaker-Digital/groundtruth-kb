@@ -1,35 +1,37 @@
 #!/usr/bin/env python3
-"""Audit GT-KB specification/test/implementation triad completeness.
+"""Inspect current native specification, test and implementation associations.
 
-The audit is intentionally independent of adopter application test suites. It
-reads the GT-KB knowledge database and bridge files, then reports gaps that
-must be backfilled from historical evidence.
+This read-only diagnostic uses the selected project's authority configuration.
+It never opens a local authority store, parses historical bridge payloads,
+executes an adopter suite or mutates canonical records. Owner origin is assessed
+during review of the current canonical specification, with unclear cases referred
+to the owner. This diagnostic checks mechanical triad relationships only.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
-import re
-import sqlite3
+import sys
+from collections import Counter
 from dataclasses import asdict, dataclass
+from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_DB_PATH = PROJECT_ROOT / "groundtruth.db"
-DEFAULT_BRIDGE_DIR = PROJECT_ROOT / "bridge"
+from groundtruth_kb.authority_client import (
+    AuthorityClient,
+    AuthorityClientError,
+    configured_authority_client,
+    page_records,
+)
 
-TERMINAL_SPEC_STATUSES = {"implemented", "verified"}
-BRIDGE_TERMINAL_STATUSES = {"GO", "VERIFIED"}
-SPEC_LINK_RE = re.compile(r"\b(?:SPEC|GOV|ADR|DCL|PB|REQ)-[A-Z0-9][A-Z0-9_.-]*\b")
-SECTION_RE_TEMPLATE = r"(?im)^##\s+{heading}\s*$"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DOMAINS = ("specifications", "tests", "test-plans", "test-phases")
 
 
 @dataclass(frozen=True)
 class Gap:
-    """A single triad-completeness gap."""
-
     kind: str
     severity: str
     artifact_id: str
@@ -37,328 +39,216 @@ class Gap:
     detail: str
 
 
-def _json_loads(value: str | None, fallback: Any) -> Any:
-    if not value:
-        return fallback
-    try:
-        return json.loads(value)
-    except json.JSONDecodeError:
-        return fallback
+def _current_records(client: AuthorityClient) -> dict[str, dict[str, dict[str, Any]]]:
+    result = {}
+    for domain in DOMAINS:
+        records = page_records(client, "/v1/" + domain)
+        keyed = {}
+        for row in records:
+            if row["id"] in keyed or type(row.get("version")) is not int or row["version"] < 1:
+                raise AuthorityClientError(
+                    "invalid_response",
+                    f"{domain} current identities are invalid or duplicated",
+                )
+            keyed[row["id"]] = row
+        result[domain] = keyed
+    return result
 
 
-def _latest_specs(conn: sqlite3.Connection) -> list[sqlite3.Row]:
-    return conn.execute(
-        """
-        SELECT s.*
-        FROM specifications s
-        INNER JOIN (
-            SELECT id, MAX(version) AS max_version
-            FROM specifications
-            GROUP BY id
-        ) latest
-        ON s.id = latest.id AND s.version = latest.max_version
-        ORDER BY s.id
-        """
-    ).fetchall()
-
-
-def _has_registered_or_coverage_test(conn: sqlite3.Connection, spec_id: str) -> bool:
-    test_row = conn.execute(
-        """
-        SELECT 1
-        FROM tests t
-        INNER JOIN (
-            SELECT id, MAX(version) AS max_version
-            FROM tests
-            GROUP BY id
-        ) latest
-        ON t.id = latest.id AND t.version = latest.max_version
-        WHERE t.spec_id = ?
-        LIMIT 1
-        """,
-        (spec_id,),
-    ).fetchone()
-    if test_row:
-        return True
-    coverage_row = conn.execute(
-        "SELECT 1 FROM test_coverage WHERE spec_id = ? LIMIT 1",
-        (spec_id,),
-    ).fetchone()
-    return coverage_row is not None
-
-
-def _has_passing_test_result(conn: sqlite3.Connection, spec_id: str) -> bool:
-    return (
-        conn.execute(
-            """
-            SELECT 1
-            FROM tests t
-            INNER JOIN (
-                SELECT id, MAX(version) AS max_version
-                FROM tests
-                GROUP BY id
-            ) latest
-            ON t.id = latest.id AND t.version = latest.max_version
-            WHERE t.spec_id = ? AND LOWER(COALESCE(t.last_result, '')) = 'pass'
-            LIMIT 1
-            """,
-            (spec_id,),
-        ).fetchone()
-        is not None
+def _implementation_associations(spec: dict[str, Any]) -> bool:
+    constraints = spec.get("constraints")
+    return bool(
+        spec.get("assertions")
+        or spec.get("source_paths")
+        or (isinstance(constraints, dict) and constraints.get("implementation_evidence"))
     )
 
 
-def _has_implementation_evidence(row: sqlite3.Row) -> bool:
-    assertions = _json_loads(row["assertions"], [])
-    source_paths = _json_loads(row["source_paths"], [])
-    constraints = _json_loads(row["constraints"], {})
-    if assertions:
-        return True
-    if source_paths:
-        return True
-    return bool(isinstance(constraints, dict) and constraints.get("implementation_evidence"))
-
-
-def audit_spec_triad(db_path: Path) -> list[Gap]:
-    """Audit latest implemented/verified specs for test and implementation evidence."""
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    gaps: list[Gap] = []
-
-    try:
-        for row in _latest_specs(conn):
-            spec_id = row["id"]
-            status = row["status"]
-            if status != "retired" and not _has_owner_deliberation_origin(conn, spec_id):
-                gaps.append(
-                    Gap(
-                        kind="spec_without_owner_deliberation_origin",
-                        severity=_deliberation_gap_severity(row),
-                        artifact_id=spec_id,
-                        artifact_path=None,
-                        detail=(
-                            "Spec has no linked Deliberation Archive entry with "
-                            "source_type='owner_conversation'; Loyal Opposition may request "
-                            "owner approval/rejection or re-authorization before treating it "
-                            "as governing."
-                        ),
-                    )
-                )
-
-            if status not in TERMINAL_SPEC_STATUSES:
-                continue
-
-            artifact_path = None
-            source_paths = _json_loads(row["source_paths"], [])
-            if source_paths:
-                artifact_path = ", ".join(source_paths[:3])
-
-            if not _has_implementation_evidence(row):
-                gaps.append(
-                    Gap(
-                        kind="terminal_spec_without_implementation_evidence",
-                        severity="high",
-                        artifact_id=spec_id,
-                        artifact_path=artifact_path,
-                        detail=f"{status} spec has no assertions, source_paths, or implementation_evidence constraint.",
-                    )
-                )
-
-            if not _has_registered_or_coverage_test(conn, spec_id):
-                gaps.append(
-                    Gap(
-                        kind="terminal_spec_without_test_mapping",
-                        severity="critical",
-                        artifact_id=spec_id,
-                        artifact_path=artifact_path,
-                        detail=f"{status} spec has no row in tests or test_coverage.",
-                    )
-                )
-            elif not _has_passing_test_result(conn, spec_id):
-                gaps.append(
-                    Gap(
-                        kind="terminal_spec_without_passing_test_execution",
-                        severity="high",
-                        artifact_id=spec_id,
-                        artifact_path=artifact_path,
-                        detail=(
-                            f"{status} spec has test mapping but no latest tests.last_result='pass'. "
-                            "Coverage-only mappings are not execution evidence."
-                        ),
-                    )
-                )
-
-            if _is_agent_red_candidate(row):
-                gaps.append(
-                    Gap(
-                        kind="agent_red_scoped_spec_candidate_for_gtkb_reclassification",
-                        severity="medium",
-                        artifact_id=spec_id,
-                        artifact_path=artifact_path,
-                        detail=(
-                            "Spec text references Agent Red. Confirm whether it is a GT-KB platform "
-                            "behavior proven by Agent Red as adopter, or an application-only spec."
-                        ),
-                    )
-                )
-    finally:
-        conn.close()
-
-    return gaps
-
-
-def _has_owner_deliberation_origin(conn: sqlite3.Connection, spec_id: str) -> bool:
-    return (
-        conn.execute(
-            """
-            SELECT 1
-            FROM current_deliberations
-            WHERE spec_id = ?
-              AND source_type = 'owner_conversation'
-              AND COALESCE(source_ref, '') != ''
-            LIMIT 1
-            """,
-            (spec_id,),
-        ).fetchone()
-        is not None
-    )
-
-
-def _deliberation_gap_severity(row: sqlite3.Row) -> str:
-    spec_type = row["type"] or "requirement"
-    if spec_type in {"requirement", "specification"}:
-        return "critical"
-    return "high"
-
-
-def _is_agent_red_candidate(row: sqlite3.Row) -> bool:
-    text = " ".join(
-        str(row[key] or "") for key in ("title", "description", "scope", "section", "tags", "source_paths")
-    ).lower()
-    if "agent red" not in text and "agent_red" not in text and "agent-red" not in text:
+def _dated_passing_result(test: dict[str, Any]) -> bool:
+    """A recorded dated PASS is evidence, not execution by this diagnostic."""
+    if test.get("last_result") != "pass":
         return False
-    return row["status"] != "retired"
-
-
-def _has_markdown_section(content: str, heading: str) -> bool:
-    return re.search(SECTION_RE_TEMPLATE.format(heading=re.escape(heading)), content) is not None
-
-
-def _extract_bridge_entries(project_root: Path) -> list[tuple[str, str, str]]:
-    """Return status-bearing numbered bridge files as ``(slug, status, rel_path)``."""
-    from groundtruth_kb.bridge.versioned_files import scan_expected_documents, status_from_bridge_file
-
-    entries: list[tuple[str, str, str]] = []
-    for document in scan_expected_documents(project_root).values():
-        for rel_path in document.files:
-            status = status_from_bridge_file(project_root / rel_path)
-            if status:
-                entries.append((document.slug, status, rel_path))
-    return entries
-
-
-def audit_bridge_spec_links(bridge_dir: Path, project_root: Path) -> list[Gap]:
-    """Audit historical GO/VERIFIED bridge files for explicit spec linkage."""
-    if not bridge_dir.is_dir():
-        return [
-            Gap(
-                kind="bridge_state_missing",
-                severity="critical",
-                artifact_id="bridge",
-                artifact_path=str(bridge_dir),
-                detail="Bridge directory is missing; cannot audit approved/verified implementation history.",
+    timestamp, day = test.get("last_executed_at"), test.get("last_executed_on")
+    if bool(timestamp) == bool(day):
+        return False
+    try:
+        if timestamp:
+            return (
+                isinstance(timestamp, str)
+                and datetime.fromisoformat(timestamp.replace("Z", "+00:00")).tzinfo is not None
             )
-        ]
-
-    gaps: list[Gap] = []
-    for document, status, rel_path in _extract_bridge_entries(project_root):
-        if status not in BRIDGE_TERMINAL_STATUSES:
-            continue
-        bridge_file = project_root / rel_path
-        if not bridge_file.exists():
-            gaps.append(
-                Gap(
-                    kind="bridge_terminal_file_missing",
-                    severity="critical",
-                    artifact_id=document,
-                    artifact_path=rel_path,
-                    detail=f"{status} bridge entry points to a missing file.",
-                )
-            )
-            continue
-        content = bridge_file.read_text(encoding="utf-8", errors="replace")
-        if not _has_markdown_section(content, "Specification Links"):
-            gaps.append(
-                Gap(
-                    kind="bridge_terminal_without_specification_links_section",
-                    severity="high",
-                    artifact_id=document,
-                    artifact_path=rel_path,
-                    detail=f"{status} bridge file has no '## Specification Links' section.",
-                )
-            )
-        elif not SPEC_LINK_RE.search(content):
-            gaps.append(
-                Gap(
-                    kind="bridge_terminal_without_concrete_spec_id",
-                    severity="high",
-                    artifact_id=document,
-                    artifact_path=rel_path,
-                    detail=f"{status} bridge file has Specification Links but no concrete spec ID.",
-                )
-            )
-    return gaps
+        return isinstance(day, str) and len(day) == 10 and date.fromisoformat(day).isoformat() == day
+    except ValueError:
+        return False
 
 
-def run_audit(db_path: Path, bridge_dir: Path, project_root: Path) -> dict[str, Any]:
-    gaps = [
-        *audit_spec_triad(db_path),
-        *audit_bridge_spec_links(bridge_dir, project_root),
-    ]
-    by_kind: dict[str, int] = {}
-    by_severity: dict[str, int] = {}
-    for gap in gaps:
-        by_kind[gap.kind] = by_kind.get(gap.kind, 0) + 1
-        by_severity[gap.severity] = by_severity.get(gap.severity, 0) + 1
-
+def _active_test_ids(records: dict[str, dict[str, dict[str, Any]]]) -> set[str]:
+    plans = {row["id"] for row in records["test-plans"].values() if row.get("status") == "active"}
     return {
-        "db_path": str(db_path),
-        "bridge_state": str(bridge_dir),
-        "gap_count": len(gaps),
-        "by_kind": dict(sorted(by_kind.items())),
-        "by_severity": dict(sorted(by_severity.items())),
-        "gaps": [asdict(gap) for gap in gaps],
+        test_id
+        for phase in records["test-phases"].values()
+        if phase.get("plan_id") in plans
+        for test_id in (phase.get("test_ids") or [])
     }
 
 
-def main() -> int:
+def _adopter_review_candidate(spec: dict[str, Any]) -> bool:
+    scope = spec.get("application_scope")
+    if scope is not None:
+        return scope == "application:Agent_Red"
+    text = " ".join(
+        str(spec.get(key) or "") for key in ("title", "description", "scope", "section", "tags", "source_paths")
+    ).lower()
+    return any(term in text for term in ("agent red", "agent_red", "agent-red"))
+
+
+def audit_spec_triad(
+    records: dict[str, dict[str, dict[str, Any]]],
+) -> tuple[list[Gap], int]:
+    """Inspect native completion claims; do not infer verification from status."""
+    gaps: list[Gap] = []
+    implementation_claims = 0
+    active_tests = _active_test_ids(records)
+    tests = list(records["tests"].values())
+    for spec in sorted(records["specifications"].values(), key=lambda row: row["id"]):
+        spec_id, status = spec["id"], spec.get("status")
+        if status in {"retired", "superseded"}:
+            continue
+        if status != "active":
+            gaps.append(
+                Gap(
+                    "noncanonical_spec_status",
+                    "high",
+                    spec_id,
+                    None,
+                    "Current native formal status is not active, superseded or retired; reconcile the record without treating a legacy label as verification.",
+                )
+            )
+            continue
+        if _adopter_review_candidate(spec):
+            gaps.append(
+                Gap(
+                    "agent_red_scoped_spec_candidate_for_gtkb_reclassification",
+                    "medium",
+                    spec_id,
+                    None,
+                    "Review current platform-versus-adopter applicability explicitly; no reclassification is applied by this diagnostic.",
+                )
+            )
+        if not spec.get("implementation_verified_at"):
+            continue
+        implementation_claims += 1
+        paths = spec.get("source_paths") or []
+        artifact_path = ", ".join(paths[:3]) or None
+        if not _implementation_associations(spec):
+            gaps.append(
+                Gap(
+                    "verified_implementation_without_implementation_evidence",
+                    "high",
+                    spec_id,
+                    artifact_path,
+                    "The current implementation verification marker has no assertions, source associations or implementation_evidence constraint. Associations alone do not prove execution.",
+                )
+            )
+        linked = [test for test in tests if test.get("spec_id") == spec_id]
+        executable = [test for test in linked if test.get("test_file") and test["id"] in active_tests]
+        if not executable:
+            gaps.append(
+                Gap(
+                    "verified_implementation_without_active_test_binding",
+                    "critical",
+                    spec_id,
+                    artifact_path,
+                    "No current TEST for this specification declares a test_file and belongs to a phase of an active test plan, as required by the native verification evidence rule.",
+                )
+            )
+        elif not any(_dated_passing_result(test) for test in executable):
+            gaps.append(
+                Gap(
+                    "verified_implementation_without_passing_test_execution",
+                    "high",
+                    spec_id,
+                    artifact_path,
+                    "Active declared TEST bindings contain no recorded pass with exactly one valid execution timestamp or date. Definition, coverage mapping and historical adopter labels are not passing execution evidence.",
+                )
+            )
+    return gaps, implementation_claims
+
+
+def run_audit(project_root: Path, *, client: AuthorityClient | None = None) -> dict[str, Any]:
+    """Read all four native collections twice; refuse observed concurrent drift."""
+    authority = client if client is not None else configured_authority_client(project_root)
+    records = _current_records(authority)
+    gaps, claims = audit_spec_triad(records)
+    if _current_records(authority) != records:
+        raise AuthorityClientError(
+            "source_changed",
+            "Native audit inputs changed during inspection; read current state and retry. No complete result is available.",
+        )
+    return {
+        "authority_url": authority.url,
+        "source": "native_current_records",
+        "records_read": {domain: len(rows) for domain, rows in records.items()},
+        "implementation_claims": claims,
+        "gap_count": len(gaps),
+        "by_kind": dict(sorted(Counter(gap.kind for gap in gaps).items())),
+        "by_severity": dict(sorted(Counter(gap.severity for gap in gaps).items())),
+        "gaps": [asdict(gap) for gap in gaps],
+        "assessment_complete": not gaps,
+        "limitations": [
+            "Native declaration rule only: test_file plus a phase of an active plan. Source/function existence and current byte qualification are separate checks.",
+            "Recorded dated test results are not a new execution or independent verification by this audit.",
+            "Owner origin is assessed during review of the current canonical specification; unclear cases go to the owner. Mechanical triad completion neither approves nor rejects owner origin.",
+            "Repeated reads detect observed drift; this report is an inspection, not a durable authority snapshot.",
+        ],
+    }
+
+
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--db", type=Path, default=DEFAULT_DB_PATH)
-    parser.add_argument("--bridge-dir", type=Path, default=DEFAULT_BRIDGE_DIR)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    parser.add_argument("--json", action="store_true", help="Emit machine-readable JSON.")
-    parser.add_argument("--fail-on-gaps", action="store_true", help="Exit nonzero when gaps exist.")
-    args = parser.parse_args()
-
-    report = run_audit(args.db, args.bridge_dir, args.project_root)
-
+    parser.add_argument("--json", action="store_true", help="Emit the diagnostic as JSON.")
+    parser.add_argument(
+        "--fail-on-gaps",
+        action="store_true",
+        help="Exit 1 for mechanical triad findings.",
+    )
+    args = parser.parse_args(argv)
+    try:
+        report = run_audit(args.project_root)
+    except AuthorityClientError as error:
+        print(
+            json.dumps({"error": {"code": error.code, "message": str(error)}}, sort_keys=True),
+            file=sys.stderr,
+        )
+        return 2
+    except (OSError, ValueError):
+        print(
+            json.dumps(
+                {
+                    "error": {
+                        "code": "invalid_configuration",
+                        "message": "Unable to load the selected project authority configuration.",
+                    }
+                },
+                sort_keys=True,
+            ),
+            file=sys.stderr,
+        )
+        return 2
     if args.json:
         print(json.dumps(report, indent=2, sort_keys=True))
     else:
-        print("GT-KB triad completeness audit")
-        print(f"DB: {report['db_path']}")
-        print(f"Bridge state: {report['bridge_state']}")
-        print(f"Gaps: {report['gap_count']}")
-        print(f"By severity: {report['by_severity']}")
-        print(f"By kind: {report['by_kind']}")
+        print("GT-KB native triad inspection")
+        print(f"Authority: {report['authority_url']}")
+        print(f"Findings: {report['gap_count']}")
+        print(f"Mechanical triad checks complete: {report['assessment_complete']}")
         for gap in report["gaps"][:50]:
             print(f"- [{gap['severity']}] {gap['kind']} {gap['artifact_id']}: {gap['detail']}")
-        if len(report["gaps"]) > 50:
-            print(f"... {len(report['gaps']) - 50} more gaps omitted from text output; use --json.")
-
-    if args.fail_on_gaps and report["gap_count"]:
-        return 1
-    return 0
+        print(report["limitations"][2])
+        if report["gap_count"] > 50:
+            print("Additional findings are retained in --json output.")
+    return 1 if args.fail_on_gaps and not report["assessment_complete"] else 0
 
 
 if __name__ == "__main__":

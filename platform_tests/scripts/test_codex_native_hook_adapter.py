@@ -24,14 +24,14 @@ ROOT = Path(__file__).resolve().parents[2]
 def runtime(tmp_path):
     root = tmp_path / "installed workspace"
     (root / "scripts").mkdir(parents=True)
-    (root / ".codex/hooks").mkdir(parents=True)
+    (root / ".harness-baseline-configuration/hooks").mkdir(parents=True)
     (root / "groundtruth-kb").mkdir()
     (root / "nested cwd").mkdir()
     subprocess.run(["git", "init", str(root)], check=True, capture_output=True)
     shutil.copyfile(ROOT / "scripts/codex_hook_adapter.py", root / "scripts/codex_hook_adapter.py")
     venv = root / "groundtruth-kb/.venv"
     subprocess.run(["cmd", "/c", "mklink", "/J", str(venv), sys.prefix], check=True, capture_output=True)
-    target = root / ".codex/hooks/probe.py"
+    target = root / ".harness-baseline-configuration/hooks/probe.py"
     target.write_text(
         "import json, os, sys\nfrom pathlib import Path\n"
         "data=json.load(sys.stdin)\nPath('observed.json').write_text(json.dumps({'payload':data,"
@@ -48,13 +48,13 @@ def runtime(tmp_path):
 
 def command(event="PreToolUse", args=(), timeout=8):
     engine = _load_projector(ROOT)
-    profile = engine.load_profiles()["harnesses"]["codex"]
+    profile = {**engine.load_profiles()["harnesses"]["codex"], "name": "codex"}
     gaps = []
     hook = {"script": "probe.py", "args": list(args)}
     rendered = engine._native_cwd_hook_command(profile, hook, event, timeout, {}, gaps)
     assert not gaps
     assert str(ROOT) not in rendered and "$CODEX_PROJECT_DIR" not in rendered
-    assert _references_script(rendered, ".codex/hooks/probe.py", profile["project_dir_var"])
+    assert _references_script(rendered, ".harness-baseline-configuration/hooks/probe.py", profile["project_dir_var"])
     return rendered
 
 
@@ -100,7 +100,7 @@ def test_rendered_native_events_preserve_identity_utf8_cwd_and_literal_arguments
     assert observed["payload"] == {**supplied, "project_root": str(root)}
     assert observed["native"] == supplied["session_id"]
     assert observed["root"] == str(root) and observed["harness"] == "codex"
-    assert observed["args"] == list(args)
+    assert observed["args"] == [*args, "--harness", "codex"]
     assert not (root / "nested cwd/café.py").exists()
     assert not (root / ".claude").exists()
 
@@ -177,7 +177,7 @@ def test_command_enumeration_never_rewrites_shell_code():
 
 def test_native_registration_covers_bash_and_patch_once():
     engine = _load_projector(ROOT)
-    profile = engine.load_profiles()["harnesses"]["codex"]
+    profile = {**engine.load_profiles()["harnesses"]["codex"], "name": "codex"}
     plan = engine.build_plan("codex")
     assert not plan.gaps
     document = json.loads(plan.writes[profile["hooks_json_path"]])
@@ -199,7 +199,7 @@ def test_native_registration_covers_bash_and_patch_once():
 
 def test_each_registered_hook_uses_the_native_adapter_without_batch_or_finalizer():
     engine = _load_projector(ROOT)
-    profile = engine.load_profiles()["harnesses"]["codex"]
+    profile = {**engine.load_profiles()["harnesses"]["codex"], "name": "codex"}
     plan = engine.build_plan("codex")
     assert not plan.gaps
     document = json.loads(plan.writes[profile["hooks_json_path"]])

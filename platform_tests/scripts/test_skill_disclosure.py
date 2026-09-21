@@ -10,12 +10,6 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 EMITTER_PATH = REPO_ROOT / "scripts" / "skill_disclosure.py"
-WRITE_VERDICT = REPO_ROOT / ".claude" / "skills" / "verify" / "helpers" / "write_verdict.py"
-CODEX_REPORT_SKILL = REPO_ROOT / ".claude" / "skills" / "codex-report" / "SKILL.md"
-SESSION_WRAP_SKILL = REPO_ROOT / ".claude" / "skills" / "kb-session-wrap" / "SKILL.md"
-CODEX_ADAPTER_REPORT = REPO_ROOT / ".codex" / "skills" / "codex-report" / "SKILL.md"
-CODEX_ADAPTER_WRAP = REPO_ROOT / ".codex" / "skills" / "kb-session-wrap" / "SKILL.md"
-PARITY_SCRIPT = REPO_ROOT / "scripts" / "check_harness_parity.py"
 
 
 def _load_emitter():

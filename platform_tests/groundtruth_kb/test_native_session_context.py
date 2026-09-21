@@ -21,52 +21,18 @@ from groundtruth_kb.authority_api import create_authority_app
 from groundtruth_kb.postgres_kernel import PostgresTransaction
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put
+from platform_tests.groundtruth_kb.native_fixtures import (
+    BASELINE,
+    FORMALS,
+    _serve_authority,
+    database_contents,
+    files,
+    put,
+    seed_startup_sources,
+)
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-FORMALS = (
-    "GOV-SESSION-SELF-INITIALIZATION-001",
-    "DCL-SESSION-ROLE-RESOLUTION-001",
-    "GOV-HARNESS-ISOLATION-001",
-)
-BASELINE = (
-    ".harness-baseline-configuration/rules/session-bootstrap.md",
-    ".harness-baseline-configuration/rules/operating-model.md",
-)
-
-
-def seed_startup_sources(client, root):
-    """Declare owned sources; never borrow production state or generated files."""
-    for record_id in FORMALS:
-        result = put(
-            client,
-            "specifications",
-            record_id,
-            {"title": record_id, "description": f"Current requirement: {record_id}", "status": "active"},
-        )
-        assert result.status_code == 200, result.text
-    for relative in BASELINE:
-        path = root / relative
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(f"Authored role-neutral source: {relative}\n", encoding="utf-8")
-
-
-def database_contents(service):
-    with service.kernel.transaction(read_only=True) as tx:
-        tx.cursor.execute("SELECT tablename FROM pg_tables WHERE schemaname=%s ORDER BY tablename", (tx.schema,))
-        tables = [row["tablename"] for row in tx.cursor.fetchall()]
-        result = {}
-        for table in tables:
-            tx.cursor.execute(sql.SQL("SELECT * FROM {}.{}").format(sql.Identifier(tx.schema), sql.Identifier(table)))
-            result[table] = sorted(json.dumps(dict(row), default=str, sort_keys=True) for row in tx.cursor.fetchall())
-        return result
-
-
-def files(root):
-    return {p.relative_to(root).as_posix(): p.read_bytes() for p in root.rglob("*") if p.is_file()}
 
 
 @pytest.fixture

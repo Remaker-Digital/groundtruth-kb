@@ -51,9 +51,10 @@ COHORT: dict[str, tuple[int, str]] = {
     # Re-pinned under WI-7669: the two side defects in this file were repaired,
     # which changes its blob. A reviewed-preimage pin is re-pinned under review
     # when the file legitimately changes; that is what the pin is for.
+    # Re-pinned under c102 (Q-3, D23): shared fixtures moved to postgres_fixtures.py, imports rewired; tests unchanged.
     "platform_tests/groundtruth_kb/test_postgres_kernel_integration.py": (
-        73588,
-        "7d44de9c101b58d639f23a981f59b582ed2a228d302ef4868fa11be1e1c0714e",
+        62537,
+        "4e5e7674dfca4eae904d4bcab25e838b33d3a811f4d362fce8f062e45a554c7f",
     ),
 }
 

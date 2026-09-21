@@ -1,401 +1,115 @@
 # Start Here
 
-A guided walkthrough for adopters evaluating GroundTruth-KB for the first time.
+GroundTruth-KB connects engineering requirements, executable tests and current
+work through a native service. Use this page to orient yourself, then follow
+the [bootstrap guide](bootstrap.md) for the concrete setup sequence.
 
-## Reader Profile
+## What you need
 
-This page assumes **zero prior context**. You have not used GroundTruth-KB
-before, you have not read the method documentation, and you may have never
-run a file-bridge protocol in your life. The only assumption is that you are
-sitting at a Windows workstation with internet access and can copy-paste
-commands into a PowerShell terminal.
-
-If that describes you, keep reading. Everything a senior technologist needs
-to decide whether GroundTruth-KB is worth an evaluation sits on this page or
-behind the links at the bottom.
-
-## Prerequisites
-
-Before anything else, make sure these are present on your workstation:
-
-- **Python 3.11+** — check with `python --version`
-- **Git** — check with `git --version`
-- **pip** — included with Python
-- **Claude Code** — Anthropic's terminal-based coding assistant. Install
-  from the [Anthropic Claude Code install page](https://docs.anthropic.com/claude/docs/claude-code)
-  (retrieved 2026-04-17). Claude Code is a **separate prerequisite**. Install
-  and authenticate Claude Code before installing GroundTruth-KB.
-  GroundTruth-KB does not bundle Claude Code and does not manage its updates.
-- **(Optional) Codex** — available through OpenAI. Only needed if you intend
-  to run the dual-agent file bridge with a Loyal Opposition reviewer.
-
-The PowerShell primer at the bottom of this page shows exactly what commands
-to run if any of the above are missing.
-
-## 1. What Is GroundTruth-KB?
-
-GroundTruth-KB is a **specification-first governance toolkit for AI
-engineering teams**. It gives you three things that are hard to keep in sync
-without discipline:
-
-- A **canonical record** of what the system is supposed to do
-  (specifications).
-- A **machine-checkable proof** that the code still does it (assertions).
-- An **audit trail** of every decision and its rejected alternatives
-  (the Deliberation Archive).
-
-The toolkit is a single Python package (`pip install groundtruth-kb`). It
-ships with a CLI (`gt`), an optional Web UI, project scaffolding, CI
-templates, and a dual-agent file-bridge pattern for AI code review.
-
-See [Architecture — Product Split](architecture/product-split.md) for the
-three-layer split (Core Knowledge Database, Project Scaffold, Workstation
-Doctor).
-
-## 2. Features, One Problem at a Time
-
-Each capability exists because a specific thing is hard to get right without
-tooling. Read the problem first; the feature follows.
-
-### Specifications
-
-**Problem:** "What is this thing supposed to do?" is the single most common
-source of argument in AI-assisted development. Without a canonical record,
-every team member, every agent, and every reviewer carries their own
-unverifiable mental model.
-
-**Solution:** GroundTruth-KB stores specifications in an append-only SQLite
-database. Each spec has an ID, a status (`specified` → `implemented` →
-`verified`), and a history of every change. Specs are the project's
-decision log — not a build specification for an implementer.
-
-### Assertions
-
-**Problem:** Documentation rots. A spec that says "users can create tasks
-with a priority" does not prove the code still does it.
-
-**Solution:** Every spec can carry one or more machine-checkable
-**assertions**. A grep pattern, a file-exists check, a JSON path, a counted
-occurrence. Run `gt assert` and GroundTruth-KB tells you which specs still
-hold and which have drifted.
-
-### Tests
-
-**Problem:** Tests written without specifications drift in a different
-direction than the code they were meant to pin down.
-
-**Solution:** Every test is linked to a spec. When a test fails, you see
-which specification is at risk. When a spec changes, you see which tests
-need review.
-
-### Work Items
-
-**Problem:** "Known gap between spec and implementation" is a real
-engineering state, but most trackers (Jira, Linear) don't distinguish it
-from ordinary bugs or feature requests.
-
-**Solution:** A work item (WI) is always tied to a source spec. It has an
-origin (`new`, `regression`, `defect`, `hygiene`) and a stage. When the WI
-resolves, the linked spec can advance its status.
-
-### Deliberation Archive
-
-**Problem:** Six months from now, nobody will remember why you picked
-approach A over approach B, or whether a rejected alternative has already
-been tried.
-
-**Solution:** Every decision — owner conversation, Loyal Opposition review,
-bridge thread — is archived as a deliberation with semantic search. Cite
-deliberation IDs in proposals. Search before re-opening a settled decision.
-
-### Governance Gates
-
-**Problem:** "We will review every change" is aspirational. It does not
-survive contact with a fast-moving codebase.
-
-**Solution:** GroundTruth-KB enforces GOV specs (spec-first, test clarity,
-owner consent, no-fixes-during-testing, KB-is-truth) as runnable assertions.
-If a governance rule is violated, `gt assert` says so.
-
-### File-Bridge Dual-Agent Pattern
-
-**Problem:** A single AI agent reviewing its own work is weaker than two
-agents with opposing incentives. But coordinating two agents over chat is
-lossy.
-
-**Solution:** A file-bridge protocol in `bridge/` with a versioned INDEX.
-Prime Builder writes proposals; Loyal Opposition writes GO / NO-GO reviews;
-both agents poll the index independently. The filesystem is the audit trail.
-
-### Core Specification Intake
-
-**Problem:** New adopters often start building before the *baseline* application
-specifications exist — what the system is, who its users are, the data it holds, the
-compliance and security posture. Those gaps surface late, as rework.
-
-**Solution:** GroundTruth-KB enrolls new projects by default and re-surfaces the next
-missing core-spec question in `MEMORY.md` at each session start until the baseline is
-captured, then stops. Completion is read from persisted MemBase evidence, so a slot
-you have answered — or explicitly marked not applicable — never re-prompts. The
-behavior is automation-safe and opt-out (`gt project init --opt-out-core-spec-intake`);
-check progress any time with `gt core-specs status`.
-
-## 3. Block Diagram: Where Things Live
-
-```mermaid
-flowchart TB
-    subgraph Local["Your Workstation"]
-        CLI["gt CLI<br/>(init / assert / serve)"]
-        DB["MemBase<br/>groundtruth.db<br/>(append-only SQLite)"]
-        MEM["MEMORY.md<br/>(operational notepad)"]
-        DA["Deliberation Archive<br/>(deliberations table)"]
-        CHROMA["ChromaDB index<br/>(semantic search, optional)"]
-        BRIDGE["bridge/<br/>(file-bridge proposals, INDEX.md)"]
-    end
-    subgraph Agents["AI Agents"]
-        CC["Claude Code<br/>(Prime Builder)"]
-        CX["Codex<br/>(Loyal Opposition)"]
-    end
-    subgraph Infra["Infrastructure"]
-        SCHED["OS Scheduler<br/>(Task Scheduler / cron)"]
-        WEB["Web UI<br/>(gt serve, optional)"]
-        CI["CI templates<br/>(GitHub Actions)"]
-    end
-
-    CLI --> DB
-    CLI --> MEM
-    CLI --> DA
-    DA --> CHROMA
-    CC --> BRIDGE
-    CX --> BRIDGE
-    SCHED --> CC
-    SCHED --> CX
-    DB --> WEB
-    CI --> CLI
-```
-
-The diagram names the 14 directive entities an adopter touches in the first
-week: the CLI, the canonical database (MemBase), the operational memory
-file, the Deliberation Archive, the ChromaDB index, the bridge directory,
-the two AI agents, the OS scheduler, the Web UI, the CI templates, plus
-three roles (Prime Builder, Loyal Opposition, OS Scheduler).
-
-The **three-tier memory architecture** is defined in
-[ADR-0001](method/08-architecture.md): **MemBase** is the canonical
-knowledge tier (specs, tests, work items, procedures, documents);
-**MEMORY.md** is the operational notepad (session state, what you were
-working on yesterday); the **Deliberation Archive** is the decision log
-(why you picked approach A over approach B). ChromaDB is a derived search
-index, not a fourth tier. See
-[product-split.md](architecture/product-split.md) for the authoritative
-definition of each layer.
-
-## 4. Install
-
-Once the prerequisites are satisfied, installation is a single command:
-
-```powershell
-pip install groundtruth-kb
-```
-
-Verify the install:
+Use Python 3.11 or newer and Git, a configured GT-KB host with a reachable
+native authority, and the harnesses you intend to use. Install the package
+version selected for that host and confirm the CLI:
 
 ```powershell
 gt --version
+gt --help
 ```
 
-If your system `PATH` is not configured to run `gt` directly, or you are running inside a virtual environment (e.g., `groundtruth-kb/.venv`), you can run the CLI via the virtual environment's executable path (e.g., `groundtruth-kb/.venv/Scripts/gt` on Windows or `groundtruth-kb/.venv/bin/gt` on POSIX), or using the canonical python module invocation:
+`gt --version` prints `gt, version 0.7.0rc1` for the current package.
+
+A harness does not determine an agent's role. Prime Builder and Loyal Opposition
+are separate session roles established by the supplied initialization marker.
+Independent review remains separate from implementation.
+
+## Where the state lives
+
+```mermaid
+flowchart LR
+    CLI["CLI and agents"] --> API["Native service"]
+    API --> PG[("Canonical PostgreSQL records")]
+    CLI --> APP["Application source and tests"]
+    PG --> VIEWS["Derived search and dashboard views"]
+```
+
+Specifications describe required behavior. TEST records identify executable
+coverage and test-plan placement. Each work item belongs to one project, whose
+authorization field controls dispatch eligibility. Canonical writers preserve
+history and check the observed version before changing a record.
+
+Assertions and test results provide evidence about behavior. They do not by
+themselves approve a specification or establish complete semantic coverage.
+Owner input changes the appropriate canonical record directly; a retained
+conversation archive is not a prerequisite.
+
+## Initialize an application
+
+Application registration, execution-project creation and file initialization
+are separate steps. The execution project must carry
+`repository_ref = application:<APPLICATION>`.
 
 ```powershell
-python -m groundtruth_kb --version
+gt --config <host>/groundtruth.toml application register <APPLICATION> --host-root <host> --json
+gt --config <host>/groundtruth.toml project init <APPLICATION> --project-id <PROJECT> --host-root <host> --owner "<OWNER>" --dry-run --json
+gt --config <host>/groundtruth.toml project init <APPLICATION> --project-id <PROJECT> --host-root <host> --owner "<OWNER>" --json
+gt --config <host>/groundtruth.toml project doctor --project-id <PROJECT> --host-root <host> --json
 ```
 
-Expected output:
+The [bootstrap guide](bootstrap.md) supplies the project-record fields, first
+specification, executable TEST binding and assertion examples. Initialization
+creates application files and selected projections; it does not create a local
+authority database or a Git commit.
 
-```
-gt, version 0.7.0rc1
-```
+Core specification intake reports the next missing question through
+`gt core-specs next-question`. Use the explicit answer writer and current
+version to record the owner's answer. `gt core-specs status` reports the current
+result; no mutable session-progress file is needed.
 
-Create your first project:
+## Implement and review work
 
-```powershell
-gt project init my-first-project --profile local-only --no-seed-example --no-include-ci
-```
+The owner selects work while Dispatcher Next remains inactive. Start from
+`gt context work-item <WI-ID> --json`, the current native attempt and the
+applicable formal records.
 
-Switch into the project and verify its health:
+1. Prime Builder authors a NEW proposal for the selected work.
+2. Loyal Opposition reviews it and authors GO or NO-GO.
+3. Prime Builder implements after GO, or responds to NO-GO with REVISED.
+4. Prime Builder reports the implementation with READY.
+5. Loyal Opposition verifies the measured result with VERIFIED, or requests
+   correction with NOT-READY.
 
-```powershell
-cd my-first-project
-gt project doctor
-```
+The native bridge CLI claims and delivers each exact next artifact. An agent
+does not acquire ownership of a whole work item. Bridge messages are disposable
+coordination; they are excluded from work-product commits. The complete verified
+project is the commit unit, with the applicable independent review and native
+commit checks.
 
-The doctor reports which tools are present and which are optional. All core
-checks should pass at this point.
+See [dual-agent setup](tutorials/dual-agent-setup.md) for the current commands.
+Release and deployment follow the selected project's requirements and operator
+instructions; a particular branch name is not itself deployment authority.
 
-See the [Bootstrap Guide](bootstrap.md) for the full 10-step technical
-walkthrough (seed data, first spec, first test, first assertion, Web UI,
-CI). See [Desktop Setup](desktop-setup.md) for the same-day application
-setup path (`gt application register` then `gt project init`).
+## Operate and inspect
 
-## 5. PowerShell Primer
+| Task | Current command |
+| --- | --- |
+| Inspect the current specification | `gt spec show <SPEC-ID> --json` |
+| Run its assertions | `gt assert --spec <SPEC-ID> --json` |
+| Read a work item's current context | `gt context work-item <WI-ID> --json` |
+| Read native coordination | `gt bridge state-report --json` |
+| Preview managed application updates | `gt project upgrade <APPLICATION> --project-id <PROJECT> --host-root <host> --json` |
+| Operate the derived dashboard | `gt dashboard --help` |
 
-If you have never opened a terminal, this five-command primer covers
-everything the walkthrough above requires. Open PowerShell (Start menu →
-type `PowerShell` → press Enter).
+Select the intended configuration with `gt --config <path>`. A service failure
+remains a failed or unavailable native operation; local files and caches do not
+replace authority. Managed harness outputs are refreshed through the projector,
+with shared authored sources edited at their source.
 
-| Task | Command | What it does |
-|------|---------|--------------|
-| Change directory | `cd C:\Users\you\projects` | Move into a folder |
-| List files | `ls` | Show what is in the current folder |
-| Run a program | `python --version` | Run a `.exe` that is on your `PATH` |
-| Install a Python package | `pip install groundtruth-kb` | Download + install a package from PyPI |
-| Check a command exists | `where.exe python` | Show the path to a `.exe` |
+## Continue with
 
-If a command fails with "not recognized," it usually means the `.exe` is
-not on your `PATH`. The installers for Python and Git both offer to add
-themselves to `PATH` during setup — accept that option. If you already
-installed them without that option, re-run the installer and choose
-"Modify."
+- [Bootstrap guide](bootstrap.md): registration, canonical records and executable examples.
+- [Product architecture](architecture/product-split.md): current components and boundaries.
+- [Application isolation](architecture/isolation.md): host/application ownership and recovery.
+- [CLI reference](reference/cli.md): current parameters and refusal behavior.
+- [Known limitations](known-limitations.md): remaining operational and host constraints.
+- [Release health](wiki/release-health.md): what dashboard observations establish.
 
-## 6. Third-Party Integrations
-
-Current evaluation path: the base package installs from PyPI, the operations
-dashboard is generated by `gt dashboard`, and external services remain explicit
-adopter decisions. GroundTruth-KB reports service status and scaffolds
-instructions, but it does not manage external credentials.
-
-GroundTruth-KB deliberately stays thin. The heavy lifting is delegated to
-tools you probably already have. Here is the named inventory:
-
-| Tool | Why it is needed |
-|------|------------------|
-| **Claude Code** | Prime Builder — reads the bridge, writes proposals, edits code. |
-| **Codex** (OpenAI) | Loyal Opposition — reads the bridge, writes GO/NO-GO reviews. |
-| **OS Scheduler** (Windows Task Scheduler / Linux cron / macOS launchd) | Runs the bridge pollers every 3 minutes, independent of open chat sessions. |
-| **GitHub** | Hosts the repo and runs the CI templates. Not required for local-only mode. |
-| **PyPI** | Distributes the `groundtruth-kb` wheel. Required for install. |
-| **MkDocs + Material theme** | Renders the docs site (this page). Optional but recommended for team-scale adoption. |
-| **ChromaDB** | Semantic search backend for the Deliberation Archive. Optional; a SQLite LIKE fallback ships in the base install. |
-| **Grafana OSS** | Local operations dashboard runtime for `gt dashboard start`. |
-| **frser SQLite datasource** | Lets Grafana read `.groundtruth/dashboard/gtkb-dashboard.sqlite`. |
-| **SonarCloud** | Hosted quality gate for this package repo. Optional for adopters. |
-
-Nothing on this list is installed automatically by GroundTruth-KB. That is
-intentional — each is a separate decision that an adopter (or their IT
-department) should make explicitly. See [Desktop Setup](desktop-setup.md)
-for the install order that has been battle-tested on Windows.
-
-## 7. Operations Dashboard
-
-For CTO evaluation, use the package-generated operations dashboard:
-
-```powershell
-gt dashboard init
-gt dashboard install
-gt dashboard start
-```
-
-Open:
-
-```text
-http://127.0.0.1:3000/d/groundtruth-kb/groundtruth-kb-dashboard
-```
-
-This writes `.groundtruth/dashboard/gtkb-dashboard.sqlite`, Grafana
-provisioning files, and dashboard JSON from the pip-installed package. Use
-`gt dashboard refresh` to refresh data and `gt dashboard stop` to stop local
-processes started by `gt dashboard start`.
-
-The optional Web UI (`pip install "groundtruth-kb[web]"` then `gt serve`) is
-separate from the Grafana operations dashboard. In the operations dashboard,
-each metric has an action attached to it:
-
-| Metric | What it tells you | If it is off-normal |
-|--------|-------------------|---------------------|
-| Specs by status | How many specs are `specified`, `implemented`, `verified` | A growing `specified` pile means WIs are not being created. A shrinking `verified` pile means drift. |
-| Tests total | How many tests are linked to specs | Test count dropping without a deletion reason → regression. |
-| Assertion pass / fail | How many machine-checkable assertions currently pass | Any failing `verified` spec is a regression. Failing `specified` is expected. |
-| Work item counts | Open vs. resolved WIs | An open WI with no recent change → investigate stalling. |
-| Recent activity | Last 20 spec / WI / test changes | A quiet day when you know you worked → the CLI is not writing to the expected DB. |
-| Deliberation archive size | Rows in the `deliberations` table | Zero rows after a session with reviews → the harvest script did not run. |
-
-The dashboard is text-first. No charting, no animated widgets. Every row
-can be exported via `gt export` for external tooling.
-
-## 8. Core Operational Loops
-
-Adoption means internalizing two loops. Both are short.
-
-### The Deploy Loop
-
-```
-develop → staging → prod
-```
-
-- **develop** is the branch where every change lands. CI runs on every
-  push. Nobody commits directly to `main`.
-- **staging** is where the branch is tested against a production-shaped
-  environment before release.
-- **prod** is what the user sees. A merge to `main` is a deployment
-  operation; `main` is always deployable.
-
-GroundTruth-KB itself does not provision the staging and prod
-environments. The CI templates in `templates/ci/` show the wiring; the
-rest is your cloud decision.
-
-### The Bridge Loop
-
-```
-propose → review → implement → verify
-```
-
-- **Propose:** Prime Builder writes `bridge/{topic}-001.md` and publishes a
-  `NEW` entry to TAFE/dispatcher bridge state.
-- **Review:** Loyal Opposition reads the proposal and writes
-  `bridge/{topic}-002.md` with verdict `GO` or `NO-GO`.
-- **Implement:** On `GO`, Prime writes the code. On `NO-GO`, Prime writes
-  a `REVISED` proposal as `-003.md`.
-- **Verify:** Prime files a post-implementation report; Loyal Opposition
-  reads it and writes `VERIFIED` or another `NO-GO`.
-
-The dispatcher daemon dispatches the counterpart harness on
-tool-use and Stop events (the retired OS scheduler and smart poller are no
-longer used). No human has to babysit the queue. See
-[Method — File Bridge Automation](method/12-file-bridge-automation.md)
-for the full protocol.
-
-## 9. Next Steps
-
-Once this page makes sense, walk through these in order:
-
-- **[Your First Specification](tutorials/first-spec.md)** — write a spec,
-  link a test, run an assertion. 15 minutes.
-- **[Dual-Agent Setup](tutorials/dual-agent-setup.md)** — add the Loyal
-  Opposition and wire the file-bridge poller. 30 minutes.
-- **[A Day in the Life](day-in-the-life.md)** — a synthetic first week
-  with a solo developer using Claude Code + GroundTruth-KB together.
-- **[Evidence](evidence.md)** — live metrics from the reference
-  implementation, each with generating command + commit SHA + date.
-- **[Known Limitations](known-limitations.md)** — open gaps you should
-  know about before committing. Honesty beats marketing.
-- **[Executive Overview](groundtruth-kb-executive-overview.md)** — the
-  business case for an engineering manager reviewing this tool.
-
-## Command Quick Reference
-
-| Task | Command |
-|------|---------|
-| Install | `pip install groundtruth-kb` |
-| Scaffold a project | `gt project init my-project --profile <profile>` |
-| Same-day application setup | `gt application register my-project --host-root <host>` then `gt project init my-project --project-id <PROJECT> --host-root <host> --owner <owner>` |
-| Check workstation | `gt project doctor` |
-| View summary | `gt summary` |
-| Run assertions | `gt assert` |
-| View history | `gt history` |
-| Capture a deliberation | `gt deliberations add --id DELIB-... --summary ... --content ...` |
-| Search deliberations | `gt deliberations search "query"` |
-| Start the Web UI | `gt serve` |
-
----
-
-*Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.*
+Copyright 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

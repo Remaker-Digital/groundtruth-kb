@@ -2,6 +2,9 @@
 
 The inventory is evidence, not an authority or a proof of semantic completeness.
 It never opens runtime databases, credentials, foreign checkouts or harness state.
+The rendered inventory is derived local output under ``.groundtruth/derived/``
+(the gitignored KB working directory); it is never committed, and ``--check`` is
+a local operational diagnostic of those derived bytes, not a completeness verdict.
 """
 
 from __future__ import annotations
@@ -32,7 +35,10 @@ from groundtruth_kb.project.operational_control_config import (
 )
 
 EXTRACTION_SPEC_VERSION = 2
-GENERATED_ARTIFACT_REL = Path("config/governance/timer-inventory.toml")
+# Derived output lives under the gitignored KB working directory, not under
+# config/governance/, which carries only the hand-authored control catalog
+# (owner ruling D14, 2026-09-17: derived output is untracked and ignored).
+GENERATED_ARTIFACT_REL = Path(".groundtruth/derived/timer-inventory.toml")
 CONTROL_CLASSES = (
     "timer",
     "ttl",

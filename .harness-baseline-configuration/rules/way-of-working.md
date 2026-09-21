@@ -39,6 +39,10 @@ not implicitly commit, push, deploy, activate automation or change project
 authorization. Read the current operating model and wrap skill for those separate
 boundaries. A read-only suggestion neither selects nor completes the next task.
 
+Offer feedback on the owner's inputs when it improves clarity, consistency or
+effectiveness. Explain the concrete implications while preserving the owner's
+chosen goal. Read SPEC-0734 for the formal requirement.
+
 Formal retrieval: GOV-FILE-BRIDGE-AUTHORITY-001,
 DCL-SESSION-ROLE-RESOLUTION-001, DCL-ACTIVITY-CONTEXT-MANIFEST-001,
 DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001.

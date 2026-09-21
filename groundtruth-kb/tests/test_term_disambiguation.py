@@ -2,7 +2,7 @@
 """Tests for GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL Slice 1.
 
 Per bridge `gtkb-gov-term-disambiguation-mechanical-2026-05-02-005.md` Test Plan T1:
-verify the policy file exists, registers correctly in managed-artifacts.toml,
+verify the policy file exists as a template (M15: no managed rule copy row),
 declares all 7 pinned defaults, and covers the 21 generic owner-required terms
 (adopter template; "Agent Red" is GT-KB-self-only and added post-render).
 
@@ -63,17 +63,17 @@ def test_canonical_terminology_policy_toml_exists() -> None:
     assert _POLICY_PATH.exists(), f"canonical-terminology-policy.toml must exist at {_POLICY_PATH}"
 
 
-def test_policy_registered_in_managed_artifacts() -> None:
-    """The policy file is registered as `rule.canonical-terminology-policy`
-    in managed-artifacts.toml following the same pattern as the existing
-    `rule.canonical-terminology` and `rule.canonical-terminology-config` rows.
+def test_policy_is_not_a_managed_copy_row() -> None:
+    """M15 (D15/D34): the policy file is a template, never a managed rule copy.
+
+    The former `rule.canonical-terminology-policy` row and every other rule row are gone from
+    managed-artifacts.toml; the template itself stays in place pending M26.6.
     """
     text = _MANAGED_ARTIFACTS_PATH.read_text(encoding="utf-8")
-    assert 'id = "rule.canonical-terminology-policy"' in text, (
-        "managed-artifacts.toml must register the policy file as 'rule.canonical-terminology-policy'"
-    )
-    assert 'template_path = "rules/canonical-terminology-policy.toml"' in text
-    assert 'target_path = ".claude/rules/canonical-terminology-policy.toml"' in text
+    assert 'id = "rule.canonical-terminology-policy"' not in text
+    assert 'class = "rule"' not in text and 'class = "skill"' not in text
+    assert ".claude/rules/" not in text
+    assert _POLICY_PATH.is_file()
 
 
 def test_policy_declares_all_seven_pinned_defaults() -> None:

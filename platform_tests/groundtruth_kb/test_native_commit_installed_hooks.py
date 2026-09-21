@@ -9,21 +9,10 @@ from pathlib import Path
 import groundtruth_kb
 import pytest
 
-from platform_tests.groundtruth_kb.test_native_commit_boundary import (
-    base,
-    git,
-    integration,
-    invoke,
-)
-from platform_tests.groundtruth_kb.test_native_commit_boundary import (
-    bridge as bridge,
-)
-from platform_tests.groundtruth_kb.test_native_commit_boundary import (
-    commit_environment as commit_environment,
-)
-from platform_tests.groundtruth_kb.test_native_commit_boundary import (
-    native as native,
-)
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration, invoke
+from platform_tests.groundtruth_kb.finalization_fixtures import commit_environment as commit_environment
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]

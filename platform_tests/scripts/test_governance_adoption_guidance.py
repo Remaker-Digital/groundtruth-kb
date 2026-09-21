@@ -13,9 +13,10 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_RULE = REPO_ROOT / ".harness-baseline-configuration/rules/acting-prime-builder.md"
 PROJECTED_RULE = REPO_ROOT / ".claude/rules/acting-prime-builder.md"
-AGENTS = REPO_ROOT / "AGENTS.md"
+PRIORITIES = REPO_ROOT / ".harness-baseline-configuration/rules/governance-principles.md"
 GOVERNING_RECORDS = (
-    "GOV-ACTING-PRIME-BUILDER-001",
+    "GOV-ROLE-DETERMINATION-INIT-LINE-ONLY-001",
+    "DCL-SESSION-ROLE-RESOLUTION-001",
     "GOV-AGENT-RED-GTKB-CONFORMANCE-001",
     "GOV-ARTIFACT-APPROVAL-001",
     "PB-ARTIFACT-APPROVAL-001",
@@ -34,17 +35,15 @@ GOVERNING_RECORDS = (
     "DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001",
 )
 RETAINED_DIRECTIVES = (
-    "Prime Builder and Loyal Opposition are not permanently bound",
-    "Any AI model harness may assume either role",
-    "Agent Red is a well-behaved",
-    "fully-conformant adopter",
-    "supported and sustained by GroundTruth-KB",
-    "to be treated as one",
+    "A role belongs to one session context",
+    "The role is immutable for that context",
+    "There is no acting-role fallback",
+    "no whole-work-item agent ownership",
+    "Independent review remains with a different context",
+    "Agent Red is a well-behaved, fully-conformant adopter",
     "require production-release work to include governed release-readiness evidence",
-    "cited in rules, regression-tested, and visible",
-    "standing backlog",
-    "treated like other formal",
     "Individual backlog entries remain queue/work items",
+    "follow the owner's dispatch",
 )
 
 
@@ -60,12 +59,12 @@ def test_acting_prime_builder_rule_names_the_governing_records() -> None:
         assert directive in rule or directive.lower() in rule.lower(), directive
 
 
-def test_projected_rule_carries_the_baseline_body() -> None:
-    assert _one_line(BASELINE_RULE) in _one_line(PROJECTED_RULE)
+def test_rule_is_authored_once_without_a_projected_copy() -> None:
+    assert not PROJECTED_RULE.exists(), "rules are read on demand from the authored baseline"
 
 
 def test_standing_priorities_cite_artifact_oriented_governance() -> None:
-    priorities = AGENTS.read_text(encoding="utf-8")
+    priorities = PRIORITIES.read_text(encoding="utf-8")
     for record in (
         "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001",
         "ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001",
@@ -75,8 +74,6 @@ def test_standing_priorities_cite_artifact_oriented_governance() -> None:
 
 
 def test_release_candidate_gate_skill_documents_the_gate_script() -> None:
-    skill = (REPO_ROOT / ".harness-baseline-configuration/skills/gtkb-release-candidate-gate/SKILL.md").read_text(
-        encoding="utf-8"
-    )
+    skill = (REPO_ROOT / ".agents/skills/gtkb-release-candidate-gate/SKILL.md").read_text(encoding="utf-8")
     assert "scripts/release_candidate_gate.py" in skill
     assert "--skip-frontend" in skill and "--include-frontend" in skill

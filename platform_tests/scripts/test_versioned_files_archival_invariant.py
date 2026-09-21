@@ -2,71 +2,41 @@ from __future__ import annotations
 
 from pathlib import Path
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
-
-from groundtruth_kb.bridge.versioned_files import (  # noqa: E402
-    candidate_is_archived,
-    load_acknowledged_archived_slugs,
-    scan_expected_documents,
-)
+import pytest
+from groundtruth_kb.bridge.versioned_files import parse_bridge_header_block, status_from_bridge_file
+from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES, HISTORICAL_INERT_STATUSES
 
 
-def _write_bridge_file(project_root: Path, filename: str, text: str) -> None:
-    bridge_dir = project_root / "bridge"
-    bridge_dir.mkdir(parents=True, exist_ok=True)
-    (bridge_dir / filename).write_text(text, encoding="utf-8")
-
-
-def _is_archived(project_root: Path, slug: str) -> bool:
-    return candidate_is_archived(
-        slug,
-        scan_expected_documents(project_root),
-        load_acknowledged_archived_slugs(project_root),
-        project_root,
-    )
+def _write_bridge_file(project_root: Path, filename: str, text: str) -> Path:
+    path = project_root / "bridge" / filename
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
+    return path
 
 
 def test_canonical_nonterminal_status_remains_live_even_with_later_terminal_text(tmp_path: Path) -> None:
-    _write_bridge_file(
+    path = _write_bridge_file(
         tmp_path,
         "live-go-001.md",
         "GO\n\n## Prior status\n\nVERIFIED was discussed in historical context.\n",
     )
-
-    assert _is_archived(tmp_path, "live-go") is False
-
-
-def test_terminal_first_line_status_is_archived(tmp_path: Path) -> None:
-    _write_bridge_file(tmp_path, "finished-001.md", "VERIFIED\n\nImplementation accepted.\n")
-
-    assert _is_archived(tmp_path, "finished") is True
+    assert status_from_bridge_file(path) == "GO"
 
 
-def test_owner_acknowledged_malformed_candidate_is_archived(tmp_path: Path) -> None:
-    config_dir = tmp_path / "config" / "governance"
-    config_dir.mkdir(parents=True)
-    (config_dir / "tafe-acknowledged-archived-bridges.toml").write_text(
-        """
-[[acknowledged]]
-slug = "acknowledged-malformed"
-""".lstrip(),
-        encoding="utf-8",
-    )
-    _write_bridge_file(
-        tmp_path,
-        "acknowledged-malformed-001.md",
-        "Implementation report without status\n\nVERIFIED\n",
-    )
-
-    assert _is_archived(tmp_path, "acknowledged-malformed") is True
+def test_terminal_first_line_status_is_read(tmp_path: Path) -> None:
+    path = _write_bridge_file(tmp_path, "finished-001.md", "VERIFIED\n\nImplementation accepted.\n")
+    assert status_from_bridge_file(path) == "VERIFIED"
 
 
-def test_terminal_implementation_sibling_archives_source_thread(tmp_path: Path) -> None:
-    _write_bridge_file(tmp_path, "source-thread-001.md", "GO\n\nApproved work remains live.\n")
-    _write_bridge_file(
-        tmp_path,
-        "source-thread-implementation-001.md",
-        "VERIFIED\n\nImplementation sibling closed this thread.\n",
-    )
-
-    assert _is_archived(tmp_path, "source-thread") is True
+@pytest.mark.parametrize("status", sorted(CANONICAL_STATUSES | HISTORICAL_INERT_STATUSES))
+@pytest.mark.parametrize("decoration", ["", "## ", "**"])
+def test_reader_preserves_status_spelling_and_never_selects_later_body_status(tmp_path, status, decoration) -> None:
+    text = f"{decoration}{status}\nDocument: example\nGO\nVERDICT-REJECTED\n"
+    path = _write_bridge_file(tmp_path, "example-001.md", text)
+    original = path.read_bytes()
+    header = parse_bridge_header_block(text)
+    assert header.status == status
+    assert header.status_line == f"{decoration}{status}"
+    assert header.status_line_exact is (not decoration)
+    assert status_from_bridge_file(path) == status
+    assert path.read_bytes() == original

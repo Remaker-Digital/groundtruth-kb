@@ -49,21 +49,17 @@ _TARGET_RE = re.compile(
     r"\.(?:" + "|".join(re.escape(name.lstrip(".")) for name in HARNESS_PROJECTION_DIRS) + r")/[A-Za-z0-9_./-]+"
 )
 
-# The canonical neutral source, and the canonical helper tree. A reference that
-# names one of these on the same line is paired with its real carrier.
+# The authored neutral sources and projector. A reference that names one of
+# these on the same line is paired with its real carrier.
 CANONICAL_MARKERS: tuple[str, ...] = (
+    ".agents/skills/",
     ".harness-baseline-configuration/",
-    "scripts/skill-helpers/",
     "scripts/harness_projection/",
 )
 
 # Sources that legitimately name generated targets because they produce or declare
 # them. These are `required`, not residual consumers.
-REQUIRED_SOURCE_PREFIXES: tuple[str, ...] = (
-    "scripts/harness_projection/",
-    ".harness-baseline-configuration/.projection-manifest.json",
-    ".harness-baseline-configuration/skills/MANIFEST.json",
-)
+REQUIRED_SOURCE_PREFIXES: tuple[str, ...] = ("scripts/harness_projection/",)
 REQUIRED_SOURCE_SUFFIXES: tuple[str, ...] = ("/hooks.json",)
 
 # Indicators that a line depends on the target operationally rather than
@@ -173,6 +169,8 @@ def _walk_candidate_files(project_root: Path) -> list[tuple[Path, str]]:
             if Path(filename).suffix.lower() in _SKIPPED_SUFFIXES:
                 continue
             rel = filename if at_root else f"{rel_dir}/{filename}"
+            if rel == "config/governance/timer-inventory.toml":
+                continue
             candidates.append((Path(dirpath) / filename, rel))
     return candidates
 
@@ -186,7 +184,7 @@ def domain_coverage(project_root: Path) -> dict[str, int]:
     baseline_files = 0
     other_files = 0
     for _path, source_path in _walk_candidate_files(project_root):
-        if source_path.startswith(".harness-baseline-configuration/"):
+        if source_path.startswith((".harness-baseline-configuration/", ".agents/skills/")):
             baseline_files += 1
         else:
             other_files += 1
@@ -251,7 +249,7 @@ def build_report(references: list[Reference]) -> dict[str, object]:
     for ref in references:
         by_classification[ref.classification] += 1
         by_harness[ref.harness] = by_harness.get(ref.harness, 0) + 1
-        if ref.source_path.startswith(".harness-baseline-configuration/"):
+        if ref.source_path.startswith((".harness-baseline-configuration/", ".agents/skills/")):
             baseline_side += 1
     return {
         "schema_version": 1,

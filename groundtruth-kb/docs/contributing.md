@@ -13,10 +13,10 @@ it needs to grow.
 ### High-signal contributions
 
 - **Bug reports** with reproduction steps — these reveal method failures.
-  Use the [Bug Report](https://github.com/Remaker-Digital/groundtruth-kb/issues/new?template=bug_report.yml) template.
+  Use the [Bug Report](https://github.com/Remaker-Digital/groundtruth-kb/issues/new?template=bug_report.md) template.
 
 - **Feature requests** that describe the problem, not just the solution.
-  Use the [Feature Request](https://github.com/Remaker-Digital/groundtruth-kb/issues/new?template=feature_request.yml) template.
+  Use the [Feature Request](https://github.com/Remaker-Digital/groundtruth-kb/issues/new?template=feature_request.md) template.
 
 - **Pull requests** with clear problem/approach/rationale.
   See the PR template for the expected structure.
@@ -35,10 +35,10 @@ method it implements.
 
 ```bash
 git clone https://github.com/Remaker-Digital/groundtruth-kb.git
-cd groundtruth-kb
+cd groundtruth-kb/groundtruth-kb
 python -m venv .venv
 source .venv/bin/activate  # or .venv\Scripts\activate on Windows
-pip install -e ".[dev,web]"
+pip install -e ".[dev,authority]"
 make check  # lint + format-check + test
 ```
 

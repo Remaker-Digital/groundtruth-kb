@@ -1,5 +1,5 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for governance hook templates."""
+"""Tests for the governance hooks: the authored baseline hooks and the remaining template-only hooks."""
 
 from __future__ import annotations
 
@@ -13,18 +13,27 @@ import pytest
 
 from groundtruth_kb import get_templates_dir
 
-HOOKS_DIR = get_templates_dir() / "hooks"
+# D15/D34: the authored hooks under the baseline are the one source and run in place; the two template-only
+# hooks (bridge-compliance-gate, session-health) still live in the template directory.
+BASELINE_HOOKS_DIR = Path(__file__).resolve().parents[2] / ".harness-baseline-configuration" / "hooks"
+TEMPLATE_HOOKS_DIR = get_templates_dir() / "hooks"
 
+
+def _hook_path(hook_name: str) -> Path:
+    authored = BASELINE_HOOKS_DIR / hook_name
+    return authored if authored.is_file() else TEMPLATE_HOOKS_DIR / hook_name
+
+
+# kb-not-markdown is a registered recovery stub with no self-test or enforcement contract (WI-4449; its
+# re-implementation or removal is WI-5959's absorbed scope) and is covered by its own stub test below.
 ALL_HOOKS = [
     "bridge-compliance-gate.py",
-    "kb-not-markdown.py",
     "destructive-gate.py",
     "credential-scan.py",
 ]
 
 PRETOOLUSE_HOOKS = [
     "bridge-compliance-gate.py",
-    "kb-not-markdown.py",
     "destructive-gate.py",
     "credential-scan.py",
 ]
@@ -47,7 +56,7 @@ def _run_hook(
     args: list[str] | None = None,
     env: dict | None = None,
 ) -> subprocess.CompletedProcess:
-    cmd = [sys.executable, str(HOOKS_DIR / hook_name)] + (args or [])
+    cmd = [sys.executable, str(_hook_path(hook_name))] + (args or [])
     run_env = os.environ.copy()
     if env:
         run_env.update(env)
@@ -195,7 +204,7 @@ def _fallback_isolated_copy(tmp_path: Path) -> Path:
 
     isolated = tmp_path / "isolated"
     isolated.mkdir()
-    shutil.copy(HOOKS_DIR / "credential-scan.py", isolated / "credential-scan.py")
+    shutil.copy(_hook_path("credential-scan.py"), isolated / "credential-scan.py")
     return isolated
 
 
@@ -919,24 +928,14 @@ def test_bridge_compliance_multi_doc_partial_match(tmp_path):
 # ---------------------------------------------------------------------------
 
 
-def test_kb_not_markdown_approved_path(tmp_path):
-    """bridge/foo.md → pass."""
-    payload = json.dumps(
-        {
-            "hook_event_name": "PreToolUse",
-            "tool_name": "Write",
-            "tool_input": {"file_path": "bridge/foo.md", "content": "# Proposal"},
-            "session_id": "test",
-            "cwd": str(tmp_path),
-        }
-    )
-    result = _run_hook("kb-not-markdown.py", stdin_data=payload)
-    assert result.returncode == 0
-    assert json.loads(result.stdout) == {}
+def test_kb_not_markdown_is_a_registered_no_op_stub(tmp_path):
+    """The registered baseline hook is the WI-4449 recovery stub: no output, exit 0, no enforcement.
 
-
-def test_kb_not_markdown_unapproved_path(tmp_path):
-    """analysis/notes.md → advisory with hookEventName."""
+    The advisory implementation lived only in the retired template copy (M15 correction 34). This test
+    records the stub's real behaviour instead of counting it as enforcement; re-implementing it at the right
+    boundary or removing the registration is WI-5959's absorbed scope (WI-6187/WI-6792).
+    """
+    assert _hook_path("kb-not-markdown.py") == BASELINE_HOOKS_DIR / "kb-not-markdown.py"
     payload = json.dumps(
         {
             "hook_event_name": "PreToolUse",
@@ -948,29 +947,8 @@ def test_kb_not_markdown_unapproved_path(tmp_path):
     )
     result = _run_hook("kb-not-markdown.py", stdin_data=payload)
     assert result.returncode == 0
-    output = json.loads(result.stdout)
-    assert "hookSpecificOutput" in output
-    assert output["hookSpecificOutput"]["hookEventName"] == "PreToolUse"
-
-
-def test_kb_not_markdown_configured_allowlist(tmp_path):
-    """groundtruth.toml adds reports/ → pass for reports/foo.md."""
-    (tmp_path / "groundtruth.toml").write_text(
-        '[groundtruth]\ndb_path = "./groundtruth.db"\n\n[governance]\napproved_markdown_paths = ["reports/"]\n',
-        encoding="utf-8",
-    )
-    payload = json.dumps(
-        {
-            "hook_event_name": "PreToolUse",
-            "tool_name": "Write",
-            "tool_input": {"file_path": "reports/foo.md", "content": "# Report"},
-            "session_id": "test",
-            "cwd": str(tmp_path),
-        }
-    )
-    result = _run_hook("kb-not-markdown.py", stdin_data=payload)
-    assert result.returncode == 0
-    assert json.loads(result.stdout) == {}
+    assert result.stdout.strip() == "" and result.stderr.strip() == ""
+    assert not (tmp_path / "analysis").exists()
 
 
 # ---------------------------------------------------------------------------

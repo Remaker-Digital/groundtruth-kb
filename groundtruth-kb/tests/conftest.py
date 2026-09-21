@@ -178,6 +178,12 @@ class NativeApplicationHost:
             self.host / ".harness-baseline-configuration",
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.lock"),
         )
+        # D15: the one skills source lives beside the baseline; the projector fails closed without it.
+        shutil.copytree(
+            checkout / ".agents/skills",
+            self.host / ".agents/skills",
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
         shutil.copytree(
             checkout / "scripts/harness_projection",
             self.host / "scripts/harness_projection",

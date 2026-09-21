@@ -9088,7 +9088,7 @@ class KnowledgeDB:
         search. Running LIKE on every call guarantees such fresh-but-unindexed
         deliberations are surfaced by the very next search, protecting the
         mandatory pre-proposal/pre-review Deliberation Archive search contract
-        (``.claude/rules/deliberation-protocol.md``). LIKE is in-process
+        (``.harness-baseline-configuration/rules/deliberation-protocol.md``). LIKE is in-process
         SQLite: fast and cannot hang.
 
         Returns list of dicts with all deliberation row fields plus:

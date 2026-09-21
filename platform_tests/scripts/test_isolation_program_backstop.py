@@ -70,7 +70,7 @@ def test_backstop_detects_unauthorized_application_reference(tmp_path: Path) -> 
 def test_backstop_allows_documented_cross_scope_references(tmp_path: Path) -> None:
     mod = _load_backstop_module()
     bridge = tmp_path / "bridge"
-    rules = tmp_path / ".claude" / "rules"
+    rules = tmp_path / ".harness-baseline-configuration" / "rules"
     tests = tmp_path / "platform_tests"
     bridge.mkdir()
     rules.mkdir(parents=True)
@@ -139,6 +139,34 @@ def test_backstop_prunes_generated_temp_directories(tmp_path: Path) -> None:
     assert payload["status"] == "pass"
     assert payload["violations"] == []
     assert payload["scanned_files"] == ["scripts/clean.py"]
+
+
+@pytest.mark.parametrize(
+    "relative",
+    [
+        "scripts/deploy/rollback.ps1",
+        "scripts/embed_knowledge_base.py",
+        "scripts/provision_tenant_one.py",
+        "scripts/seed_knowledge_base.py",
+        "scripts/seed_demo_data.py",
+        "scripts/test_admin_ui_validation.py",
+        "scripts/test_chat_battery.py",
+        "scripts/stripe/create_product_catalog.py",
+    ],
+)
+def test_backstop_allows_named_application_operators_only(tmp_path, relative):
+    mod = _load_backstop_module()
+    target = tmp_path / relative
+    target.parent.mkdir(parents=True)
+    target.write_text('APP_ROOT = "applications/Agent_Red"\n', encoding="utf-8")
+    (tmp_path / "scripts/other.py").write_text('APP_ROOT = "applications/Agent_Red"\n', encoding="utf-8")
+    inventory = tmp_path / "config/governance/timer-inventory.toml"
+    inventory.parent.mkdir(parents=True)
+    inventory.write_text("excluded inventory", encoding="utf-8")
+    result = mod.scan(tmp_path)
+    assert [row["path"] for row in result["allowed_references"]] == [relative]
+    assert [row["path"] for row in result["violations"]] == ["scripts/other.py"]
+    assert "config/governance/timer-inventory.toml" not in result["scanned_files"]
 
 
 def test_backstop_default_scan_excludes_history_surfaces(tmp_path: Path) -> None:

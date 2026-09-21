@@ -116,7 +116,7 @@ def bind_context(cli: CliRunner, native_context_id: str, init_line: str) -> dict
 
 
 def build_prompt(root: Path, binding: dict[str, Any], task: str, document: str, version: int) -> str:
-    baseline = (root / ".harness-baseline-configuration" / "AGENTS.md").read_text(encoding="utf-8")
+    baseline = (root / "AGENTS.md").read_text(encoding="utf-8")
     facts = (
         f"Native context identifier: {binding['native_context_id']}. "
         f"Bound session context: {binding['session_context_id']}. Immutable role: {binding['role']}. "

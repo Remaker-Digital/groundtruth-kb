@@ -8,7 +8,7 @@ assertions over the live tree. All paths are repo-root-relative.
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RULES = REPO_ROOT / ".claude" / "rules"
+RULES = REPO_ROOT / ".harness-baseline-configuration" / "rules"
 
 
 def _read(rel: str) -> str:
@@ -19,7 +19,7 @@ def _read(rel: str) -> str:
 
 
 def test_file_bridge_protocol_no_poller_cadence():
-    text = _read(".claude/rules/file-bridge-protocol.md")
+    text = _read(".harness-baseline-configuration/rules/file-bridge-protocol.md")
     assert "every 3 minutes" not in text
     assert "scheduled every 3 minutes" not in text
     assert "automated every 3 minutes" not in text

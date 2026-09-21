@@ -33,7 +33,7 @@ from fastapi.testclient import TestClient
 from groundtruth_kb.authority_api import create_authority_app
 from packaging.requirements import Requirement
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native  # noqa: F401
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 AGENT_RED_ROOT = REPO_ROOT / "applications" / "Agent_Red"

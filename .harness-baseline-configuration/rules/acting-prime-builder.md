@@ -1,187 +1,115 @@
-# AI Role Assignment And Acting Prime Builder Mapping
+# Session roles and platform scope
 
-Owner decisions `DELIB-0830`, `DELIB-0831`, `DELIB-0832`, and the associated
-MemBase records `GOV-ACTING-PRIME-BUILDER-001`,
-`GOV-HARNESS-ROLE-PORTABILITY-001`, and
-`GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001` establish the current role mapping
-rules.
+Prime Builder and Loyal Opposition are not permanently bound to a vendor,
+model or harness. A role belongs to one session context and is established
+only by the exact owner-supplied or dispatched `::init gtkb <pb|lo>` line.
+The role is immutable for that context. A harness name, an unavailable
+counterpart or a prior assignment cannot confer a role or change it.
 
-## General Principle
+Read the current records `GOV-ROLE-DETERMINATION-INIT-LINE-ONLY-001`,
+`DCL-SESSION-ROLE-RESOLUTION-001` and `GOV-SESSION-SELF-INITIALIZATION-001`.
+Independent review remains with a different context in the reviewing role.
+There is no acting-role fallback and no whole-work-item agent ownership.
 
-The roles of Prime Builder and Loyal Opposition are not permanently bound to
-one model name or vendor harness.
+## Project and application boundaries
 
-## Mandatory Project Root Boundary
+Resolve the selected GT-KB project root and apply
+`.harness-baseline-configuration/rules/project-root-boundary.md` before
+accepting, proposing, implementing, reviewing, testing or verifying work.
+Project-relative paths must remain inside that root. Application work requires
+the explicitly selected application root and its native application scope.
 
-All active GT-KB files and artifacts must remain within `E:\GT-KB`. All GT-KB
-demo/application files must remain within `E:\GT-KB\applications`. Agent Red
-is the reference adopter application for GT-KB at
-`E:\GT-KB\applications\Agent_Red`; its in-root application subtree is in scope
-for GT-KB review when explicitly named. Unqualified GT-KB tooling references
-must not resolve silently to Agent Red's lifecycle-independent repository or CI
-surfaces. There are no exceptions to the root-containment rule.
-Apply `.harness-baseline-configuration/rules/project-root-boundary.md` before accepting, proposing,
-implementing, reviewing, testing, or verifying any GT-KB work.
+Agent Red is a well-behaved, fully-conformant adopter supported and sustained
+by GroundTruth-KB. It is the reference adopter at `applications/Agent_Red/`,
+with its application boundary declared in `.gtkb-app-isolation.json`.
+Portability between GT-KB installations exercises the application-isolation
+contract. Read `GOV-AGENT-RED-GTKB-CONFORMANCE-001` for current requirements.
 
-Any AI model harness may assume either role if it supports the operational
-capabilities needed for that role, including hooks, skills, plugins, CLI access,
-desktop/app access when needed, filesystem access, and related integration
-abilities.
-
-## Agent Red Reference Adopter Application Boundary
-
-Agent Red is the reference adopter application for GT-KB. The application subtree
-lives at `applications/Agent_Red/` per `CLAUDE.md` § Mandatory Project Root
-Boundary and is described by `applications/Agent_Red/.gtkb-app-isolation.json`.
-Its hosted form deploys from a lifecycle-independent repository at
-`https://github.com/mike-remakerdigital/agent-red`. Agent Red exercises the
-platform's application-isolation contract in continuous use; portability of
-Agent Red between GT-KB installations is the operative test of that contract.
-
-The canonical framing is established by `GOV-AGENT-RED-GTKB-CONFORMANCE-001`
-and `DELIB-0834`: Agent Red is a well-behaved, fully-conformant adopter
-supported and sustained by GroundTruth-KB, not an ad hoc exception, and is not
-to be treated as one. Active adopter-experience work tracks under
-`PROJECT-GTKB-ADOPTER-EXPERIENCE` (e.g., the Agent Red Deployability
-Preservation Gate at `bridge/gtkb-agent-red-deployability-preservation-gate-*`).
-
-The 2026-05-04 owner correction narrowed tooling-reference discipline:
-unqualified GT-KB tooling references - CLI invocations, CI workflows, GitHub
-Actions, release evidence, repository state - must not resolve silently to Agent
-Red surfaces. The narrowing scopes tooling-reference resolution; it does not
-alter Agent Red's role as the reference adopter or as the isolation validator.
-Agent Red surfaces are addressed explicitly when in scope.
-
-GroundTruth-KB also includes five adopter fixtures in `groundtruth-kb/examples/` used as scaffold examples; those are distinct from Agent Red (the reference adopter). Do not
-route unqualified GT-KB release, CI, bridge, source, or verification evidence to
-Agent Red surfaces; Agent Red work requires explicit scope.
-
-Owner deliberation `DELIB-S347-AGENT-RED-REFERENCE-ADOPTER-FRAMING-RESTORATION`
-explicitly describes the "reference adopter" framing for Agent Red and authorizes
-this narrative edit.
+Unqualified GT-KB CLI, CI, source, repository, release and verification
+references resolve to the platform. Do not silently substitute Agent Red's
+repository or CI. Name Agent Red explicitly when it is in scope. The three
+adopter fixtures under `groundtruth-kb/examples/` are exercised scaffold
+examples, distinct from Agent Red and from platform release evidence.
 
 ## Owner direction and native specification authority
 
 Read current formal requirements through `gt spec show`. The owner directs
 formal substance; an assigned scope already supported by owner direction does
-not need a second per-artifact approval. Ask only a material unresolved choice.
-Drafting text does not create a canonical requirement. Apply directed changes
-through `gt spec record` with the freshly read version, actual attribution and
-a concrete change reason, then compare a separate canonical readback.
+not need a second per-artifact approval. Ask only about a material unresolved
+choice. Draft text does not create a canonical requirement.
 
-GOV-ARTIFACT-APPROVAL-001, PB-ARTIFACT-APPROVAL-001,
-ADR-ARTIFACT-FORMALIZATION-GATE-001 and DCL-ARTIFACT-APPROVAL-HOOK-001
-describe the native writer and current authority contract under
-GOV-ARTIFACT-AUTHORITY-HIERARCHY-001. There is no intrinsic approval envelope,
-packet, receipt, digest, scoped auto-approval registry or transcript registration
-to create or validate. The actor string supplies attribution, not permission.
-Session logs retain the conversation without becoming an execution dependency.
+Apply directed changes through `gt spec record` with a freshly read version,
+actual attribution and a concrete change reason, then compare a separate
+canonical readback. `GOV-ARTIFACT-APPROVAL-001`,
+`PB-ARTIFACT-APPROVAL-001`, `ADR-ARTIFACT-FORMALIZATION-GATE-001` and
+`DCL-ARTIFACT-APPROVAL-HOOK-001` describe the native writer and current authority
+contract under `GOV-ARTIFACT-AUTHORITY-HIERARCHY-001`.
 
-The native writer checks typed fields and expected versions and atomically
-records the changed row and history. Current requirement status is distinct
-from implementation verification. A stale write requires fresh reconciliation.
-Project formal relationships use their own native route and preserve project
-authorization. These operations do not replace independent review, exact
-artifact claims, tests or the project commit lifecycle.
+The writer validates typed fields and expected versions and records the changed
+row and its history atomically. Attribution does not grant permission. Current
+requirement status is distinct from implementation verification. Reconcile a
+stale write with current facts. Project relationships use their native route
+and preserve project authorization. These operations retain independent
+review, artifact-scoped claims, executable tests and project commit duties.
 
-## Release And Adoption Governance Principle
+## Release, adoption and backlog
 
-Owner deliberations `DELIB-0828` and `DELIB-0829`, formalized as
 `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
-`GOV-GTKB-ADOPTION-ENFORCEMENT-001`, require production-release work to include
-governed release-readiness evidence. Any prior Agent Red adoption framing must
-be interpreted through the 2026-05-04 tooling-reference narrowing: unqualified
-GT-KB release-readiness evidence must not resolve silently to Agent Red surfaces
-unless Agent Red is explicitly in scope.
+`GOV-GTKB-ADOPTION-ENFORCEMENT-001` require production-release work to include
+governed release-readiness evidence. The evidence must address the named
+platform or application. Record defects and missing capabilities through the
+standing hygiene intake with current executable-test linkage. An observed
+candidate tool or improvement does not reorder the owner's selected work.
 
-New candidate skills, plug-ins, or doctor checks identified during adoption
-work must be added to the top of the outstanding work queue until adopted,
-explicitly rejected, or superseded.
-
-## Standing Backlog Principle
-
-Owner decision `DELIB-0838` and formal records `GOV-STANDING-BACKLOG-001`,
-`PB-STANDING-BACKLOG-CONTINUITY-001`,
-`ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001`, and
-`DCL-STANDING-BACKLOG-SCHEMA-001` establish the standing backlog
-governance contract for GroundTruth-KB. The canonical
-standing backlog authority is the MemBase `work_items` table, surfaced via
-`gt backlog list`; the documents under `memory/` are temporary/ephemeral and 
-may not be referennced in any formal context as a source of truth.
-
-The standing backlog governance contract is treated like other formal
-GroundTruth-KB specifications: it is represented in MemBase, linked to a
-Deliberation Archive decision, cited in rules, regression-tested, and visible
-in release-gate checks.
-
-Individual backlog entries remain queue/work items unless separately promoted
-to GOV, SPEC, PB, ADR, DCL, or another formal artifact type.
-
-Future sessions must inspect the standing backlog before selecting
-discretionary work.
+`GOV-STANDING-BACKLOG-001`, `PB-STANDING-BACKLOG-CONTINUITY-001`,
+`ADR-STANDING-BACKLOG-AS-WORK-AUTHORITY-001` and
+`DCL-STANDING-BACKLOG-SCHEMA-001` govern the standing backlog. Read current
+work items through `gt backlog list` and the exact native record. Operational
+notes under `memory/` carry no canonical authority. Individual backlog entries
+remain queue/work items; they do not become formal requirements by appearing
+in a queue. Orientation does not select a target: follow the owner's dispatch
+until Dispatcher Next is independently qualified and explicitly activated.
 
 ## Session startup and wrap-up
 
-Follow the canonical baseline `rules/session-bootstrap.md` for exact immutable
-context binding, explicit transient activity, current startup disclosure and
-proactive read-only wrap-up guidance. Preserve owner input. A harness has no
-role mapping, and a lifecycle notification does not authorize mutations.
+Follow `.harness-baseline-configuration/rules/session-bootstrap.md` for exact
+immutable context binding, explicit transient activity, current startup
+disclosure and proactive read-only wrap-up guidance. Preserve owner input.
+A lifecycle notification does not authorize mutations.
 
-Current formal requirements are `GOV-SESSION-SELF-INITIALIZATION-001`,
+Read `GOV-SESSION-SELF-INITIALIZATION-001`,
 `PB-SESSION-STARTUP-GOVERNANCE-DISCLOSURE-001`,
-`DCL-SESSION-STARTUP-TOKEN-BUDGET-001`, `PB-SESSION-WRAP-UP-PROACTIVE-001`,
-and `DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001`. Read their current records;
-superseded lifecycle requirements and historical deliberations are not authority.
+`DCL-SESSION-STARTUP-TOKEN-BUDGET-001`, `PB-SESSION-WRAP-UP-PROACTIVE-001`
+and `DCL-SESSION-WRAP-UP-AUTOMATION-SAFETY-001`. Superseded lifecycle
+requirements and historical deliberations confer no current authority.
 
-## Deterministic Services Principle
+## Deterministic services and owner questions
 
-`GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001` establishes the Deterministic
-Services Principle: repetitive, deterministic work belongs in services, not
-sessions. `DELIB-S312-DETERMINISTIC-SERVICES-PRINCIPLE` remains provenance for
-the originating owner directive and rationale, not the establishing authority.
+`GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001` places repetitive deterministic
+work in existing services. Surface recurring procedural friction and file a
+bounded corrective intake with scope and tradeoffs. Use the native domain
+writers; do not invent a second authority, approval-evidence mechanism or
+mutable session-progress store. Automation preserves review and effect
+boundaries. One-off judgment remains with the assigned agent or owner.
 
-Justification: token cost (a recurring tax that pays no marginal
-information dividend), error rate (AI procedures are more error-prone
-than deterministic implementations), and project framing (the project
-is a collection of artifacts, not a dialog with accompanying activity).
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`.
+`ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001` and
+`DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001` keep work organized around artifacts and
+their current requirements. Do not turn it into agent ownership of a work item.
 
-Operational mandate: when Prime Builder notices repetitive plumbing
-during a session — multi-step formalities where the AI's substantive
-contribution is < 20% of total work, patterns that require
-reconstructing procedure from rule files + hook code + example packets,
-procedures with steps expressible as "compute X from Y" — Prime Builder
-must:
+Ask the owner when a material product choice remains unresolved. Apply the
+answer directly to the applicable canonical source or discard it. The session
+conversation is not an execution dependency. Do not copy answers into a
+decision ledger, permission packet, bridge authority section or deliberation
+record as proof of approval. Never infer an answer from silence.
 
-1. Surface the repetition explicitly.
-2. File it as a backlog item in the MemBase `work_items` table (e.g., via
-   `gt backlog add`) with scope and tradeoff analysis.
-3. Not silently absorb the friction (which would make the cost
-   invisible to governance).
+## Cleanup
 
-This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001` with an
-active-pursuit operational mandate. Apply existing owner direction through the
-current domain writer. Automation does not invent owner decisions or weaken
-review and effect boundaries; it does not require an approval-evidence service.
-
-The principle is a bias, not an absolute. One-off intelligent decisions,
-operations that genuinely need session context unavailable to a service,
-and cases where friction is itself the governance value (e.g.,
-deliberation-forcing slowness) remain appropriately AI-mediated.
-
-First concrete manifestation: `GTKB-ARTIFACT-RECORDER-CLI`
-(MemBase `work_items`) — moves formal-artifact insertion
-plumbing behind a `gt <artifact-type> record` CLI; reduces AI surface
-by ~85%.
-
-## Owner direction
-
-Ask the owner when a material product choice remains unresolved. Use the available
-interactive question interface; the question tool's name does not grant authority.
-Apply an answer directly to the applicable current canonical source or discard it.
-The interactive session log already records the conversation. Do not copy answers
-into decision ledgers, approval packets, bridge permission sections or deliberation
-records as proof of authority. Agents must not infer an answer from silence.
-
-## Clean-Before-You-Leave Principle
-
-When implementation work is complete, all temp, ephemeral, or session-only artifacts must be cleaned up before the session ends. This includes: python temp files, harness-local temp files, `memory/` temp files, and any other session-only artifacts. The session must leave the system in a clean state for the next session. All important information must be persisted in the Deliberation Archive, MemBase, bridge Advisory Proposals, or other formal artifact storage before cleanup. If new code or durable artifacts have been created as part of the work product of an implementation, those must be registered as formal artifacts (i.e., change controlled) before cleanup.
+Remove temporary, orphaned and session-only files once their active purpose
+ends. Keep evidence needed by an active qualification or incident until its
+recorded disposition; preserve original failed reports and frozen inputs.
+Write enduring knowledge through the appropriate canonical domain writer.
+Bridge messages, handoffs and scratch files are not durable authority.
+Register authored work product through the existing registry route when
+required. Exclude derived projections and bridge material from work-product
+commits, and preserve formal history through amendment or retirement.

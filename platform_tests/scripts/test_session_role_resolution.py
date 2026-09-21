@@ -14,11 +14,11 @@ import pytest
 from groundtruth_kb.assertion_schema import validate_assertion_list
 from groundtruth_kb.assertions import run_spec_assertions
 
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver
+from platform_tests.groundtruth_kb.native_fixtures import history_count, put
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.specs.conftest import formal_record as formal_record
-from platform_tests.groundtruth_kb.test_native_authority_service import history_count, put
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_bridge import claim, deliver
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 

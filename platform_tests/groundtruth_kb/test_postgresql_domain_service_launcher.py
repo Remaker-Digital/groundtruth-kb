@@ -2,7 +2,8 @@
 that process, drops every inherited override that could redirect the database connection, contains the service tree
 in a kill-on-close job before the service can execute (no job: nothing is started; the service is created suspended,
 placed in the job, then resumed; a service that cannot be contained is ended while still suspended, leaving no
-descendant), and never prints credential values. The PowerShell readiness probe treats failed probes as expected and
+descendant), names the job per installation root and refuses a second launcher for a root whose job is held
+(exit 3), and never prints credential values. The PowerShell readiness probe treats failed probes as expected and
 never aborts its loop, in Windows PowerShell 5.1 as in PowerShell 7. Test cleanup ends only a listener proven to be
 this test's own service and leaves a foreign listener alone. The composition, refusal, containment, descendant,
 foreign-listener and probe-timeout tests run everywhere; the launch-to-readiness and delayed-readiness tests start
@@ -26,6 +27,7 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
+from groundtruth_kb import job_containment
 
 ROOT = Path(__file__).resolve().parents[2]
 LAUNCHER = ROOT / "infrastructure" / "postgresql" / "domain_service_launcher.py"
@@ -301,6 +303,48 @@ def test_missing_credential_file_refuses_before_starting_anything(tmp_path):
 
 
 @WINDOWS_ONLY
+def test_unimportable_package_is_refused_with_a_logged_reason(tmp_path):
+    """A ``groundtruth_kb`` that raises while importing (a broken installation, not merely an absent one) makes
+    the launcher refuse with exit 3 and the failure written to the log; ``--print-command`` still composes the
+    command. Under the scheduled task's pythonw.exe nothing else would surface the failure."""
+    site = tmp_path / "site" / "groundtruth_kb"
+    site.mkdir(parents=True)
+    (site / "__init__.py").write_text('raise RuntimeError("broken installation under test")\n', encoding="utf-8")
+    root = tmp_path / "root"
+    credentials = root / "infrastructure" / "postgresql" / "credentials" / "pg_service.conf"
+    credentials.parent.mkdir(parents=True)
+    credentials.write_text("", encoding="utf-8")
+    _operator_config(root, "gtkb_test_unused")
+    env = {k: v for k, v in os.environ.items() if k != "PYTHONPATH"}
+    env["PYTHONPATH"] = str(site.parent)
+    env["PYTHONIOENCODING"] = "utf-8"
+    printed = subprocess.run(
+        [sys.executable, str(LAUNCHER), "--root", str(root), "--print-command"],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+        timeout=60,
+    )
+    assert printed.returncode == 0, printed.stderr
+    assert "-m groundtruth_kb" in printed.stdout
+    completed = subprocess.run(
+        [sys.executable, str(LAUNCHER), "--root", str(root)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        env=env,
+        timeout=60,
+    )
+    assert completed.returncode == 3, completed.stderr
+    text = (root / "infrastructure" / "postgresql" / "logs" / "domain-service.log").read_text(encoding="utf-8")
+    assert "refused: job containment unavailable" in text
+    assert "RuntimeError: broken installation under test" in text
+    assert "nothing started; exit 3" in text
+    assert "contained by a kill-on-close job" not in text
+
+
+@WINDOWS_ONLY
 def test_no_job_object_refuses_before_anything_is_started(tmp_path):
     """When no kill-on-close job can be created the launcher exits 3 without attempting to start the service: the
     argv names an executable that does not exist, so any start attempt would have raised."""
@@ -312,6 +356,7 @@ def test_no_job_object_refuses_before_anything_is_started(tmp_path):
         dict(os.environ),
         log,
         1,
+        root=tmp_path,
         job_factory=lambda: None,
         assign=lambda job, process: assignments.append(process) or True,
     )
@@ -337,7 +382,7 @@ def test_uncontainable_service_is_ended_before_it_can_run_or_spawn_a_descendant(
         return failure != "assignment_refused" and module._assign(job, process)
 
     resume = (lambda process: False) if failure == "resume_failed" else module._resume
-    code = module.serve(argv, dict(os.environ), log, 1, assign=assign, resume=resume)
+    code = module.serve(argv, dict(os.environ), log, 1, root=tmp_path, assign=assign, resume=resume)
     assert code == module.EXIT_UNCONTAINED == 3
     assert started and started[0].poll() is not None, "the uncontainable service must be ended"
     assert not marker.exists(), "the service ran before containment was established"
@@ -346,6 +391,7 @@ def test_uncontainable_service_is_ended_before_it_can_run_or_spawn_a_descendant(
     text = log.read_text(encoding="utf-8")
     assert "ended before it ran" in text
     assert "contained by a kill-on-close job" not in text
+    assert job_containment.open_job(module._job_name(tmp_path)) is None, "the job handle was not closed"
 
 
 @WINDOWS_ONLY
@@ -354,7 +400,8 @@ def test_contained_service_and_its_real_descendant_end_when_the_job_closes(tmp_p
     last handle (what the launcher's exit does) ends both the service and the descendant."""
     module = _load()
     argv, marker, record = _spawner(tmp_path)
-    job = module._kill_on_close_job()
+    name = module._job_name(tmp_path)
+    job = module._kill_on_close_job(name)
     assert job
     process = module._start_contained(argv, dict(os.environ), job, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     grandchild = None
@@ -364,6 +411,9 @@ def test_contained_service_and_its_real_descendant_end_when_the_job_closes(tmp_p
         grandchild = int(record.read_text(encoding="utf-8"))
         assert process.poll() is None and _wait_pid_gone(grandchild, 0) is False
         assert _in_job(process.pid, job) and _in_job(grandchild, job), "the descendant was born outside the job"
+        held = job_containment.open_job(name)
+        assert held is not None, "the named job is not observable by name"
+        job_containment.close_handle(held)
         service_pid = int(marker.read_text(encoding="utf-8"))
         # Windows venv executables can introduce a redirector. Observe the
         # real immediate child in either launch shape, without assuming it.
@@ -373,12 +423,76 @@ def test_contained_service_and_its_real_descendant_end_when_the_job_closes(tmp_p
         job = None
         assert process.wait(timeout=15) is not None
         assert _wait_pid_gone(grandchild, 15), "the descendant survived the job"
+        assert job_containment.open_job(name) is None, "the named job outlived its last handle"
     finally:
         module._end(process)
         if grandchild is not None and not _wait_pid_gone(grandchild, 0):
             subprocess.run(["taskkill", "/F", "/PID", str(grandchild)], capture_output=True, timeout=60)
         if job:
             ctypes.windll.kernel32.CloseHandle(job)
+
+
+@WINDOWS_ONLY
+def test_service_job_is_named_per_root_and_a_held_name_refuses_a_second_launcher(tmp_path):
+    """The launcher's job is the domain-service prefix plus the digest of the installation root (the same digest
+    the dashboard uses under its own prefix, so the two jobs for one root never collide); while that name is held,
+    a second launcher for the root exits 3 before starting anything, and the name is free again once released."""
+    from groundtruth_kb import dashboard
+
+    module = _load()
+    name = module._job_name(tmp_path)
+    prefix = module.DOMAIN_SERVICE_JOB_PREFIX
+    assert name.startswith(prefix) and len(name) == len(prefix) + 24
+    dashboard_name = dashboard._dashboard_job_name(tmp_path)
+    assert name != dashboard_name
+    assert name[len(prefix) :] == dashboard_name[len(dashboard.DASHBOARD_JOB_PREFIX) :]
+    job = module._kill_on_close_job(name)
+    assert job
+    try:
+        assert module._kill_on_close_job(name) is None, "a held name must not be created twice"
+        log = tmp_path / "logs" / "domain-service.log"
+        code = module.serve(
+            ["no-such-domain-service-executable-" + uuid4().hex], dict(os.environ), log, 1, root=tmp_path
+        )
+        assert code == module.EXIT_UNCONTAINED == 3
+        text = log.read_text(encoding="utf-8")
+        assert "is held by another launcher for this root" in text
+        assert "contained by a kill-on-close job" not in text
+    finally:
+        ctypes.windll.kernel32.CloseHandle(job)
+    assert job_containment.open_job(name) is None, "the empty job outlived its last handle"
+    again = module._kill_on_close_job(name)
+    assert again, "the released name must be creatable again"
+    ctypes.windll.kernel32.CloseHandle(again)
+
+
+@WINDOWS_ONLY
+def test_a_job_that_exists_but_cannot_be_opened_counts_as_held(tmp_path, monkeypatch):
+    """The held-name probe explains a refusal that is already decided; when the name exists but the open fails
+    (access denied on a job created under another account) the launcher still exits 3 with the held-name reason
+    instead of escaping with a traceback."""
+    module = _load()
+    name = module._job_name(tmp_path)
+
+    def denied(requested: str) -> int | None:
+        assert requested == name
+        raise OSError(5, f"job {requested} could not be opened")
+
+    monkeypatch.setattr(job_containment, "open_job", denied)
+    assert module._job_held(name) is True
+    log = tmp_path / "logs" / "domain-service.log"
+    code = module.serve(
+        ["no-such-domain-service-executable-" + uuid4().hex],
+        dict(os.environ),
+        log,
+        1,
+        root=tmp_path,
+        job_factory=lambda: None,
+    )
+    assert code == module.EXIT_UNCONTAINED == 3
+    text = log.read_text(encoding="utf-8")
+    assert f"refused: job {name} is held by another launcher for this root; nothing started" in text
+    assert "contained by a kill-on-close job" not in text
 
 
 @pytest.mark.skipif(os.name != "nt", reason="the safety net re-identifies listeners through Windows")

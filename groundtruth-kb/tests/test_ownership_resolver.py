@@ -22,21 +22,20 @@ from groundtruth_kb.project.ownership import OwnershipResolver
 
 
 def test_classify_tracked_managed_hook_file() -> None:
-    """A managed hook file → gt-kb-managed / overwrite / warn (destructive-gate; the assertion-check hook retired)."""
+    """The authored hook identity → gt-kb-managed / overwrite / warn (M15: hooks run in place from the baseline)."""
     resolver = OwnershipResolver()
-    rec = resolver.classify_path(".claude/hooks/destructive-gate.py")
+    rec = resolver.classify_path(".harness-baseline-configuration/hooks/destructive-gate.py")
     assert rec.ownership == "gt-kb-managed"
     assert rec.upgrade_policy == "overwrite"
     assert rec.adopter_divergence_policy == "warn"
 
 
-def test_classify_tracked_managed_rule_file() -> None:
-    """A managed rule file → gt-kb-managed / overwrite / warn."""
+def test_classify_rule_file_is_never_a_managed_copy() -> None:
+    """M15 (D15/D34): rules are read from the baseline, never scaffolded as managed copies."""
     resolver = OwnershipResolver()
     rec = resolver.classify_path(".claude/rules/prime-builder.md")
-    assert rec.ownership == "gt-kb-managed"
-    assert rec.upgrade_policy == "overwrite"
-    assert rec.adopter_divergence_policy == "warn"
+    assert rec.source_class == "__fallback__"
+    assert rec.ownership == "adopter-owned"
 
 
 # ---------------------------------------------------------------------------
@@ -249,9 +248,9 @@ def test_classify_by_id_returns_settings_hook_record() -> None:
 
 
 def test_classify_by_id_returns_gitignore_record() -> None:
-    """classify_by_id returns the gitignore-pattern row."""
+    """classify_by_id returns a retained gitignore-pattern row (gitignore.hook-logs retired with the hook log)."""
     resolver = OwnershipResolver()
-    rec = resolver.classify_by_id("gitignore.hook-logs")
+    rec = resolver.classify_by_id("gitignore.kb-database")
     assert rec.source_class == "gitignore-pattern"
     assert rec.ownership == "gt-kb-managed"
     assert rec.upgrade_policy == "structured-merge"

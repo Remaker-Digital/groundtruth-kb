@@ -1,37 +1,14 @@
-# Â© 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-#
-# Managed Artifact Registry â€” single source of truth for scaffold, upgrade, and doctor.
-#
-# Managed source records define scaffold, upgrade and doctor delivery.
-# Advisory counter and specification-event notification behavior is retired.
-#
-# Automatic SessionStart assertion evaluation and its registration are retired.
-#
-# Three independent lifecycle axes per record:
-#   - initial_profiles:          scaffold copies this artifact for these profiles
-#   - managed_profiles:          upgrade enforces drift/missing-file repair for these profiles
-#   - doctor_required_profiles:  doctor enforces presence as a simple required check for these profiles
-#                                (empty = not required, or enforced via composite check)
-#
-# Loader invariants (InvalidArtifactRecord on violation):
-#   - managed_profiles âŠ† initial_profiles
-#   - doctor_required_profiles âŠ† initial_profiles
-#
-# Profile groups:
-#   ALL     = ["local-only", "dual-agent", "dual-agent-webapp"]
-#   bridge  = ["dual-agent", "dual-agent-webapp"]
-#   none    = []
-
-# =========================================================================
-# HOOKS (19 records: 14 original plus active governance and follow-on policy
-# hooks after retired dead-stub hooks were removed)
-# =========================================================================
+# Managed artifact metadata for authored sources and native registrations.
+# M15: four paired authored hooks remain; the projector owns registration derivation.
+# Hook template_path equals target_path and denotes the authored source identity.
+# No third hook/rule/skill copy is scaffolded or compared.
+# Protected-effect checks are supplied by manifest.toml -> scripts/implementation_start_gate.py.
 
 [[artifacts]]
 class = "hook"
 id = "hook.destructive-gate"
-template_path = "hooks/destructive-gate.py"
-target_path = ".claude/hooks/destructive-gate.py"
+template_path = ".harness-baseline-configuration/hooks/destructive-gate.py"
+target_path = ".harness-baseline-configuration/hooks/destructive-gate.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
@@ -43,8 +20,8 @@ notes = "PreToolUse destructive-op gate; product-managed framework safety policy
 [[artifacts]]
 class = "hook"
 id = "hook.credential-scan"
-template_path = "hooks/credential-scan.py"
-target_path = ".claude/hooks/credential-scan.py"
+template_path = ".harness-baseline-configuration/hooks/credential-scan.py"
+target_path = ".harness-baseline-configuration/hooks/credential-scan.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
@@ -56,8 +33,8 @@ notes = "PreToolUse credential-pattern scanner; product-managed because the cred
 [[artifacts]]
 class = "hook"
 id = "hook.scanner-safe-writer"
-template_path = "hooks/scanner-safe-writer.py"
-target_path = ".claude/hooks/scanner-safe-writer.py"
+template_path = ".harness-baseline-configuration/hooks/scanner-safe-writer.py"
+target_path = ".harness-baseline-configuration/hooks/scanner-safe-writer.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
@@ -68,22 +45,9 @@ notes = "PreToolUse safe-writer for non-credential content; product-managed fram
 
 [[artifacts]]
 class = "hook"
-id = "hook.bridge-compliance-gate"
-template_path = "hooks/bridge-compliance-gate.py"
-target_path = ".claude/hooks/bridge-compliance-gate.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "PreToolUse adapter to the installed native CLI effect checker; current artifact claims and checkout scope are enforced by the authority."
-
-[[artifacts]]
-class = "hook"
 id = "hook.kb-not-markdown"
-template_path = "hooks/kb-not-markdown.py"
-target_path = ".claude/hooks/kb-not-markdown.py"
+template_path = ".harness-baseline-configuration/hooks/kb-not-markdown.py"
+target_path = ".harness-baseline-configuration/hooks/kb-not-markdown.py"
 initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
 managed_profiles = ["dual-agent", "dual-agent-webapp"]
 doctor_required_profiles = []
@@ -91,311 +55,6 @@ ownership = "gt-kb-managed"
 upgrade_policy = "overwrite"
 adopter_divergence_policy = "warn"
 notes = "PreToolUse anti-drift gate ('KB lives in MemBase, not new markdown'); product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.session-health"
-template_path = "hooks/session-health.py"
-target_path = ".claude/hooks/session-health.py"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = []
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Session-health monitoring hook; product-managed framework policy."
-
-[[artifacts]]
-class = "hook"
-id = "hook.code-quality-baseline-proposal-check"
-template_path = "hooks/code-quality-baseline-proposal-check.py"
-target_path = ".claude/hooks/code-quality-baseline-proposal-check.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "PreToolUse proposal-time Code Quality Baseline table contract; product-managed governance policy."
-
-[[artifacts]]
-class = "rule"
-id = "rule.prime-builder"
-template_path = "rules/prime-builder.md"
-target_path = ".claude/rules/prime-builder.md"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Prime Builder role rule; product-managed because role contracts are framework-defined."
-
-[[artifacts]]
-class = "rule"
-id = "rule.loyal-opposition"
-template_path = "rules/loyal-opposition.md"
-target_path = ".claude/rules/loyal-opposition.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Loyal Opposition role rule; product-managed because role contracts are framework-defined."
-
-[[artifacts]]
-class = "rule"
-id = "rule.bridge-poller-canonical"
-template_path = "rules/bridge-poller-canonical.md"
-target_path = ".claude/rules/bridge-poller-canonical.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Bridge-poller canonical-state rule; product-managed because poller protocol is framework-defined."
-
-[[artifacts]]
-class = "rule"
-id = "rule.prime-bridge-collaboration-protocol"
-template_path = "rules/prime-bridge-collaboration-protocol.md"
-target_path = ".claude/rules/prime-bridge-collaboration-protocol.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Prime/Bridge collaboration protocol; product-managed framework operating-mode rule."
-
-[[artifacts]]
-class = "rule"
-id = "rule.report-depth"
-template_path = "rules/report-depth.md"
-target_path = ".claude/rules/report-depth.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Report-depth + Prime Builder context standard; product-managed framework reporting rule."
-
-[[artifacts]]
-class = "rule"
-id = "rule.file-bridge-protocol"
-template_path = "rules/file-bridge-protocol.md"
-target_path = ".claude/rules/file-bridge-protocol.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "File-bridge protocol contract; product-managed because bridge file/INDEX format is framework-defined."
-
-[[artifacts]]
-class = "rule"
-id = "rule.bridge-essential"
-template_path = "rules/bridge-essential.md"
-target_path = ".claude/rules/bridge-essential.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Bridge-protocol essential rule (top-priority mandate); product-managed because bridge integrity is framework-critical."
-
-[[artifacts]]
-class = "rule"
-id = "rule.deliberation-protocol"
-template_path = "rules/deliberation-protocol.md"
-target_path = ".claude/rules/deliberation-protocol.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = ["dual-agent", "dual-agent-webapp"]
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-
-# Canonical terminology surface (SPEC-TERMINOLOGY-TEMPLATE-INHERITANCE,
-# SPEC-TERMINOLOGY-CONFIG-TOML). Presence/validity is enforced by the
-# composite ``_check_canonical_terminology()`` (not generic ``_check_rules()``
-# Markdown enumeration). ``doctor_required_profiles`` is intentionally empty.
-notes = "Deliberation Archive protocol rule; product-managed because DA semantics are framework-defined."
-[[artifacts]]
-class = "rule"
-id = "rule.canonical-terminology"
-template_path = "rules/canonical-terminology.md"
-target_path = ".claude/rules/canonical-terminology.md"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Canonical terminology guidance rule; product-managed because the term set is framework-defined."
-
-[[artifacts]]
-class = "rule"
-id = "rule.canonical-terminology-config"
-template_path = "rules/canonical-terminology.toml"
-target_path = ".claude/rules/canonical-terminology.toml"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Canonical-terminology TOML config; product-managed because the term/file matrix is framework policy."
-
-# GTKB-GOV-TERM-DISAMBIGUATION-MECHANICAL Slice 1 (S327): canonical-terminology
-# disambiguation policy template. Sibling to canonical-terminology.{md,toml};
-# composes with the existing surface without modifying its schema. Slice 2
-# wires this into the term-disambiguation-precheck PreToolUse hook; Slice 3
-# wires the PostToolUse audit hook.
-[[artifacts]]
-class = "rule"
-id = "rule.canonical-terminology-policy"
-template_path = "rules/canonical-terminology-policy.toml"
-target_path = ".claude/rules/canonical-terminology-policy.toml"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Canonical-terminology disambiguation policy; product-managed because the per-term Tier A/B/C policy is framework-defined."
-
-[[artifacts]]
-class = "rule"
-id = "rule.session-start-orientation"
-template_path = "rules/session-start-orientation.md"
-target_path = ".claude/rules/session-start-orientation.md"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Mandatory session-start ORIENT block format, live-source rules, structured UNKNOWN tags, and baseline-audit trigger contract."
-
-# =========================================================================
-# SKILLS (12 records)
-# =========================================================================
-
-[[artifacts]]
-class = "skill"
-id = "skill.baseline-audit.skill-md"
-template_path = "skills/gtkb-baseline-audit/SKILL.md"
-target_path = ".claude/skills/gtkb-baseline-audit/SKILL.md"
-initial_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-managed_profiles = ["local-only", "dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "Extended baseline audit skill with evidence-class enforcement; runnable by Prime Builder and Loyal Opposition."
-
-[[artifacts]]
-class = "skill"
-id = "skill.bridge-propose.skill-md"
-template_path = "skills/gtkb-bridge-propose/SKILL.md"
-target_path = ".claude/skills/gtkb-bridge-propose/SKILL.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge-propose SKILL.md manifest; product-managed because skill contract is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.spec-intake.skill-md"
-template_path = "skills/gtkb-spec-intake/SKILL.md"
-target_path = ".claude/skills/gtkb-spec-intake/SKILL.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "spec-intake SKILL.md manifest; product-managed because skill contract is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.spec-intake.helper"
-template_path = "skills/gtkb-spec-intake/helpers/spec_intake.py"
-target_path = ".claude/skills/gtkb-spec-intake/helpers/spec_intake.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "spec-intake helper module; product-managed because spec-intake contract is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.bridge.skill-md"
-template_path = "skills/gtkb-bridge/SKILL.md"
-target_path = ".claude/skills/gtkb-bridge/SKILL.md"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge SKILL.md manifest; product-managed because bridge protocol operations are framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.bridge.scan-helper"
-template_path = "skills/gtkb-bridge/helpers/scan_bridge.py"
-target_path = ".claude/skills/gtkb-bridge/helpers/scan_bridge.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge scan helper; product-managed because bridge queue classification is framework-defined."
-
-[[artifacts]]
-class = "skill"
-id = "skill.bridge.show-thread-helper"
-template_path = "skills/gtkb-bridge/helpers/show_thread_bridge.py"
-target_path = ".claude/skills/gtkb-bridge/helpers/show_thread_bridge.py"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "overwrite"
-adopter_divergence_policy = "warn"
-notes = "bridge show-thread helper; product-managed because bridge thread status inspection is framework-defined."
-
-# =========================================================================
-# SETTINGS-HOOK-REGISTRATION (14 records: 11 original plus active governance
-# and recovery hook registrations after retired dead-stub hooks were removed)
-# =========================================================================
-
-[[artifacts]]
-class = "settings-hook-registration"
-id = "settings.hook.bridge-compliance-gate.pretooluse"
-event = "PreToolUse"
-hook_filename = "bridge-compliance-gate.py"
-target_settings_path = ".claude/settings.json"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Registers the native bridge effect adapter on PreToolUse; delivery validation remains in the native bridge CLI."
 
 [[artifacts]]
 class = "settings-hook-registration"
@@ -452,24 +111,7 @@ ownership = "gt-kb-managed"
 upgrade_policy = "structured-merge"
 adopter_divergence_policy = "warn"
 
-# Governance hook settings registrations (4 records â€” per
-# gtkb-da-governance-completeness-implementation-015 Â§A). First rows to opt
-# in to BOTH upgrade enforcement AND doctor enforcement. Registry order
-# below is the authoritative target order for the structured-merge.
 notes = "Registers scanner-safe-writer on PreToolUse; product-managed framework registration."
-
-[[artifacts]]
-class = "gitignore-pattern"
-id = "gitignore.hook-logs"
-pattern = ".claude/hooks/*.log"
-comment = "Operational hook logs"
-initial_profiles = ["dual-agent", "dual-agent-webapp"]
-managed_profiles = ["dual-agent", "dual-agent-webapp"]
-doctor_required_profiles = []
-ownership = "gt-kb-managed"
-upgrade_policy = "structured-merge"
-adopter_divergence_policy = "warn"
-notes = "Ignore hook log files; product-managed because hook log paths are framework convention."
 
 [[artifacts]]
 class = "gitignore-pattern"
@@ -511,10 +153,7 @@ adopter_divergence_policy = "warn"
 notes = "Ignore .claude/settings.local.json adopter overrides; product-managed framework gitignore policy."
 
 # =========================================================================
-# FILE (4 records: Slice 3/4 adopter-facing scaffold artifacts plus one
-# template-only approval-gate coverage record per WI-4225.
-# Slice 3 adopter-facing scaffold artifacts per
-# bridge/gtkb-isolation-017-slice3-init-defaults-2026-05-02-007.md GO -008.
+# FILE (2 records: adopter-facing README and release-readiness content).
 # These are adopter-owned files with preserve upgrade policy: the platform
 # scaffolds them on init but does not overwrite them on upgrade.)
 # =========================================================================

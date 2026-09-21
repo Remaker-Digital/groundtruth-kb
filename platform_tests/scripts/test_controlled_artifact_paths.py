@@ -24,22 +24,22 @@ from scripts.controlled_artifact_paths import (
         (
             ".gtkb-state/implementation-authorizations/current.json",
             "runtime_authority_state_direct_mutation",
-            ".gtkb-state/implementation-authorizations/",
+            ".gtkb-state/",
         ),
         (
             ".gtkb-state/work-intent/thread.json",
             "runtime_authority_state_direct_mutation",
-            ".gtkb-state/work-intent/",
+            ".gtkb-state/",
         ),
         (
             ".gtkb-state/bridge-poller/dispatch-state.json",
             "runtime_authority_state_direct_mutation",
-            ".gtkb-state/bridge-poller/",
+            ".gtkb-state/",
         ),
         (
             ".gtkb-state/dispatcher-daemon/status.json",
             "runtime_authority_state_direct_mutation",
-            ".gtkb-state/dispatcher-daemon/",
+            ".gtkb-state/",
         ),
         (
             "harness-state/codex/session-envelope.json",
@@ -49,12 +49,12 @@ from scripts.controlled_artifact_paths import (
         (
             ".gtkb-state/git-lifecycle/operations/operation.json",
             "runtime_authority_state_direct_mutation",
-            ".gtkb-state/git-lifecycle/",
+            ".gtkb-state/",
         ),
         (
             ".gtkb-state/modernization-release-candidate/evidence/receipt.json",
             "runtime_authority_state_direct_mutation",
-            ".gtkb-state/modernization-release-candidate/",
+            ".gtkb-state/",
         ),
     ],
 )
@@ -72,9 +72,6 @@ def test_direct_controlled_artifacts_are_block_classified(path: str, reason_code
     [
         "bridge/design-note.md",
         "bridge/example.md",
-        ".gtkb-state/bridge-impl-reports/drafts/report.md",
-        ".gtkb-state/bridge-revisions/drafts/revision.md",
-        ".gtkb-state/state.json",
         "independent-progress-assessments/report.md",
     ],
 )
@@ -99,7 +96,7 @@ def test_runtime_authority_state_helper_is_specific() -> None:
     assert is_runtime_authority_state_path(".gtkb-state/implementation-authorizations/current.json") is True
     assert is_runtime_authority_state_path("harness-state/harness-registry.json") is True
     assert is_runtime_authority_state_path(".gtkb-state/modernization-release-candidate/status.json") is True
-    assert is_runtime_authority_state_path(".gtkb-state/bridge-impl-reports/drafts/report.md") is False
+    assert is_runtime_authority_state_path(".gtkb-state/bridge-impl-reports/drafts/report.md") is True
 
 
 def test_multi_surface_reason_collapses_to_generic_direct_mutation() -> None:
@@ -107,3 +104,20 @@ def test_multi_surface_reason_collapses_to_generic_direct_mutation() -> None:
         direct_write_block_reason_code(["bridge/example-001.md", "groundtruth.db"])
         == "controlled_artifact_direct_mutation"
     )
+
+
+@pytest.mark.parametrize(
+    "path",
+    [
+        ".gtkb-state",
+        ".gtkb-state/bridge-impl-reports/drafts/report.md",
+        ".gtkb-state/bridge-revisions/drafts/revision.md",
+        ".gtkb-state/state.json",
+        "harness-state",
+    ],
+)
+def test_retired_state_trees_have_no_diagnostic_write_exception(path):
+    result = classify_controlled_artifact(path)
+    assert result.is_controlled
+    assert result.direct_write_blocked
+    assert result.reason_code == "runtime_authority_state_direct_mutation"

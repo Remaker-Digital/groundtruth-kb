@@ -7,16 +7,14 @@ ROOT = Path(__file__).resolve().parents[2]
 
 LF_POLICY_PATHS = (
     ".gitattributes",
-    ".codex/skills/bridge-propose/SKILL.md",
-    ".codex/skills/bridge-propose/helpers/write_bridge.py",
-    ".codex/skills/MANIFEST.json",
-    ".claude/skills/bridge-propose/SKILL.md",
-    ".agent/skills/verify/SKILL.md",
-    ".api-harness/skills/verify/SKILL.md",
-    "config/agent-control/harness-capability-registry.toml",
-    "groundtruth-kb/templates/hooks/bridge-compliance-gate.py",
-    "groundtruth-kb/templates/skills/bridge-propose/SKILL.md",
-    "groundtruth-kb/templates/skills/bridge-propose/helpers/write_bridge.py",
+    ".agents/skills/gtkb-spec-intake/SKILL.md",
+    ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+    ".claude/skills/gtkb-spec-intake/SKILL.md",
+    ".cursor/skills/gtkb-spec-intake/SKILL.md",
+    ".agent/skills/gtkb-spec-intake/SKILL.md",
+    ".goose/skills/gtkb-spec-intake/SKILL.md",
+    ".harness-baseline-configuration/hooks/destructive-gate.py",
+    ".harness-baseline-configuration/rules/operating-model.md",
 )
 
 

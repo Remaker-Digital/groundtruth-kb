@@ -19,10 +19,12 @@ def test_doctor_check_skill_health_clean(tmp_path: Path) -> None:
     shutil.copy(str(SCRIPT_PATH), str(scripts_dir / "check_skill_health.py"))
 
     # Create empty skill directories to ensure 0 findings
-    skills_dir = tmp_path / ".claude" / "skills"
+    skills_dir = tmp_path / ".agents" / "skills"
     skills_dir.mkdir(parents=True)
 
+    before_paths = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
     check = doctor._check_skill_health(tmp_path)
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")) == before_paths
 
     assert check.name == "Skill health"
     assert check.status == "pass"
@@ -38,11 +40,13 @@ def test_doctor_check_skill_health_warnings(tmp_path: Path) -> None:
     shutil.copy(str(SCRIPT_PATH), str(scripts_dir / "check_skill_health.py"))
 
     # Create a skill directory with a failing SKILL.md (fenced python block)
-    skill_dir = tmp_path / ".claude" / "skills" / "bad-skill"
+    skill_dir = tmp_path / ".agents" / "skills" / "bad-skill"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text("```python\nprint('hello')\n```", encoding="utf-8")
 
+    before_paths = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
     check = doctor._check_skill_health(tmp_path)
+    assert sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*")) == before_paths
 
     assert check.name == "Skill health"
     assert check.status == "warning"

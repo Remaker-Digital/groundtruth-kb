@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
-from platform_tests.groundtruth_kb.test_assertion_cli import assertion_source as assertion_source
-from platform_tests.groundtruth_kb.test_assertion_cli import native as native
+from platform_tests.groundtruth_kb.native_fixtures import assertion_source as assertion_source
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 from groundtruth_kb.cli import main
 
@@ -78,11 +78,6 @@ def _force_rmtree(path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 # gt seed
-# ---------------------------------------------------------------------------
-
-
-# ---------------------------------------------------------------------------
-# gt summary
 # ---------------------------------------------------------------------------
 
 
@@ -215,11 +210,6 @@ class TestConfig:
         assert "runtime fallback" not in result.output
         assert "chromadb not installed" not in result.output
         assert not attempts
-
-
-# ---------------------------------------------------------------------------
-# gt serve
-# ---------------------------------------------------------------------------
 
 
 # ---------------------------------------------------------------------------

@@ -5,7 +5,7 @@ Purpose: persistent priority directives loaded at session initialization.
 > This surface loads on demand after `::open project` (or when project or deliberation
 > context is active), not at base session startup.
 
-> Bridge state and status-bearing numbered bridge files are canonical.
+> Current project, work-item and bridge state is read through the native CLI; bridge files are transport, never authority.
 
 These priorities remain active across sessions unless Mike explicitly suspends them during a session. A suspension is temporary and does not persist across session boundaries.
 
@@ -42,7 +42,7 @@ These priorities remain active across sessions unless Mike explicitly suspends t
 ## File Bridge Operating Note
 
 - The active Prime Builder / Loyal Opposition bridge is bridge
-  state, with `{{HARNESS_RULES_DIR}}/file-bridge-protocol.md` retained for legacy helper
+  state, with `.harness-baseline-configuration/rules/file-bridge-protocol.md` retained for legacy helper
   behavior and historical audit interpretation.
 - Aggregate queue artifacts are not the authoritative review queue.
 - Bridge reliability maintenance is no longer a standing priority unless the
@@ -52,7 +52,7 @@ These priorities remain active across sessions unless Mike explicitly suspends t
 
 ## Cross-Cutting Directive - GroundTruth KB Vision
 
-- Load `{{HARNESS_RULES_DIR}}/groundtruth-kb-vision.md` as persistent context for GroundTruth-related reviews and proposals.
+- Load `.harness-baseline-configuration/rules/groundtruth-kb-vision.md` as persistent context for GroundTruth-related reviews and proposals.
 - Use the GroundTruth KB vision as a decision filter: does this reduce the owner's role to specifications, clarifications, and decisions?
 - Prefer options that move routine owner burden into specifications, automated checks, traceability, agent workflows, and Azure deployment-readiness evidence.
 - Flag approaches that leave the owner supervising routine implementation, deployment plumbing, spec/code reconciliation, generated-artifact inspection, or cross-agent process state.

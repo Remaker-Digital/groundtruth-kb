@@ -833,16 +833,53 @@ def run_spec_assertions(
     }
 
 
+def select_scoped_specs(
+    specs: list[dict[str, Any]], application_scope: str | None
+) -> tuple[list[dict[str, Any]], dict[str, int]]:
+    """Partition current records by ``application_scope`` for one selected scope.
+
+    With no selection every record is kept. With a selection, records carrying
+    that scope and records carrying no scope (null: explicitly unresolved) are
+    kept; records carrying another scope are excluded. The counts state how
+    many of the kept records were unscoped and how many were excluded, so an
+    observation never silently drops or silently absorbs unresolved records.
+    """
+    if application_scope is None:
+        return list(specs), {"scoped_specs": len(specs), "unscoped_specs": 0, "excluded_specs": 0}
+    selected = []
+    counts = {"scoped_specs": 0, "unscoped_specs": 0, "excluded_specs": 0}
+    for spec in specs:
+        scope = spec.get("application_scope")
+        if scope == application_scope:
+            counts["scoped_specs"] += 1
+        elif scope is None:
+            counts["unscoped_specs"] += 1
+        else:
+            counts["excluded_specs"] += 1
+            continue
+        selected.append(spec)
+    return selected, counts
+
+
 def run_all_assertions(
     db: SpecificationReader,
     project_root: Path,
     triggered_by: str = "manual",
     spec_id: str | None = None,
+    application_scope: str | None = None,
 ) -> dict[str, Any]:
     """Run assertions for all specs (or a single spec) and return summary.
 
+    ``application_scope`` selects ``gtkb_platform`` or ``application:<name>``:
+    current active records carrying that scope are evaluated together with
+    records carrying no scope, and records carrying another scope are excluded
+    (``select_scoped_specs``). ``None`` evaluates every active record. An
+    explicitly selected ``spec_id`` is evaluated whatever its scope; the
+    summary still states the selection and the record's classification.
+
     Returns:
       {total_specs, specs_with_assertions, passed, failed, skipped,
+       application_scope, scoped_specs, unscoped_specs, excluded_specs,
        details: [{spec_id, title, overall_passed, results, ...}, ...]}
     """
     if spec_id:
@@ -850,8 +887,13 @@ def run_all_assertions(
         if not spec:
             return {"error": f"Spec {spec_id} not found"}
         specs = [spec]
+        scope_counts = {
+            "scoped_specs": int(application_scope is None or spec.get("application_scope") == application_scope),
+            "unscoped_specs": int(application_scope is not None and spec.get("application_scope") is None),
+            "excluded_specs": 0,
+        }
     else:
-        specs = db.list_specs(status="active")
+        specs, scope_counts = select_scoped_specs(db.list_specs(status="active"), application_scope)
 
     details = []
     passed = 0
@@ -927,6 +969,8 @@ def run_all_assertions(
         "unassessed": unassessed,
         "aggregate_result": aggregate_result,
         "triggered_by": triggered_by,
+        "application_scope": application_scope,
+        **scope_counts,
         "details": details,
     }
 
@@ -940,6 +984,11 @@ def format_summary(summary: dict[str, Any]) -> str:
     lines.append(f"\n{'=' * 60}")
     lines.append(f"  Assertion Results — triggered by: {summary['triggered_by']}")
     lines.append(f"{'=' * 60}")
+    scope = summary.get("application_scope") or "every active record (no scope selected)"
+    lines.append(f"  Scope:             {scope}")
+    if summary.get("application_scope") is not None:
+        lines.append(f"  Unscoped (null) records evaluated with it: {summary.get('unscoped_specs', 0)}")
+        lines.append(f"  Other-scope records excluded:              {summary.get('excluded_specs', 0)}")
     lines.append(f"  Total specs:       {summary['total_specs']}")
     lines.append(f"  With assertions:   {summary['specs_with_assertions']}")
     lines.append(f"  PASSED:            {summary['passed']}")

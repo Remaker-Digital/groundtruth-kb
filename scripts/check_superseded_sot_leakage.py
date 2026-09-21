@@ -5,7 +5,7 @@ Evaluator ID: ``superseded-sot-leakage``.
 Canonical invocation: ``gt assert --spec DCL-SUPERSEDED-SOT-LEAKAGE-001``.
 
 The scanner answers one question deterministically: does any **active** GT-KB
-surface still cite a formal record whose current MemBase status is retired or
+surface still cite a formal record whose current native status is retired or
 superseded, in a way that could direct current behavior?
 
 The hard part is not detection, it is *lifecycle classification*. GT-KB's
@@ -35,6 +35,8 @@ import re
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
+
+from groundtruth_kb.authority_client import AuthorityClient, configured_authority_client, page_records
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
@@ -70,10 +72,13 @@ SUPERSEDED_STATUSES = frozenset({"retired", "superseded"})
 # ---------------------------------------------------------------------------
 
 ACTIVE_SURFACE_CLASSES: tuple[tuple[str, tuple[str, ...]], ...] = (
-    ("generated", (".codex/skills/**/*.md", ".cursor/skills/**/*.md", ".agent/skills/**/*.md")),
-    ("hook", (".claude/hooks/*.py",)),
-    ("skill", (".claude/skills/**/SKILL.md",)),
-    ("rule", (".claude/rules/*.md",)),
+    (
+        "generated",
+        (".claude/skills/**/*.md", ".goose/skills/**/*.md", ".cursor/skills/**/*.md", ".agent/skills/**/*.md"),
+    ),
+    ("hook", (".harness-baseline-configuration/hooks/*.py",)),
+    ("skill", (".agents/skills/**/SKILL.md",)),
+    ("rule", (".harness-baseline-configuration/rules/*.md",)),
     ("manifest", ("config/registry/*.toml", "groundtruth-kb/templates/managed-artifacts.toml")),
     ("scaffold", ("groundtruth-kb/templates/rules/*.md", "groundtruth-kb/templates/project/*.md")),
     ("cli-help", ("groundtruth-kb/src/groundtruth_kb/cli.py",)),
@@ -247,10 +252,10 @@ def _is_guarded_keep(rel_path: str, line_text: str, subject_id: str) -> tuple[bo
     return False, "", ""
 
 
-def load_superseded_index(db: Any) -> dict[str, dict[str, Any]]:
-    """Build the superseded-authority index from current MemBase formal records."""
+def load_superseded_index(client: AuthorityClient) -> dict[str, dict[str, Any]]:
+    """Build the index from all current native formal records, including retired ones."""
     index: dict[str, dict[str, Any]] = {}
-    for spec in db.list_specs():
+    for spec in page_records(client, "/v1/specifications"):
         status = str(spec.get("status") or "").strip().lower()
         if status not in SUPERSEDED_STATUSES:
             continue
@@ -271,28 +276,14 @@ def _subject_hash(subject_id: str, meta: dict[str, Any]) -> str:
     return "sha256:" + hashlib.sha256(material.encode("utf-8")).hexdigest()[:32]
 
 
-def scan(root: Path, db: Any | None = None) -> ScanReport:
+def scan(root: Path, client: AuthorityClient | None = None) -> ScanReport:
     """Run the deterministic superseded-authority scan."""
     report = ScanReport()
 
-    # --- provider resolution (missing-provider => never PASS) ---------------
-    if db is None:
-        try:
-            from groundtruth_kb.db import KnowledgeDB
-
-            db = KnowledgeDB(str(root / "groundtruth.db"))
-        except Exception as exc:  # noqa: BLE001 - a missing provider is a reported outcome
-            report.providers[PROVIDER_CURRENT_FORMAL_ARTIFACTS] = {
-                "resolved": False,
-                "reason": f"{MISSING_PROVIDER}: {exc}",
-            }
-            report.result = RESULT_UNASSESSED
-            report.gate_blocked = True
-            report.counts = {"findings": 0, SEVERITY_P0: 0, SEVERITY_P1: 0}
-            return report
-
+    # Missing or unavailable native authority never produces PASS.
     try:
-        superseded = load_superseded_index(db)
+        client = client or configured_authority_client(root)
+        superseded = load_superseded_index(client)
     except Exception as exc:  # noqa: BLE001
         report.providers[PROVIDER_CURRENT_FORMAL_ARTIFACTS] = {
             "resolved": False,

@@ -18,14 +18,14 @@ import pytest
 from fastapi.testclient import TestClient
 from groundtruth_kb.authority_api import create_authority_app
 
-from platform_tests.groundtruth_kb.test_deepseek_sdk_harness import _serve_authority
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put
-from platform_tests.groundtruth_kb.test_native_harness_records import harness_fields
-from platform_tests.groundtruth_kb.test_native_session_context import (
+from platform_tests.groundtruth_kb.native_fixtures import (
+    _serve_authority,
     database_contents,
     files,
+    harness_fields,
+    put,
 )
+from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 ROOT = Path(__file__).resolve().parents[2]

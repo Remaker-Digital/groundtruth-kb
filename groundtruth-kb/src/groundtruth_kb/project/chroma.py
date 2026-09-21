@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import gc
 import shutil
-import tomllib
 from collections.abc import Iterator
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +30,7 @@ from groundtruth_kb.isolation.app_root_minimization import (
     _load_registry,
     _normalize_registry_entries,
 )
+from groundtruth_kb.isolation.scope import explicit_application_scope, marker_application_scope
 
 CHROMA_DIRNAME = ".groundtruth-chroma"
 CHROMA_CLASSIFICATION = "generated_output"
@@ -153,19 +153,13 @@ def _confine_cache_target(target: Path, chroma_path: Path) -> None:
 
 
 def _application_scope(target: Path, explicit: str | None) -> str:
+    # The cache indexes one application: an explicit scope or the root's marker; no platform fallback.
     if explicit is not None:
-        if explicit != "gtkb_platform" and not explicit.startswith("application:"):
-            raise ValueError("application_scope must be gtkb_platform or application:<catalog name>")
-        return explicit
-    marker = target / "application.toml"
-    if not marker.is_file():
+        return explicit_application_scope(explicit)
+    scope = marker_application_scope(target)
+    if scope is None:
         raise ValueError(f"{target} has no application.toml marker; select the application scope explicitly")
-    payload = tomllib.loads(marker.read_text(encoding="utf-8"))
-    nested = payload.get("application", {})
-    name = nested.get("name") if isinstance(nested, dict) else None
-    if not isinstance(name, str) or not name:
-        raise ValueError("application.toml must name the registered application")
-    return "application:" + name
+    return scope
 
 
 def _validate_target(target: Path) -> tuple[Path, GTConfig]:

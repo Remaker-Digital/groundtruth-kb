@@ -120,8 +120,8 @@ def _source_inputs(root: Path) -> tuple[dict, dict]:
         if not directory.is_dir() or not directory.resolve().is_relative_to(root):
             raise InputError(f"outside_test_roots: {name}")
         for candidate in sorted(directory.rglob("*.py")):
-            if candidate.name != "conftest.py" and not candidate.name.startswith("test_"):
-                continue
+            # Imported fixtures and helpers can change the observed behavior too.
+            # Test discovery still uses only test modules below; identity covers all Python inputs.
             relative = candidate.relative_to(root).as_posix()
             path, _ = _test_path(root, relative)
             data = path.read_bytes()

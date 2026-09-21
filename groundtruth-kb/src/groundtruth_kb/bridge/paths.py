@@ -1,21 +1,8 @@
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""GT-KB project root and bridge-state directory resolution.
+"""Resolve the marked GT-KB project root from an explicit setting or Git context.
 
-RETIRED (2026-05-09): The smart-poller runtime that was the primary consumer of
-``state_dir`` has been archived to ``archive/smart-poller-2026-05-09/``. The
-dispatcher daemon reuses the same directory layout under
-``.gtkb-state/bridge-poller/`` for its dispatch-state file. This module's
-project-root and state-dir resolution helpers remain valid for both the retired
-smart-poller substrate and the current daemon.
-
-Per ``.claude/rules/project-root-boundary.md`` and DELIB-S319 owner directives,
-all live GT-KB bridge state must remain under the GT-KB host root.
-Resolution is fail-closed: paths outside the validated host root raise
-``StateDirOutOfRootError``; candidates without ``groundtruth.toml`` raise
-``ProjectRootNotFoundError``. ``.git/`` is never sufficient on its own.
-
-Authority: ``bridge/gtkb-bridge-poller-p1-detector-implementation-2026-04-28-008.md``
-GO at REVISED-3.
+A valid root contains ``groundtruth.toml``. Linked worktrees resolve through
+Git's common directory; ``.git`` alone is not enough to select a root.
 """
 
 from __future__ import annotations
@@ -26,26 +13,14 @@ from pathlib import Path
 
 GROUNDTRUTH_MARKER = "groundtruth.toml"
 PROJECT_ROOT_ENV_VAR = "GTKB_PROJECT_ROOT"
-STATE_DIR_ENV_VAR = "GTKB_STATE_DIR"
-DEFAULT_STATE_SUBDIR = (".gtkb-state", "bridge-poller")
 
 
 class ProjectRootNotFoundError(Exception):
     """Raised when no GT-KB host root can be resolved.
 
     A valid host root must contain ``groundtruth.toml``. Per
-    ``.claude/rules/project-root-boundary.md``, ``.git/`` alone is not
+    ``.harness-baseline-configuration/rules/project-root-boundary.md``, ``.git/`` alone is not
     sufficient.
-    """
-
-
-class StateDirOutOfRootError(Exception):
-    """Raised when ``GTKB_STATE_DIR`` resolves outside the GT-KB host root.
-
-    Per ``.claude/rules/project-root-boundary.md``, GT-KB state must remain
-    in-root. Production code does not allow naming-convention bypasses for
-    test-temp paths; tests use synthetic in-root projects under pytest
-    ``tmp_path`` instead.
     """
 
 
@@ -176,36 +151,3 @@ def resolve_project_root() -> Path:
         f"A valid host root must contain {GROUNDTRUTH_MARKER}. "
         f"Set {PROJECT_ROOT_ENV_VAR} or run from inside a GT-KB checkout."
     )
-
-
-def _ensure_dir(path: Path) -> Path:
-    path.mkdir(parents=True, exist_ok=True)
-    return path
-
-
-def get_state_dir() -> Path:
-    """Get the smart-poller state directory, fail-closed against out-of-root paths.
-
-    Default: ``<project_root>/.gtkb-state/bridge-poller/``.
-
-    Override: ``GTKB_STATE_DIR`` env var. Accepted only when its resolved path
-    is relative to the validated project root. Out-of-root values raise
-    ``StateDirOutOfRootError``.
-
-    Raises:
-        ProjectRootNotFoundError: when the project root cannot be resolved.
-        StateDirOutOfRootError: when ``GTKB_STATE_DIR`` resolves outside root.
-    """
-    root = resolve_project_root()
-    override = os.environ.get(STATE_DIR_ENV_VAR)
-    if override:
-        path = Path(override).resolve()
-        if path.is_relative_to(root):
-            return _ensure_dir(path)
-        raise StateDirOutOfRootError(
-            f"{STATE_DIR_ENV_VAR}={override} resolves to {path}, "
-            f"which is outside project root {root}. "
-            f"Per .claude/rules/project-root-boundary.md, GT-KB state "
-            f"must remain in-root."
-        )
-    return _ensure_dir(root.joinpath(*DEFAULT_STATE_SUBDIR))

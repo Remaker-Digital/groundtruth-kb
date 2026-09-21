@@ -5,6 +5,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from groundtruth_kb.cli import _default_secret_allowlist
 from groundtruth_kb.secrets import (
     PRODUCTION_PATTERNS,
     TEST_SYNTHETIC_PATTERNS,
@@ -16,6 +17,9 @@ from groundtruth_kb.secrets import (
     scan_range,
     scan_staged,
 )
+from groundtruth_kb.secrets.allowlist import DEFAULT_ALLOWLIST_PATH, TEST_TREE_PREFIXES
+
+REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _synthetic_value(provider_class: str, suffix: str = "ABCDEFGH") -> str:
@@ -118,6 +122,54 @@ def test_production_path_allowlist_entry_is_rejected(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
+    with pytest.raises(AllowlistLoadError, match="production-path entries are prohibited"):
+        Allowlist.load(allowlist_path)
+
+
+def _allowlist_toml(value: str, path: str) -> str:
+    return "\n".join(["[[entries]]", f'value = "{value}"', f'path = "{path}"', 'justification = "synthetic fixture"'])
+
+
+def test_default_allowlist_is_the_tracked_platform_tests_fixture(tmp_path: Path) -> None:
+    """The library scanner's default allowlist is the tracked fixture under platform_tests (the former default
+    named a tests/ path that does not exist, so a missing file loaded as an empty allowlist); the tracked file is
+    empty today, and a repository that carries both files is read from the platform_tests one."""
+    assert DEFAULT_ALLOWLIST_PATH.as_posix() == "platform_tests/secrets/fixtures/allowlist.toml"
+    assert (REPO_ROOT / DEFAULT_ALLOWLIST_PATH).is_file()
+    assert _default_secret_allowlist(REPO_ROOT).entries == ()
+    tracked = tmp_path / DEFAULT_ALLOWLIST_PATH
+    tracked.parent.mkdir(parents=True)
+    value = _synthetic_value(TEST_SYNTHETIC_PATTERNS[0].name)
+    tracked.write_text(_allowlist_toml(value, "platform_tests/secrets/x.txt"), encoding="utf-8")
+    drifted = tmp_path / "tests" / "secrets" / "fixtures" / "allowlist.toml"
+    drifted.parent.mkdir(parents=True)
+    drifted.write_text(_allowlist_toml(value, "tests/secrets/y.txt"), encoding="utf-8")
+    assert _default_secret_allowlist(tmp_path).entries == (
+        AllowlistEntry(value=value, path="platform_tests/secrets/x.txt", justification="synthetic fixture"),
+    )
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["tests/x.txt", "platform_tests/secrets/fixtures/x.txt", "groundtruth-kb/tests/x.txt", "platform_tests\\x.txt"],
+)
+def test_allowlist_accepts_every_repository_test_tree(tmp_path: Path, path: str) -> None:
+    allowlist_path = tmp_path / "allowlist.toml"
+    value = _synthetic_value(TEST_SYNTHETIC_PATTERNS[0].name)
+    allowlist_path.write_text(_allowlist_toml(value, path.replace("\\", "\\\\")), encoding="utf-8")
+    (entry,) = Allowlist.load(allowlist_path).entries
+    assert entry.path == path.replace("\\", "/") and entry.path.startswith(TEST_TREE_PREFIXES)
+    assert TEST_TREE_PREFIXES == ("tests/", "platform_tests/", "groundtruth-kb/tests/")
+
+
+@pytest.mark.parametrize(
+    "path",
+    ["src/config.py", "groundtruth-kb/src/x.py", "tests_legacy/x.txt", "platform_tests_extra/x.txt", "scripts/x.py"],
+)
+def test_allowlist_rejects_paths_outside_the_test_trees(tmp_path: Path, path: str) -> None:
+    allowlist_path = tmp_path / "allowlist.toml"
+    value = _synthetic_value(TEST_SYNTHETIC_PATTERNS[0].name)
+    allowlist_path.write_text(_allowlist_toml(value, path), encoding="utf-8")
     with pytest.raises(AllowlistLoadError, match="production-path entries are prohibited"):
         Allowlist.load(allowlist_path)
 

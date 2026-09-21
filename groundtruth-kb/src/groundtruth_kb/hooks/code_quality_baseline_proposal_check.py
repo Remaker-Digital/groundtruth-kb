@@ -18,11 +18,12 @@ CANONICAL_RULE_IDS = (
     "CQ-TESTS-001",
     "CQ-LOGGING-001",
     "CQ-VERIFICATION-001",
+    "CQ-PERF-001",
+    "CQ-DEPS-001",
 )
-REQUIRED_HEADERS = ("Rule ID", "Applies?", "Compliance plan", "Verification", "Waiver / N/A reason")
+REQUIRED_HEADERS = ("Rule ID", "Applies?", "Compliance plan", "Verification", "N/A reason")
 VAGUE_PHRASES = ("TBD", "to be determined", "pending", "???", "will be careful", "best effort", "trivial", "obvious")
 RULE_ID_RE = re.compile(r"^CQ-[A-Z]+-\d{3}$")
-WAIVER_RE = re.compile(r"^Owner waiver:\s+(CQ-[A-Z]+-\d{3})\s+-\s+(DELIB-[A-Za-z0-9-]+)\s+-\s+.+$")
 
 
 @dataclass(frozen=True)
@@ -51,7 +52,9 @@ def validate(markdown: str) -> list[Finding]:
     if "## Code Quality Baseline" not in markdown:
         findings.append(Finding("missing_heading", "missing ## Code Quality Baseline section"))
         return findings
-    table_rows = _rows(markdown)
+    baseline = markdown.split("## Code Quality Baseline", 1)[1]
+    baseline = re.split(r"(?m)^##\s+", baseline, maxsplit=1)[0]
+    table_rows = _rows(baseline)
     if not table_rows:
         return [Finding("missing_table", "missing Code Quality Baseline table")]
     headers = table_rows[0]
@@ -70,18 +73,14 @@ def validate(markdown: str) -> list[Finding]:
             continue
         if rule_id not in CANONICAL_RULE_IDS:
             findings.append(Finding("unknown_rule_id", f"unknown rule id: {rule_id}"))
+        if rule_id in seen:
+            findings.append(Finding("duplicate_rule_id", f"duplicate rule id: {rule_id}"))
         seen.add(rule_id)
         if applies == "Yes" and (not plan or not verification):
             findings.append(Finding("empty_yes_cells", f"{rule_id} Yes row requires plan and verification"))
         elif applies == "N/A" and not reason:
             findings.append(Finding("empty_na_reason", f"{rule_id} N/A row requires reason"))
-        elif applies.startswith("Owner waiver:"):
-            match = WAIVER_RE.match(applies)
-            if not match:
-                findings.append(Finding("bad_waiver", f"{rule_id} waiver row lacks Owner waiver line"))
-            elif match.group(1) != rule_id:
-                findings.append(Finding("bad_waiver_rule", f"{rule_id} waiver references {match.group(1)}"))
-        elif applies != "Yes" and applies != "N/A" and not applies.startswith("Owner waiver:"):
+        elif applies not in {"Yes", "N/A"}:
             findings.append(Finding("bad_applies", f"{rule_id} has invalid Applies? value: {applies!r}"))
         row_text = " ".join(row)
         for phrase in VAGUE_PHRASES:

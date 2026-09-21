@@ -142,6 +142,8 @@ def _walk_and_classify(root: Path, config: dict[str, Any]) -> list[dict[str, Any
                 rel = path.relative_to(root).as_posix()
             except ValueError:
                 rel = path.as_posix()
+            if rel == "config/governance/timer-inventory.toml":
+                continue
             family = _classify(rel, config)
             if family == "projection":
                 # Projections are reported but flagged; they are not source families.
@@ -199,7 +201,7 @@ def run_inventory(root: Path, config: dict[str, Any], *, report_dir: Path | None
     findings = _check(artifacts)
     result = {
         "schema_version": config.get("schema_version", 1),
-        "source_tree": ".harness-baseline-configuration + config + scripts + groundtruth-kb/src",
+        "source_tree": ".harness-baseline-configuration + .agents/skills + config + scripts + groundtruth-kb/src",
         "artifact_count": len(artifacts),
         "families": _family_counts(artifacts),
         "digest": digest,
@@ -316,6 +318,8 @@ def _scan_reference_occurrences(
                 rel = path.relative_to(root).as_posix()
             except ValueError:
                 rel = path.as_posix()
+            if rel == "config/governance/timer-inventory.toml":
+                continue
             family = _classify(rel, config)
             if family in {"junk", "projection"}:
                 # Disposable content and generated trees are not neutral source;
@@ -401,7 +405,7 @@ def run_certification(root: Path, config: dict[str, Any], *, report_dir: Path | 
     result = {
         "schema_version": config.get("schema_version", 1),
         "mode": "certify",
-        "source_tree": (".harness-baseline-configuration + config + scripts + groundtruth-kb/src"),
+        "source_tree": (".harness-baseline-configuration + .agents/skills + config + scripts + groundtruth-kb/src"),
         "declaration_count": len(rules),
         "occurrence_count": len(occurrences),
         "declared_count": len(occurrences) - len(undeclared),

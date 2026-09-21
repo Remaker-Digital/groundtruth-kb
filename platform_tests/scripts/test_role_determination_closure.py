@@ -10,7 +10,8 @@ from groundtruth_kb.authority_client import AuthorityClient
 
 ROOT = Path(__file__).resolve().parents[2]
 OPERATING_ROLE = ROOT / ".harness-baseline-configuration" / "rules" / "operating-role.md"
-CLAUDE_MD = ROOT / "CLAUDE.md"
+CLAUDE_MD = ROOT / "CLAUDE.md"  # R1 option B: the declared @AGENTS.md pointer
+AGENTS_MD = ROOT / "AGENTS.md"  # the root guidance the pointer names
 
 CONTRADICTING_SPEC_IDS = {
     "GOV-HARNESS-ROLE-PORTABILITY-001",
@@ -58,10 +59,12 @@ def test_canonical_operating_role_rule_has_one_session_context_authority() -> No
 
 
 def test_root_guidance_has_no_retired_role_authority_or_lookup_route() -> None:
-    text = CLAUDE_MD.read_text(encoding="utf-8")
+    assert CLAUDE_MD.read_text(encoding="utf-8") == "@AGENTS.md\n"
+    text = AGENTS_MD.read_text(encoding="utf-8")
     lowered = text.lower()
 
-    assert "::init gtkb <pb|lo>" in text
+    assert "--init-keyword" in text and "gt session bind" in text
+    assert "::init gtkb <pb|lo>" in OPERATING_ROLE.read_text(encoding="utf-8")
     forbidden = (
         "roles attach to harnesses",
         "registered harness may hold this role",

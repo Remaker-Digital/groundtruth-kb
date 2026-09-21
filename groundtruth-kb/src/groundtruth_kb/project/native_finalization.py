@@ -341,13 +341,16 @@ class NativeProjectFinalization:
         *,
         root: Path,
         index_tree: str | None = None,
+        context_checkout: Path | None = None,
     ) -> None:
         integration_head = self._head(root=root)
         if integration_head not in {request.expected_parent, request.commit_id}:
             _error("integration_base_changed", "Read and review the current integration base before another commit")
         if index_tree is not None:
             try:
-                checkout = _registered_context_checkout(self.root, binding["session_context_id"], repository_root=root)
+                checkout = context_checkout or _registered_context_checkout(
+                    self.root, binding["session_context_id"], repository_root=root
+                )
             except SessionWorktreeError as error:
                 raise PostgresKernelError(error.code, str(error)) from error
             if self._head(checkout) != request.expected_parent:
@@ -356,18 +359,19 @@ class NativeProjectFinalization:
             "for-each-ref", "--contains=" + request.commit_id, "--format=%(refname)", "refs/heads", root=root
         ).strip():
             _error("commit_not_published", "The candidate must be a reachable repository branch fact")
+        # One immutable commit-object read supplies its tree, parents and message.
+        candidate_id, candidate_tree, parent_text, message = (
+            self._git("show", "-s", "--format=%H%x00%T%x00%P%x00%B", request.commit_id, root=root)
+            .decode("utf-8")
+            .split("\0", 3)
+        )
         if index_tree is not None:
             if integration_head != request.expected_parent:
                 _error("integration_base_changed", "The integration base changed before the reference update")
-            candidate_tree = self._git("rev-parse", request.commit_id + "^{tree}", root=root).decode("ascii").strip()
             if candidate_tree != index_tree:
                 _error("commit_index_changed", "A hook changed the index after Git formed the candidate commit")
-        parent_line = (
-            self._git("rev-list", "--parents", "-n", "1", request.commit_id, root=root).decode("ascii").strip().split()
-        )
-        if parent_line != [request.commit_id, request.expected_parent]:
+        if candidate_id != request.commit_id or parent_text.split() != [request.expected_parent]:
             _error("unexpected_commit_parent", "A project commit has exactly the prepared parent")
-        message = self._git("show", "-s", "--format=%B", request.commit_id, root=root).decode("utf-8")
         required = {f"({work['id']})" for work in works}
         cited = set(re.findall(r"\(WI-[A-Za-z0-9_-]+\)", message))
         if not required.issubset(cited):
@@ -474,7 +478,15 @@ class NativeProjectFinalization:
             checkout = _registered_context_checkout(
                 self.root, binding["session_context_id"], repository_root=repository
             )
-            self._verify_commit(request, binding, works, artifacts, index_tree=request.index_tree, root=repository)
+            self._verify_commit(
+                request,
+                binding,
+                works,
+                artifacts,
+                index_tree=request.index_tree,
+                root=repository,
+                context_checkout=checkout,
+            )
             local = self.bridge._snapshot(sorted(artifacts), root=checkout)
             if local != artifacts:
                 _error("commit_checkout_changed", "The context files changed after preparation")
@@ -605,10 +617,10 @@ class NativeProjectFinalization:
                         _error("commit_context_mismatch", "Only this commit's bound context can check its candidate")
                     return self._check_commit_locked(tx, project_id, current)
 
-            self._commit_callbacks[project_id] = check
             checkout = Path(prepared["checkout"]["path"])
             git_dir = Path(self._git("rev-parse", "--absolute-git-dir", root=checkout).decode("utf-8").strip())
             message_path = None
+            self._commit_callbacks[project_id] = check
             try:
                 with tempfile.NamedTemporaryFile(
                     dir=git_dir, prefix="gtkb-message-", suffix=".txt", delete=False
@@ -623,25 +635,29 @@ class NativeProjectFinalization:
                     message_file=message_path,
                 )
             except (ProjectCommitError, OSError) as error:
-                binding, project, repository = self._project(tx, project_id, request)
-                works, attempts, artifacts = self._cohort(tx, project)
-                existing = self._existing_commit(request, binding, works, artifacts, root=repository)
-                if existing:
-                    # Git may already have committed when later checkout/index
-                    # housekeeping failed. Preserve that index and confirm once.
-                    result = self._confirm_locked(
-                        tx,
-                        project_id,
-                        CommitConfirmation(
-                            native_context_id=request.native_context_id,
-                            expected_version=request.expected_version,
-                            expected_parent=existing["expected_parent"],
-                            commit_id=existing["commit_id"],
-                        ),
-                    )
-                    return {**result, "checkout_notice": str(error)}
-                result = self._request_verification(tx, attempts, "commit_not_confirmed", {"message": str(error)})
-                return {**result, "message": f"Project commit did not complete: {error}"}
+                # The hook can time out while the server callback still uses tx.
+                # Drain and retire it before recovery touches the same cursor.
+                with callback_lock:
+                    self._commit_callbacks.pop(project_id, None)
+                    binding, project, repository = self._project(tx, project_id, request)
+                    works, attempts, artifacts = self._cohort(tx, project)
+                    existing = self._existing_commit(request, binding, works, artifacts, root=repository)
+                    if existing:
+                        # Git may already have committed when later checkout/index
+                        # housekeeping failed. Preserve that index and confirm once.
+                        result = self._confirm_locked(
+                            tx,
+                            project_id,
+                            CommitConfirmation(
+                                native_context_id=request.native_context_id,
+                                expected_version=request.expected_version,
+                                expected_parent=existing["expected_parent"],
+                                commit_id=existing["commit_id"],
+                            ),
+                        )
+                        return {**result, "checkout_notice": str(error)}
+                    result = self._request_verification(tx, attempts, "commit_not_confirmed", {"message": str(error)})
+                    return {**result, "message": f"Project commit did not complete: {error}"}
             finally:
                 # Serialize the final callback's exit with closing this local
                 # operation, so a late request never uses an ended transaction.

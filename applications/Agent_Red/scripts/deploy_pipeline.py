@@ -26,6 +26,7 @@ Exit codes:
 from __future__ import annotations
 
 import argparse
+import contextlib
 import io
 import json
 import os
@@ -52,7 +53,6 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
 
 try:
     from scripts.deploy_config import ENVIRONMENTS  # noqa: E402
@@ -66,6 +66,13 @@ except ModuleNotFoundError:
     def api_call(*_args, **_kwargs):  # noqa: ANN002, ANN003
         """Fallback stub used when upgrade verification is not app-local yet."""
         return (0, {"error": "upgrade_verification unavailable"}, {})
+
+
+# Evidence pair of the DEFECT work items this pipeline records (WI-7860, owner ruling D17): the governing
+# specification and this pipeline's own executable test; the native writer refuses creation without both.
+DEFECT_SOURCE_SPEC_ID = "SPEC-1615"
+DEFECT_SOURCE_TEST_ID = "TEST-2941"
+DEFECT_ACTOR = "deploy-pipeline"
 
 
 def _install_app_scaling_compat_modules() -> None:
@@ -166,10 +173,8 @@ def log(level: str, msg: str) -> None:
     ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     line = f"[{ts}] [{level:5s}] {msg}"
     _log_lines.append(line)
-    try:
+    with contextlib.suppress(OSError, ValueError):  # stdout closed (background task) — still captured in _log_lines
         print(line, flush=True)
-    except (OSError, ValueError):
-        pass  # stdout closed (background task) — still captured in _log_lines
 
 
 def _write_log_file(env: str) -> Path:
@@ -1462,19 +1467,23 @@ def phase_11_production_verification(args: argparse.Namespace) -> PhaseResult:
 # DEFECT work item creation on failure
 # ---------------------------------------------------------------------------
 def _create_defect_work_item(results: list[PhaseResult], args: argparse.Namespace) -> str | None:
-    """Create a DEFECT work item in the KB for the first failed phase.
+    """Record a DEFECT work item on the native authority for the first failed phase.
 
-    Delegates to the shared _defect_reporter module (SPEC-1617).
+    Delegates to the shared _defect_reporter module (WI-7860, owner ruling D17). A refused or
+    unreachable authority raises ``DefectReportError`` out of this function: nothing is warned past.
     """
-    try:
-        from scripts._defect_reporter import create_defect
-    except ModuleNotFoundError:
-        log("WARN", "  Defect reporter unavailable in app-local deploy context; skipping DEFECT creation")
-        return None
-
     failed = [r for r in results if r.status == "FAIL"]
     if not failed:
         return None
+
+    try:
+        from scripts._defect_reporter import create_defect
+    except ModuleNotFoundError as error:
+        # An app-local deploy context has no path to the platform's native defect writer; the failed
+        # phase cannot be recorded there, and that is an error, not a skipped step (WI-7860).
+        raise RuntimeError(
+            "Defect reporter unavailable in the app-local deploy context; the failed phase was not recorded"
+        ) from error
 
     first_fail = failed[0]
     all_failures = "; ".join(f"Phase {r.phase} ({r.name}): {r.detail}" for r in failed)
@@ -1489,12 +1498,16 @@ def _create_defect_work_item(results: list[PhaseResult], args: argparse.Namespac
             f"First failure: Phase {first_fail.phase} ({first_fail.name}): "
             f"{first_fail.detail}"
         ),
-        source_spec_id="SPEC-1615",
+        source_spec_id=DEFECT_SOURCE_SPEC_ID,
+        source_test_id=DEFECT_SOURCE_TEST_ID,
+        actor=DEFECT_ACTOR,
+        reason=(
+            f"Automated deploy pipeline ({DEFECT_SOURCE_SPEC_ID}) failed Phase {first_fail.phase} "
+            f"({first_fail.name}) for {args.env} {args.version}"
+        ),
         component="infrastructure_automation",
-        changed_by="deploy-pipeline",
     )
-    if wi_id:
-        log("INFO", f"  Created DEFECT work item: {wi_id}")
+    log("INFO", f"  Created DEFECT work item: {wi_id}")
     return wi_id
 
 
@@ -1503,10 +1516,8 @@ def _create_defect_work_item(results: list[PhaseResult], args: argparse.Namespac
 # ---------------------------------------------------------------------------
 def _safe_print(*args_p, **kwargs_p) -> None:
     """Print that silently ignores closed stdout (background tasks)."""
-    try:
+    with contextlib.suppress(OSError, ValueError):
         print(*args_p, **kwargs_p)
-    except (OSError, ValueError):
-        pass
 
 
 def _print_summary(

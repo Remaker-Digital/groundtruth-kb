@@ -10,8 +10,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from groundtruth_kb.project.checks import get_registered_checks
 from groundtruth_kb.project.checks.state_location_registry import (
+    FORBIDDEN_ROOTS,
+    _is_permitted,
     check_state_location_registry,
 )
 
@@ -25,20 +29,20 @@ def _write_registry(root: Path, storage_paths: list[str]) -> None:
 
 
 def test_registered_directory_passes(tmp_path: Path) -> None:
-    (tmp_path / ".gtkb-state" / "permitted").mkdir(parents=True)
-    _write_registry(tmp_path, [".gtkb-state/permitted"])
+    (tmp_path / ".groundtruth" / "permitted").mkdir(parents=True)
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     result = check_state_location_registry(tmp_path)
     assert result.status == "pass"
     assert result.required is True
 
 
 def test_unregistered_directory_fails(tmp_path: Path) -> None:
-    (tmp_path / ".gtkb-state" / "rogue").mkdir(parents=True)
-    _write_registry(tmp_path, [".gtkb-state/permitted"])
+    (tmp_path / ".groundtruth" / "rogue").mkdir(parents=True)
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     result = check_state_location_registry(tmp_path)
     assert result.status == "fail"
     assert result.required is True
-    assert ".gtkb-state/rogue" in result.message
+    assert ".groundtruth/rogue" in result.message
 
 
 def test_unregistered_loose_file_fails(tmp_path: Path) -> None:
@@ -51,86 +55,69 @@ def test_unregistered_loose_file_fails(tmp_path: Path) -> None:
     session = tmp_path / ".claude" / "session"
     session.mkdir(parents=True)
     (session / "handoff-abc.md").write_text("x", encoding="utf-8")
-    _write_registry(tmp_path, [".gtkb-state"])
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     result = check_state_location_registry(tmp_path)
     assert result.status == "fail"
     assert ".claude/session/handoff-abc.md" in result.message
 
 
 def test_discriminates_config_from_state_inside_one_parent(tmp_path: Path) -> None:
-    """The core requirement: same parent, opposite classifications.
-
-    ``harness-state/`` holds legitimate per-harness configuration and
-    illegitimate per-harness session state side by side. Classification must be
-    by longest-prefix match on the path, never by parent directory.
-    """
-    harness = tmp_path / "harness-state" / "claude"
-    harness.mkdir(parents=True)
-    (harness / "active-workspace.md").write_text("x", encoding="utf-8")
-    (harness / "session-lifecycle-guard.json").write_text("{}", encoding="utf-8")
-    (harness / "session-envelope-archive").mkdir()
-    _write_registry(tmp_path, ["harness-state/claude/active-workspace.md"])
-
+    """Registered metadata and unregistered state under one ordinary parent differ."""
+    state = tmp_path / ".groundtruth"
+    state.mkdir()
+    (state / "metadata.json").write_text("{}", encoding="utf-8")
+    (state / "unregistered.json").write_text("{}", encoding="utf-8")
+    (state / "unregistered-directory").mkdir()
+    _write_registry(tmp_path, [".groundtruth/metadata.json"])
     result = check_state_location_registry(tmp_path)
     assert result.status == "fail"
-    # Registered per-harness CONFIG is not reported.
-    assert "active-workspace.md" not in result.message
-    # Unregistered per-harness STATE is reported, both file and directory.
-    assert "harness-state/claude/session-lifecycle-guard.json" in result.message
-    assert "harness-state/claude/session-envelope-archive" in result.message
+    assert "metadata.json" not in result.message
+    assert ".groundtruth/unregistered.json" in result.message
+    assert ".groundtruth/unregistered-directory" in result.message
 
 
-def test_descends_one_level_under_harness_state(tmp_path: Path) -> None:
-    """Per-harness state is invisible at depth 1 and must be found at depth 2."""
+def test_rejects_nested_state_under_retired_harness_root(tmp_path: Path) -> None:
+    """A retired root is rejected without interpreting files below it."""
     (tmp_path / "harness-state" / "codex" / "session-envelopes").mkdir(parents=True)
     # Only a sibling config file is registered, not the harness directory.
     _write_registry(tmp_path, ["harness-state/codex/session-startup-preferences.json"])
     result = check_state_location_registry(tmp_path)
     assert result.status == "fail"
-    assert "harness-state/codex/session-envelopes" in result.message
+    assert "harness-state" in result.message
 
 
-def test_blanket_container_registration_defeats_the_check(tmp_path: Path) -> None:
-    """Registering a container over a state tree permits everything inside it.
-
-    This documents a hazard rather than a bug. Ancestor matching is required --
-    a registered ``.groundtruth/formal-artifact-approvals/`` must permit the
-    packets inside it -- but the same rule means a container registered over a
-    state tree grants blanket permission and silently disables enforcement
-    beneath it.
-
-    This is precisely why WI-6739 narrows the existing ``opaque_container``
-    registrations on ``.gtkb-state/`` and ``.claude/session/`` as part of the
-    same work: without that narrowing, one registry row would grant blanket
-    authority over the very tree the other rows enumerate, and this check would
-    report ``pass`` over an entirely unregistered subtree.
-
-    The test exists so that if someone later re-registers a broad container and
-    the check goes quiet, the reason is discoverable rather than mysterious.
-    """
-    (tmp_path / "harness-state" / "codex" / "session-envelopes").mkdir(parents=True)
-    (tmp_path / "harness-state" / "codex" / "session-lifecycle-guard.json").write_text("{}", encoding="utf-8")
-    _write_registry(tmp_path, ["harness-state/codex"])
+@pytest.mark.parametrize("location", FORBIDDEN_ROOTS)
+@pytest.mark.parametrize("kind", ["file", "directory"])
+@pytest.mark.parametrize("registered", [False, True])
+def test_forbidden_roots_cannot_be_permitted_by_registration(tmp_path, location, kind, registered):
+    path = tmp_path / location
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if kind == "file":
+        path.write_text("inert forbidden state", encoding="utf-8")
+    else:
+        path.mkdir()
+    if registered:
+        _write_registry(tmp_path, [location, ".groundtruth"])
     result = check_state_location_registry(tmp_path)
-    assert result.status == "pass", (
-        "blanket container registration is expected to permit contents; "
-        "if this now fails, ancestor matching changed and the narrowing "
-        "requirement in WI-6739 should be revisited"
-    )
+    assert result.status == "fail" and result.required is True
+    assert location in result.message
+    assert "Register permitted" not in result.message
+    assert not _is_permitted(location, {location, ".groundtruth"})
+    assert not _is_permitted(location + "/nested.json", {location, ".groundtruth"})
 
 
 def test_ancestor_registration_permits_contents(tmp_path: Path) -> None:
     """A registered container permits what is inside it."""
-    approvals = tmp_path / ".groundtruth" / "formal-artifact-approvals"
+    approvals = tmp_path / ".groundtruth" / "metadata"
     approvals.mkdir(parents=True)
     (approvals / "packet.json").write_text("{}", encoding="utf-8")
-    _write_registry(tmp_path, [".groundtruth/formal-artifact-approvals"])
+    _write_registry(tmp_path, [".groundtruth/metadata"])
     assert check_state_location_registry(tmp_path).status == "pass"
 
 
 def test_trailing_slash_in_registration_is_tolerated(tmp_path: Path) -> None:
-    (tmp_path / ".gtkb-state" / "permitted").mkdir(parents=True)
-    _write_registry(tmp_path, [".gtkb-state/permitted/"])
+    (tmp_path / ".groundtruth" / "permitted").mkdir(parents=True)
+    _write_registry(tmp_path, [".groundtruth/permitted/"])
     assert check_state_location_registry(tmp_path).status == "pass"
 
 
@@ -140,14 +127,14 @@ def test_missing_registry_warns_rather_than_fails(tmp_path: Path) -> None:
     Failing here would make the check fire loudly on a tree it cannot actually
     assess, which trains readers to ignore it.
     """
-    (tmp_path / ".gtkb-state" / "rogue").mkdir(parents=True)
+    (tmp_path / ".groundtruth" / "rogue").mkdir(parents=True)
     result = check_state_location_registry(tmp_path)
     assert result.status == "warning"
     assert result.found is False
 
 
 def test_absent_state_roots_pass(tmp_path: Path) -> None:
-    _write_registry(tmp_path, [".gtkb-state/permitted"])
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     assert check_state_location_registry(tmp_path).status == "pass"
 
 
@@ -158,16 +145,16 @@ def test_unscanned_roots_are_ignored(tmp_path: Path) -> None:
     """
     (tmp_path / "scripts" / "whatever").mkdir(parents=True)
     (tmp_path / "applications" / "Agent_Red").mkdir(parents=True)
-    _write_registry(tmp_path, [".gtkb-state/permitted"])
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     assert check_state_location_registry(tmp_path).status == "pass"
 
 
 def test_message_truncates_but_reports_full_count(tmp_path: Path) -> None:
-    root = tmp_path / ".gtkb-state"
+    root = tmp_path / ".groundtruth"
     root.mkdir(parents=True)
     for i in range(20):
         (root / f"rogue{i:02d}").mkdir()
-    _write_registry(tmp_path, ["harness-state"])
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     result = check_state_location_registry(tmp_path)
     assert result.status == "fail"
     assert "20 unregistered state location(s)" in result.message
@@ -178,6 +165,6 @@ def test_registered_via_pkgutil_discovery(tmp_path: Path) -> None:
     """ADR-REGISTRY-DISCOVERY-001: discovered without editing doctor.py."""
     checks = get_registered_checks()
     assert "state_location_registry" in checks
-    _write_registry(tmp_path, [".gtkb-state"])
+    _write_registry(tmp_path, [".groundtruth/permitted"])
     result = checks["state_location_registry"](tmp_path)
     assert result.required is True

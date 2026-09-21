@@ -19,7 +19,9 @@ RECORD_SET = {
     # session governance principles
     "GOV-RELEASE-READINESS-GOVERNED-TESTING-001": ("governance", "active"),
     "GOV-GTKB-ADOPTION-ENFORCEMENT-001": ("governance", "active"),
-    "GOV-ACTING-PRIME-BUILDER-001": ("governance", "active"),
+    "GOV-ACTING-PRIME-BUILDER-001": ("governance", "retired"),
+    "GOV-ROLE-DETERMINATION-INIT-LINE-ONLY-001": ("governance", "active"),
+    "DCL-SESSION-ROLE-RESOLUTION-001": ("design_constraint", "active"),
     "GOV-HARNESS-ROLE-PORTABILITY-001": ("governance", "retired"),
     "GOV-GTKB-MULTI-HARNESS-ROLE-CONFIG-001": ("governance", "retired"),
     "GOV-AGENT-RED-GTKB-CONFORMANCE-001": ("governance", "active"),

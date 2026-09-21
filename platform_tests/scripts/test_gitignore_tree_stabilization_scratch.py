@@ -46,14 +46,14 @@ WI5299_IGNORED_SCRATCH_PATHS = (
     ".codex/skills/gtkb-verify/helpers/draft_wi5299.md",
 )
 
+# Rendered helper paths under .claude/ and .codex/ are no longer listed here: the projector
+# roots are ignored wholesale and untracked (owner ruling D14, 2026-09-17; see
+# test_projected_roots_untracked.py), so no rendered path is a visible control path.
 VISIBLE_CONTROL_PATHS = (
     ".gitignore",
     ".gitattributes",
     "bridge/gtkb-wi5114-scratch-ignore-hygiene-004.md",
     "bridge/gtkb-wi5299-deterministic-scratch-ignore-closure-002.md",
-    ".codex/skills/gtkb-verify/helpers/write_verdict.py",
-    ".claude/skills/gtkb-bridge-propose/helpers/write_bridge.py",
-    ".codex/skills/gtkb-verify/helpers/gtkb-wi5069-final.md",
     "nested/.tmp_lo_keep.py",
     "test-auth-root-canonical/groundtruth.toml",
 )

@@ -18,7 +18,7 @@ another harness to coordinate its work.
 
 Use the current `gtkb-bridge` skill and the phase-specific proposal, review or
 verification skill. Related review direction is in
-`{{HARNESS_RULES_DIR}}/counterpart-review-gate.md`. Agent-authored proposals and
+`.harness-baseline-configuration/rules/counterpart-review-gate.md`. Agent-authored proposals and
 verdicts contain the complete routing header. The service validates and records
 them without constructing or repairing the agent's message. Dispatcher selects
 work and transports it; it does not author proposals or verdicts.

@@ -26,7 +26,7 @@ from pathlib import Path
 # Import the hook module directly
 # ---------------------------------------------------------------------------
 
-HOOK_PATH = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "credential-scan.py"
+HOOK_PATH = Path(__file__).resolve().parents[2] / ".harness-baseline-configuration" / "hooks" / "credential-scan.py"
 
 spec = importlib.util.spec_from_file_location("credential_scan", HOOK_PATH)
 credential_scan = importlib.util.module_from_spec(spec)

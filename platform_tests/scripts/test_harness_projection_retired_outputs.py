@@ -202,6 +202,96 @@ def test_exact_retired_file_never_expands_to_local_directory(tmp_path, monkeypat
     assert not (tmp_path / ".api-harness/openrouter/current.txt").exists()
 
 
+def _seed(root, paths, text="previous bytes"):
+    for name in paths:
+        target = root / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(text, encoding="utf-8")
+
+
+def _previous_manifest(root, config_dir, harness, paths):
+    target = root / config_dir / ".projection-manifest.json"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "engine": "scripts/harness_projection/project_harness.py",
+        "harness": harness,
+        "baseline_root": ".harness-baseline-configuration",
+        "paths": [*paths, f"{config_dir}/.projection-manifest.json"],
+    }
+    target.write_text(json.dumps(payload), encoding="utf-8")
+    return payload
+
+
+def test_write_sweeps_emptied_parents_bounded_to_config_dir(tmp_path, monkeypatch):
+    """M15 stage 1: retiring the copies must not leave ~240 SKILL.md-less skill directories behind."""
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    retired = [".cursor/rules/a.md", ".cursor/hooks/b.py", ".cursor/skills/x/helpers/c.py"]
+    current = ".cursor/skills/x/SKILL.md"
+    _seed(tmp_path, [*retired, current])
+    previous = _previous_manifest(tmp_path, ".cursor", "cursor", [*retired, current])
+    plan = project_harness.Plan(
+        writes={current: "stub", ".cursor/.projection-manifest.json": json.dumps({**previous, "paths": [current]})}
+    )
+    project_harness.apply_leftover_removes(plan, {"name": "cursor", "config_dir": ".cursor"})
+    assert not plan.gaps and set(plan.removes) == set(retired)
+    monkeypatch.setattr(project_harness, "build_plan", lambda _: plan)
+    assert project_harness.run("cursor", "write") == 0
+    assert not (tmp_path / ".cursor/rules").exists()
+    assert not (tmp_path / ".cursor/hooks").exists()
+    assert not (tmp_path / ".cursor/skills/x/helpers").exists()
+    assert (tmp_path / ".cursor").is_dir() and (tmp_path / ".cursor/skills/x").is_dir()
+    assert (tmp_path / current).read_text() == "stub"
+
+
+def test_sweep_keeps_directories_holding_unmanaged_files(tmp_path, monkeypatch):
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    retired = [".cursor/rules/a.md", ".cursor/hooks/b.py"]
+    local = ".cursor/rules/local.md"
+    _seed(tmp_path, [*retired, local])
+    previous = _previous_manifest(tmp_path, ".cursor", "cursor", retired)
+    plan = project_harness.Plan(
+        writes={
+            ".cursor/hooks.json": "{}",
+            ".cursor/.projection-manifest.json": json.dumps({**previous, "paths": [".cursor/hooks.json"]}),
+        }
+    )
+    project_harness.apply_leftover_removes(plan, {"name": "cursor", "config_dir": ".cursor"})
+    assert not plan.gaps and set(plan.removes) == set(retired)
+    monkeypatch.setattr(project_harness, "build_plan", lambda _: plan)
+    assert project_harness.run("cursor", "write") == 0
+    assert (tmp_path / local).read_text() == "previous bytes"
+    assert (tmp_path / ".cursor/rules").is_dir()
+    assert not (tmp_path / ".cursor/hooks").exists()
+
+
+def test_sweep_never_removes_config_dir_or_escapes_it(tmp_path, monkeypatch):
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    retired = [".api-harness/openrouter/rules/a.md", ".api-harness/openrouter/skills/s/SKILL.md"]
+    sibling = ".api-harness/ollama/settings.json"
+    _seed(tmp_path, [*retired, sibling])
+    _previous_manifest(tmp_path, ".api-harness/openrouter", "openrouter", retired)
+    plan = project_harness.Plan()
+    project_harness.apply_leftover_removes(plan, {"name": "openrouter", "config_dir": ".api-harness/openrouter"})
+    assert not plan.gaps
+    assert set(plan.removes) == {*retired, ".api-harness/openrouter/.projection-manifest.json"}
+    monkeypatch.setattr(project_harness, "build_plan", lambda _: plan)
+    assert project_harness.run("openrouter", "write") == 0
+    assert (tmp_path / ".api-harness/openrouter").is_dir()
+    assert not any((tmp_path / ".api-harness/openrouter").iterdir())
+    assert (tmp_path / ".api-harness").is_dir() and (tmp_path / sibling).read_text() == "previous bytes"
+
+
+def test_check_mode_ignores_empty_directories(tmp_path, monkeypatch):
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    plan = project_harness.Plan(writes={".cursor/hooks.json": "{}"})
+    _seed(tmp_path, [".cursor/hooks.json"], "{}")
+    (tmp_path / ".cursor/rules").mkdir(parents=True)
+    (tmp_path / ".cursor/skills/x").mkdir(parents=True)
+    monkeypatch.setattr(project_harness, "build_plan", lambda _: plan)
+    assert project_harness.run("cursor", "check") == 0
+    assert (tmp_path / ".cursor/rules").is_dir() and (tmp_path / ".cursor/skills/x").is_dir()
+
+
 @pytest.mark.parametrize("relative", [".api-harness", ".api-harness/hooks", ".api-harness/hooks/assertion-check.py"])
 def test_generic_retirement_refuses_redirected_output_before_writes(tmp_path, monkeypatch, relative):
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)

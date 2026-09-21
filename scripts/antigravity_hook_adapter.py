@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Translate native Antigravity tool/Stop events for selected GT-KB hooks.
 
-Targets are shared platform scripts or this harness's own projected hooks.
+Targets are shared platform scripts or an authored baseline hooks.
 The adapter verifies and translates; it never executes the proposed tool.
 See https://antigravity.google/docs/hooks for the native stdin/stdout contract.
 """
@@ -133,8 +133,8 @@ def _target(raw: str) -> Path:
     if not path.is_absolute():
         path = PROJECT_ROOT / path
     rel = path.relative_to(PROJECT_ROOT)
-    if not (rel.is_relative_to("scripts") or rel.is_relative_to(".agent/hooks")):
-        raise ValueError("Hook target must be platform code or this harness's own projected hook")
+    if not (rel.is_relative_to("scripts") or rel.is_relative_to(".harness-baseline-configuration/hooks")):
+        raise ValueError("Hook target must be platform code or an authored baseline hook")
     if not path.is_file() or path.resolve() != path:
         raise ValueError("Hook target is missing or redirected")
     return path

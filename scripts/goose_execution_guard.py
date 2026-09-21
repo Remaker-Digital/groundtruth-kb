@@ -758,7 +758,10 @@ def export_model_configuration(model: str, routing_model: str | None = None) -> 
 
     Reads from the resolved model or routing default, sets GTKB_AUTHOR_MODEL
     and GTKB_AUTHOR_MODEL_VERSION environment variables so bridge_author_metadata
-    and the provenance guard can read them.
+    and the provenance guard can read them. Only the harness name and id are
+    exported as identity; no role is exported, because the role comes only from
+    the immutable binding of the Goose-native context
+    (DCL-INIT-BOUND-SESSION-IDENTITY-001).
     """
     effective_model = model or routing_model or ""
     if effective_model:
@@ -767,4 +770,3 @@ def export_model_configuration(model: str, routing_model: str | None = None) -> 
     # Also set GTKB_AUTHOR_HARNESS_NAME and GTKB_AUTHOR_HARNESS_ID if not already set
     os.environ.setdefault("GTKB_AUTHOR_HARNESS_NAME", "goose")
     os.environ.setdefault("GTKB_AUTHOR_HARNESS_ID", "G")
-    os.environ.setdefault("GTKB_AUTHOR_IDENTITY", "prime-builder/goose/G")

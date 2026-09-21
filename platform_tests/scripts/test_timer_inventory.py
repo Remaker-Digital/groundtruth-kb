@@ -16,6 +16,8 @@ import pytest
 
 import scripts.timer_inventory as ti
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+
 
 @pytest.fixture
 def fixture_root(tmp_path: Path) -> Path:
@@ -523,24 +525,64 @@ def test_regeneration_reports_all_surfaces_and_preserves_source_bytes(
     assert all((fixture_root / path).read_bytes() == content for path, content in before.items())
 
 
-def test_output_parent_junction_refuses_without_writing_outside(fixture_root: Path, tmp_path: Path) -> None:
+def test_derived_inventory_lives_under_ignored_working_directory_not_the_governance_catalog(
+    fixture_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D14: the inventory is derived local output; config/governance/ carries only the hand-authored catalog."""
+    import subprocess
+
+    assert ti.GENERATED_ARTIFACT_REL.as_posix() == ".groundtruth/derived/timer-inventory.toml"
+    assert not ti.GENERATED_ARTIFACT_REL.as_posix().startswith("config/")
+    _write(fixture_root / "scripts" / "poll.py", "TIMEOUT_SECONDS = 10\n")
+    monkeypatch.setattr(ti, "_git_head_sha", lambda *a: "deadbeef")
+    assert ti.main(["--project-root", str(fixture_root), "--write"]) == 0
+    artifact = fixture_root / ti.GENERATED_ARTIFACT_REL
+    assert artifact.is_file()
+    assert sorted(p.name for p in (fixture_root / "config/governance").iterdir()) == ["operational-controls.toml"]
+    payload = ti.build_inventory(fixture_root)
+    excluded = payload["coverage"]["excluded_paths"]
+    assert {"path": ti.GENERATED_ARTIFACT_REL.as_posix(), "reason": "inventory_output"} in excluded
+    assert all(
+        row["file"] != ti.GENERATED_ARTIFACT_REL.as_posix()
+        for field in ("records", "test_records", "derived_records")
+        for row in payload[field]
+    )
+    # The repository ignores the derived location; nothing under it can enter the index without --force.
+    ignored = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "check-ignore", "-v", "--no-index", "--", ti.GENERATED_ARTIFACT_REL.as_posix()],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert ignored.returncode == 0, ignored.stdout + ignored.stderr
+    assert ignored.stdout.startswith(".gitignore:") and ":/.groundtruth/*\t" in ignored.stdout, ignored.stdout
+
+
+@pytest.mark.parametrize("linked_parent", [".groundtruth", ".groundtruth/derived"])
+def test_output_parent_junction_refuses_without_writing_outside(
+    fixture_root: Path, tmp_path: Path, linked_parent: str
+) -> None:
     import os
     import subprocess
 
     outside = tmp_path.parent / (tmp_path.name + "-output")
     outside.mkdir()
-    protected = outside / "timer-inventory.toml"
+    protected_parent = outside / ti.GENERATED_ARTIFACT_REL.parent.relative_to(linked_parent)
+    protected_parent.mkdir(parents=True, exist_ok=True)
+    protected = protected_parent / "timer-inventory.toml"
     protected.write_text("owner bytes", encoding="utf-8")
-    parent = fixture_root / "config/governance"
-    assert parent.resolve().is_relative_to(fixture_root.resolve())
-    parent.rename(fixture_root / "saved-control-fixture")
+    parent = fixture_root / linked_parent
+    parent.parent.mkdir(parents=True, exist_ok=True)
+    assert not parent.exists()
     if os.name == "nt":
         subprocess.run(["cmd", "/c", "mklink", "/J", str(parent), str(outside)], check=True, capture_output=True)
     else:
         parent.symlink_to(outside, target_is_directory=True)
     assert ti.main(["--project-root", str(fixture_root), "--write"]) == 1
     assert protected.read_text(encoding="utf-8") == "owner bytes"
-    assert sorted(p.name for p in outside.iterdir()) == ["timer-inventory.toml"]
+    assert [p.relative_to(outside).as_posix() for p in outside.rglob("*") if p.is_file()] == [
+        protected.relative_to(outside).as_posix()
+    ]
 
 
 def test_profile_selected_nested_projection_outputs_are_scanned(fixture_root: Path) -> None:

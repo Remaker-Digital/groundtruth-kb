@@ -176,6 +176,7 @@ def test_registry_lock_typed_timeout_exception(tmp_path: Path, monkeypatch: pyte
 
 
 def test_registry_lock_reload_keeps_current_operation_snapshot(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    (tmp_path / ".git").mkdir(exist_ok=True)
     controls = _controls(tmp_path, 22.5)
     lock_path = tmp_path / "control-plane.lock"
     active = registry_control_plane._RegistryFileLock(lock_path, controls=controls)

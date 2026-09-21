@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Guard declared substitute paths using the selected project's current registry.
 
-This authored baseline is projected independently into each harness. The guard
+Every host registration invokes this authored hook in the baseline. The guard
 handles normalized native read/search events and explicit simple shell read
 arguments. An empty result neither proves currentness nor qualifies host hook
 invocation. Current facts still require their canonical CLI/domain readers.
@@ -17,12 +17,8 @@ import sys
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-HOOKS_DIR = "{{HARNESS_HOOKS_DIR}}"
-if "{{" in HOOKS_DIR:
-    HOOKS_DIR = ".harness-baseline-configuration/hooks"
-# Derive the root from this exact authored/projected location, not cwd, a
-# neighbouring harness, an environment fallback or a fixed directory depth.
-PROJECT_ROOT = Path(__file__).absolute().parents[len(PurePosixPath(HOOKS_DIR).parts)]
+# The only installation is the authored baseline; never select authority by cwd.
+PROJECT_ROOT = Path(__file__).absolute().parents[2]
 BYPASS_ENV_VAR = "GTKB_SOT_READ_DISCIPLINE_BYPASS"
 SHELL_COMMAND_TOOLS = frozenset({"Bash", "PowerShell", "Shell", "shell", "bash", "powershell"})
 _PATH_FLAGS = frozenset({"-path", "-literalpath", "--path"})
@@ -202,7 +198,7 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     targets = [value for value in targets if isinstance(value, str) and value]
     if not targets:
         return {}
-    installed = PROJECT_ROOT / HOOKS_DIR / "sot-read-discipline.py"
+    installed = PROJECT_ROOT / ".harness-baseline-configuration/hooks/sot-read-discipline.py"
     if installed != Path(__file__).absolute() or installed.resolve() != installed:
         raise ValueError("Read hook installation is missing or redirected")
     cwd = payload.get("cwd") or str(Path.cwd())

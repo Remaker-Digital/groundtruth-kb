@@ -7,7 +7,7 @@ file directly under a ``bridge/`` directory (e.g. ``bridge/foo-001.md``) and
 scans the proposed ``content`` against the canonical credential catalog.
 When any canonical credential-class regex matches, the hook emits a
 ``permissionDecision=deny`` via the structured path and records a
-deny record to ``{{HARNESS_HOOKS_DIR}}/scanner-safe-writer.log`` for the metrics
+deny record to ``.groundtruth/runtime/gate-denials.jsonl`` for the metrics
 collector (Tier A #6).
 
 Scope
@@ -46,7 +46,7 @@ operators can tell which catalog was used:
 Deny record schema (version 1)
 ------------------------------
 When a write is denied the hook appends a single-line JSON record to
-``{{HARNESS_HOOKS_DIR}}/scanner-safe-writer.log``. Fields (``schema_version`` first):
+``.groundtruth/runtime/gate-denials.jsonl``. Fields (``schema_version`` first):
 
 - ``schema_version`` (int, always ``1``)
 - ``timestamp_utc`` (ISO-8601 UTC ``Z``)
@@ -56,6 +56,10 @@ When a write is denied the hook appends a single-line JSON record to
 - ``catalog_source`` (string, ``"canonical"`` or ``"fallback"``)
 - ``hits`` (list of ``{"pattern_name": str, "pattern_description": str, "span": [int,int]}``)
 - ``session_id`` (string or ``null``)
+- ``gate``, ``pattern_id``, ``command_hash`` and ``reason`` (merged gate telemetry)
+
+The optional ``GTKB_GATE_DENIALS_PATH`` override is anchored on the resolved
+project root when relative. Log failures never change the deny result.
 
 Stable interface contract
 ~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -82,6 +86,12 @@ import os
 import re
 import sys
 from pathlib import Path
+
+HOOKS = Path(__file__).resolve().parent
+if str(HOOKS) not in sys.path:
+    sys.path.insert(0, str(HOOKS))
+# The authored sibling module requires the installation-relative path setup above.
+from _hook_context import resolve_root  # noqa: E402
 
 try:
     from groundtruth_kb.governance.credential_patterns import (
@@ -258,28 +268,12 @@ BRIDGE_PATH_PATTERN = re.compile(
     re.IGNORECASE,
 )
 
-DENY_LOG_PATH = Path("{{HARNESS_HOOKS_DIR}}/scanner-safe-writer.log")
 SCHEMA_VERSION = 1
 
 
-def _record_gate_denial(pattern_id: str, subject: str, reason: str) -> None:
-    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH", ".gtkb-state/gate-denials.jsonl"))
-    if not path.is_absolute():
-        path = Path.cwd() / path
-    record = {
-        "schema_version": 1,
-        "timestamp_utc": datetime.datetime.now(tz=datetime.UTC).isoformat().replace("+00:00", "Z"),
-        "gate": "scanner-safe-writer",
-        "pattern_id": pattern_id,
-        "command_hash": hashlib.sha256(subject.encode("utf-8")).hexdigest(),
-        "reason": reason,
-    }
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(record, sort_keys=True) + "\n")
-    except OSError:
-        pass
+def _denial_log_path(payload: dict | None = None) -> Path:
+    path = Path(os.environ.get("GTKB_GATE_DENIALS_PATH") or ".groundtruth/runtime/gate-denials.jsonl")
+    return path if path.is_absolute() else resolve_root(payload) / path
 
 
 def _is_in_scope(file_path: str) -> bool:
@@ -318,6 +312,8 @@ def _write_deny_record(
     file_path: str,
     hits: list[tuple[str, str, tuple[int, int]]],
     session_id: str | None,
+    reason: str,
+    payload: dict | None = None,
 ) -> None:
     """Append a single-line JSON deny record to the deny log.
 
@@ -329,6 +325,10 @@ def _write_deny_record(
         "schema_version": SCHEMA_VERSION,
         "timestamp_utc": datetime.datetime.now(tz=datetime.UTC).isoformat().replace("+00:00", "Z"),
         "hook": "scanner-safe-writer",
+        "gate": "scanner-safe-writer",
+        "pattern_id": hits[0][0],
+        "command_hash": hashlib.sha256(file_path.encode("utf-8")).hexdigest(),
+        "reason": reason,
         "event": "deny",
         "file_path": file_path,
         "catalog_source": _catalog_source,
@@ -343,8 +343,9 @@ def _write_deny_record(
         "session_id": session_id,
     }
     try:
-        DENY_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with DENY_LOG_PATH.open("a", encoding="utf-8") as fh:
+        path = _denial_log_path(payload)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as fh:
             fh.write(json.dumps(record) + "\n")
     except OSError:
         # Logging failure must not convert a deny into a pass. The structured
@@ -384,10 +385,9 @@ def _self_test() -> None:
             file=sys.stderr,
         )
         sys.exit(1)
-    _write_deny_record(SELF_TEST_FILE_PATH, hits, session_id="self-test")
     first_name = hits[0][0]
     reason = f"Bridge write blocked by scanner-safe-writer: {first_name} detected."
-    _record_gate_denial(first_name, SELF_TEST_FILE_PATH, reason)
+    _write_deny_record(SELF_TEST_FILE_PATH, hits, session_id="self-test", reason=reason)
     emit_deny(
         "PreToolUse",
         reason,
@@ -452,15 +452,14 @@ def main() -> None:
         sys.exit(0)
 
     session_id = payload.get("session_id")
-    _write_deny_record(file_path, hits, session_id)
     first_name, first_description, _ = hits[0]
     reason = (
         f"Bridge write blocked by scanner-safe-writer: {first_name} "
         f"({first_description}) detected in {file_path}. Redact credential "
-        "values before retrying. See {{HARNESS_HOOKS_DIR}}/scanner-safe-writer.log "
+        f"values before retrying. See {_denial_log_path(payload)} "
         "for the full deny record."
     )
-    _record_gate_denial(first_name, file_path, reason)
+    _write_deny_record(file_path, hits, session_id, reason, payload)
     emit_deny(
         "PreToolUse",
         reason,

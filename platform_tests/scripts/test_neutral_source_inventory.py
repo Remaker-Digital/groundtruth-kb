@@ -60,6 +60,7 @@ def _fixture_config_text():
     return """schema_version = 1
 [roots]
 harness_baseline = ".harness-baseline-configuration"
+shared_skills = ".agents/skills"
 [families]
 configuration = { description = "config" }
 source = { description = "source" }
@@ -339,3 +340,19 @@ def test_wi6390_certification_exits_non_zero(tmp_path):
     _write(root, ".harness-baseline-configuration/leaky.md", "see .agent/rules/x.md")
     rc = nsi.main(["--certify", "--project-root", str(root)])
     assert rc == 1, "an undeclared generated-target reference must exit non-zero"
+
+
+def test_authored_shared_skills_participate_in_classification_and_reference_checks(tmp_path):
+    root = _certify_fixture(tmp_path)
+    source = ".agents/skills/example/SKILL.md"
+    _write(root, source, "---\nname: example\ndescription: Example\n---\nUse the CLI.")
+    config = nsi._load_config(root)
+    inventory = nsi.run_inventory(root, config)
+    matched = [row for row in inventory["artifacts"] if row["path"] == source]
+    assert len(matched) == 1 and matched[0]["family"] != "projection"
+    clean = nsi.run_certification(root, config)
+    assert clean["certified"], clean["findings"]
+    _write(root, source, "Run .claude/hooks/retired.py for current authority")
+    contaminated = nsi.run_certification(root, config)
+    assert not contaminated["certified"]
+    assert any(source in finding for finding in contaminated["findings"])

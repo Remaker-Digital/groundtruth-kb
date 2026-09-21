@@ -11,11 +11,17 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 from groundtruth_kb.assertions import _VALID_ASSERTION_TYPES, run_single_assertion  # noqa: E402
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+from groundtruth_kb.authority_client import (  # noqa: E402
+    AuthorityClient,
+    AuthorityClientError,
+    configured_authority_client,
+    page_records,
+)
 
 EVALUATOR_VERSION = 1
 CHANGE_CONTROLLED_TYPES = {"architecture_decision", "design_constraint", "governance"}
@@ -275,7 +281,7 @@ def evaluate_spec(
 
 
 def evaluate_specs(
-    db: KnowledgeDB,
+    client: AuthorityClient,
     *,
     project_root: Path,
     spec_ids: list[str] | None = None,
@@ -285,12 +291,14 @@ def evaluate_specs(
     if spec_ids:
         specs: list[dict[str, Any]] = []
         for spec_id in spec_ids:
-            spec = db.get_spec(spec_id)
-            if spec is None:
-                raise EvaluationError(f"spec not found: {spec_id}")
+            spec = client.request("GET", "/v1/specifications/" + quote(spec_id, safe=""))
+            if not isinstance(spec, dict) or spec.get("id") != spec_id:
+                raise EvaluationError(f"invalid specification response: {spec_id}")
             specs.append(spec)
     else:
-        specs = [spec for spec in db.list_specs() if spec.get("type") in CHANGE_CONTROLLED_TYPES]
+        specs = [
+            spec for spec in page_records(client, "/v1/specifications") if spec.get("type") in CHANGE_CONTROLLED_TYPES
+        ]
     if assertion_ids is not None and len(specs) != 1:
         raise EvaluationError("--assertion requires exactly one --spec")
 
@@ -316,29 +324,24 @@ def evaluate_specs(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--project-root", type=Path, default=PROJECT_ROOT)
-    parser.add_argument("--database", type=Path, default=None)
     parser.add_argument("--spec", action="append", dest="spec_ids")
     parser.add_argument("--assertion", action="append", dest="assertion_ids")
     parser.add_argument("--evidence-state", choices=sorted(EVIDENCE_STATES), default="current")
     parser.add_argument("--json", action="store_true", dest="as_json")
     args = parser.parse_args(argv)
     project_root = args.project_root.resolve()
-    database = args.database or (project_root / "groundtruth.db")
-
-    db = KnowledgeDB(database)
     try:
+        client = configured_authority_client(project_root)
         report = evaluate_specs(
-            db,
+            client,
             project_root=project_root,
             spec_ids=args.spec_ids,
             assertion_ids=set(args.assertion_ids) if args.assertion_ids else None,
             evidence_state=args.evidence_state,
         )
-    except EvaluationError as exc:
+    except (EvaluationError, AuthorityClientError, OSError, ValueError) as exc:
         print(f"ARTIFACT EVALUABILITY: FAIL - {exc}", file=sys.stderr)
         return 1
-    finally:
-        db.close()
 
     if args.as_json:
         print(json.dumps(report, indent=2, sort_keys=True))

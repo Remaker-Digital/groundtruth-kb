@@ -6,29 +6,9 @@ import sqlite3
 from pathlib import Path
 
 import pytest
-from groundtruth_kb.config import PostgreSQLConfig
-from groundtruth_kb.postgres_kernel import (
-    MIGRATION_TABLES,
-    SOURCE_TABLES,
-    PostgresKernel,
-    PostgresKernelError,
-    _current_sqlite_rows,
-)
+from groundtruth_kb.postgres_kernel import MIGRATION_TABLES, SOURCE_TABLES, PostgresKernelError, _current_sqlite_rows
 
-
-def snapshot(path: Path, tables: set[str]) -> Path:
-    with sqlite3.connect(path) as connection:
-        for table in sorted(tables):
-            connection.execute(f'CREATE TABLE "{table}" (marker TEXT)')
-    return path
-
-
-def preflight(path: Path):
-    def no_postgres(**_kwargs):
-        raise AssertionError("Source classification must not contact PostgreSQL")
-
-    kernel = PostgresKernel(PostgreSQLConfig(service="unused"), connector=no_postgres)
-    return kernel.preflight_export_current(sqlite_snapshot=path, live_sqlite_source=None)
+from platform_tests.groundtruth_kb.postgres_fixtures import preflight, snapshot
 
 
 def test_current_sqlite_rows_preserves_unversioned_links_and_rejects_version_tie():

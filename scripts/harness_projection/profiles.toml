@@ -1,7 +1,9 @@
 # Harness projection profiles - GT-KB neutral baseline projection framework
 #
 # Bridge: gtkb-baseline-correction-and-goose-projector-slice-1 (GO at -004).
-# Spec: GOV-HARNESS-NEUTRAL-BASELINE-001 (obligations 2, 4, 5).
+# Spec: GOV-HARNESS-NEUTRAL-BASELINE-001 (obligations 2, 4, 5); owner ruling
+# D15/D34 (2026-09-19, M15 rulings R1-R15): a projection is the minimum a host's
+# limitation requires - registrations and pointers only, never copies.
 #
 # Each [harnesses.<name>] table is the ONLY artifact aware of the difference
 # between that harness's configuration surface and the neutral baseline
@@ -13,38 +15,23 @@ schema_version = 1
 
 [baseline]
 root = ".harness-baseline-configuration"
-# Neutral tokens the engine substitutes per harness. A token appearing in a
-# baseline file and NOT declared in a profile is a projection error (fail
-# closed), never silently passed through.
-tokens = [
-    "HARNESS_CONFIG_DIR",
-    "HARNESS_SKILLS_DIR",
-    "HARNESS_RULES_DIR",
-    "HARNESS_HOOKS_DIR",
-    "HARNESS_PROJECT_DIR_VAR",
-    "HARNESS_SESSION_ID_VAR",
-    "HARNESS_NAME",
-    "SHARED_HELPERS_DIR",
-]
+# The one skills source (D15: the tree moved out of the baseline directory).
+# Hosts that discover this directory natively read it; the others receive
+# pointer stubs (skills_discovery below).
+skills_root = ".agents/skills"
+# Hook scripts run in place from the baseline; registrations name this path.
+hooks_root = ".harness-baseline-configuration/hooks"
 hook_manifest = "hooks/manifest.toml"
-shared_helpers_dir = "scripts/skill-helpers"
+# Rules are read on demand from <root>/rules by every host; nothing projects them.
 
-# Rules the activity-envelope contract defers to `::open <activity>`.
-# They are NOT projected into harness rules dirs, because those dirs
-# auto-load wholesale -- projecting them would make the deferral advisory
-# only. Consumers read them from the baseline on demand. Kept here rather
-# than in config/agent-control (forbidden runtime dependency).
-deferred_rules = [
-    "standing-priorities.md",
-    "way-of-working.md",
-    "review-operating-contract.md",
-    "loyal-opposition-runbook.md",
-    "loyal-opposition-knowledge-base-index.md",
-    "loyal-opposition-review-checklists.md",
-    "groundtruth-kb-vision.md",
-    "template-code-review.md",
-    "template-decision-memo.md",
-]
+# Tracked, hand-maintained root pointer files (R1 option B). They are NOT
+# projector output: the projector never writes outside a config_dir. The
+# acceptance checker pins existence, regular-file status and exact bytes
+# (declared_pointer_drift). The root AGENTS.md is the moved baseline
+# instruction file, tracked source, not listed here.
+[root_pointers]
+"CLAUDE.md" = "@AGENTS.md\n"
+".goosehints" = "Follow ./AGENTS.md (GT-KB session instructions). This file is only a pointer; do not add guidance here.\n"
 
 [stamp]
 # Obligation 5: every projected artifact declares it is not canonical.
@@ -59,15 +46,12 @@ the baseline and re-projection, file a work item against the projector
 
 [harnesses.goose]
 config_dir = ".goose"
-skills_dir = ".goose/skills"
-rules_dir = ".goose/rules"
-hooks_dir = ".goose/hooks"
 project_dir_var = "GOOSE_PROJECT_DIR"
-session_id_var = "GOOSE_SESSION_ID"
-# Full native skill bodies per owner decision (Option A,
-# DELIB-20260813-BASELINE-CLEANSE-AND-PROJECTOR-ARCHITECTURE): Goose loads
-# SKILL.md directly with progressive disclosure.
-rules_projection = true
+# Native .agents/skills discovery UNCONFIRMED (M13 Q0.4): pointer stubs until
+# the goose Q0.4 evidence file exists; then flip to "agents_skills" and drop
+# skills_stub_dir.
+skills_discovery = "pointer_stubs"
+skills_stub_dir = ".goose/skills"
 hooks_projection = "plugin_hooks_json"
 # Goose-native hook registration: shell commands consuming JSON on stdin,
 # registered at plugins/gtkb/hooks/hooks.json. Only PreToolUse and Stop can
@@ -90,12 +74,10 @@ supported = ["PreToolUse", "Stop"]
 
 [harnesses.claude]
 config_dir = ".claude"
-skills_dir = ".claude/skills"
-rules_dir = ".claude/rules"
-hooks_dir = ".claude/hooks"
 project_dir_var = "CLAUDE_PROJECT_DIR"
-session_id_var = "CLAUDE_SESSION_ID"
-rules_projection = true
+# Native .agents/skills discovery UNCONFIRMED (M13 Q0.4): pointer stubs meanwhile.
+skills_discovery = "pointer_stubs"
+skills_stub_dir = ".claude/skills"
 hooks_projection = "settings_json"
 hooks_json_path = ".claude/settings.json"
 # Stale surfaces from superseded projections. The engine deletes these on every
@@ -145,13 +127,13 @@ all = ""
 # slices (Phase D of the parent bridge thread).
 [harnesses.codex]
 config_dir = ".codex"
-skills_dir = ".codex/skills"
-rules_dir = ".codex/rules"
-hooks_dir = ".codex/hooks"
 project_dir_var = "CODEX_PROJECT_DIR"
-session_id_var = "CODEX_SESSION_ID"
-# Full native skill bodies, as for Antigravity and Goose.
-rules_projection = true
+# Owner ruling R14 (a): Codex discovers .agents/skills natively (2026-09-10
+# observation, interim pin; M13 Q0.1 records the version string). No stub
+# tree is rendered. Fallback if Q0.4 fails for the pinned version:
+#   skills_discovery = "pointer_stubs"
+#   skills_stub_dir = ".codex/skills"
+skills_discovery = "agents_skills"
 hooks_projection = "native_cwd_hooks_json"
 hooks_json_path = ".codex/hooks.json"
 stdin_adapter = "scripts/codex_hook_adapter.py"
@@ -195,12 +177,10 @@ read_access = "Read|Grep|Glob"
 all = ""
 [harnesses.cursor]
 config_dir = ".cursor"
-skills_dir = ".cursor/skills"
-rules_dir = ".cursor/rules"
-hooks_dir = ".cursor/hooks"
 project_dir_var = "CURSOR_PROJECT_DIR"
-session_id_var = "CURSOR_SESSION_ID"
-rules_projection = true
+# Native .agents/skills discovery UNCONFIRMED (M13 Q0.4): pointer stubs meanwhile.
+skills_discovery = "pointer_stubs"
+skills_stub_dir = ".cursor/skills"
 hooks_projection = "hooks_json"
 hooks_json_path = ".cursor/hooks.json"
 stdin_adapter = "scripts/cursor_hook_adapter.py"
@@ -232,13 +212,10 @@ read_access = "Read|Grep|Glob"
 all = ""
 [harnesses.antigravity]
 config_dir = ".agent"
-skills_dir = ".agent/skills"
-rules_dir = ".agent/rules"
-hooks_dir = ".agent/hooks"
 project_dir_var = "ANTIGRAVITY_PROJECT_DIR"
-session_id_var = "ANTIGRAVITY_SESSION_ID"
-# Full native skill bodies, as for Goose: Antigravity loads SKILL.md directly.
-rules_projection = true
+# Native .agents/skills discovery UNCONFIRMED (M13 Q0.4): pointer stubs meanwhile.
+skills_discovery = "pointer_stubs"
+skills_stub_dir = ".agent/skills"
 hooks_projection = "antigravity_hooks_json"
 hooks_json_path = ".agent/hooks.json"
 stdin_adapter = "scripts/antigravity_hook_adapter.py"
@@ -246,6 +223,14 @@ windowless_hooks = true
 # Projected copy of the retired implementation-start gate wrapper (owner ruling
 # 2026-09-07, canon v8.92).
 leftover_paths = [".agent/hooks/implementation-start-gate.py"]
+# Owner ruling R14 (b) / R4: the host's read of the root AGENTS.md is UNCONFIRMED
+# (context.fileName is a host-side setting; M13 host action). One projector-
+# rendered one-line pointer in the host's own rules directory carries the
+# instruction pointer until the antigravity Q0.2 evidence file exists; then this
+# table is emptied and the file leaves through the ownership manifest. Values are
+# exact bytes (no stamp); paths are relative to config_dir; classified POINTER.
+[harnesses.antigravity.pointer_files]
+"rules/gtkb-pointer.md" = "Follow ./AGENTS.md (GT-KB session instructions). This file is only a pointer; do not add guidance here.\n"
 [harnesses.antigravity.hook_events]
 pre_tool_use = "PreToolUse"
 post_tool_use = "PostToolUse"
@@ -257,16 +242,14 @@ file_write = "write_to_file|replace_file_content|multi_replace_file_content"
 shell_exec = "run_command"
 read_access = "view_file|list_dir|find_by_name|grep_search"
 all = ""
-# Each provider has an independent generated configuration.
+# Each provider has an independent generated configuration. GT-KB is the
+# runtime for these three profiles: the launchers read .agents/skills and the
+# baseline hooks directly (skills_discovery = "agents_skills", no stub tree).
 [harnesses.ollama]
 config_dir = ".api-harness/ollama"
-skills_dir = ".api-harness/ollama/skills"
-rules_dir = ".api-harness/ollama/rules"
-hooks_dir = ".api-harness/ollama/hooks"
 project_dir_var = "GTKB_PROJECT_ROOT"
-session_id_var = "GTKB_NATIVE_CONTEXT_ID"
-rules_projection = true
-routing_projection = true
+skills_discovery = "agents_skills"
+# Routing is read directly from the baseline; settings.json is the native hook registration.
 hooks_projection = "settings_json"
 hooks_json_path = ".api-harness/ollama/settings.json"
 
@@ -285,13 +268,8 @@ all = ""
 
 [harnesses.openrouter]
 config_dir = ".api-harness/openrouter"
-skills_dir = ".api-harness/openrouter/skills"
-rules_dir = ".api-harness/openrouter/rules"
-hooks_dir = ".api-harness/openrouter/hooks"
 project_dir_var = "GTKB_PROJECT_ROOT"
-session_id_var = "GTKB_NATIVE_CONTEXT_ID"
-rules_projection = true
-routing_projection = true
+skills_discovery = "agents_skills"
 hooks_projection = "settings_json"
 hooks_json_path = ".api-harness/openrouter/settings.json"
 
@@ -436,13 +414,8 @@ all = ""
 
 [harnesses.alibaba-cloud-studio]
 config_dir = ".api-harness/alibaba-cloud-studio"
-skills_dir = ".api-harness/alibaba-cloud-studio/skills"
-rules_dir = ".api-harness/alibaba-cloud-studio/rules"
-hooks_dir = ".api-harness/alibaba-cloud-studio/hooks"
 project_dir_var = "GTKB_PROJECT_ROOT"
-session_id_var = "GTKB_NATIVE_CONTEXT_ID"
-rules_projection = true
-routing_projection = true
+skills_discovery = "agents_skills"
 hooks_projection = "settings_json"
 hooks_json_path = ".api-harness/alibaba-cloud-studio/settings.json"
 

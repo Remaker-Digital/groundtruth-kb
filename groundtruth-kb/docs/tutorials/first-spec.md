@@ -2,209 +2,113 @@
 
 <!-- © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved. -->
 
-A hands-on walkthrough of the GOV-01 spec-first workflow using the bundled
-task-tracker example. By the end you will have written a specification, created
-a linked work item, run assertions, and seen the method in action.
+This walkthrough records a requirement and its executable test through the native
+authority in your configured project. The example requirement is: “Creating a
+task returns its title and the initial status `open`.”
 
-!!! info "Living reference"
-    The task-tracker project used throughout this tutorial lives in
-    [`examples/task-tracker/`](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/examples/task-tracker).
-    Open it alongside this tutorial.
+## 1. Read the current project and applicable requirements
 
-## Prerequisites
-
-- `groundtruth-kb` installed (`pip install groundtruth-kb`)
-- A project directory (use `gt project init my-tasks --profile local-only` if
-  you do not have one yet)
-
----
-
-## Step 1: Understand GOV-01 — Spec First
-
-GOV-01 is the foundational rule: **before you write a line of code, write a
-specification.** A specification is an agreement between you and the system
-about what must be true. It is not a build plan — it is a decision log.
-
-> "Users can create tasks with a title and priority."
-
-That one sentence is a specification. It answers *what* the system must do,
-not *how* to build it.
-
----
-
-## Step 2: Create Your First Specification
-
-Open a Python shell in your project directory:
-
-```python
-from groundtruth_kb import KnowledgeDB
-
-db = KnowledgeDB(db_path="groundtruth.db")
-
-db.insert_spec(
-    "SPEC-100",
-    "Users can create tasks with a title and priority",
-    status="specified",
-    changed_by="tutorial-s1",
-    change_reason="Initial requirement from project kickoff",
-    description=(
-        "The create_task() function must accept a title (required string) "
-        "and a priority (optional: 'low', 'medium', 'high', default 'medium'). "
-        "It returns a dict with at least: id, title, priority, status='open'."
-    ),
-)
-
-print(db.get_spec("SPEC-100"))
-db.close()
-```
-
-Verify it was stored:
+Use the configured CLI in your project directory. Confirm the doctor can reach
+the native authority, then read the selected project and its linked formal
+records. Use the project's current application scope when recording new rows.
 
 ```bash
-gt summary
+gt doctor
+gt projects show <PROJECT_ID> --json
+gt spec show <SPEC_ID> --history --json
 ```
 
-You should now see one more specification in the count.
+Choose the existing requirement when it already expresses the intended behavior.
+A new specification uses an unused ID; an amendment uses the current version
+returned by the service. A missing record and an unavailable service are different
+conditions and must not be treated as interchangeable.
 
----
+## 2. Record the required behavior
 
-## Step 3: Create a Linked Test
+For a new requirement, prepare a UTF-8 JSON fields file such as
+`spec-fields.json`:
 
-Every specification should have at least one test. A test records *how you
-will verify* the spec — it does not have to be executable code right now.
-
-```python
-from groundtruth_kb import KnowledgeDB
-
-db = KnowledgeDB(db_path="groundtruth.db")
-
-db.insert_test(
-    "TEST-100",
-    "create_task() returns a dict with status='open'",
-    spec_id="SPEC-100",
-    test_type="unit",
-    expected_outcome=(
-        "Calling create_task('Buy milk') returns a dict where "
-        "d['status'] == 'open' and d['title'] == 'Buy milk'."
-    ),
-    changed_by="tutorial-s1",
-    change_reason="Test for SPEC-100",
-)
-
-db.close()
+```json
+{
+  "title": "Creating a task returns its initial state",
+  "description": "Creating a task with a nonempty title returns that title and status open. Invalid empty titles are rejected.",
+  "status": "active"
+}
 ```
 
----
-
-## Step 4: Add an Assertion
-
-Once you know what you will implement, add a machine-checkable assertion to
-the spec. Assertions are checked by `gt assert`.
-
-```python
-from groundtruth_kb import KnowledgeDB
-
-db = KnowledgeDB(db_path="groundtruth.db")
-
-db.update_spec(
-    "SPEC-100",
-    changed_by="tutorial-s1",
-    change_reason="Add assertion — promote to implemented",
-    status="implemented",
-    assertions=[
-        {
-            "type": "grep",
-            "file": "src/tasks.py",
-            "pattern": "def create_task",
-            "description": "create_task function exists in tasks module",
-        },
-        {
-            "type": "grep",
-            "file": "src/tasks.py",
-            "pattern": "status.*=.*['\"]open['\"]",
-            "description": "create_task sets status to open",
-        },
-    ],
-)
-
-db.close()
-```
-
----
-
-## Step 5: Write the Implementation
-
-Create `src/tasks.py` in your project:
-
-```python
-# src/tasks.py
-
-
-def create_task(
-    title: str,
-    priority: str = "medium",
-) -> dict:
-    """Create a task with the given title and priority."""
-    return {
-        "id": 1,
-        "title": title,
-        "priority": priority,
-        "status": "open",
-    }
-```
-
----
-
-## Step 6: Run Assertions
+Record it with expected version `0` only when the ID is new. Supply your actual
+attribution and the reason for the change:
 
 ```bash
-gt assert
+gt spec record --id <SPEC_ID> --fields-file spec-fields.json --expected-version 0 --actor <ACTOR> --change-reason "Record the required task creation behavior" --json
+gt spec show <SPEC_ID> --history --json
 ```
 
-Both assertions should pass:
+Confirm the canonical readback has the exact intended fields. An active formal
+record states a current requirement; it does not establish implemented or
+verified behavior. See [Specifications](../method/02-specifications.md).
 
-```
-PASSED: 2
-FAILED: 0
-```
+## 3. Define an executable test
 
-Congratulations — you have completed the spec-first workflow loop:
-**specify → test → implement → assert**.
-
----
-
-## Step 7: Create a Work Item for a Gap
-
-Suppose you notice the spec says priority defaults to `"medium"` but the
-assertion does not verify it. Create a work item to track the gap:
+In your application's actual test suite, test both the required result and its
+failure boundary. For example, when the selected implementation exposes
+`create_task` from `tasks`, the test can express:
 
 ```python
-from groundtruth_kb import KnowledgeDB
+import pytest
+from tasks import create_task
 
-db = KnowledgeDB(db_path="groundtruth.db")
 
-db.insert_work_item(
-    "WI-100",
-    "Add assertion for default priority = medium in create_task()",
-    origin="defect",
-    component="api",
-    spec_id="SPEC-100",
-    changed_by="tutorial-s1",
-    change_reason="Gap found during tutorial walkthrough",
-)
-
-db.close()
+def test_task_initial_state():
+    task = create_task("Buy milk")
+    assert task["title"] == "Buy milk"
+    assert task["status"] == "open"
+    with pytest.raises(ValueError):
+        create_task("")
 ```
 
-The work item is now tracked in the KB alongside the spec and test. Nothing
-falls through the cracks.
+The import and selector must name real code and a real test in your application.
+Run that test in the application's configured environment. Before implementation,
+a measured failure can establish the missing behavior; a test description alone
+does not supply executable coverage.
 
----
+## 4. Record the test binding and plan membership
 
-## What's Next
+Prepare `test-fields.json` with the actual selector and the specification ID:
 
-- See the full example in [`examples/task-tracker/`](https://github.com/Remaker-Digital/groundtruth-kb/tree/main/examples/task-tracker)
-- Read the [Dual-Agent Setup](dual-agent-setup.md) tutorial to add a Loyal
-  Opposition reviewer to your workflow
-- Read the [Method: Specifications](../method/02-specifications.md) guide
-  for a deeper look at the spec lifecycle
+```json
+{
+  "title": "Task creation preserves title and validates empty input",
+  "spec_id": "<SPEC_ID>",
+  "test_type": "unit",
+  "test_file": "tests/test_tasks.py",
+  "test_function": "test_task_initial_state",
+  "expected_outcome": "A valid title is returned with status open; an empty title is rejected."
+}
+```
+
+```bash
+gt tests record --id <TEST_ID> --fields-file test-fields.json --expected-version 0 --actor <ACTOR> --change-reason "Bind the executable requirement test" --json
+gt tests show <TEST_ID> --history --json
+gt test-phases show <PHASE_ID> --history --json
+```
+
+Add the TEST to the appropriate active test-plan phase through its version-checked
+native amendment, preserving its existing members. Do not put an invented PASS
+or execution timestamp in the fields file. Keep the observed execution evidence
+and the test's current definition together.
+
+## 5. Progress the selected implementation work
+
+The implementation work item belongs to one execution project and links the
+applicable specification and executable test. Follow the current independent
+proposal, implementation and verification process for that work. Reading or
+creating a specification does not itself grant an implementation verdict.
+
+After implementation, rerun the actual test, inspect the result and review the
+smallest affected requirement closure. A selected passing test is evidence for
+its measured duty; complete independent verification remains a separate step.
+
+The [CLI reference](../reference/cli.md#canonical-record-commands) describes current
+record fields and version-checked commands. The [adopter fixtures](../examples/task-tracker.md)
+show the small layouts used by the platform's scaffold smoke checks.

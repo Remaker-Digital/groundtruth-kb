@@ -8,6 +8,11 @@ Phases:
     D — Live Tenant Provisioning Verification (end-to-end smoke test)
     E — Verdict
 
+Defect work items: the checklist no longer records DEFECT work items. Its call site cited the
+retired SPEC-1617 and was retired with it under WI-7860 (owner ruling D17, 2026-09-17); the verdict,
+the saved report and the exit code are the checklist's record. The deploy and test pipelines record
+their own failures through the native authority (scripts/_defect_reporter.py).
+
 Usage:
     python scripts/pre_flight_checklist.py --env production --new-version 1.59.1
     python scripts/pre_flight_checklist.py --env production --phase D --new-version 1.59.0
@@ -54,7 +59,7 @@ from scripts._env import load_env_local  # noqa: E402
 
 load_env_local()
 
-from upgrade_verification import api_call, widget_call, ENVIRONMENTS  # noqa: E402
+from upgrade_verification import ENVIRONMENTS, api_call, widget_call  # noqa: E402
 
 # Optional: httpx for Phase D SSE streaming
 try:
@@ -224,7 +229,7 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
             nats_connected = rb["nats"].get("connected", False)
         if ready_status == "ready":
             if nats_connected:
-                results.append(_pass("C.3", "Ready endpoint", f"status=ready, nats=connected"))
+                results.append(_pass("C.3", "Ready endpoint", "status=ready, nats=connected"))
             else:
                 results.append(_warn("C.3", "Ready endpoint", "status=ready but nats.connected=false (lazy init)"))
         else:
@@ -348,8 +353,8 @@ def phase_c(fqdn: str, api_key: str, widget_key: str, new_version: str) -> list[
     _safe_print("    ... waiting 65s for rate limit cooldown before regression tests ...")
     time.sleep(65)
 
-    # C.11 — Tier 0 regression (17 tests)
-    tier0_result = _run_regression_tier(fqdn, api_key, widget_key, "tier0", "C.11", 17)
+    # C.11 — Tier 0 regression (18 tests; every required check must pass, none may be skipped)
+    tier0_result = _run_regression_tier(fqdn, api_key, widget_key, "tier0", "C.11", 18)
     results.append(tier0_result)
 
     # Cooldown between tier0 and tier1 — tier0 makes 18+ API calls
@@ -475,13 +480,13 @@ def phase_d(fqdn: str, spa_api_key: str) -> list[AssertionResult]:
         results.append(_fail("D.1", "Create smoke tenant", f"HTTP {s}: {detail}"))
         # Cannot continue Phase D without tenant credentials
         for i in range(2, 19):
-            results.append(_skip(f"D.{i}", f"(skipped — D.1 failed)", "No tenant"))
+            results.append(_skip(f"D.{i}", "(skipped — D.1 failed)", "No tenant"))
         return results
 
     if not admin_key or not widget_key:
         results.append(_fail("D.2", "Tenant credentials", "Missing admin key or widget key"))
         for i in range(3, 19):
-            results.append(_skip(f"D.{i}", f"(skipped — no credentials)", ""))
+            results.append(_skip(f"D.{i}", "(skipped — no credentials)", ""))
         return results
 
     # D.2 — Tenant in directory
@@ -694,8 +699,8 @@ def _verify_sse(fqdn: str, conv_id: str, widget_key: str) -> AssertionResult:
         body={"conversation_id": conv_id, "content": "Hello, what products do you offer?"},
     )
     # Widget key auth for message endpoint — use header
-    from urllib.request import Request, urlopen
     from urllib.error import HTTPError
+    from urllib.request import Request, urlopen
 
     msg_url = f"https://{fqdn}/api/chat/message"
     msg_headers = {
@@ -843,7 +848,7 @@ def main():
     spa_api_key = env_cfg.get("spa_api_key", "") or os.environ.get("SPA_CONSOLE_API_KEY", "")
 
     _safe_print(f"\n{'#' * 60}")
-    _safe_print(f"  Pre-Flight Deployment Checklist")
+    _safe_print("  Pre-Flight Deployment Checklist")
     _safe_print(f"  Environment: {args.env}")
     _safe_print(f"  Target FQDN: {fqdn}")
     _safe_print(f"  Expected Version: {args.new_version}")
@@ -879,9 +884,9 @@ def main():
     # Phase D
     if "D" in phases_to_run:
         if not spa_api_key:
-            _safe_print(f"\n  WARNING: SUPERADMIN_PREVIEW_API_KEY not set.")
-            _safe_print(f"  Phase D requires the SPA superadmin key to provision tenants.")
-            _safe_print(f"  Set it: export SUPERADMIN_PREVIEW_API_KEY=ar_user_rema_...")
+            _safe_print("\n  WARNING: SUPERADMIN_PREVIEW_API_KEY not set.")
+            _safe_print("  Phase D requires the SPA superadmin key to provision tenants.")
+            _safe_print("  Set it: export SUPERADMIN_PREVIEW_API_KEY=ar_user_rema_...")
             all_results["D"] = [_fail("D.0", "SPA key required", "Set STAGING_SPA_KEY or SPA_CONSOLE_API_KEY env var")]
         else:
             results_d = phase_d(fqdn, spa_api_key)
@@ -898,28 +903,7 @@ def main():
     _safe_print(f"  Results: {report_path}")
     _safe_print(f"{'#' * 60}\n")
 
-    # DEFECT auto-creation (SPEC-1617): one per failed phase
-    if "VERIFIED" not in verdict:
-        from scripts._defect_reporter import create_defect
-
-        for phase_name, phase_results in all_results.items():
-            fails = [r for r in phase_results if r.status == "FAIL"]
-            if fails:
-                detail = "; ".join(f"{r.id}: {r.detail[:80]}" for r in fails[:5])
-                wi = create_defect(
-                    title=f"Pre-flight Phase {phase_name} failure: {args.env} {args.new_version}",
-                    description=(
-                        f"Pre-flight checklist Phase {phase_name} failed.\n\n"
-                        f"Environment: {args.env}\n"
-                        f"Version: {args.new_version}\n"
-                        f"Failures: {detail}"
-                    ),
-                    source_spec_id="SPEC-1617",
-                    component="infrastructure_automation",
-                    changed_by="pre-flight-checklist",
-                )
-                if wi:
-                    _safe_print(f"  Created DEFECT: {wi} (Phase {phase_name})")
+    # DEFECT work items are not recorded here: the SPEC-1617 call site retired under WI-7860 (owner ruling D17).
 
     # Exit code: 0 for verified, 1 for failures
     sys.exit(0 if "VERIFIED" in verdict else 1)

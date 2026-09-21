@@ -93,6 +93,27 @@ def test_staged_profile_removal_is_a_failure(project):
     assert GATE.main(["--staged", "--project-root", str(project)]) == 1
 
 
+@pytest.mark.parametrize(
+    "staged, validated",
+    [(".agents/skills/x/SKILL.md", True), ("AGENTS.md", False), ("CLAUDE.md", False), (".goosehints", False)],
+)
+def test_staged_skill_source_triggers_validation(project, monkeypatch, staged, validated):
+    """D15: a staged stub source re-validates every profile; the root carriers are not projection inputs."""
+    assert GATE.projection_source(".agents/skills/x/SKILL.md") and GATE.projection_source(
+        ".harness-baseline-configuration/rules/r.md"
+    )
+    assert not any(
+        GATE.projection_source(path) for path in ("AGENTS.md", "CLAUDE.md", ".goosehints", ".agents/other.md")
+    )
+    git(project, "-c", "user.email=test@invalid.example", "-c", "user.name=Test", "commit", "-qm", "base")
+    write(project, staged, "---\nname: x\ndescription: X.\n---\n" if validated else "pointer bytes\n")
+    git(project, "add", "--", staged)
+    calls: list[str] = []
+    monkeypatch.setattr(GATE, "check_harness", lambda _root, harness: (calls.append(harness), (0, ""))[1])
+    assert GATE.main(["--staged", "--project-root", str(project)]) == 0
+    assert calls == (["claude"] if validated else [])
+
+
 def test_no_sources_staged_does_not_run_projector(tmp_path, monkeypatch):
     git(tmp_path, "init", "-q")
     write(tmp_path, "unrelated.py", "pass")

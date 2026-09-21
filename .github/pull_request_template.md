@@ -2,6 +2,18 @@
 
 <!-- Brief description of what this PR does and why -->
 
+## Problem
+
+<!-- State the problem or limitation this change addresses. -->
+
+## Approach
+
+<!-- Describe the change and its affected platform/application scope. -->
+
+## Rationale
+
+<!-- Explain the tradeoffs and why this approach addresses the problem. -->
+
 ## Change Class (Required)
 
 <!-- Select ONE. This determines the review and release gates required for promotion. -->
@@ -16,6 +28,14 @@
 ## Test Plan
 
 <!-- How was this tested? What should reviewers verify? -->
+
+## Testing Evidence
+
+- [ ] Existing tests pass for the affected scope
+- [ ] New tests added for changed behavior, or a concrete reason recorded
+- [ ] Applicable specification assertions still pass
+
+<!-- Include exact commands, outcomes and any remaining verification limits. -->
 
 ## Checklist
 

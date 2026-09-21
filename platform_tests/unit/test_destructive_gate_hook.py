@@ -18,12 +18,9 @@ from pathlib import Path
 import pytest
 
 # Import the hook module directly
-_HOOK_PATH = Path(__file__).resolve().parents[2] / ".claude" / "hooks" / "destructive-gate.py"
-
-pytestmark = pytest.mark.skipif(
-    not _HOOK_PATH.exists(),
-    reason=f"Hook file not in checkout: {_HOOK_PATH}",
-)
+_HOOK_PATH = Path(__file__).resolve().parents[2] / ".harness-baseline-configuration" / "hooks" / "destructive-gate.py"
+# The application package is imported from its own root (a platform test never has it on sys.path).
+_APP_ROOT = Path(__file__).resolve().parents[2] / "applications" / "Agent_Red"
 
 
 @pytest.fixture()
@@ -107,20 +104,22 @@ class TestAzureDestructiveBlocking:
 class TestContactRequirementInProvisioning:
     """SPEC-1882: provision_tenant parameter includes customer_phone."""
 
-    def test_provision_tenant_has_customer_phone_param(self):
+    @pytest.fixture()
+    def provision_tenant(self, monkeypatch):
+        """Import the application's provisioning entry point from the application root."""
+        monkeypatch.syspath_prepend(str(_APP_ROOT))
+        return importlib.import_module("src.integrations.provisioning").provision_tenant
+
+    def test_provision_tenant_has_customer_phone_param(self, provision_tenant):
         """provision_tenant() accepts customer_phone parameter."""
         import inspect
-
-        from src.integrations.provisioning import provision_tenant
 
         sig = inspect.signature(provision_tenant)
         assert "customer_phone" in sig.parameters, "provision_tenant must accept customer_phone parameter (SPEC-1882)"
 
-    def test_provision_tenant_customer_email_param_exists(self):
+    def test_provision_tenant_customer_email_param_exists(self, provision_tenant):
         """provision_tenant() still accepts customer_email parameter."""
         import inspect
-
-        from src.integrations.provisioning import provision_tenant
 
         sig = inspect.signature(provision_tenant)
         assert "customer_email" in sig.parameters

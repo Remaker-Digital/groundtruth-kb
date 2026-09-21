@@ -12,14 +12,12 @@ import hashlib
 import json
 import os
 import random
-import sqlite3
 import stat
 import subprocess
 import sys
 import time
 import uuid
 from collections.abc import Callable, Iterator, Mapping, Sequence
-from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
@@ -406,21 +404,6 @@ class CensusEntry:
     coverage_class: CoverageClass
     registry_id: str | None = None
     detail: str | None = None
-
-
-@contextmanager
-def _open_registry_read_only_connection(db_path: Path) -> Iterator[sqlite3.Connection]:
-    """Open an existing registry database without write or create authority."""
-
-    uri = db_path.resolve().as_uri() + "?mode=ro"
-    conn = sqlite3.connect(uri, uri=True)
-    try:
-        conn.execute("PRAGMA query_only=ON")
-        if conn.execute("PRAGMA query_only").fetchone()[0] != 1:
-            raise RegistryControlPlaneError(f"registry read connection is not query-only: {db_path}")
-        yield conn
-    finally:
-        conn.close()
 
 
 def load_registry_snapshot(*, project_root: Path | None = None, registry_path: Path | None = None) -> RegistrySnapshot:

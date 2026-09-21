@@ -52,7 +52,7 @@ class PolicyConfig:
     """Loaded view of `canonical-terminology-policy.toml`.
 
     The default factory loads from the GT-KB-installed path
-    (`.claude/rules/canonical-terminology-policy.toml`) at the project
+    (`.harness-baseline-configuration/rules/canonical-terminology-policy.toml`) at the project
     root. Tests pass an explicit path.
     """
 

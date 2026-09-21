@@ -1,15 +1,11 @@
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-RULE_PATH = REPO_ROOT / ".claude" / "rules" / "project-root-boundary.md"
+RULE_PATH = REPO_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md"
 BASELINE_RULE_PATH = REPO_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md"
 
 
 EXCEPTION_CARRIERS = {
-    "Sandbox Output Exception": (
-        "DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001",
-        "DELIB-S325-PROJECT-ROOT-BOUNDARY-SANDBOX-EXCEPTION-CHOICE",
-    ),
     "External Harness Executable Resolution Exception": (
         "DCL-PROJECT-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXEC-EXCEPTION-001",
         "DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION",
@@ -44,3 +40,14 @@ def test_adopter_templates_cite_the_canonical_carrier_pattern() -> None:
         section = _exception_section(baseline, heading)
         assert f"Authority: `{carrier}`" in section
         assert f"Provenance: `{provenance}`" in section
+
+
+def test_retired_sandbox_exception_grants_no_authority() -> None:
+    """D37: the sandbox exception is retired; its section is history, not an authority carrier."""
+    for path in (RULE_PATH, BASELINE_RULE_PATH):
+        text = path.read_text(encoding="utf-8")
+        assert "## Sandbox Output Exception" not in text
+        section = _exception_section(text, "Sandbox Output (retired exception)")
+        assert "DCL-PROJECT-ROOT-BOUNDARY-SANDBOX-OUTPUT-EXCEPTION-001" in section and "retired" in section
+        assert "Authority:" not in section and "Provenance:" not in section
+        assert "scripts/rehearse/_common.py" not in text.replace(section, "")

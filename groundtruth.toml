@@ -1,19 +1,6 @@
 [groundtruth]
 db_path = "groundtruth.db"
 
-[scoped_service]
-default_subject = "application"
-application_id = "agent-red"
-project_root = "."
-allowed_read_operations = [
-  "dashboard.summary.read",
-]
-# Intentionally omitted in this slice (added by later Phase 4 sub-slices):
-#   - "dashboard.history.read"
-#   - allowed_request_operations
-runtime_root = "memory"
-dashboard_db = "memory/gtkb-dashboard.sqlite"
-
 [backup]
 retain_recent = 7
 retain_daily_days = 30

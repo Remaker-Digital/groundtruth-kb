@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ast
 import copy
 import json
 import sys
@@ -26,8 +25,9 @@ def cursor_profiles(monkeypatch):
 
 
 def _fixture(root: Path, names=("alpha", "beta")):
+    (root / ".harness-baseline-configuration").mkdir(parents=True, exist_ok=True)
     for name in names:
-        directory = root / ".harness-baseline-configuration/skills" / name
+        directory = root / ".agents/skills" / name
         directory.mkdir(parents=True)
         (directory / "SKILL.md").write_bytes(
             (
@@ -83,22 +83,23 @@ def test_cursor_plan_uses_only_neutral_sources_and_does_not_write(tmp_path, monk
     assert not (tmp_path / ".cursor").exists()
 
 
-def test_cursor_frontmatter_resources_and_own_paths(tmp_path, monkeypatch, cursor_profiles):
+def test_cursor_pointer_keeps_frontmatter_and_resources_remain_authored(tmp_path, monkeypatch, cursor_profiles):
     _fixture(tmp_path, ("alpha",))
+    source = tmp_path / ".agents/skills/alpha"
+    before = _bytes(source)
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
     assert project_harness.run("cursor", "write") == 0
     raw = (tmp_path / ".cursor/skills/alpha/SKILL.md").read_bytes()
     assert raw.startswith(b"---\n") and b"\r" not in raw
     text = raw.decode()
     assert yaml.safe_load(text.split("---", 2)[1]) == {"name": "alpha", "description": "alpha skill"}
-    assert ".cursor/skills/alpha/helpers/run.py" in text
-    assert ".cursor/skills/alpha/references/notes.md" in text
+    assert ".agents/skills/alpha/SKILL.md" in text
     assert "scripts/harness_projection/project_harness.py" in text
-    helper = (tmp_path / ".cursor/skills/alpha/helpers/run.py").read_bytes()
-    assert b"\r" not in helper
-    assert ast.dump(ast.parse(helper)) == ast.dump(ast.parse("print('ok')"))
-    assert "Neutral notes." in (tmp_path / ".cursor/skills/alpha/references/notes.md").read_text(encoding="utf-8")
-    for peer in (".claude/", ".codex/", ".agents/", ".antigravity/", "config/agent-control"):
+    assert "Run {{HARNESS_SKILLS_DIR}}" not in text
+    assert _bytes(source) == before, "authored helpers and references are never rewritten"
+    assert not (tmp_path / ".cursor/skills/alpha/helpers").exists()
+    assert not (tmp_path / ".cursor/skills/alpha/references").exists()
+    for peer in (".claude/", ".codex/", ".antigravity/", "config/agent-control"):
         assert peer not in text
 
 
@@ -151,14 +152,14 @@ def test_cursor_refresh_preserves_unlisted_work_and_removes_retired_outputs(tmp_
     assert project_harness.run("cursor", "check") == 0
 
 
-@pytest.mark.parametrize("defect", ["unknown-token", "unknown-artifact"])
+@pytest.mark.parametrize("defect", ["frontmatter-token", "name-mismatch"])
 def test_cursor_source_gaps_refuse_all_projection_writes(tmp_path, monkeypatch, cursor_profiles, defect):
     _fixture(tmp_path, ("alpha",))
-    source = tmp_path / ".harness-baseline-configuration/skills/alpha"
-    if defect == "unknown-token":
-        (source / "SKILL.md").write_text("{{UNKNOWN_CONTROL}}\n", encoding="utf-8")
+    source = tmp_path / ".agents/skills/alpha/SKILL.md"
+    if defect == "frontmatter-token":
+        source.write_text("---\nname: alpha\ndescription: '{{UNKNOWN_CONTROL}}'\n---\nBody.\n", encoding="utf-8")
     else:
-        (source / "unclassified.bin").write_bytes(b"Unclassified bytes")
+        source.write_text("---\nname: other\ndescription: Skill\n---\nBody.\n", encoding="utf-8")
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
     before = _bytes(tmp_path)
     assert project_harness.run("cursor", "write") == 2

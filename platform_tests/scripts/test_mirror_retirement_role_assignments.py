@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import ast
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -23,32 +22,6 @@ def test_protected_artifact_drift_registry_drops_retired_mirror() -> None:
     registry = ROOT / "config" / "governance" / "protected-artifact-inventory-drift.toml"
 
     assert RETIRED_TOKEN not in registry.read_text(encoding="utf-8")
-
-
-def test_dev_environment_inventory_uses_harness_registry_evidence() -> None:
-    inventory = json.loads(
-        (ROOT / ".groundtruth" / "inventory" / "dev-environment-inventory.json").read_text(encoding="utf-8")
-    )
-    rendered = json.dumps(inventory, sort_keys=True)
-
-    assert RETIRED_TOKEN not in rendered
-    assert "harness-state/harness-registry.json" in rendered
-
-
-def test_role_writer_does_not_recreate_retired_mirror(tmp_path: Path) -> None:
-    from scripts.harness_roles import ROLE_PRIME_BUILDER, write_role_assignments
-
-    document = {
-        "schema_version": 1,
-        "harnesses": {
-            "A": {"role": [ROLE_PRIME_BUILDER]},
-        },
-    }
-
-    returned_path = write_role_assignments(tmp_path, document)
-
-    assert returned_path == tmp_path / "harness-state" / "harness-registry.json"
-    assert not (tmp_path / "harness-state" / RETIRED_FILENAME).exists()
 
 
 def _contains_retired_path(node: ast.AST, retired_names: set[str]) -> bool:

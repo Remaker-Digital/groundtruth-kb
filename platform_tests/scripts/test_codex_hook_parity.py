@@ -22,11 +22,16 @@ def tree(tmp_path):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / rel, target)
     base = tmp_path / parity.BASELINE
-    (base / "skills/inspect-work").mkdir(parents=True)
-    (base / "skills/inspect-work/SKILL.md").write_text(
+    # D15: the one skills source lives beside the baseline; the projector fails closed without it. The root
+    # AGENTS.md and the declared [root_pointers] files are tracked authored sources the checker pins (R1 option B).
+    skills = tmp_path / parity.SKILLS_ROOT
+    (skills / "inspect-work").mkdir(parents=True)
+    (skills / "inspect-work/SKILL.md").write_text(
         "---\nname: inspect-work\ndescription: Inspect current work.\n---\nUse the CLI.\n", encoding="utf-8"
     )
-    (base / "hooks").mkdir()
+    for rel in ("AGENTS.md", "CLAUDE.md", ".goosehints"):
+        shutil.copyfile(ROOT / rel, tmp_path / rel)
+    (base / "hooks").mkdir(parents=True)
     (base / "hooks/manifest.toml").write_text(
         "schema_version = 1\n"
         '[[hook]]\nevent = "pre_tool_use"\nintents = ["file_write", "shell_exec"]\n'
@@ -72,7 +77,16 @@ def test_codex_derivation_has_no_peer_configuration_dependency(monkeypatch):
 def test_codex_current_projection_passes_without_role_or_identity_files(tree):
     result = report(tree)
     assert result["status"] == "pass", result
-    assert {p.name for p in tree.iterdir()} == {"scripts", parity.BASELINE, ".codex"}
+    # The tree holds the baseline, the one skills source, the three root carriers, the projector and the projection.
+    assert {p.name for p in tree.iterdir()} == {
+        "scripts",
+        parity.BASELINE,
+        ".agents",
+        "AGENTS.md",
+        "CLAUDE.md",
+        ".goosehints",
+        ".codex",
+    }
     assert result["operational_readiness"] == "not_evaluated"
 
 

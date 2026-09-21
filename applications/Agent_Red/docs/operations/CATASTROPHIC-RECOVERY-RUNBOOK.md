@@ -435,7 +435,10 @@ python -m pytest tests/regression/ -x -q --tb=short
 ### 6c. Admin UI validation
 
 ```powershell
-python scripts/test_admin_ui_validation.py --base-url "https://<FQDN>" --api-key "<new_superadmin_api_key>"
+$env:AGENT_RED_BASE_URL = "https://<FQDN>"
+$env:SUPERADMIN_PREVIEW_API_KEY = "<new_superadmin_api_key>"
+$env:PREVIEW_WIDGET_KEY = "<new_widget_key>"
+python scripts/test_admin_ui_validation.py
 ```
 
 ---

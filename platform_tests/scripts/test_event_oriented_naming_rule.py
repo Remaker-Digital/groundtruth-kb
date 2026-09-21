@@ -66,15 +66,19 @@ def test_naming_rule_matches_sibling_section_grammar(rule_text: str) -> None:
     assert "Justification:" in body
     assert "Operational mandate:" in body
     assert "GOV-ARTIFACT-ORIENTED-GOVERNANCE-001" in body
-    assert "GOV-STANDING-BACKLOG-001" in body, "capture must route to the backlog"
-    assert "GOV-ARTIFACT-APPROVAL-001" in body, "rule must state that it does not supersede formal artifact approval"
+    # M15 (edit-m15-37): capture routes through the current backlog writer under current formal requirements;
+    # a separate approval-evidence artifact is a retired carrier and is not required.
+    assert "through the current backlog writer" in body, "capture must route to the backlog"
+    assert "does not require a separate" in body, (
+        "rule must state that owner direction needs no approval-evidence artifact"
+    )
     numbered = re.findall(r"^\d+\. ", body, flags=re.MULTILINE)
     assert len(numbered) >= 3, "operational mandate must enumerate its obligations"
 
 
 def test_naming_rule_does_not_overclaim_enforceability(rule_text: str) -> None:
     body = _section(rule_text, SECTION_HEADING)
-    assert "judgment, not a" in body, (
+    assert "is a judgment about the actual behavior" in body and "cannot establish complete" in body, (
         "rule must record that event-shapedness is a judgment rather than a "
         "mechanical test, so a future reader does not treat it as enforced"
     )

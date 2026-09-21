@@ -18,6 +18,8 @@ import tomllib
 from pathlib import Path
 
 BASELINE_PREFIX = ".harness-baseline-configuration/"
+# The one skills source (owner ruling D15/D34): stub frontmatter is rendered from it.
+SKILLS_PREFIX = ".agents/skills/"
 PROJECTOR = Path("scripts/harness_projection/project_harness.py")
 PROFILES = Path("scripts/harness_projection/profiles.toml")
 PENDING_STATUS = "profile_pending"
@@ -35,7 +37,7 @@ def staged_paths(project_root: Path) -> list[str]:
 
 
 def projection_source(path: str) -> bool:
-    return path.startswith((BASELINE_PREFIX, "scripts/harness_projection/", "scripts/generate_"))
+    return path.startswith((BASELINE_PREFIX, SKILLS_PREFIX, "scripts/harness_projection/", "scripts/generate_"))
 
 
 def renderable_harnesses(project_root: Path) -> list[str]:

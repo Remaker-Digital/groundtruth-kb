@@ -52,6 +52,7 @@ def _cloud_profile() -> cloud_base.AdopterProfile:
         auth_env_key="TESTCLOUD_API_KEY",
         provider_routing_key="testcloud",
         routing_config_path=Path(".api-harness") / "routing.toml",
+        native_hook_settings_path=Path(".api-harness/settings.json"),
         dialect=cloud_base.DIALECT_OPENAI_CHAT,
         hook_tier=cloud_base.HOOK_TIER_GUARD_ADAPTER_FLOOR,
         extra_headers={},
@@ -140,7 +141,9 @@ def _ollama_root(tmp_path: Path) -> Path:
     }:
         (root / guard).parent.mkdir(parents=True, exist_ok=True)
         (root / guard).write_text("print('{}')\n", encoding="utf-8")
-    (root / ".api-harness" / "ollama" / "routing.toml").write_text(
+    # R6 (ii): the launcher reads the one authored routing source.
+    (root / ".harness-baseline-configuration").mkdir(parents=True, exist_ok=True)
+    (root / ".harness-baseline-configuration" / "routing.toml").write_text(
         "schema_version = 1\n"
         "[models.fixture-model]\n"
         'model_id = "fixture:latest"\n'

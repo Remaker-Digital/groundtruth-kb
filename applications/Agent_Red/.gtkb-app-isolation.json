@@ -116,12 +116,6 @@
       "purpose": "Agent Red application marker consumed by GT-KB application registration, slot diagnostics, and isolation doctor checks."
     },
     {
-      "name": "assets",
-      "type": "DIR",
-      "classification": "generated_output",
-      "purpose": "Generated application documentation site JavaScript and CSS assets. This classification grants no cleanup or rebuild-completeness claim."
-    },
-    {
       "name": "branding",
       "type": "DIR",
       "classification": "authoritative_input",

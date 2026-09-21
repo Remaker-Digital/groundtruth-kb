@@ -28,11 +28,11 @@ from groundtruth_kb.project.native_finalization import NativeProjectFinalization
 from groundtruth_kb.session.worktree import project_worktree
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native
-from platform_tests.groundtruth_kb.test_native_authority_service import put, work_fields
-from platform_tests.groundtruth_kb.test_native_bridge import authored, claim
-from platform_tests.groundtruth_kb.test_native_bridge import bridge as bridge
-from platform_tests.groundtruth_kb.test_native_project_finalization import base, git, integration
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim
+from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
+from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
 
 ROOT = Path(__file__).resolve().parents[2]
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(180)]

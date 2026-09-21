@@ -42,9 +42,8 @@ def test_agent_red_registry_uses_current_classifications_without_retired_authori
             "bounded_temporary_output",
         }
         assert "bucket" not in entry
-    assert {"assets", "terraform"} <= {e["name"] for e in entries}
-    assert not {".vscode", "harness-state"} & {e["name"] for e in entries}
-    assert _artifact_entry("assets")["classification"] == "generated_output"
+    assert "terraform" in {e["name"] for e in entries}
+    assert not {"assets", ".vscode", "harness-state"} & {e["name"] for e in entries}
     assert _artifact_entry("terraform")["classification"] == "authoritative_input"
     assert (
         not {

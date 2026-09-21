@@ -608,6 +608,8 @@ def _install_test_baseline(item):
     source = Path(__file__).resolve().parents[2]
     host = item["host"]
     shutil.copytree(source / ".harness-baseline-configuration", host / ".harness-baseline-configuration")
+    # D15: the one skills source lives beside the baseline; the projector fails closed without it.
+    shutil.copytree(source / ".agents/skills", host / ".agents/skills")
     shutil.copytree(source / "scripts/harness_projection", host / "scripts/harness_projection")
     shutil.copyfile(source / "pyproject.toml", host / "pyproject.toml")
     profiles = tomllib.loads((source / "scripts/harness_projection/profiles.toml").read_text(encoding="utf-8"))

@@ -19,10 +19,12 @@ from groundtruth_kb.cli import main
 
 def _make_fixture(tmp_path: Path) -> Path:
     fixture = tmp_path / "tree"
-    (fixture / ".claude" / "hooks").mkdir(parents=True)
+    (fixture / ".harness-baseline-configuration" / "hooks").mkdir(parents=True)
     (fixture / "bridge").mkdir()
     (fixture / "memory").mkdir()
-    (fixture / ".claude" / "hooks" / "destructive-gate.py").write_text("# managed hook body\n", encoding="utf-8")
+    (fixture / ".harness-baseline-configuration" / "hooks" / "destructive-gate.py").write_text(
+        "# managed hook body\n", encoding="utf-8"
+    )
     (fixture / "groundtruth.toml").write_text('[groundtruth]\nproject_root = "."\n', encoding="utf-8")
     (fixture / "groundtruth.db").write_bytes(b"retired local store")
     (fixture / "bridge" / "thread-001.md").write_text("# NEW\n", encoding="utf-8")
@@ -92,7 +94,11 @@ def test_classify_tree_findings_count_matches_rows(tmp_path: Path) -> None:
         == sum(1 for line in content.splitlines() if line.startswith("| ") and line.endswith("| undeclared |"))
         >= 4
     )
-    managed = next(line for line in content.splitlines() if line.startswith("| .claude/hooks/destructive-gate.py |"))
+    managed = next(
+        line
+        for line in content.splitlines()
+        if line.startswith("| .harness-baseline-configuration/hooks/destructive-gate.py |")
+    )
     assert "| gt-kb-managed |" in managed and managed.endswith("|  |")
 
 
@@ -231,7 +237,7 @@ def test_classify_tree_states_an_unavailable_declaration_source_instead_of_guess
     assert body and all(line.endswith("| undeclared |") for line in body), "every row is a finding"
 
 
-_HOOK = ".claude/hooks/destructive-gate.py"
+_HOOK = ".harness-baseline-configuration/hooks/destructive-gate.py"
 _HOOK_UNDECLARED_ROW = f"| {_HOOK} | adopter-owned | preserve | — | __fallback__:{_HOOK} | undeclared |"
 
 
@@ -339,10 +345,12 @@ def test_classify_tree_rejects_invalid_application_declarations_without_defaulti
     registry_text, expected_code = _INVALID_APPLICATION_DECLARATIONS[case]
     application = tmp_path / "application"
     (application / "data").mkdir(parents=True)
-    (application / ".claude" / "hooks").mkdir(parents=True)
+    (application / ".harness-baseline-configuration" / "hooks").mkdir(parents=True)
     (application / "notes.md").write_text("application notes\n", encoding="utf-8")
     (application / "data" / "cache.json").write_text("{}", encoding="utf-8")
-    (application / ".claude" / "hooks" / "destructive-gate.py").write_text("# managed hook body\n", encoding="utf-8")
+    (application / ".harness-baseline-configuration" / "hooks" / "destructive-gate.py").write_text(
+        "# managed hook body\n", encoding="utf-8"
+    )
     (application / ".gtkb-app-isolation.json").write_text(registry_text, encoding="utf-8")
 
     output = tmp_path / "report.json"
@@ -355,7 +363,12 @@ def test_classify_tree_rejects_invalid_application_declarations_without_defaulti
     assert expected_code in codes, codes
     assert all(finding["severity"] == "error" for finding in source["findings"])
     rows = _rows(payload)
-    assert set(rows) == {".claude/hooks/destructive-gate.py", ".gtkb-app-isolation.json", "data/cache.json", "notes.md"}
+    assert set(rows) == {
+        ".harness-baseline-configuration/hooks/destructive-gate.py",
+        ".gtkb-app-isolation.json",
+        "data/cache.json",
+        "notes.md",
+    }
     assert all(row["finding"] == "undeclared" for row in rows.values()), "no path defaults to a classification"
     assert not any(row["record_id"].startswith("application-registry:") for row in rows.values())
     cache = rows["data/cache.json"]

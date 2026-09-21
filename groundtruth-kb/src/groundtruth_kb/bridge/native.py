@@ -8,7 +8,9 @@ successor artifact, expires after 600 seconds, and is consumed by delivery.
 from __future__ import annotations
 
 import hashlib
+import os
 import re
+import stat
 import subprocess
 import unicodedata
 from datetime import UTC, date, datetime
@@ -107,6 +109,10 @@ class AbandonRequest(SessionRequest):
     reason: Text
 
 
+class ScratchTeardownRequest(SessionRequest):
+    """Remove exactly the bound context's disposable scratch directory."""
+
+
 def _hash(content: str) -> str:
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
@@ -152,7 +158,6 @@ def _paths(value: Any, label: str, *, error_code: str = "invalid_bridge_header")
                     "scratchpad",
                     ".worktrees",
                     ".agent",
-                    ".agents",
                     ".antigravity",
                     ".api-harness",
                     ".claude",
@@ -161,6 +166,11 @@ def _paths(value: Any, label: str, *, error_code: str = "invalid_bridge_header")
                     ".goose",
                 }
                 for part in parts.parts
+            )
+            or any(
+                part.casefold() == ".agents"
+                and (index != 0 or len(parts.parts) < 3 or parts.parts[1].casefold() != "skills")
+                for index, part in enumerate(parts.parts)
             )
             or parts.parts[0].casefold() == "bridge"
             or any(
@@ -173,6 +183,28 @@ def _paths(value: Any, label: str, *, error_code: str = "invalid_bridge_header")
     if len(set(normalized)) != len(normalized):
         _error(error_code, f"{label} contains duplicate artifact paths")
     return value
+
+
+def _scratch_entry(path: Path, root: Path) -> str:
+    return path.relative_to(root).as_posix() or "."
+
+
+def _surviving(relative: str, kind: str, error: OSError) -> dict[str, Any]:
+    return {
+        "path": relative,
+        "kind": kind,
+        "reason": type(error).__name__,
+        "errno": error.errno,
+        "winerror": getattr(error, "winerror", None),
+    }
+
+
+def _unlink_link(path: Path) -> None:
+    """Remove a symlink or junction entry itself; its target is never visited."""
+    try:
+        os.unlink(path)
+    except (IsADirectoryError, PermissionError):
+        os.rmdir(path)
 
 
 def parse_authored_message(content: str) -> dict[str, Any]:
@@ -521,7 +553,7 @@ class NativeBridgeService:
                 "formal_sources": "gt spec show <record-id> --json",
                 "assigned_work": "gt context work-item <owner-selected-work-item-id> --json",
                 "bridge": "gt bridge show <received-document-id> --json",
-                "baseline": "Read applicable authored rules and skills under .harness-baseline-configuration",
+                "baseline": "Read applicable authored rules under .harness-baseline-configuration/rules and skills under .agents/skills",
             },
         }
 
@@ -998,6 +1030,106 @@ class NativeBridgeService:
                 _error("effect_outside_claim", "Every work target must belong to one exact current artifact claim")
             document, fence = matches[0]
             return {"status": "current", "scope": "implementation", "document": document, "fence": fence}
+
+    def scratch_teardown(self, request: ScratchTeardownRequest) -> dict[str, Any]:
+        """Remove exactly the bound context's disposable scratch directory and report every entry's outcome.
+
+        The directory is derived from the immutable binding, never from a
+        supplied path, a harness name or another context. Links are not
+        followed: a redirected scratch root or context directory is refused
+        before any deletion, and a link inside the directory is unlinked
+        without visiting its target. An entry the host refuses to delete (an
+        open handle on Windows, a permission denial) is reported as surviving
+        and the outcome is ``partial``, never ``removed``. The binding, formal
+        history and every sibling directory are untouched. An explicit close or
+        wrap runs this verb; no session-end hook event exists to run it.
+        """
+        with self.kernel.transaction(read_only=True) as tx:
+            binding = self._binding(tx, request.native_context_id)
+        session_context_id = str(binding["session_context_id"])
+        scratch_root = self.project_root / "scratchpad"
+        own = scratch_root / session_context_id
+        report: dict[str, Any] = {"session_context_id": session_context_id, "scratch_directory": str(own)}
+        if own.parent != scratch_root or own.name != session_context_id or scratch_root.parent != self.project_root:
+            _error(
+                "invalid_scratch_directory", "The bound context's scratch identity is not one directory name", **report
+            )
+        if any(path.is_symlink() or path.is_junction() for path in (scratch_root, own)):
+            _error(
+                "effect_path_redirected",
+                "The scratch root or the context's directory is redirected; nothing was deleted",
+                **report,
+            )
+        try:
+            state = own.lstat()
+        except FileNotFoundError:
+            return {"status": "absent", **report, "removed": [], "surviving": []}
+        if not stat.S_ISDIR(state.st_mode):
+            _error(
+                "invalid_scratch_directory",
+                "The context's scratch path is not a directory; nothing was deleted",
+                **report,
+            )
+        removed: list[dict[str, str]] = []
+        surviving: list[dict[str, Any]] = []
+        if self._remove_scratch_entries(own, own, removed, surviving):
+            try:
+                os.rmdir(own)
+                removed.append({"path": ".", "kind": "directory"})
+            except OSError as error:
+                surviving.append(_surviving(".", "directory", error))
+        try:
+            own.lstat()
+            present = True
+        except FileNotFoundError:
+            present = False
+        status = "removed" if not surviving and not present else "partial"
+        result: dict[str, Any] = {"status": status, **report, "removed": removed, "surviving": surviving}
+        if status == "partial":
+            result["recovery_route"] = (
+                "Close the process or handle holding each surviving path, then rerun "
+                "gt session scratch-teardown --native-context-id <actual-native-context-id>; "
+                "a repeated teardown removes only what remains and never reports a partial outcome as removed"
+            )
+        return result
+
+    @classmethod
+    def _remove_scratch_entries(
+        cls, root: Path, directory: Path, removed: list[dict[str, str]], surviving: list[dict[str, Any]]
+    ) -> bool:
+        """Delete the entries below ``directory`` bottom-up without following links; True when all are gone."""
+        try:
+            with os.scandir(directory) as listing:
+                entries = list(listing)
+        except OSError as error:
+            surviving.append(_surviving(_scratch_entry(directory, root), "directory", error))
+            return False
+        cleared = True
+        for entry in sorted(entries, key=lambda item: item.name):
+            path = Path(entry.path)
+            relative = _scratch_entry(path, root)
+            if entry.is_symlink() or entry.is_junction():
+                kind = "link"
+            elif entry.is_dir(follow_symlinks=False):
+                kind = "directory"
+                if not cls._remove_scratch_entries(root, path, removed, surviving):
+                    cleared = False
+                    continue
+            else:
+                kind = "file"
+            try:
+                if kind == "link":
+                    _unlink_link(path)
+                elif kind == "directory":
+                    os.rmdir(path)
+                else:
+                    os.unlink(path)
+            except OSError as error:
+                surviving.append(_surviving(relative, kind, error))
+                cleared = False
+                continue
+            removed.append({"path": relative, "kind": kind})
+        return cleared
 
     def release(self, document: str, request: FenceRequest) -> dict[str, Any]:
         with self.kernel.transaction() as tx:

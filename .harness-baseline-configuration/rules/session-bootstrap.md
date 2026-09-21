@@ -161,7 +161,12 @@ an ephemeral continuation to the owner. They do not automatically commit, stash,
 publish, deploy or create a retained handoff object. Apply owner decisions to the
 relevant authoritative source and agent direction; interactive logs retain the
 conversation. Preserve unrelated work and report defects without fabricating
-missing role, activity, scope, review or completion facts.
+missing role, activity, scope, review or completion facts. At wrap, remove this
+context's scratch directory with the explicit
+`gt session scratch-teardown --native-context-id <id>` verb; the service derives
+the directory from the immutable binding, refuses foreign or redirected paths and
+reports surviving entries as a partial outcome. No session-end hook performs the
+teardown, and the binding is not closed or deleted by it.
 
 Before ending, proactively present useful read-only wrap-up guidance, unresolved
 work and concrete next actions when a lifecycle notification or an equivalent

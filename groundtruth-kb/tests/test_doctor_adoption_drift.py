@@ -185,3 +185,20 @@ def test_managed_artifact_drift_crlf_normalized_passes(tmp_path: Path, monkeypat
 
     assert check.status == "pass"
     assert "current=1" in check.message
+
+
+def test_authored_hook_identity_needs_no_third_template_copy(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from dataclasses import replace
+
+    relative = ".harness-baseline-configuration/hooks/credential-scan.py"
+    artifact = replace(_file_artifact(), target_path=relative, template_path=relative)
+    templates = _patch_registry(monkeypatch, tmp_path, [artifact])
+    source = tmp_path / relative
+    source.parent.mkdir(parents=True)
+    source.write_text("# authored fixture\n", encoding="utf-8")
+    check = doctor._check_managed_artifact_drift(tmp_path, "dual-agent")
+    assert check.status == "pass" and "current=1" in check.message
+    assert not templates.exists()
+    source.unlink()
+    missing = doctor._check_managed_artifact_drift(tmp_path, "dual-agent")
+    assert missing.status == "fail" and "missing=1" in missing.message

@@ -24,8 +24,8 @@ from groundtruth_kb.postgres_kernel import (
 )
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.test_postgres_kernel_integration import _create_sqlite_fixture
-from platform_tests.groundtruth_kb.test_postgres_kernel_integration import isolated_postgres as isolated_postgres
+from platform_tests.groundtruth_kb.postgres_fixtures import _create_sqlite_fixture
+from platform_tests.groundtruth_kb.postgres_fixtures import isolated_postgres as isolated_postgres
 
 
 def ddl_columns():

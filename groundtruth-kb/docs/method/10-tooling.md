@@ -1,18 +1,12 @@
 # 10. KB Tooling
 
-This guide covers the practical use of the GroundTruth CLI, web UI, and configuration system. Where the preceding documents describe *when* and *why*, this one describes *how*.
+This guide covers the practical use of the GroundTruth CLI and configuration system. Where the preceding documents describe *when* and *why*, this one describes *how*.
 
 ## Installation
 
 ```bash
 # Install from PyPI
 pip install groundtruth-kb
-```
-
-For the web UI (optional):
-
-```bash
-pip install "groundtruth-kb[web]"
 ```
 
 For development (tests, linting):
@@ -92,17 +86,17 @@ Configuration values are resolved in this order (later overrides earlier):
 
 ### Path resolution
 
-Relative paths in `groundtruth.toml` are resolved against the **config file's directory**, not the caller's working directory. This means `gt --config /path/to/project/groundtruth.toml summary` works correctly from any location.
+Relative paths in `groundtruth.toml` are resolved against the **config file's directory**, not the caller's working directory. This means `gt --config /path/to/project/groundtruth.toml status` works correctly from any location.
 
 ## CLI commands
 
-### `gt summary`
+### `gt status`
 
-Display spec counts by status, test counts, and work item status:
+Compact read-only operating status from fresh native reads (service, schema, session binding, formal catalog); unavailable facts are reported, never inferred:
 
 ```bash
-gt summary
-gt --config path/to/groundtruth.toml summary
+gt status
+gt --config path/to/groundtruth.toml status --json
 ```
 
 ### `gt assert`
@@ -148,91 +142,47 @@ Display current configuration values:
 gt config
 ```
 
-### `gt serve`
+## Automation
 
-Start the web UI:
+For scripts and automation, drive the `gt` CLI: the record verbs (`show`, `list`, `record`) accept `--json` and read or write the authority selected by `authority_url` in `groundtruth.toml`. There is no local database to open: `show` reads `GET /v1/<domain>/<id>`, `list` reads `GET /v1/<domain>` and `record` writes `PUT /v1/<domain>/<id>` on that authority.
 
 ```bash
-gt serve                    # default port 8090
-gt serve --port 9000        # custom port
-gt serve --host 0.0.0.0     # listen on all interfaces
+# Create a specification (--expected-version 0 asserts a new record)
+gt spec record --id SPEC-001 --fields-file spec-001.json --expected-version 0 --actor S1 --change-reason "Initial requirement" --json
+
+# List current specifications
+gt spec list --status active --json
 ```
 
-## Web UI
+where `spec-001.json` holds only the authored fields:
 
-The web UI provides a read-only dashboard for browsing MemBase. It is served by a FastAPI application with Jinja2 templates.
-
-Pages:
-
-| Page | URL | Content |
-|------|-----|---------|
-| Dashboard | `/` | Spec counts, recent changes, status overview |
-| Specifications | `/specs` | List with status filter |
-| Spec detail | `/specs/{id}` | Full spec with version history |
-| Tests | `/tests` | List with spec and result filters |
-| Test detail | `/tests/{id}` | Full test with execution history |
-| Operations | `/ops` | Operational procedures |
-| Op detail | `/ops/{id}` | Procedure steps and variables |
-| Environment | `/env` | Environment config entries |
-| History | `/history` | Global change log with author filter |
-| Assertions | `/assertions` | Assertion run results |
-
-### Branding
-
-The web UI supports project-specific branding via `groundtruth.toml`:
-
-- `app_title`: page title and header text
-- `brand_mark`: short text shown in the navigation (e.g., "GT", "MP")
-- `brand_color`: primary color as hex (e.g., `#2563eb`)
-- `logo_url`: optional URL to a logo image
-- `legal_footer`: copyright or legal text in the page footer
-
-## Python API
-
-For scripts and automation, import `KnowledgeDB` directly:
-
-```python
-from groundtruth_kb import KnowledgeDB, GTConfig
-from groundtruth_kb.gates import GateRegistry
-
-# Load config and create gated DB
-config = GTConfig.load()
-registry = GateRegistry.from_config(
-    config.governance_gates,
-    gate_config=config.gate_config,
-    project_root=config.project_root,
-)
-db = KnowledgeDB(db_path=config.db_path, gate_registry=registry)
-
-# Insert a spec
-db.insert_spec(
-    "SPEC-001", "Users can create tasks",
-    status="specified", changed_by="S1", change_reason="Initial requirement",
-)
-
-# List specs
-for spec in db.list_specs(status="specified"):
-    print(f"{spec['id']}: {spec['title']}")
-
-db.close()
+```json
+{
+  "title": "Users can create tasks",
+  "type": "requirement",
+  "status": "active",
+  "description": "Users can create tasks with a title and priority."
+}
 ```
 
-### Key methods
+### Key verbs
 
-| Method | Purpose |
-|--------|---------|
-| `insert_spec()` / `update_spec()` | Create or version a specification |
-| `insert_test()` / `update_test()` | Create or version a test |
-| `insert_work_item()` / `update_work_item()` | Create or version a work item |
-| `list_specs()` / `list_tests()` / `list_work_items()` | Query with filters |
-| `get_spec()` / `get_test()` / `get_work_item()` | Get latest version by ID |
-| `export_json()` | Full database export to JSON |
-| `get_summary()` | Aggregate counts by status |
-| `get_history()` | Cross-table change timeline |
+| Verb | Purpose |
+|------|---------|
+| `gt spec record` | Create or version a specification |
+| `gt tests record` | Create or version a test |
+| `gt backlog record` | Create (`--project-id`) or version a work item |
+| `gt spec list` / `gt tests list` / `gt backlog list` | Query with filters (`--search`, `--limit`, `--after`) |
+| `gt spec show` / `gt tests show` / `gt backlog show` | Get the current record by ID |
+| `gt <domain> show <ID> --history` | The record's version chain |
+| `gt db postgres readback-current --output <file>` | Publish a canonical current-state readback manifest |
+| `gt status` | Component status from fresh native reads |
 
-Assertions are executed via the `assertions` module, not directly on `KnowledgeDB`:
+A `record` write is a compare-and-set: `--expected-version 0` creates, the current version amends, and a stale version is refused with `cas_conflict`.
 
-```python
-from groundtruth_kb.assertions import run_all_assertions, run_single_assertion
-results = run_all_assertions(db, project_root=config.project_root)
+Assertions are evaluated by `gt assert`, which reads the current specifications from the authority and exits `0` when the aggregate result is `PASS`:
+
+```bash
+gt assert --json
+gt assert --spec SPEC-001 --json
 ```

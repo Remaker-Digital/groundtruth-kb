@@ -39,10 +39,11 @@ Experience" app from the Shopify Partners dashboard.
 
 ### Step 2: Provision Tenant **[OWNER]**
 
-Run from the project root with `.env.local` configured:
+Run from the repository root with `applications/Agent_Red/.env.local` configured
+for the intended application database:
 
 ```bash
-python scripts/provision_tenant_one.py
+SEED_TIER=starter python scripts/provision_tenant_one.py --provision
 ```
 
 This creates the `remaker-digital-001` tenant in Cosmos DB with Starter tier
@@ -157,8 +158,9 @@ Enable the 14-day free trial for all tiers.
 ### Step 9: Enable Stripe Live Mode **[OWNER]**
 
 1. In Stripe Dashboard, switch from Test Mode to Live Mode
-2. Create live-mode Products and Prices matching `config/stripe_product_ids.json`
-   (or use `scripts/stripe/create_product_catalog.py` against live keys)
+2. From the repository root, run `python scripts/stripe/create_product_catalog.py`
+   with the intended live key in `STRIPE_SECRET_KEY`. The result is written to
+   `applications/Agent_Red/config/stripe_product_ids.json`.
 3. Update `.env` / Container App env vars with live Stripe keys
 4. Verify tax settings: origin address (Delaware), automatic_tax enabled,
    tax code `txcd_10103001` (SaaS — Business Use)

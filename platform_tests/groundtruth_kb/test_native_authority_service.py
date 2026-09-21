@@ -13,7 +13,7 @@ import subprocess
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from threading import Event
@@ -22,14 +22,10 @@ from uuid import uuid4
 import groundtruth_kb
 import psycopg
 import pytest
-from fastapi.testclient import TestClient
-from groundtruth_kb.authority_api import create_authority_app
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
-from groundtruth_kb.config import PostgreSQLConfig
-from groundtruth_kb.native_authority import AuthorityService, WorkItemMutation
+from groundtruth_kb.native_authority import WorkItemMutation
 from groundtruth_kb.postgres_kernel import (
     TABLE_SPECS,
-    PostgresKernel,
     PostgresKernelError,
     PostgresTransaction,
     canonical_json_bytes,
@@ -37,51 +33,10 @@ from groundtruth_kb.postgres_kernel import (
 )
 from psycopg import sql
 
+from platform_tests.groundtruth_kb.native_fixtures import history_count, link_project_formal, put, seed, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import native as native
+
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
-
-
-@pytest.fixture
-def native(monkeypatch):
-    if os.environ.get("GTKB_RUN_POSTGRES_INTEGRATION") != "1":
-        pytest.fail("Explicitly select a disposable PostgreSQL installation")
-    service_name = os.environ.get("GTKB_TEST_POSTGRES_SERVICE")
-    if not service_name:
-        pytest.fail("GTKB_TEST_POSTGRES_SERVICE is required")
-    # Every CLI/service child must use the same package as the parent test.
-    # This also preserves installed-package isolation in a separate checkout.
-    monkeypatch.setenv("PYTHONPATH", str(Path(groundtruth_kb.__file__).resolve().parent.parent))
-    schema = f"gtkb_test_{uuid4().hex}"
-    with psycopg.connect(service=service_name, autocommit=True) as connection:
-        connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
-    monkeypatch.setenv("PGOPTIONS", f"-c search_path={schema}")
-    try:
-        with psycopg.connect(service=service_name) as connection:
-            assert connection.execute("SELECT current_schema()").fetchone()[0] == schema
-        kernel = PostgresKernel(PostgreSQLConfig(service=service_name))
-        kernel.initialize()
-        service = AuthorityService(kernel)
-        with TestClient(create_authority_app(service)) as client:
-            yield service, client, schema, service_name
-    finally:
-        with psycopg.connect(service=service_name, autocommit=True) as connection:
-            connection.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(schema)))
-
-
-def put(client, domain, record_id, fields, *, expected_version=0, **extra):
-    # Existing platform fixtures declare their repository explicitly. Tests of
-    # omitted references submit the raw native request instead of this helper.
-    if domain == "projects" and expected_version == 0 and extra.get("kind", "project") == "project":
-        fields = {"repository_ref": "platform", **fields}
-    return client.put(
-        f"/v1/{domain}/{record_id}",
-        json={
-            "expected_version": expected_version,
-            "actor": "qualification",
-            "reason": "Exercise native domain behavior",
-            "fields": fields,
-            **extra,
-        },
-    )
 
 
 @pytest.mark.parametrize("column", ["formal_roots", "terminal_author_session_context_id"])
@@ -108,67 +63,6 @@ def test_an_older_v1_bridge_catalog_cannot_start_or_serve_as_current(native, col
             )
         ]
         assert column not in columns  # No guessed backfill or silent schema upgrade.
-
-
-def seed(client):
-    inputs = [
-        (
-            "specifications",
-            "SPEC-1",
-            {"title": "Required effect", "description": "Preserve complete work", "status": "active"},
-            {},
-        ),
-        (
-            "tests",
-            "TEST-1",
-            {
-                "title": "Effect test",
-                "spec_id": "SPEC-1",
-                "test_type": "integration",
-                "test_file": "tests/test_effect.py",
-                "expected_outcome": "Effect observed",
-            },
-            {},
-        ),
-        ("test-plans", "PLAN-1", {"title": "Behavioral qualification"}, {}),
-        (
-            "test-phases",
-            "PHASE-1",
-            {
-                "title": "Native effects",
-                "plan_id": "PLAN-1",
-                "phase_order": 10,
-                "gate_criteria": "Observable result",
-                "test_ids": ["TEST-1"],
-            },
-            {},
-        ),
-        ("projects", "PROGRAM-1", {"name": "Coherent platform"}, {"kind": "program"}),
-        (
-            "projects",
-            "PROJECT-1",
-            {
-                "name": "Complete outcome",
-                "parent_project_id": "PROGRAM-1",
-                "target_outcome": "Complete native authority",
-            },
-            {},
-        ),
-        ("projects", "PROJECT-GTKB-NEW-WORK-INTAKE", {"name": "Standing intake"}, {}),
-    ]
-    for domain, record_id, fields, extra in inputs:
-        result = put(client, domain, record_id, fields, **extra)
-        assert result.status_code == 200, result.text
-
-
-def work_fields(**extra):
-    return {"title": "Artifact correction", "source_spec_id": "SPEC-1", "source_test_id": "TEST-1", **extra}
-
-
-def history_count(service):
-    with service.kernel.transaction(read_only=True) as tx:
-        tx.cursor.execute(sql.SQL("SELECT count(*) AS n FROM {}.record_history").format(sql.Identifier(tx.schema)))
-        return tx.cursor.fetchone()["n"]
 
 
 def test_dashboard_reads_native_inventories_without_initialization_or_authority_mutations(
@@ -430,31 +324,6 @@ def test_registry_path_inventory_reads_one_snapshot_during_concurrent_changes(na
     fresh = client.get("/v1/registry/path-observations")
     assert {row["path"] for row in fresh.json()} == {"src/new.py", "tests/test_new.py"}
     assert history_count(service) == before
-
-
-def link_project_formal(service, spec_id):
-    """Set up an existing canonical relationship, without a second test registry."""
-    row = {column: None for column in TABLE_SPECS["project_artifact_links"].columns}
-    row.update(
-        id=f"LINK-{spec_id}",
-        version=1,
-        project_id="PROJECT-1",
-        artifact_type="spec",
-        artifact_ref=spec_id,
-        relationship="governs",
-        status="active",
-        changed_at=datetime.now(UTC).isoformat(),
-        changed_by="qualification",
-        change_reason="Current project requirement",
-    )
-    service.kernel.mutate_current(
-        table="project_artifact_links",
-        identity={"id": row["id"]},
-        expected_version=0,
-        new_state=row,
-        actor="qualification",
-        reason="Current project requirement",
-    )
 
 
 def test_atomic_membership_and_program_semantics(native):
@@ -867,6 +736,96 @@ def test_new_specification_default_is_current_authority_and_amendments_preserve_
     assert history_count(service) == history
 
 
+def test_specification_verification_marker_is_service_stamped_under_the_work_evidence_rule(native):
+    """WI-7861 (owner ruling D17): `implementation_verified_at` needs an executable test of the specification in
+    an active plan phase, is stamped by the service, and is otherwise an ordinary CAS-guarded field."""
+    service, client, _, _ = native
+    seed(client)  # SPEC-1 is exercised by TEST-1 (test_file set) inside PHASE-1 of the active PLAN-1
+    assert put(client, "specifications", "SPEC-UNPROVEN", {"title": "Nothing executable yet"}).status_code == 200
+
+    def refused_without_evidence():
+        before = client.get("/v1/specifications/SPEC-UNPROVEN").content
+        history = history_count(service)
+        refused = put(
+            client, "specifications", "SPEC-UNPROVEN", {"implementation_verified_at": True}, expected_version=1
+        )
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["error"]["code"] == "verification_evidence_required"
+        assert refused.json()["error"]["details"] == {"id": "SPEC-UNPROVEN"}
+        assert client.get("/v1/specifications/SPEC-UNPROVEN").content == before
+        assert history_count(service) == history
+
+    refused_without_evidence()  # no test at all
+    assert (
+        put(
+            client,
+            "tests",
+            "TEST-NOFILE",
+            {"title": "Not executable", "spec_id": "SPEC-UNPROVEN", "test_type": "unit", "expected_outcome": "n/a"},
+        ).status_code
+        == 200
+    )
+    assert (
+        put(
+            client,
+            "tests",
+            "TEST-UNPHASED",
+            {
+                "title": "Outside every phase",
+                "spec_id": "SPEC-UNPROVEN",
+                "test_type": "unit",
+                "test_file": "tests/test_unphased.py",
+                "expected_outcome": "n/a",
+            },
+        ).status_code
+        == 200
+    )
+    assert (
+        put(client, "test-phases", "PHASE-1", {"test_ids": ["TEST-1", "TEST-NOFILE"]}, expected_version=1).status_code
+        == 200
+    )
+    refused_without_evidence()  # a test without test_file in the phase, and an executable test outside every phase
+
+    # The contract refuses a client-supplied time, as it refuses retired_at: the service owns both stamps.
+    before = client.get("/v1/specifications/SPEC-1").content
+    history = history_count(service)
+    for value in ("2026-02-01T00:00:00+00:00", "now", False, 1):
+        contract = put(client, "specifications", "SPEC-1", {"implementation_verified_at": value}, expected_version=1)
+        assert contract.status_code == 422 and contract.json()["code"] == "invalid_request", value
+    assert client.get("/v1/specifications/SPEC-1").content == before
+    assert history_count(service) == history
+
+    started = datetime.now(UTC)
+    accepted = put(client, "specifications", "SPEC-1", {"implementation_verified_at": True}, expected_version=1)
+    assert accepted.status_code == 200, accepted.text
+    row = accepted.json()
+    stamp = datetime.fromisoformat(row["implementation_verified_at"])
+    assert started - timedelta(seconds=1) <= stamp <= datetime.now(UTC) + timedelta(seconds=1)
+    assert row["version"] == 2 and row["status"] == "active" and row["title"] == "Required effect"
+    assert client.get("/v1/specifications/SPEC-1").json() == row
+    assert history_count(service) == history + 1
+
+    stale = put(client, "specifications", "SPEC-1", {"implementation_verified_at": True}, expected_version=1)
+    assert stale.status_code == 409 and stale.json()["error"]["code"] == "cas_conflict"
+    assert client.get("/v1/specifications/SPEC-1").json() == row
+    assert history_count(service) == history + 1
+
+    renamed = put(client, "specifications", "SPEC-1", {"title": "Required effect (renamed)"}, expected_version=2)
+    assert (
+        renamed.status_code == 200 and renamed.json()["implementation_verified_at"] == row["implementation_verified_at"]
+    )
+    cleared = put(client, "specifications", "SPEC-1", {"implementation_verified_at": None}, expected_version=3)
+    assert cleared.status_code == 200 and cleared.json()["implementation_verified_at"] is None
+    assert cleared.json()["version"] == 4
+    versions = client.get("/v1/specifications/SPEC-1/history").json()
+    assert [entry["state"].get("implementation_verified_at") for entry in versions["history"]] == [
+        None,
+        row["implementation_verified_at"],
+        row["implementation_verified_at"],
+        None,
+    ]
+
+
 @pytest.mark.parametrize(
     "status", ["specified", "implemented", "verified", "accepted", "unknown", "ACTIVE", "", None, 1, True]
 )
@@ -892,7 +851,7 @@ def test_specification_writer_rejects_noncanonical_status_without_partial_state(
 
 def _check_specification_authoring_cli(cli, client, service, tmp_path):
     """Execute the baseline examples through real CLI/HTTP and check their limits."""
-    guide = Path(__file__).resolve().parents[2] / ".harness-baseline-configuration/skills/gtkb-spec"
+    guide = Path(__file__).resolve().parents[2] / ".agents/skills/gtkb-spec"
 
     def example(path):
         text = path.read_text(encoding="utf-8")
@@ -1313,6 +1272,18 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                         pytest.fail("Native authority did not start; inspect disposable service.log")
                     time.sleep(0.1)
             _check_architecture_authoring_cli(cli, client, service, tmp_path)
+            # Current spec-to-test mapping comes from the native test domain.
+            # An empty result or an unexecuted test must not become a pass.
+            mapping_before = history_count(service)
+            current_test = client.get("/v1/tests/TEST-1").json()
+            mapped = cli("tests", "list", "--spec-id", "SPEC-1", "--json")
+            assert mapped.returncode == 0, mapped.stderr
+            assert json.loads(mapped.stdout) == [current_test]
+            assert current_test["last_result"] is None
+            empty_mapping = cli("tests", "list", "--spec-id", "SPEC-NO-TESTS", "--json")
+            assert empty_mapping.returncode == 0, empty_mapping.stderr
+            assert json.loads(empty_mapping.stdout) == []
+            assert history_count(service) == mapping_before
             # Test-phase listing is a current native domain read, not a legacy
             # SQLite history query under the backlog command. Exercise several
             # real revisions and both ordinary CLI output modes.
@@ -1929,3 +1900,110 @@ def test_invalid_mutation_result_rolls_back_native_write(native, monkeypatch, in
     assert writes == ["PROJECT-INVALID-READBACK"]
     assert client.get("/v1/projects").json() == before
     assert client.get("/v1/projects/PROJECT-INVALID-READBACK").status_code == 404
+
+
+def _recorded_test_execution(native, execution_precision):
+    """Arrange one valid historical execution precision on the disposable fixture."""
+    service, client, _, _ = native
+    seed(client)
+    current = client.get("/v1/tests/TEST-1").json()
+    service.kernel.mutate_current(
+        table="tests",
+        identity={"id": "TEST-1"},
+        expected_version=current["version"],
+        new_state={
+            **current,
+            "last_result": "pass",
+            "last_executed_at": "2026-09-01T00:00:00+00:00" if execution_precision == "timestamp" else None,
+            "last_executed_on": "2026-09-01" if execution_precision == "date" else None,
+        },
+        actor="qualification",
+        reason="Arrange execution evidence for the original test definition",
+    )
+    return service, client, client.get("/v1/tests/TEST-1").json()
+
+
+@pytest.mark.parametrize(
+    "fields",
+    [
+        {"test_file": "tests/test_replacement.py"},
+        {"test_file": None},
+        {"test_class": "TestReplacement"},
+        {"test_function": "test_replacement"},
+        {"test_type": "unit"},
+        {"expected_outcome": "Replacement effect observed"},
+        {"spec_id": "SPEC-REPLACEMENT"},
+        {"application_scope": "gtkb_platform"},
+    ],
+)
+@pytest.mark.parametrize("execution_precision", ["timestamp", "date"])
+def test_test_definition_change_clears_execution_and_preserves_history(native, fields, execution_precision):
+    service, client, before = _recorded_test_execution(native, execution_precision)
+    if "spec_id" in fields:
+        replacement = put(
+            client,
+            "specifications",
+            "SPEC-REPLACEMENT",
+            {"title": "Replacement requirement", "description": "Revised required effect", "status": "active"},
+        )
+        assert replacement.status_code == 200, replacement.text
+    with service.kernel.transaction(read_only=True) as tx:
+        history_before = list(tx.history("tests", {"id": "TEST-1"}))
+    result = put(client, "tests", "TEST-1", fields, expected_version=before["version"])
+    assert result.status_code == 200, result.text
+    current = client.get("/v1/tests/TEST-1").json()
+    assert current["version"] == before["version"] + 1
+    assert all(current[key] == value for key, value in fields.items())
+    assert all(current[key] is None for key in ("last_result", "last_executed_at", "last_executed_on"))
+    with service.kernel.transaction(read_only=True) as tx:
+        history_after = list(tx.history("tests", {"id": "TEST-1"}))
+    assert history_after[:-1] == history_before
+    execution_fields = ("last_result", "last_executed_at", "last_executed_on")
+    assert {key: history_after[-2]["new_state"][key] for key in execution_fields} == {
+        key: before[key] for key in execution_fields
+    }
+    assert all(history_after[-1]["new_state"][key] is None for key in execution_fields)
+
+
+@pytest.mark.parametrize("kind", ["title", "description", "unchanged_definition"])
+@pytest.mark.parametrize("execution_precision", ["timestamp", "date"])
+def test_test_metadata_or_same_definition_preserves_execution(native, kind, execution_precision):
+    _service, client, before = _recorded_test_execution(native, execution_precision)
+    fields = {"title": "Clearer title"} if kind == "title" else {"description": "Clarified explanatory metadata"}
+    if kind == "unchanged_definition":
+        fields = {
+            key: before[key]
+            for key in (
+                "test_file",
+                "test_class",
+                "test_function",
+                "test_type",
+                "expected_outcome",
+                "spec_id",
+                "application_scope",
+            )
+        }
+    result = put(client, "tests", "TEST-1", fields, expected_version=before["version"])
+    assert result.status_code == 200, result.text
+    current = client.get("/v1/tests/TEST-1").json()
+    assert {key: current[key] for key in ("last_result", "last_executed_at", "last_executed_on")} == {
+        key: before[key] for key in ("last_result", "last_executed_at", "last_executed_on")
+    }
+
+
+@pytest.mark.parametrize("execution_precision", ["timestamp", "date"])
+def test_refused_test_definition_change_keeps_execution_and_history(native, execution_precision):
+    service, client, before = _recorded_test_execution(native, execution_precision)
+    with service.kernel.transaction(read_only=True) as tx:
+        history_before = list(tx.history("tests", {"id": "TEST-1"}))
+    stale = put(client, "tests", "TEST-1", {"test_file": "changed.py"}, expected_version=before["version"] - 1)
+    assert stale.status_code == 409, stale.text
+    invalid = put(client, "tests", "TEST-1", {"test_file": 17}, expected_version=before["version"])
+    assert invalid.status_code == 422, invalid.text
+    forged = put(client, "tests", "TEST-1", {"last_result": "pass"}, expected_version=before["version"])
+    assert forged.status_code == 422, forged.text
+    unbound = put(client, "tests", "TEST-1", {"spec_id": None}, expected_version=before["version"])
+    assert unbound.status_code == 422, unbound.text
+    assert client.get("/v1/tests/TEST-1").json() == before
+    with service.kernel.transaction(read_only=True) as tx:
+        assert list(tx.history("tests", {"id": "TEST-1"})) == history_before

@@ -1,11 +1,4 @@
-"""Spec-derived tests for the obsolete-reference-purge check (WI-4795).
-
-Verifies ``DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001`` assertions 1-3 and the
-``ADR-OBSOLETE-REFERENCE-PURGE-OBLIGATION-001`` doctor surface. Hermetic: the
-integration tests build a fixture ``groundtruth.db`` and never mutate the live
-MemBase, per the Loyal Opposition GO condition on bridge thread
-``gtkb-obsolete-reference-purge-deterministic-check`` (-002).
-"""
+"""Native read-only purge-pairing diagnostics and the retained Phase-1 advisory behavior."""
 
 from __future__ import annotations
 
@@ -19,7 +12,8 @@ for _path in (_SCRIPTS,):
         sys.path.insert(0, str(_path))
 
 import check_obsolete_reference_purge as check  # noqa: E402
-from groundtruth_kb.db import KnowledgeDB  # noqa: E402
+import pytest  # noqa: E402
+from groundtruth_kb.authority_client import AuthorityClient  # noqa: E402
 
 PAST_DATE = "2000-01-01"
 FUTURE_DATE = "2099-01-01"
@@ -43,7 +37,7 @@ def test_is_retirement_class_superseded_status():
 
 
 def test_is_retirement_class_retire_spec_prefix():
-    ok, reason = check.is_retirement_class({"id": FIXTURE_SPEC, "status": "specified"})
+    ok, reason = check.is_retirement_class({"id": FIXTURE_SPEC, "status": "active"})
     assert ok
     assert "RETIRE-SPEC" in reason
 
@@ -52,7 +46,7 @@ def test_is_retirement_class_adr_supersedes_field():
     ok, reason = check.is_retirement_class(
         {
             "id": "ADR-X-001",
-            "status": "specified",
+            "status": "active",
             "type": "architecture_decision",
             "description": "Decision body.\nSupersedes: ADR-OLD-LOAD-BEARING-001\nConsequences...",
         }
@@ -68,7 +62,7 @@ def test_is_retirement_class_definitional_supersedes_not_flagged():
     ok, _ = check.is_retirement_class(
         {
             "id": "DCL-METHODOLOGY-001",
-            "status": "specified",
+            "status": "active",
             "type": "design_constraint",
             "description": "an ADR/DCL that supersedes a prior load-bearing implementation",
         }
@@ -78,7 +72,7 @@ def test_is_retirement_class_definitional_supersedes_not_flagged():
 
 def test_is_retirement_class_negative_active_spec():
     ok, _ = check.is_retirement_class(
-        {"id": "SPEC-3", "status": "implemented", "type": "requirement", "description": "active"}
+        {"id": "SPEC-3", "status": "active", "type": "requirement", "description": "active"}
     )
     assert not ok
 
@@ -101,7 +95,8 @@ def test_paired_by_purge_project_member():
             "description": f"strip {FIXTURE_SPEC} references",
         }
     ]
-    assert check.paired_work_item(FIXTURE_SPEC, work_items) == "WI-3"
+    assert check.paired_work_item(FIXTURE_SPEC, work_items) is None
+    assert check.paired_work_item(FIXTURE_SPEC, work_items, purge_member_ids={"WI-3"}) == "WI-3"
 
 
 def test_unpaired_returns_none():
@@ -117,68 +112,105 @@ def test_in_window_boundary():
 
 
 # ---------------------------------------------------------------------------
-# Integration tests (fixture database; no live MemBase mutation)
+# Native response tests (GET stubs; no canonical mutation)
 # ---------------------------------------------------------------------------
 
 
-def _fixture_db(tmp_path: Path) -> Path:
-    db_path = tmp_path / "groundtruth.db"
-    db = KnowledgeDB(db_path)
-    db.insert_spec(
-        id=FIXTURE_SPEC,
-        title="Fixture retire-spec",
-        status="specified",
-        changed_by="test",
-        change_reason="fixture",
-        type="requirement",
-    )
-    return db_path
+def _fixture_native(tmp_path: Path, monkeypatch, *, paired=False):
+    monkeypatch.setenv("GT_AUTHORITY_URL", "http://127.0.0.1:12345")
+    sentinel = tmp_path / "groundtruth.db"
+    sentinel.write_bytes(b"inert leftover")
+
+    def refuse(*args, **kwargs):
+        pytest.fail("Purge pairing must not open SQLite")
+
+    monkeypatch.setattr("sqlite3.connect", refuse)
+
+    def request(self, method, path, *, body=None, query=None):
+        assert method == "GET" and body is None
+        if path == "/v1/specifications":
+            rows = [
+                {"id": FIXTURE_SPEC, "status": "active", "type": "requirement", "changed_at": "2026-09-19T00:00:00Z"}
+            ]
+        elif path == "/v1/work-items":
+            rows = [{"id": "WI-FIXTURE-PURGE", "source_spec_id": FIXTURE_SPEC}] if paired else []
+        else:
+            assert path == "/v1/projects"
+            rows = []
+        return {"records": rows, "next_after": None}
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    return sentinel
 
 
-def test_unpaired_retirement_in_window_warns(tmp_path):
-    _fixture_db(tmp_path)
+def test_unpaired_retirement_in_window_warns(tmp_path, monkeypatch):
+    sentinel = _fixture_native(tmp_path, monkeypatch)
     result = check.evaluate(tmp_path, obligation_effective_date=PAST_DATE)
     assert result["status"] == "warning"
-    assert any(f["artifact_id"] == FIXTURE_SPEC for f in result["unpaired"])
+    assert [row["artifact_id"] for row in result["unpaired"]] == [FIXTURE_SPEC]
+    assert sentinel.read_bytes() == b"inert leftover"
 
 
-def test_paired_retirement_passes(tmp_path):
-    _fixture_db(tmp_path)
-    db = KnowledgeDB(tmp_path / "groundtruth.db")
-    db.insert_work_item(
-        id="WI-FIXTURE-PURGE",
-        title="purge fixture",
-        origin="hygiene",
-        component="governance",
-        resolution_status="open",
-        changed_by="test",
-        change_reason="fixture",
-        source_spec_id=FIXTURE_SPEC,
-    )
+def test_paired_retirement_passes(tmp_path, monkeypatch):
+    _fixture_native(tmp_path, monkeypatch, paired=True)
     result = check.evaluate(tmp_path, obligation_effective_date=PAST_DATE)
     assert result["status"] == "pass"
     assert result["unpaired"] == []
-    assert any(f["artifact_id"] == FIXTURE_SPEC for f in result["paired"])
+    assert result["paired"][0]["pair_work_item"] == "WI-FIXTURE-PURGE"
 
 
-def test_pre_obligation_retirement_excluded(tmp_path):
-    _fixture_db(tmp_path)
-    # A future window start excludes the now-dated fixture -> no findings.
+def test_pre_obligation_retirement_excluded(tmp_path, monkeypatch):
+    _fixture_native(tmp_path, monkeypatch)
     result = check.evaluate(tmp_path, obligation_effective_date=FUTURE_DATE)
     assert result["status"] == "pass"
     assert result["evaluated"] == 0
 
 
-def test_doctor_surface_warn_pass_failsoft(tmp_path):
+def test_doctor_surface_warn_pass_failsoft(tmp_path, monkeypatch):
     from groundtruth_kb.project.doctor import _check_obsolete_reference_purge
 
-    _fixture_db(tmp_path)
-    tool_check = _check_obsolete_reference_purge(tmp_path)
-    # GO condition 1: doctor returns warning/pass, never fail.
-    assert tool_check.status in {"warning", "pass"}
-    assert tool_check.status != "fail"
+    _fixture_native(tmp_path, monkeypatch)
+    result = _check_obsolete_reference_purge(tmp_path)
+    assert result.status == "warning"
+    assert FIXTURE_SPEC in result.message
+    assert (tmp_path / "groundtruth.db").read_bytes() == b"inert leftover"
 
 
 def test_check_script_exists_at_declared_path():
     # DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001 assertion 3.
     assert (_PROJECT_ROOT / "scripts" / "check_obsolete_reference_purge.py").is_file()
+
+
+@pytest.mark.parametrize(
+    "memberships",
+    [None, [], [{"work_item_id": "WI-PURGE", "project_id": "PROJECT-OBSOLETE-REFERENCE-PURGE", "status": "active"}]],
+)
+def test_only_native_project_membership_covers_project_pairing(tmp_path, monkeypatch, memberships):
+    _fixture_native(tmp_path, monkeypatch)
+    original = AuthorityClient.request
+
+    def request(self, method, path, **kwargs):
+        if path == "/v1/work-items":
+            return {
+                "records": [
+                    {
+                        "id": "WI-PURGE",
+                        "project_name": "PROJECT-OBSOLETE-REFERENCE-PURGE",
+                        "description": f"Remove {FIXTURE_SPEC} references",
+                    }
+                ],
+                "next_after": None,
+            }
+        if path == "/v1/projects":
+            return {"records": [{"id": "PROJECT-OBSOLETE-REFERENCE-PURGE", "kind": "project"}], "next_after": None}
+        if path == "/v1/projects/PROJECT-OBSOLETE-REFERENCE-PURGE":
+            return {} if memberships is None else {"memberships": memberships}
+        return original(self, method, path, **kwargs)
+
+    monkeypatch.setattr(AuthorityClient, "request", request)
+    if memberships is None:
+        with pytest.raises(check.AuthorityClientError, match="memberships are malformed"):
+            check.evaluate(tmp_path)
+    else:
+        result = check.evaluate(tmp_path)
+        assert result["status"] == ("pass" if memberships else "warning")

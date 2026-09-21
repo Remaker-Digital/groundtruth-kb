@@ -28,7 +28,7 @@ def launch(tmp_path, monkeypatch):
     binary.write_bytes(b"Process creation is captured; this fixture is never executed")
     (home / "conf").mkdir()
     (home / "conf/defaults.ini").write_text("fixture", encoding="utf-8")
-    calls, identities, health = [], {}, []
+    calls, identities, health, contained = [], {}, [], []
 
     def popen(args, **kwargs):
         pid = 910000 + len(calls)
@@ -39,6 +39,13 @@ def launch(tmp_path, monkeypatch):
     monkeypatch.setattr(dashboard.subprocess, "Popen", popen)
     monkeypatch.setattr(dashboard, "_process_identity", lambda pid: identities.get(pid))
     monkeypatch.setattr(dashboard, "_wait_dashboard_http", lambda *args, **kwargs: health.append((args, kwargs)))
+    # Containment steps are observed, not performed, on the captured stand-in processes.
+    monkeypatch.setattr(
+        dashboard, "_assign_to_job", lambda job, process: contained.append(("assign", process.pid)) or True
+    )
+    monkeypatch.setattr(
+        dashboard, "_resume_primary_thread", lambda process: contained.append(("resume", process.pid)) or True
+    )
     monkeypatch.delenv("GTKB_DASHBOARD_HEADLESS", raising=False)
     with socket.socket() as first, socket.socket() as second:
         first.bind(("127.0.0.1", 0))
@@ -70,6 +77,7 @@ def launch(tmp_path, monkeypatch):
         identities=identities,
         reply=json.loads(result.output),
         health=health,
+        contained=contained,
     )
 
 
@@ -82,7 +90,9 @@ def test_launcher_needs_no_headless_switch_or_environment_setting(launch):
 
 def test_launcher_suppresses_child_windows_and_redirects_logs(launch):
     for call in launch.calls:
-        assert call["kwargs"]["creationflags"] == getattr(subprocess, "CREATE_NO_WINDOW", 0)
+        assert call["kwargs"]["creationflags"] & getattr(subprocess, "CREATE_NO_WINDOW", 0) == getattr(
+            subprocess, "CREATE_NO_WINDOW", 0
+        )
         assert call["kwargs"]["stderr"] == subprocess.STDOUT
         assert call["kwargs"].get("shell", False) is False
         assert call["kwargs"]["stdout"].closed
@@ -99,9 +109,36 @@ def test_launcher_uses_installed_service_and_exact_selected_grafana(launch):
     assert grafana["kwargs"]["env"]["GF_SERVER_HTTP_ADDR"] == "127.0.0.1"
 
 
-def test_launcher_records_creation_identity_for_both_services(launch):
-    pids = launch.root / ".groundtruth/dashboard/pids"
-    for name, call in zip(("refresh-service", "grafana"), launch.calls, strict=True):
-        record = json.loads((pids / f"{name}.pid").read_text(encoding="utf-8"))
-        assert record == launch.identities[call["pid"]]
-        assert set(record) == {"pid", "created_at", "executable"}
+def test_grafana_launch_pins_plugin_updates_and_egress_off_with_one_log_writer(launch):
+    """Every server-initiated check, download and update path is off, plugin administration is off, the embedded
+    signing key is used without retrieval, and Grafana logs to its console only (the redirect is grafana.log's
+    single writer)."""
+    env = launch.calls[1]["kwargs"]["env"]
+    assert {key: env[key] for key in dashboard.GRAFANA_LAUNCH_PINS} == dashboard.GRAFANA_LAUNCH_PINS
+    assert env["GF_PLUGINS_PREINSTALL_DISABLED"] == "true" and env["GF_PLUGINS_PREINSTALL_AUTO_UPDATE"] == "false"
+    assert env["GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES"] == "false" and env["GF_LOG_MODE"] == "console"
+    assert "GF_LOG_MODE" not in launch.calls[0]["kwargs"]["env"]
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="job containment is a Windows mechanism")
+def test_launcher_contains_both_launches_and_records_the_job(launch):
+    """Both processes are created suspended with the job handle in their inheritable handle list, assigned to the
+    job and resumed in that order; the launch record names the job and both launches; no pid record exists."""
+    runtime = launch.root / ".groundtruth/dashboard"
+    job_name = dashboard._dashboard_job_name(runtime)
+    assert launch.reply["job"] == job_name
+    handles = set()
+    for call in launch.calls:
+        assert call["kwargs"]["creationflags"] & dashboard.CREATE_SUSPENDED
+        handles.update(call["kwargs"]["startupinfo"].lpAttributeList["handle_list"])
+    assert len(handles) == 1 and all(isinstance(handle, int) and handle for handle in handles)
+    pids = [call["pid"] for call in launch.calls]
+    assert launch.contained == [("assign", pids[0]), ("resume", pids[0]), ("assign", pids[1]), ("resume", pids[1])]
+    record = json.loads((runtime / dashboard.LAUNCH_RECORD_NAME).read_text(encoding="utf-8"))
+    assert record["job"] == job_name
+    assert [(m["role"], m["pid"]) for m in record["members"]] == [("grafana", pids[1]), ("refresh-service", pids[0])]
+    for member in record["members"]:
+        assert {k: member[k] for k in ("pid", "created_at", "executable")} == launch.identities[member["pid"]]
+    assert not (runtime / "pids").exists()
+    # The captured stand-ins never inherited the handle, so the launcher's own close ended the (empty) job.
+    assert dashboard._open_dashboard_job(job_name) is None

@@ -1,4 +1,4 @@
-"""Provider configuration derives independently from the neutral baseline."""
+"""Providers read shared routing and execute authored hooks through their own settings."""
 
 from __future__ import annotations
 
@@ -29,17 +29,18 @@ def projection_root(tmp_path, monkeypatch):
     monkeypatch.setattr(projector, "PROJECT_ROOT", tmp_path)
     baseline = tmp_path / ".harness-baseline-configuration"
     (baseline / "hooks").mkdir(parents=True)
+    (tmp_path / ".agents/skills").mkdir(parents=True)
     (baseline / "routing.toml").write_bytes((ROOT / ".harness-baseline-configuration/routing.toml").read_bytes())
     (baseline / "hooks/manifest.toml").write_text(
         'schema_version=1\n[[hook]]\nevent="session_start"\nscript="identity_probe.py"\nblocking=true\n',
         encoding="utf-8",
     )
     (baseline / "hooks/identity_probe.py").write_text(
-        "import json, os, sys\nfrom pathlib import Path\n"
+        "import json, os, sys, groundtruth_kb\nfrom pathlib import Path\n"
         "payload = json.load(sys.stdin)\n"
-        'out = Path(os.environ["{{HARNESS_PROJECT_DIR_VAR}}"])/"observed-hook.json"\n'
+        'out = Path(os.environ["GTKB_PROJECT_ROOT"])/"observed-hook.json"\n'
         'out.write_text(json.dumps({"path": __file__, "context": payload["session_id"], '
-        '"env_context": os.environ["{{HARNESS_SESSION_ID_VAR}}"]}), encoding="utf-8")\n'
+        '"package_file": groundtruth_kb.__file__, "env_context": os.environ["GTKB_NATIVE_CONTEXT_ID"]}), encoding="utf-8")\n'
         'print("{}")\n',
         encoding="utf-8",
     )
@@ -56,19 +57,23 @@ def projection_root(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("name,provider", PROVIDERS)
-def test_each_provider_routing_and_hooks_are_independently_derived(name, provider, projection_root):
+def test_each_provider_filters_shared_routing_and_executes_authored_hooks(name, provider, projection_root):
     config_root = Path(".api-harness") / name
-    assert config_root / "routing.toml" == provider.ROUTING_CONFIG_PATH
+    assert Path(".harness-baseline-configuration/routing.toml") == provider.ROUTING_CONFIG_PATH
+    assert config_root / "settings.json" == provider.NATIVE_HOOK_SETTINGS_PATH
     plan = projector.build_plan(name)
     assert not plan.gaps
     assert all(Path(path).is_relative_to(config_root) for path in plan.writes)
-    routing = tomllib.loads(plan.writes[(config_root / "routing.toml").as_posix()])
-    assert set(routing["routing"]) == {name}
-    assert {row["provider"] for row in routing["models"].values()} == {name}
+    assert set(plan.writes) == {
+        (config_root / "settings.json").as_posix(),
+        (config_root / ".projection-manifest.json").as_posix(),
+    }
+    source = tomllib.loads((projection_root / provider.ROUTING_CONFIG_PATH).read_text(encoding="utf-8"))
     assert projector.run(name, "write") == 0
     assert projector.run(name, "check") == 0
     loaded = provider.load_routing_config(projection_root)
     assert loaded.default_model in loaded.models
+    assert {source["models"][key]["provider"] for key in loaded.models} == {name}
     assert set(loaded.skill_routes.values()) <= set(loaded.models)
     from groundtruth_kb.project.doctor import _check_provider_routing
 
@@ -82,14 +87,22 @@ def test_each_provider_routing_and_hooks_are_independently_derived(name, provide
     }[provider]
     base.invoke_native_hooks(base.NATIVE_HOOK_SESSION_START, metadata, projection_root, profile)
     observed = json.loads((projection_root / "observed-hook.json").read_text(encoding="utf-8"))
-    assert Path(observed["path"]).resolve().is_relative_to((projection_root / config_root).resolve())
+    assert (
+        Path(observed["path"]).resolve()
+        == (projection_root / ".harness-baseline-configuration/hooks/identity_probe.py").resolve()
+    )
     assert observed["context"] == observed["env_context"] == metadata.native_context_id
+    assert Path(observed["package_file"]).resolve() == Path(groundtruth_kb.__file__).resolve()
 
 
 @pytest.mark.parametrize("name,provider", PROVIDERS)
-def test_missing_own_routing_never_uses_the_old_shared_catalog(name, provider, projection_root):
+def test_missing_baseline_routing_never_uses_retired_shared_or_provider_copies(name, provider, projection_root):
+    (projection_root / provider.ROUTING_CONFIG_PATH).unlink()
+    own = projection_root / ".api-harness" / name / "routing.toml"
+    own.parent.mkdir(parents=True)
+    own.write_bytes((ROOT / ".harness-baseline-configuration/routing.toml").read_bytes())
     shared = projection_root / ".api-harness/routing.toml"
-    shared.parent.mkdir()
+    shared.parent.mkdir(exist_ok=True)
     shared.write_bytes((ROOT / ".harness-baseline-configuration/routing.toml").read_bytes())
     with pytest.raises(RuntimeError, match="routing config is missing"):
         provider.load_routing_config(projection_root)
@@ -120,9 +133,9 @@ def test_provider_loop_executes_own_five_events_and_honors_native_denial(project
     baseline.joinpath("identity_probe.py").write_text(
         "import json, os, sys\nfrom pathlib import Path\n"
         "p = json.load(sys.stdin)\n"
-        'trace = Path(os.environ["{{HARNESS_PROJECT_DIR_VAR}}"])/"hook-events.jsonl"\n'
+        'trace = Path(os.environ["GTKB_PROJECT_ROOT"])/"hook-events.jsonl"\n'
         'entry = {"event": p["hook_event_name"], "session": p["session_id"], '
-        '"native": os.environ["{{HARNESS_SESSION_ID_VAR}}"], "script": __file__}\n'
+        '"native": os.environ["GTKB_NATIVE_CONTEXT_ID"], "script": __file__}\n'
         'with trace.open("a", encoding="utf-8") as f: f.write(json.dumps(entry)+"\\n")\n'
         'deny = {"hookSpecificOutput": {"hookEventName": "PreToolUse", '
         '"permissionDecision": "deny", "permissionDecisionReason": "qualification refusal"}}\n'
@@ -204,16 +217,19 @@ def test_provider_loop_executes_own_five_events_and_honors_native_denial(project
     assert len({entry["session"] for entry in entries}) == 1
     assert all(entry["session"] == entry["native"] for entry in entries)
     assert all(
-        Path(entry["script"]).is_relative_to(projection_root / provider.ROUTING_CONFIG_PATH.parent) for entry in entries
+        Path(entry["script"]) == projection_root / ".harness-baseline-configuration/hooks/identity_probe.py"
+        for entry in entries
     )
 
 
 @pytest.mark.parametrize("name,provider", PROVIDERS)
-def test_provider_config_directory_cannot_be_a_junction_to_peer_material(name, provider, projection_root):
+def test_baseline_routing_cannot_be_a_junction_to_peer_material(name, provider, projection_root):
     peer = projection_root / "unrelated-config"
     peer.mkdir()
     peer.joinpath("routing.toml").write_bytes((ROOT / ".harness-baseline-configuration/routing.toml").read_bytes())
     own = projection_root / provider.ROUTING_CONFIG_PATH.parent
+    preserved = projection_root / "authored-baseline-preimage"
+    own.rename(preserved)
     own.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(
         ["cmd", "/c", "mklink", "/J", str(own), str(peer)], capture_output=True, text=True, encoding="utf-8"
@@ -228,23 +244,24 @@ def test_provider_config_directory_cannot_be_a_junction_to_peer_material(name, p
         assert inspected.status == "fail" and "configuration was not read" in inspected.message
     finally:
         own.rmdir()
+        preserved.rename(own)
 
 
-def test_missing_routing_source_refuses_projection_before_any_output(projection_root):
+def test_routing_is_runtime_input_independent_of_registration_generation(projection_root):
     (projection_root / ".harness-baseline-configuration/routing.toml").unlink()
-    assert projector.run("openrouter", "write") == 2
-    assert not (projection_root / ".api-harness").exists()
+    assert projector.run("openrouter", "write") == 0
+    assert (projection_root / openrouter.NATIVE_HOOK_SETTINGS_PATH).is_file()
+    with pytest.raises(RuntimeError, match="routing config is missing"):
+        openrouter.load_routing_config(projection_root)
 
 
-@pytest.mark.parametrize("nested", (False, True))
-def test_projection_refuses_redirected_output_before_writing(projection_root, nested):
+@pytest.mark.parametrize("ancestor", (False, True))
+def test_projection_refuses_redirected_output_before_writing(projection_root, ancestor):
     peer = projection_root / "unrelated-config"
     peer.mkdir()
     marker = peer / "routing.toml"
     marker.write_text("Unrelated configuration.", encoding="utf-8")
-    own = projection_root / ".api-harness/openrouter"
-    if nested:
-        own = own / "hooks"
+    own = projection_root / (".api-harness" if ancestor else ".api-harness/openrouter")
     own.parent.mkdir(parents=True, exist_ok=True)
     result = subprocess.run(["cmd", "/c", "mklink", "/J", str(own), str(peer)], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
@@ -252,6 +269,30 @@ def test_projection_refuses_redirected_output_before_writing(projection_root, ne
         assert projector.run("openrouter", "write") == 2
         assert marker.read_text(encoding="utf-8") == "Unrelated configuration."
         assert sorted(path.name for path in peer.iterdir()) == ["routing.toml"]
+    finally:
+        own.rmdir()
+
+
+def test_unowned_retired_hook_directory_is_preserved_without_following_its_junction(projection_root):
+    peer = projection_root / "unrelated-hook-directory"
+    peer.mkdir()
+    marker = peer / "routing.toml"
+    marker.write_bytes(b"Unrelated configuration.")
+    own = projection_root / ".api-harness/openrouter/hooks"
+    own.parent.mkdir(parents=True)
+    result = subprocess.run(["cmd", "/c", "mklink", "/J", str(own), str(peer)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    try:
+        # Hooks are no longer outputs; an unowned sibling is neither followed nor removed.
+        assert projector.run("openrouter", "write") == 0
+        assert own.is_junction()
+        assert marker.read_bytes() == b"Unrelated configuration."
+        assert sorted(path.name for path in peer.iterdir()) == ["routing.toml"]
+        manifest = json.loads((own.parent / ".projection-manifest.json").read_text(encoding="utf-8"))
+        assert set(manifest["paths"]) == {
+            ".api-harness/openrouter/settings.json",
+            ".api-harness/openrouter/.projection-manifest.json",
+        }
     finally:
         own.rmdir()
 
@@ -286,9 +327,11 @@ def test_cli_projects_selected_sources_without_opening_a_database(projection_roo
         text.replace('model_id = "deepseek/deepseek-v4-pro"', 'model_id = "changed-model"'), encoding="utf-8"
     )
     check = runner.invoke(main, [*args, "--check"])
-    assert check.exit_code == 1 and "drifted" in check.output
+    assert check.exit_code == 0, check.output
+    assert not (projection_root / ".api-harness/openrouter/routing.toml").exists()
     rendered = tomllib.loads((projection_root / openrouter.ROUTING_CONFIG_PATH).read_text(encoding="utf-8"))
-    assert rendered["models"]["deepseek-v4-pro"]["model_id"] == "deepseek/deepseek-v4-pro"
+    assert rendered["models"]["deepseek-v4-pro"]["model_id"] == "changed-model"
+    assert openrouter.load_routing_config(projection_root).models["deepseek-v4-pro"].model_id == "changed-model"
     conflicting = runner.invoke(main, [*args, "--check", "--validate"])
     assert conflicting.exit_code != 0
     retired = runner.invoke(main, ["--config", str(config), "harness", "roles"])

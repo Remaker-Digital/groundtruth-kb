@@ -17,7 +17,7 @@ from groundtruth_kb.postgres_kernel import (
     PostgresKernelError,
 )
 
-from platform_tests.groundtruth_kb.test_postgres_export_source_set import preflight, snapshot
+from platform_tests.groundtruth_kb.postgres_fixtures import preflight, snapshot
 
 
 def test_migration_classes_are_disjoint_and_preserve_domain_records_and_bindings():

@@ -18,15 +18,18 @@ def no_legacy_authority(monkeypatch):
         pytest.fail("Provider diagnostics must not consult SQLite or legacy harness state")
 
     monkeypatch.setattr("sqlite3.connect", refuse)
-    monkeypatch.setattr("groundtruth_kb.harness_projection.read_roles", refuse)
-    monkeypatch.setattr("groundtruth_kb.harness_projection.read_identity", refuse)
     monkeypatch.delenv("GT_AUTHORITY_URL", raising=False)
     monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_PROBE", raising=False)
     monkeypatch.delenv("GTKB_DOCTOR_OLLAMA_SKIP_HOST_READINESS", raising=False)
 
 
 def routing(root, provider="ollama", content=None):
-    path = root / ".api-harness" / provider / "routing.toml"
+    """Write the one authored routing source (R6 (ii)) beside a projected provider directory.
+
+    The shared file legitimately carries another provider's section; the retired per-provider
+    ``.api-harness/<provider>/routing.toml`` projection is written as unreadable bytes and must stay unread.
+    """
+    path = root / ".harness-baseline-configuration" / "routing.toml"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         content
@@ -35,14 +38,18 @@ def routing(root, provider="ollama", content=None):
             f'provider="{provider}"\ntool_calling_supported=true\n'
             'allowed_tools=["Read","Write","Edit","Grep","Glob","Bash"]\n'
             f'[routing.{provider}]\ndefault_model="fixture"\n'
+            '[routing.peer]\ndefault_model="fixture"\n'
         ),
         encoding="utf-8",
     )
+    retired = root / ".api-harness" / provider / "routing.toml"
+    retired.parent.mkdir(parents=True, exist_ok=True)
+    retired.write_bytes(b"retired per-provider projection \xff")
     return path
 
 
 @pytest.mark.parametrize("provider", ["ollama", "openrouter", "alibaba-cloud-studio"])
-def test_provider_routing_reads_own_projection_and_preserves_foreign_bytes(tmp_path, provider):
+def test_provider_routing_reads_authored_source_and_preserves_foreign_bytes(tmp_path, provider):
     routing(tmp_path, provider)
     poisoned = tmp_path / ".api-harness/routing.toml"
     poisoned.write_bytes(b"unreadable old shared catalog \xff")
@@ -81,7 +88,7 @@ def test_absent_provider_is_inapplicable_but_partial_installation_is_unverified(
         "unknown_tool",
         "not_tool_calling",
         "missing_default",
-        "peer_routing",
+        "bad_skill_route",
     ],
 )
 def test_invalid_provider_routing_is_not_a_pass(tmp_path, change):
@@ -97,7 +104,10 @@ def test_invalid_provider_routing_is_not_a_pass(tmp_path, change):
         "unknown_tool": ('"Bash"', '"UnknownTool"'),
         "not_tool_calling": ("tool_calling_supported=true", "tool_calling_supported=false"),
         "missing_default": ('default_model="fixture"', 'default_model="missing"'),
-        "peer_routing": ('default_model="fixture"', 'default_model="fixture"\n[routing.peer]\ndefault_model="fixture"'),
+        "bad_skill_route": (
+            'default_model="fixture"',
+            'default_model="fixture"\n[routing.ollama.skills]\nreview="missing"',
+        ),
     }
     path.write_text(text.replace(*replacements[change]), encoding="utf-8")
     result = doctor._check_provider_routing(tmp_path, "ollama")

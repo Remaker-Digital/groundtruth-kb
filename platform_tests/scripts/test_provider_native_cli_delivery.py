@@ -8,43 +8,23 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import subprocess
 from pathlib import Path
-from uuid import UUID
 
 import pytest
 
+from platform_tests.scripts.provider_fixtures import (
+    PROVIDERS,
+    _response,
+    create_provider_guard_fixtures,
+    native_id_from_payload,
+)
 from scripts import alibaba_cloud_studio_harness as alibaba
 from scripts import cloud_harness_base as base
 from scripts import ollama_harness as ollama
 from scripts import openrouter_harness as openrouter
 
-PROVIDERS = (openrouter, ollama, alibaba)
 ROOT = Path(__file__).resolve().parents[2]
-
-
-def create_provider_guard_fixtures(provider, root):
-    runtime = ollama if provider is ollama else base
-    paths = set(runtime.WRITE_EDIT_GUARDS + runtime.BASH_GUARDS)
-    if runtime is base:
-        paths = base.projected_guard_paths(tuple(paths), provider.ROUTING_CONFIG_PATH)
-    for relative in paths:
-        target = root / relative
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text("# Controlled guard fixture", encoding="utf-8")
-    (root / provider.ROUTING_CONFIG_PATH.parent / "settings.json").write_text('{"hooks": {}}', encoding="utf-8")
-    return runtime
-
-
-def native_id_from_payload(payload):
-    system = payload.get("system") or "\n".join(
-        message["content"] for message in payload["messages"] if message["role"] == "system"
-    )
-    identifiers = re.findall(r"Native context identifier: ([0-9a-f-]{36})\.", system)
-    assert len(identifiers) == 1, system
-    assert str(UUID(identifiers[0])) == identifiers[0]
-    return identifiers[0]
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
@@ -123,12 +103,14 @@ def test_fresh_runs_keep_independent_native_identity_through_tools_and_model_cha
 @pytest.mark.parametrize("skill,selected", [("bridge-review", "gtkb-proposal-review"), ("verification", "gtkb-verify")])
 def test_prompt_reads_current_selected_canonical_skills(provider, skill, selected, tmp_path, monkeypatch):
     monkeypatch.setenv("GTKB_INHERITED_SESSION_ID", "parent-context")
+    (tmp_path / "AGENTS.md").write_text("Shared root instructions.\n", encoding="utf-8")
     for name in ("gtkb-bridge", selected):
-        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
+        relative = Path(".agents") / "skills" / name / "SKILL.md"
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((ROOT / relative).read_bytes())
     prompt = provider.build_system_prompt(skill, tmp_path)
+    assert prompt.startswith("Shared root instructions.\n")
     assert "parent-context" not in prompt
     assert "gt bridge deliver" in prompt
     assert "PublishBridgeVerdict" not in prompt
@@ -147,13 +129,67 @@ def test_prompt_reads_current_selected_canonical_skills(provider, skill, selecte
 
 @pytest.mark.parametrize("provider", PROVIDERS)
 def test_skill_loading_does_not_assign_a_context_before_the_runtime_starts(provider, tmp_path):
+    (tmp_path / "AGENTS.md").write_text("Shared root instructions.", encoding="utf-8")
     for name in ("gtkb-bridge", "gtkb-proposal-review"):
-        target = tmp_path / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
+        target = tmp_path / ".agents" / "skills" / name / "SKILL.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("Current source.", encoding="utf-8")
-    assert provider.build_system_prompt("bridge-review", tmp_path) == "Current source.\n\nCurrent source."
-    assert provider.build_system_prompt(None, tmp_path) is None
-    assert provider.build_system_prompt("implementation", tmp_path) is None
+    assert provider.build_system_prompt("bridge-review", tmp_path) == (
+        "Shared root instructions.\n\nCurrent source.\n\nCurrent source."
+    )
+    assert provider.build_system_prompt(None, tmp_path) == "Shared root instructions."
+    assert provider.build_system_prompt("implementation", tmp_path) == "Shared root instructions."
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize("skill", [None, "implementation", "bridge-review", "verification"])
+def test_prompt_rereads_shared_root_without_assigning_runtime_identity(provider, skill, tmp_path, monkeypatch):
+    monkeypatch.setenv("GTKB_NATIVE_CONTEXT_ID", "parent-context")
+    for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
+        target = tmp_path / ".agents" / "skills" / name / "SKILL.md"
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text("Selected skill body.", encoding="utf-8")
+    source = tmp_path / "AGENTS.md"
+    source.write_text("Root instruction one.", encoding="utf-8")
+    first = provider.build_system_prompt(skill, tmp_path)
+    source.write_text("Root instruction two.", encoding="utf-8")
+    second = provider.build_system_prompt(skill, tmp_path)
+    assert first.startswith("Root instruction one.")
+    assert second.startswith("Root instruction two.")
+    assert "Root instruction one." not in second
+    assert ("Selected skill body." in second) == (skill in ("bridge-review", "verification"))
+    assert "parent-context" not in first + second
+    assert os.environ["GTKB_NATIVE_CONTEXT_ID"] == "parent-context"
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+@pytest.mark.parametrize("kind", ["missing", "empty", "invalid_utf8", "directory"])
+def test_prompt_refuses_unavailable_shared_root(provider, kind, tmp_path):
+    source = tmp_path / "AGENTS.md"
+    if kind == "empty":
+        source.write_text(" \n", encoding="utf-8")
+    elif kind == "invalid_utf8":
+        source.write_bytes(b"\xff")
+    elif kind == "directory":
+        source.mkdir()
+    with pytest.raises(RuntimeError, match="Shared root instructions are unavailable"):
+        provider.build_system_prompt(None, tmp_path)
+
+
+@pytest.mark.parametrize("provider", PROVIDERS)
+def test_prompt_refuses_shared_root_that_resolves_outside_project(provider, tmp_path, monkeypatch):
+    source = tmp_path / "AGENTS.md"
+    source.write_text("local bytes", encoding="utf-8")
+    original = Path.resolve
+
+    def resolve(path, *args, **kwargs):
+        if path == source:
+            return tmp_path.parent / "foreign-root.md"
+        return original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "resolve", resolve)
+    with pytest.raises(RuntimeError, match="outside the project root"):
+        provider.build_system_prompt(None, tmp_path)
 
 
 @pytest.mark.parametrize("runtime", (base, ollama))
@@ -161,25 +197,6 @@ def test_retired_publisher_is_not_a_tool(runtime):
     assert {"Read", "Write", "Edit", "Grep", "Glob", "Bash"} == runtime.CANONICAL_TOOLS
     with pytest.raises(RuntimeError, match="unknown allowed tools"):
         runtime.build_tool_schemas(["PublishBridgeVerdict"])
-
-
-def _response(provider, *, tool=None, arguments=None, content=""):
-    if provider is alibaba:
-        blocks = (
-            [{"type": "tool_use", "id": "call-1", "name": tool, "input": arguments}]
-            if tool
-            else [{"type": "text", "text": content}]
-        )
-        return {"content": blocks, "stop_reason": "tool_use" if tool else "end_turn"}
-    message = {"content": content}
-    if tool:
-        message["tool_calls"] = [
-            {
-                "id": "call-1",
-                "function": {"name": tool, "arguments": arguments if provider is ollama else json.dumps(arguments)},
-            }
-        ]
-    return {"message": message} if provider is ollama else {"choices": [{"message": message}]}
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
@@ -364,7 +381,7 @@ def test_bridge_task_requires_an_explicit_successor_before_model_execution(provi
 @pytest.mark.parametrize("subject,role", [("gtkb", "pb"), ("gtkb", "lo"), ("application", "pb"), ("application", "lo")])
 def test_init_prompt_is_preserved_without_inventing_a_bridge_assignment(provider, subject, role, tmp_path):
     runtime = create_provider_guard_fixtures(provider, tmp_path)
-    settings = tmp_path / provider.ROUTING_CONFIG_PATH.parent / "settings.json"
+    settings = tmp_path / provider.NATIVE_HOOK_SETTINGS_PATH
     settings.write_text(
         json.dumps(
             {

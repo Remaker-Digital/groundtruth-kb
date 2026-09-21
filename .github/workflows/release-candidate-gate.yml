@@ -19,9 +19,10 @@ on:
       - 'groundtruth-kb/tests/**'
       - 'memory/**'
       - 'bridge/**'
-      - '.claude/hooks/**'
-      # WI-5640: hooks relocated from .claude/hooks/ to config/hooks/; keep both so
-      # CI re-triggers on changes in either the legacy compat path or the canonical home.
+      - '.harness-baseline-configuration/hooks/**'
+      - '.agents/skills/**'
+      # WI-5640 / D15: the hook scripts run in place from the baseline hooks directory
+      # above; config/hooks/ stays covered so CI re-triggers on changes in either home.
       - 'config/hooks/**'
   push:
     branches: [main, develop, 'hotfix/**']
@@ -38,8 +39,9 @@ on:
       - 'groundtruth-kb/tests/**'
       - 'memory/**'
       - 'bridge/**'
-      - '.claude/hooks/**'
-      # WI-5640: hooks relocated from .claude/hooks/ to config/hooks/; keep both.
+      - '.harness-baseline-configuration/hooks/**'
+      - '.agents/skills/**'
+      # WI-5640 / D15: baseline hooks directory above; config/hooks/ stays covered.
       - 'config/hooks/**'
   workflow_dispatch:
 
@@ -84,15 +86,6 @@ jobs:
       # installs are allowed).
       - name: Install local groundtruth-kb source
         run: pip install --upgrade ./groundtruth-kb[search]
-
-      # Seed groundtruth.db with the MemBase records that the governance_adoption
-      # tests assert. groundtruth.db is gitignored per owner decision 2026-04-24
-      # (commit 23a54af3); CI must materialize the records from
-      # applications/Agent_Red/tests/fixtures/ci_membase_seed.json before pytest runs.
-      # SQLite-era step; it belongs to the scoped-client follow-on retirement batch.
-      # Per DELIB-S330-SLICE-8-6-PHASE-1-5-CI-DB-SEED-CHOICE (Option A).
-      - name: Seed CI MemBase records
-        run: python scripts/membase_ci_seed.py seed
 
       - name: Configure git hooks path
         run: git config core.hooksPath .githooks

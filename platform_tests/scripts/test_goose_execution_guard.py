@@ -375,7 +375,7 @@ class TestProvenanceGuard:
         path = bridge_dir / name
         path.write_text(
             f"GO\n"
-            f"author_identity: prime-builder/goose/G\n"
+            f"author_identity: Goose G\n"
             f"author_harness_id: G\n"
             f"author_session_context_id: test-123\n"
             f"author_model: {author_model}\n"

@@ -26,11 +26,8 @@ def _rule() -> str:
     return BASELINE.read_text(encoding="utf-8")
 
 
-def test_rule_is_projected_from_the_baseline_unchanged() -> None:
-    body = _rule()
-    projected = PROJECTION.read_text(encoding="utf-8")
-    assert body.startswith("# Peer solution and advisory workflow")
-    assert projected.rstrip().endswith(body.rstrip()), "the projection must carry the baseline body verbatim"
+def test_rule_is_authored_once_without_a_projected_copy() -> None:
+    assert not PROJECTION.exists(), "rules are read on demand from the authored baseline"
 
 
 def test_rule_names_the_governing_records() -> None:

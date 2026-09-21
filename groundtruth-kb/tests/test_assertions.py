@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -17,6 +18,7 @@ from groundtruth_kb.assertions import (
     run_all_assertions,
     run_single_assertion,
     run_spec_assertions,
+    select_scoped_specs,
 )
 from groundtruth_kb.db import KnowledgeDB
 
@@ -385,6 +387,57 @@ class TestSpecAssertions:
     def test_run_nonexistent_spec(self, db: KnowledgeDB, project_dir: Path) -> None:
         summary = run_all_assertions(db, project_dir, spec_id="NOPE-999")
         assert "error" in summary
+
+    def test_selected_scope_keeps_unscoped_records_and_excludes_other_scopes(self, project_dir: Path) -> None:
+        def spec(ident: str, scope: str | None, pattern: str = "README.md") -> dict[str, Any]:
+            return {
+                "id": ident,
+                "version": 1,
+                "title": ident,
+                "status": "active",
+                "application_scope": scope,
+                "assertions": [{"type": "glob", "pattern": pattern, "description": ident}],
+            }
+
+        records = {
+            "SPEC-P": spec("SPEC-P", "gtkb_platform"),
+            "SPEC-A": spec("SPEC-A", "application:Alpha"),
+            "SPEC-N": spec("SPEC-N", None),
+            "SPEC-B": spec("SPEC-B", "application:Beta", "MISSING.md"),
+        }
+
+        class Reader:
+            def get_spec(self, spec_id: str, /) -> dict[str, Any] | None:
+                return records.get(spec_id)
+
+            def list_specs(self, *, status: str) -> list[dict[str, Any]]:
+                return [dict(record) for record in records.values() if record["status"] == status]
+
+        selected, counts = select_scoped_specs(list(records.values()), "application:Alpha")
+        assert [record["id"] for record in selected] == ["SPEC-A", "SPEC-N"]
+        assert counts == {"scoped_specs": 1, "unscoped_specs": 1, "excluded_specs": 2}
+        everything, counts = select_scoped_specs(list(records.values()), None)
+        assert len(everything) == 4 and counts == {"scoped_specs": 4, "unscoped_specs": 0, "excluded_specs": 0}
+
+        summary = run_all_assertions(Reader(), project_dir, application_scope="application:Alpha")
+        assert [row["spec_id"] for row in summary["details"]] == ["SPEC-A", "SPEC-N"]
+        assert summary["application_scope"] == "application:Alpha" and summary["aggregate_result"] == "PASS"
+        assert summary["total_specs"] == 2
+        assert (summary["scoped_specs"], summary["unscoped_specs"], summary["excluded_specs"]) == (1, 1, 2)
+        text = format_summary(summary)
+        assert "Scope:             application:Alpha" in text
+        assert "Unscoped (null) records evaluated with it: 1" in text
+        assert "Other-scope records excluded:              2" in text
+
+        unselected = run_all_assertions(Reader(), project_dir)
+        assert unselected["total_specs"] == 4 and unselected["application_scope"] is None
+        assert (unselected["scoped_specs"], unselected["unscoped_specs"], unselected["excluded_specs"]) == (4, 0, 0)
+        assert "every active record (no scope selected)" in format_summary(unselected)
+        assert "Unscoped (null)" not in format_summary(unselected)
+
+        single = run_all_assertions(Reader(), project_dir, spec_id="SPEC-B", application_scope="application:Alpha")
+        assert single["aggregate_result"] == "FAIL" and single["total_specs"] == 1
+        assert (single["scoped_specs"], single["unscoped_specs"], single["excluded_specs"]) == (0, 0, 0)
 
     def test_unassessed_only_summary_is_not_a_pass(self, db: KnowledgeDB, project_dir: Path) -> None:
         db.insert_spec(

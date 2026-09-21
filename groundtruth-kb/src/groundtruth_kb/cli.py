@@ -915,9 +915,9 @@ def _format_secret_scan_markdown(result: Any) -> str:
 
 
 def _default_secret_allowlist(repo_root: Path) -> Any:
-    from groundtruth_kb.secrets import Allowlist
+    from groundtruth_kb.secrets.allowlist import DEFAULT_ALLOWLIST_PATH, Allowlist
 
-    return Allowlist.load(repo_root / "tests" / "secrets" / "fixtures" / "allowlist.toml")
+    return Allowlist.load(repo_root / DEFAULT_ALLOWLIST_PATH)
 
 
 @secrets.command("scan")
@@ -1306,9 +1306,8 @@ def scaffold_iac_cmd(profile: str, apply: bool, target_dir: Path) -> None:
     (never overwritten). If you want to reset a file to skeleton state,
     delete it first and re-run scaffold.
 
-    Pair each module with the matching ADR-Azure-* instance from D2
-    (``gt scaffold adrs``): each skeleton references its ADR handle in a
-    TODO marker.
+    Pair each module with the matching current canonical Azure ADR. Each
+    skeleton references its ADR handle in a TODO marker.
     """
     from groundtruth_kb.iac_scaffold import (
         IacScaffoldConfig,

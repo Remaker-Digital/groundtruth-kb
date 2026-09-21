@@ -21,8 +21,8 @@ import groundtruth_kb
 import pytest
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 
-from platform_tests.groundtruth_kb.test_native_authority_service import native as native_authority_fixture
-from platform_tests.groundtruth_kb.test_native_authority_service import put
+from platform_tests.groundtruth_kb.native_fixtures import native as native_authority_fixture
+from platform_tests.groundtruth_kb.native_fixtures import put
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNNER_PATH = REPO_ROOT / "scripts/run_spec_derived_tests.py"
@@ -231,6 +231,43 @@ def test_source_change_during_actual_execution_invalidates_report(setup, capsys,
     code, report = observe(setup, capsys)
     assert code == 2 and report["inputs_unchanged"] is False
     assert "selected_inputs_changed" in report["problems"]
+
+
+@pytest.mark.parametrize("change", ["modify", "add", "delete", "unchanged"])
+def test_python_helper_changes_invalidate_actual_execution(setup, capsys, change):
+    root = setup[1]
+    helper = root / "platform_tests/native_fixtures.py"
+    helper.parent.mkdir(parents=True, exist_ok=True)
+    helper.write_text("VALUE = 7\n", encoding="utf-8")
+    actions = {
+        "modify": "helper.write_text('VALUE = 8\\n', encoding='utf-8')",
+        "add": "helper.with_name('new_helper.py').write_text('VALUE = 9\\n', encoding='utf-8')",
+        "delete": "helper.unlink()",
+        "unchanged": "assert helper.is_file()",
+    }
+    write_test(
+        root,
+        body=(
+            "from pathlib import Path\n"
+            "import importlib.util\n"
+            "spec = importlib.util.spec_from_file_location('probe_helper', Path(__file__).with_name('native_fixtures.py'))\n"
+            "helper_module = importlib.util.module_from_spec(spec)\n"
+            "spec.loader.exec_module(helper_module)\n"
+            "def test_change():\n"
+            "    assert helper_module.VALUE == 7\n"
+            "    helper = Path(__file__).with_name('native_fixtures.py')\n"
+            "    " + actions[change] + "\n"
+        ),
+    )
+    code, report = observe(setup, capsys)
+    execution = next(iter(report["executions"].values()))
+    assert execution["passed"] == 1 and execution["returncode"] == 0
+    if change == "unchanged":
+        assert code == 1 and report["inputs_unchanged"] is True
+        assert report["execution_result"] == "PASS"
+    else:
+        assert code == 2 and report["inputs_unchanged"] is False
+        assert "selected_inputs_changed" in report["problems"]
 
 
 @pytest.mark.parametrize("change", ["version", "unavailable", "new_test"])

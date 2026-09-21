@@ -44,7 +44,7 @@ import subprocess
 import sys
 import time
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
@@ -60,10 +60,16 @@ if sys.platform == "win32" and __name__ == "__main__":
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
-sys.path.insert(0, str(PROJECT_ROOT / "tools" / "knowledge-db"))
+
+from upgrade_verification import ENVIRONMENTS  # noqa: E402
 
 from scripts._subprocess_stream import stream_subprocess  # noqa: E402
-from upgrade_verification import ENVIRONMENTS  # noqa: E402
+
+# Evidence pair of the DEFECT work items this orchestrator records (WI-7860, owner ruling D17): the governing
+# specification and this orchestrator's own executable test; the native writer refuses creation without both.
+DEFECT_SOURCE_SPEC_ID = "SPEC-1825"
+DEFECT_SOURCE_TEST_ID = "TEST-DEPLOY-ORCHESTRATOR-001"
+DEFECT_ACTOR = "deploy-orchestrator"
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -148,7 +154,7 @@ def _step(result: DeployResult, name: str, status: str, detail: str = "") -> Non
             "name": name,
             "status": status,
             "detail": detail,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
         }
     )
 
@@ -453,24 +459,28 @@ def _rollback(result: DeployResult, env: str) -> None:
         result.rollback_performed = True
         _step(result, "rollback", "passed", result.previous_image)
 
-    # Create DEFECT work item for the rollback
-    try:
-        from scripts._defect_reporter import create_defect
+    # Record the rollback as a DEFECT work item on the native authority (WI-7860, owner ruling D17).
+    # A refused or unreachable authority raises DefectReportError out of the rollback: nothing is warned past.
+    from scripts._defect_reporter import create_defect
 
-        create_defect(
-            title=f"Deploy rollback: {env} {result.version} → {result.previous_image}",
-            description=(
-                f"Deploy of {result.version} to {env} failed verification. "
-                f"Auto-rollback to {result.previous_image}. "
-                f"Verification: {result.verification_pass} pass, "
-                f"{result.verification_fail} fail. Error: {result.error}"
-            ),
-            source_spec_id="SPEC-1825",
-            component="infrastructure_automation",
-            changed_by="deploy-orchestrator",
-        )
-    except Exception as e:
-        _log("WARN", f"  Could not create DEFECT WI: {e}")
+    wi_id = create_defect(
+        title=f"Deploy rollback: {env} {result.version} → {result.previous_image}",
+        description=(
+            f"Deploy of {result.version} to {env} failed verification. "
+            f"Auto-rollback to {result.previous_image}. "
+            f"Verification: {result.verification_pass} pass, "
+            f"{result.verification_fail} fail. Error: {result.error}"
+        ),
+        source_spec_id=DEFECT_SOURCE_SPEC_ID,
+        source_test_id=DEFECT_SOURCE_TEST_ID,
+        actor=DEFECT_ACTOR,
+        reason=(
+            f"Deploy orchestrator ({DEFECT_SOURCE_SPEC_ID}) rolled {env} back from {result.version} "
+            f"to {result.previous_image} after failed verification"
+        ),
+        component="infrastructure_automation",
+    )
+    _log("INFO", f"  Created DEFECT work item: {wi_id}")
 
 
 # ---------------------------------------------------------------------------
@@ -494,7 +504,7 @@ def run_deploy(
         environment=env,
         version=version,
         dry_run=dry_run,
-        started_at=datetime.now(timezone.utc).isoformat(),
+        started_at=datetime.now(UTC).isoformat(),
     )
 
     _log("INFO", f"Deploy Orchestrator starting: {env} {version}" + (" [DRY RUN]" if dry_run else ""))
@@ -588,7 +598,7 @@ def _record_deployment_event(result: DeployResult, env: str) -> None:
 
 def _finalize(result: DeployResult, env: str) -> None:
     """Compute duration and write log file."""
-    result.completed_at = datetime.now(timezone.utc).isoformat()
+    result.completed_at = datetime.now(UTC).isoformat()
     result.duration_s = round(
         (datetime.fromisoformat(result.completed_at) - datetime.fromisoformat(result.started_at)).total_seconds(), 1
     )

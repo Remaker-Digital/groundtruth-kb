@@ -184,22 +184,22 @@ DEFAULT_ANTHROPIC_MAX_TOKENS = 4096
 
 # Generic GT-KB guard-adapter sequences (shared across adopters; not adopter-specific).
 BRIDGE_WRITE_GUARDS = (
-    Path("hooks/credential-scan.py"),
-    Path("hooks/scanner-safe-writer.py"),
+    Path(".harness-baseline-configuration/hooks/credential-scan.py"),
+    Path(".harness-baseline-configuration/hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 BRIDGE_EDIT_GUARDS = (
-    Path("hooks/credential-scan.py"),
-    Path("hooks/scanner-safe-writer.py"),
+    Path(".harness-baseline-configuration/hooks/credential-scan.py"),
+    Path(".harness-baseline-configuration/hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 WRITE_EDIT_GUARDS = (
-    Path("hooks/credential-scan.py"),
-    Path("hooks/scanner-safe-writer.py"),
+    Path(".harness-baseline-configuration/hooks/credential-scan.py"),
+    Path(".harness-baseline-configuration/hooks/scanner-safe-writer.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 BASH_GUARDS = (
-    Path("hooks/destructive-gate.py"),
+    Path(".harness-baseline-configuration/hooks/destructive-gate.py"),
     Path("scripts/implementation_start_gate.py"),
 )
 
@@ -280,6 +280,7 @@ class NativeHookProfile:
     author_harness_id: str
     default_endpoint: str
     routing_config_path: Path
+    native_hook_settings_path: Path
     dialect: str
     hook_tier: str = HOOK_TIER_NATIVE_FULL
 
@@ -295,6 +296,7 @@ class AdopterProfile:
     auth_env_key: str
     provider_routing_key: str
     routing_config_path: Path
+    native_hook_settings_path: Path
     dialect: str = DIALECT_OPENAI_CHAT
     hook_tier: str = HOOK_TIER_GUARD_ADAPTER_FLOOR
     extra_headers: Mapping[str, str] = field(default_factory=dict)
@@ -1224,7 +1226,7 @@ def _default_guard_runner(
 ) -> GuardExecutionResult:
     try:
         completed = subprocess.run(
-            [sys.executable, str(guard_path)],
+            [sys.executable, "-B", str(guard_path)],
             input=json.dumps(payload),
             text=True,
             capture_output=True,
@@ -1326,7 +1328,7 @@ def _native_pretool_timeout_reason(tool_name: str | None, command: str, hook_tim
 
 
 def _load_native_hook_settings(project_root: Path, profile: AdopterProfile | NativeHookProfile) -> Mapping[str, Any]:
-    relative = profile.routing_config_path.parent / "settings.json"
+    relative = profile.native_hook_settings_path
     settings_path = resolve_configuration_path(project_root, relative)
     if not settings_path.is_file():
         raise CloudHarnessError(f"native hook settings are missing: {relative.as_posix()}")
@@ -1590,10 +1592,6 @@ def _guard_paths_for(tool_name: str, tool_input: Mapping[str, Any], project_root
     raise CloudHarnessError(f"unsupported guarded tool: {tool_name}")
 
 
-def projected_guard_paths(paths: Sequence[Path], config_path: Path) -> tuple[Path, ...]:
-    return tuple(config_path.parent / path if path.parts[0] == "hooks" else path for path in paths)
-
-
 def invoke_guard_adapter(
     tool_name: str,
     arguments: Mapping[str, Any],
@@ -1613,11 +1611,7 @@ def invoke_guard_adapter(
     if tool_name not in MUTATING_TOOLS:
         return
     tool_input = _guard_tool_input(tool_name, arguments, project_root)
-    paths = (
-        tuple(guard_paths)
-        if guard_paths is not None
-        else projected_guard_paths(_guard_paths_for(tool_name, tool_input, project_root), profile.routing_config_path)
-    )
+    paths = tuple(guard_paths) if guard_paths is not None else _guard_paths_for(tool_name, tool_input, project_root)
     runner = guard_runner or _default_guard_runner
     env = set_author_metadata_env(
         os.environ,

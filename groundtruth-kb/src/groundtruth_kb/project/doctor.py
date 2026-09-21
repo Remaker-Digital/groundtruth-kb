@@ -7,18 +7,25 @@ import json
 import os
 import re
 import shutil
-import sqlite3
 import subprocess
 import sys
 from collections.abc import Callable
 from contextlib import suppress
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any, Literal, ParamSpec, TypeVar
 
 from groundtruth_kb import get_templates_dir
-from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
+from groundtruth_kb.authority_client import (
+    AuthorityClient,
+    AuthorityClientError,
+)
+from groundtruth_kb.authority_client import (
+    configured_authority_client as _configured_authority_client,
+)
+from groundtruth_kb.authority_client import (
+    page_records as _page_native_records,
+)
 from groundtruth_kb.project.managed_registry import (
     FileArtifact,
     GitignorePattern,
@@ -28,15 +35,9 @@ from groundtruth_kb.project.managed_registry import (
 )
 from groundtruth_kb.project.profiles import get_profile
 
-STANDING_BACKLOG_STALE_NO_GO_DAYS = 14
 IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES = frozenset({"in_progress"})
 IMPLEMENTATION_ACTIVE_STAGES = frozenset({"implementing"})
-_BRIDGE_VERSION_FILE_RE = re.compile(r"^(.+)-(\d{3,})\.md$")
-_BRIDGE_FILE_STATUS_RE = re.compile(
-    r"^[#>*\-\s`]*(NEW|REVISED|GO|NO-GO|VERIFIED|WITHDRAWN|ADVISORY|DEFERRED|ACCEPTED|BLOCKED)\b",
-    re.IGNORECASE,
-)
-_BRIDGE_DATE_RE = re.compile(r"^Date:\s*(\d{4}-\d{2}-\d{2})(?:\s+UTC)?\s*$", re.IGNORECASE)
+WORK_ITEM_TERMINAL_RESOLUTION_STATUSES = frozenset({"verified", "resolved", "retired", "wont_fix", "not_a_defect"})
 _LEGACY_ROOT_MARKERS = (
     "E:\\Claude-Playground",
     "E:\\\\Claude-Playground",
@@ -202,8 +203,8 @@ $services = @(Get-Service | Where-Object {
 
 _ACTIVE_LEGACY_ROOT_GLOBS = (
     "AGENTS.md",
-    ".claude/rules/*.md",
-    ".claude/hooks/*.py",
+    ".harness-baseline-configuration/rules/*.md",
+    ".harness-baseline-configuration/hooks/*.py",
     ".codex/hooks.json",
     "config/**/*",
     "scripts/**/*.py",
@@ -535,133 +536,180 @@ def _check_groundtruth_toml(target: Path) -> ToolCheck:
         )
 
 
-def _check_db_schema(target: Path) -> ToolCheck:
-    db_path = target / "groundtruth.db"
-    if not db_path.exists():
+def _sorted_names(value: Any) -> Any:
+    """Render a status list deterministically; anything else passes through."""
+    return sorted(str(item) for item in value) if isinstance(value, list) else value
+
+
+def _check_authority_readiness(target: Path) -> ToolCheck:
+    """``GET /v1/status`` of the configured authority: reachable and schema-ready, or why not.
+
+    Replaces the retired local-store schema check (D23/D31). A local store with
+    the canonical tables is no longer a health criterion; the surviving duty is
+    that the configured authority is reachable and its schema is ready. No
+    configured authority is a warning (unverified), never a failure.
+    """
+    from groundtruth_kb.config import GTConfigError
+
+    name = "Authority readiness"
+    try:
+        client = _configured_authority_client(target)
+    except (AuthorityClientError, GTConfigError, OSError) as exc:
+        unconfigured = isinstance(exc, AuthorityClientError) and exc.code == "authority_not_configured"
         return ToolCheck(
-            name="Knowledge DB",
+            name=name,
+            required=True,
+            found=False,
+            status="warning" if unconfigured else "fail",
+            message=(
+                "No authority_url is configured (groundtruth.toml [groundtruth] authority_url or "
+                "GT_AUTHORITY_URL); native readiness is unverified"
+            )
+            if unconfigured
+            else f"Authority configuration invalid: {exc}",
+        )
+    try:
+        payload = client.request("GET", "/v1/status")
+    except AuthorityClientError as exc:
+        return ToolCheck(
+            name=name,
             required=True,
             found=False,
             status="fail",
-            message="groundtruth.db not found",
+            message=f"Authority {client.url} unreachable: {exc.code}: {exc}",
         )
-    try:
-        import sqlite3
-
-        conn = sqlite3.connect(str(db_path))
-        tables = [r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()]
-        conn.close()
-        expected = {"specifications", "tests", "work_items"}
-        if expected.issubset(set(tables)):
-            return ToolCheck(
-                name="Knowledge DB",
-                required=True,
-                found=True,
-                status="pass",
-                message=f"Schema OK ({len(tables)} tables)",
-            )
-        missing = expected - set(tables)
+    if not isinstance(payload, dict) or not isinstance(payload.get("ready"), bool):
         return ToolCheck(
-            name="Knowledge DB",
+            name=name,
             required=True,
             found=True,
             status="fail",
-            message=f"Missing tables: {missing}",
+            message=f"Authority {client.url} returned an invalid status payload",
         )
-    except Exception as e:  # intentional-catch: validation tool, error -> fail status
-        return ToolCheck(
-            name="Knowledge DB",
-            required=True,
-            found=True,
-            status="fail",
-            message=f"DB error: {e}",
-        )
-
-
-def _check_application_scope_alignment(target: Path) -> ToolCheck:
-    """Validate explicit application_scope/path alignment for specs and tests."""
-    name = "Application scope alignment"
-    db_path = target / "groundtruth.db"
-    if not db_path.exists():
-        return ToolCheck(name=name, required=True, found=False, status="fail", message="groundtruth.db not found")
-    try:
-        from groundtruth_kb.project.application_scope import classify_application_scope, scope_path_violations
-
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        try:
-            spec_cols = {row[1] for row in conn.execute("PRAGMA table_info(specifications)").fetchall()}
-            test_cols = {row[1] for row in conn.execute("PRAGMA table_info(tests)").fetchall()}
-            missing = []
-            if "application_scope" not in spec_cols:
-                missing.append("specifications.application_scope")
-            if "application_scope" not in test_cols:
-                missing.append("tests.application_scope")
-            if missing:
-                return ToolCheck(
-                    name=name,
-                    required=True,
-                    found=True,
-                    status="fail",
-                    message=f"Missing application_scope column(s): {', '.join(missing)}",
-                )
-
-            violations: list[str] = []
-            ambiguous: list[str] = []
-            spec_rows = conn.execute(
-                "SELECT id, title, source_paths, application_scope FROM current_specifications ORDER BY id"
-            ).fetchall()
-            test_rows = conn.execute(
-                "SELECT id, title, test_file, application_scope FROM current_tests ORDER BY id"
-            ).fetchall()
-            for row in spec_rows:
-                paths: list[str] = []
-                if row["source_paths"]:
-                    try:
-                        raw_paths = json.loads(row["source_paths"])
-                    except json.JSONDecodeError:
-                        raw_paths = []
-                    if isinstance(raw_paths, list):
-                        paths = [path for path in raw_paths if isinstance(path, str)]
-                for violation in scope_path_violations(row["application_scope"], paths):
-                    violations.append(f"spec {row['id']}: {violation}")
-                classification = classify_application_scope(row["id"], row["title"], paths)
-                if classification.ambiguous and row["application_scope"] is None:
-                    ambiguous.append(f"spec {row['id']}: {', '.join(classification.reasons)}")
-            for row in test_rows:
-                paths = [row["test_file"]] if row["test_file"] else []
-                for violation in scope_path_violations(row["application_scope"], paths):
-                    violations.append(f"test {row['id']}: {violation}")
-                classification = classify_application_scope(row["id"], row["title"], paths)
-                if classification.ambiguous and row["application_scope"] is None:
-                    ambiguous.append(f"test {row['id']}: {', '.join(classification.reasons)}")
-        finally:
-            conn.close()
-
-        if violations:
-            sample = "; ".join(violations[:5])
-            return ToolCheck(
-                name=name,
-                required=True,
-                found=True,
-                status="fail",
-                message=f"{len(violations)} application-scope alignment violation(s): {sample}",
-            )
-        if ambiguous:
-            sample = "; ".join(ambiguous[:5])
-            return ToolCheck(
-                name=name,
-                required=False,
-                found=True,
-                status="warning",
-                message=f"{len(ambiguous)} ambiguous application-scope candidate(s): {sample}",
-            )
+    if payload["ready"]:
         return ToolCheck(
             name=name,
             required=True,
             found=True,
             status="pass",
-            message="Application-scope alignment OK",
+            message=(
+                f"Authority {client.url} ready (schema {payload.get('schema_version')}, "
+                f"PostgreSQL {payload.get('postgresql_major_version')})"
+            ),
+        )
+    detail = ", ".join(
+        f"{key}={_sorted_names(payload.get(key))}"
+        for key in ("missing_tables", "unexpected_tables", "forbidden_tables", "forbidden_columns")
+    )
+    return ToolCheck(
+        name=name,
+        required=True,
+        found=True,
+        status="fail",
+        message=(
+            f"Authority {client.url} not ready: {detail}, "
+            f"schema_catalog_matches={payload.get('schema_catalog_matches')}"
+        ),
+    )
+
+
+_APPLICATION_SLOT_PATH_RE = re.compile(r"^applications/([A-Za-z][A-Za-z0-9_-]*)/")
+
+
+def _native_scope_path_violations(scope: str | None, paths: list[str]) -> list[str]:
+    """Violations of an explicit native application_scope against a record's path evidence.
+
+    The vocabulary is the authority's (``gtkb_platform`` or ``application:<catalog
+    name>``, ``groundtruth_kb.isolation.scope``); a retired marker such as
+    ``agent_red_application`` is itself a violation. Path evidence under another
+    application's slot (``applications/<slot>/``) contradicts the scope. Paths
+    outside ``applications/`` are platform or application-relative evidence and
+    an absent path list is not a finding: source paths are optional, and the
+    authority validates the catalog name when the record is written.
+    """
+    from groundtruth_kb.isolation.scope import PLATFORM_SCOPE, ApplicationScopeError, explicit_application_scope
+    from groundtruth_kb.project.application_scope import normalize_repo_path
+
+    if scope is None or not scope.strip():
+        return []
+    try:
+        selected = explicit_application_scope(scope.strip())
+    except ApplicationScopeError as exc:
+        return [f"application_scope {scope.strip()!r} is not current vocabulary: {exc}"]
+    own_slot = None if selected == PLATFORM_SCOPE else selected.partition(":")[2]
+    violations: list[str] = []
+    for path in paths:
+        normalized = normalize_repo_path(path)
+        match = _APPLICATION_SLOT_PATH_RE.match(normalized)
+        if match is None or match.group(1) == own_slot:
+            continue
+        violations.append(f"{selected} path points at applications/{match.group(1)}/: {normalized}")
+    return violations
+
+
+def _check_application_scope_alignment(target: Path) -> ToolCheck:
+    """Validate explicit application_scope/path alignment for current specifications and tests.
+
+    Reads the native specification and test pages (D31); nothing here opens a
+    local store. Explicit scopes are evaluated in the authority's vocabulary by
+    ``_native_scope_path_violations``; unscoped rows keep the ambiguity
+    heuristic of ``classify_application_scope``. Without a configured authority
+    the alignment is unverified (warning); a failed or malformed read is a
+    failure.
+    """
+    from groundtruth_kb.config import GTConfigError
+
+    name = "Application scope alignment"
+    try:
+        client = _configured_authority_client(target)
+    except (AuthorityClientError, GTConfigError, OSError) as exc:
+        unconfigured = isinstance(exc, AuthorityClientError) and exc.code == "authority_not_configured"
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=False,
+            status="warning" if unconfigured else "fail",
+            message=(
+                "Application-scope alignment unverified: no authority_url is configured "
+                "(groundtruth.toml authority_url or GT_AUTHORITY_URL)"
+            )
+            if unconfigured
+            else f"Application scope configuration invalid: {exc}",
+        )
+    try:
+        from groundtruth_kb.project.application_scope import classify_application_scope
+
+        specs = _page_native_records(client, "/v1/specifications")
+        tests = _page_native_records(client, "/v1/tests")
+        violations: list[str] = []
+        ambiguous: list[str] = []
+        for record in specs:
+            record_id = str(record.get("id") or "")
+            raw_paths = record.get("source_paths")
+            paths = [path for path in raw_paths if isinstance(path, str)] if isinstance(raw_paths, list) else []
+            scope = record.get("application_scope")
+            for violation in _native_scope_path_violations(scope, paths):
+                violations.append(f"spec {record_id}: {violation}")
+            classification = classify_application_scope(record_id, record.get("title"), paths)
+            if classification.ambiguous and scope is None:
+                ambiguous.append(f"spec {record_id}: {', '.join(classification.reasons)}")
+        for record in tests:
+            record_id = str(record.get("id") or "")
+            test_file = record.get("test_file")
+            paths = [test_file] if isinstance(test_file, str) and test_file else []
+            scope = record.get("application_scope")
+            for violation in _native_scope_path_violations(scope, paths):
+                violations.append(f"test {record_id}: {violation}")
+            classification = classify_application_scope(record_id, record.get("title"), paths)
+            if classification.ambiguous and scope is None:
+                ambiguous.append(f"test {record_id}: {', '.join(classification.reasons)}")
+    except AuthorityClientError as exc:
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=False,
+            status="fail",
+            message=f"Application-scope alignment check failed: {exc.code}: {exc}",
         )
     except Exception as exc:  # intentional-catch: validation tool, error -> fail status
         return ToolCheck(
@@ -671,6 +719,32 @@ def _check_application_scope_alignment(target: Path) -> ToolCheck:
             status="fail",
             message=f"Application-scope alignment check failed: {exc}",
         )
+
+    if violations:
+        sample = "; ".join(violations[:5])
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=True,
+            status="fail",
+            message=f"{len(violations)} application-scope alignment violation(s): {sample}",
+        )
+    if ambiguous:
+        sample = "; ".join(ambiguous[:5])
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="warning",
+            message=f"{len(ambiguous)} ambiguous application-scope candidate(s): {sample}",
+        )
+    return ToolCheck(
+        name=name,
+        required=True,
+        found=True,
+        status="pass",
+        message=f"Application-scope alignment OK ({len(specs)} specifications, {len(tests)} tests)",
+    )
 
 
 def _check_core_spec_intake(
@@ -866,9 +940,9 @@ def inspect_native_application(client: AuthorityClient, project_id: str, host: P
     from groundtruth_kb.project.doctor_isolation import _check_isolation_chroma_regeneratable
 
     checks.append(_check_isolation_chroma_regeneratable(target))
-    rules_dir = _projected_terminology_rules_dir(target)
+    rules_dir = _authored_terminology_rules_dir(host)
     if rules_dir is not None:
-        checks.append(_check_canonical_terminology(target, profile, rules_dir))
+        checks.append(_check_canonical_terminology(host, profile, rules_dir))
     else:
         checks.append(
             ToolCheck(
@@ -876,7 +950,7 @@ def inspect_native_application(client: AuthorityClient, project_id: str, host: P
                 required=False,
                 found=False,
                 status="info",
-                message="No projected terminology guidance (no harness selected); definitions come from the native CLI",
+                message="No authored terminology guidance in the host; definitions come from the native CLI",
             )
         )
     # The intake finding stays last: consumers read the current question from the final check.
@@ -918,25 +992,6 @@ def format_native_doctor_report(result: dict[str, Any]) -> str:
     return "\n".join(lines)
 
 
-def _connect_readonly_sqlite(db_path: Path) -> sqlite3.Connection:
-    return sqlite3.connect(f"{db_path.resolve().as_uri()}?mode=ro", uri=True)
-
-
-def _decode_tafe_json(value: Any, *, field: str, flow_id: str, findings: list[str]) -> Any:
-    try:
-        return json.loads(value or "null")
-    except (TypeError, json.JSONDecodeError) as exc:
-        findings.append(f"{flow_id} {field} invalid JSON: {exc}")
-        return None
-
-
-def _orphan_citation_audit_script(target: Path) -> Path:
-    target_script = target / "scripts" / "orphan_citation_audit.py"
-    if target_script.exists():
-        return target_script
-    return Path(__file__).resolve().parents[4] / "scripts" / "orphan_citation_audit.py"
-
-
 def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
     env_value = os.environ.get("GTKB_ORPHAN_CITATION_SEVERITY", "").strip().lower()
     if env_value in {"warning", "fail"}:
@@ -957,7 +1012,7 @@ def _orphan_citation_severity(target: Path) -> Literal["warning", "fail"]:
 
 
 def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str, ...]]:
-    """Inspect only this provider's generated routing; this grants no role or effect authority."""
+    """Inspect this provider's section of authored routing; no role or effect authority is inferred."""
     import tomllib
 
     from groundtruth_kb.session.worktree import SessionWorktreeError, _artifact_path
@@ -965,7 +1020,7 @@ def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str
     name = f"{provider} routing configuration"
     root = target / ".api-harness" / provider
     try:
-        path = _artifact_path(target, Path(".api-harness") / provider / "routing.toml")
+        path = _artifact_path(target, Path(".harness-baseline-configuration/routing.toml"))
     except SessionWorktreeError:
         return ToolCheck(
             name=name,
@@ -974,7 +1029,7 @@ def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str
             status="fail",
             message="Provider configuration path is redirected; configuration was not read",
         ), ()
-    if not root.exists():
+    if not root.exists() and not path.exists():
         return ToolCheck(
             name=name, required=False, found=False, status="info", message=f"{provider} is not projected here"
         ), ()
@@ -1001,10 +1056,10 @@ def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str
     if not isinstance(models, dict) or not models:
         findings.append("no model rows")
         models = {}
+    models = {key: row for key, row in models.items() if isinstance(row, dict) and row.get("provider") == provider}
+    if not models:
+        findings.append("no models belong to this provider")
     for key, row in models.items():
-        if not isinstance(row, dict) or row.get("provider") != provider:
-            findings.append(f"model {key} does not belong to this provider projection")
-            continue
         model_id = row.get("model_id")
         if not isinstance(model_id, str) or not model_id.strip():
             findings.append(f"model {key} has no model_id")
@@ -1026,8 +1081,11 @@ def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str
         or selected["default_model"] not in models
     ):
         findings.append("default_model does not resolve to a provider model")
-    elif isinstance(routing, dict) and set(routing) != {provider}:
-        findings.append("routing contains another provider's configuration")
+    elif isinstance(selected.get("skills", {}), dict):
+        if any(key not in models for key in selected.get("skills", {}).values()):
+            findings.append("skill route does not resolve to a provider model")
+    else:
+        findings.append("skill routes must be a table")
     if findings:
         return ToolCheck(name=name, required=False, found=True, status="fail", message="; ".join(findings)), ()
     return ToolCheck(
@@ -1221,62 +1279,51 @@ def _check_cursor_dispatch_readiness(target: Path) -> ToolCheck:
 
 
 def _check_orphan_citations(target: Path) -> ToolCheck:
-    script_path = _orphan_citation_audit_script(target)
-    if not script_path.exists():
+    """Resolve source citations against current native IDs; bridge files are not a source."""
+    from groundtruth_kb.config import GTConfigError
+
+    name = "Orphan citations"
+    try:
+        client = _configured_authority_client(target)
+    except (AuthorityClientError, GTConfigError, OSError) as exc:
+        unconfigured = isinstance(exc, AuthorityClientError) and exc.code == "authority_not_configured"
         return ToolCheck(
-            name="Orphan citations",
+            name=name,
             required=False,
             found=False,
-            status="warning",
-            message="orphan_citation_audit.py not found; citation-anchor audit unavailable",
+            status="warning" if unconfigured else "fail",
+            message=f"Orphan citations: native audit unverified: {exc}",
         )
-
-    cmd = [
-        sys.executable,
-        str(script_path),
-        "--root",
-        str(target),
-        "--db",
-        str(target / "groundtruth.db"),
-    ]
+    scripts_dir = target / "scripts"
+    inserted = scripts_dir.is_dir() and str(scripts_dir) not in sys.path
+    if inserted:
+        sys.path.insert(0, str(scripts_dir))
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30, check=False)
-        payload = json.loads(result.stdout or "{}")
-    except (json.JSONDecodeError, OSError, subprocess.TimeoutExpired) as exc:
-        return ToolCheck(
-            name="Orphan citations",
-            required=False,
-            found=True,
-            status="warning",
-            message=f"orphan citation audit did not return usable JSON: {exc}",
-        )
+        from orphan_citation_audit import audit_root  # type: ignore[import-not-found]
 
-    orphan_count = len(payload.get("orphans") or [])
-    scanned_files = payload.get("scanned_files", 0)
-    if result.returncode not in {0, 1}:
+        result = audit_root(target, client=client)
+        count = len(result.orphans)
+        detail = "; ".join(f"{row.anchor} ({row.path}:{row.line})" for row in result.orphans[:5])
         return ToolCheck(
-            name="Orphan citations",
+            name=name,
             required=False,
             found=True,
-            status="warning",
-            message=f"orphan citation audit failed with exit {result.returncode}",
+            status=_orphan_citation_severity(target) if count else "pass",
+            message=f"Orphan citations: {count} unresolved in {result.scanned_files} source files"
+            + (f": {detail}" if detail else ""),
         )
-    if orphan_count:
-        severity = _orphan_citation_severity(target)
+    except (AuthorityClientError, GTConfigError, OSError, ValueError, ImportError) as exc:
         return ToolCheck(
-            name="Orphan citations",
+            name=name,
             required=False,
-            found=True,
-            status=severity,
-            message=f"{orphan_count} orphan citation(s) found across {scanned_files} scanned file(s)",
+            found=False,
+            status="fail",
+            message=f"Orphan citations: native audit failed: {exc}",
         )
-    return ToolCheck(
-        name="Orphan citations",
-        required=False,
-        found=True,
-        status="pass",
-        message=f"No orphan citations found across {scanned_files} scanned file(s)",
-    )
+    finally:
+        if inserted:
+            with suppress(ValueError):
+                sys.path.remove(str(scripts_dir))
 
 
 def _check_skill_health(target: Path) -> ToolCheck:
@@ -1342,72 +1389,6 @@ def _check_skill_health(target: Path) -> ToolCheck:
         found=True,
         status="pass",
         message=f"No skill health findings found across {skills_scanned} scanned skill(s)",
-    )
-
-
-def _check_hooks(target: Path, profile_name: str) -> ToolCheck:
-    hooks_dir = target / ".claude" / "hooks"
-    if not hooks_dir.exists():
-        return ToolCheck(
-            name="Hooks",
-            required=True,
-            found=False,
-            status="fail",
-            message=".claude/hooks/ directory not found",
-        )
-    # Required-hook set is sourced from the managed-artifact registry
-    # (``doctor_required_profiles`` axis). Empty set for unknown profiles
-    # falls back to no required hooks rather than crashing.
-    required_hooks = {
-        Path(artifact.target_path).name
-        for artifact in artifacts_for_doctor(profile_name, class_="hook")
-        if isinstance(artifact, FileArtifact)
-    }
-
-    present = {f.name for f in hooks_dir.glob("*.py")}
-    missing = required_hooks - present
-    if missing:
-        return ToolCheck(
-            name="Hooks",
-            required=True,
-            found=True,
-            status="warning",
-            message=f"Missing hooks: {', '.join(sorted(missing))}",
-        )
-    return ToolCheck(
-        name="Hooks",
-        required=True,
-        found=True,
-        status="pass",
-        message=f"{len(present)} hook(s) present",
-    )
-
-
-def _check_rules(target: Path, profile_name: str) -> ToolCheck:
-    rules_dir = target / ".claude" / "rules"
-    if not rules_dir.exists():
-        return ToolCheck(
-            name="Rules",
-            required=True,
-            found=False,
-            status="fail",
-            message=".claude/rules/ directory not found",
-        )
-    present = {f.name for f in rules_dir.glob("*.md")}
-    if not present:
-        return ToolCheck(
-            name="Rules",
-            required=True,
-            found=True,
-            status="warning",
-            message="No rule files found",
-        )
-    return ToolCheck(
-        name="Rules",
-        required=True,
-        found=True,
-        status="pass",
-        message=f"{len(present)} rule(s) present",
     )
 
 
@@ -1487,107 +1468,10 @@ def _legacy_root_reference_is_allowed(relative_path: Path, lines: list[str], lin
 # See bridge/gtkb-gov-auq-enforcement-stack-slice-e-requirements-collector-2026-05-04 for approved scope.
 
 
-def _check_registered_hooks_tracked(target: Path) -> ToolCheck:
-    """WI-4457: WARN when a registered governance hook script is untracked in git.
-
-    For every hook script path referenced in tracked ``.claude/settings.json``
-    event arrays (PreToolUse / PostToolUse / UserPromptSubmit / SessionStart /
-    Stop), assert the file is tracked in git (``git ls-files --error-unmatch``).
-    Sibling check: untracked ``.py`` files under ``.claude/hooks/`` (which the
-    ``!.claude/hooks/*.py`` ``.gitignore`` negation already opts into git).
-
-    Fail-soft ``warning`` (never ``fail``) so a deliberately-untracked local hook
-    never blocks ``doctor``; the advisory is visible at session start before any
-    tool call can hit the WI-4449 session-block class (registered + on-disk +
-    untracked governance hook). No prior doctor check confirmed git-tracking of
-    registered hook scripts; that absence is the surface this check closes.
-    """
-    import json as _json
-    import re as _re
-
-    name = "registered hooks git-tracked"
-    settings_path = target / ".claude" / "settings.json"
-    if not settings_path.exists():
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=False,
-            status="info",
-            message=".claude/settings.json missing; no registered hooks to verify",
-        )
-
-    try:
-        data = _json.loads(_require_utf8_text(settings_path))
-    except (OSError, _json.JSONDecodeError) as exc:
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message=f"Malformed .claude/settings.json: {exc}",
-        )
-
-    events = ("PreToolUse", "PostToolUse", "UserPromptSubmit", "SessionStart", "Stop")
-    hooks = data.get("hooks") or {}
-    referenced: set[str] = set()
-    for event in events:
-        for group in hooks.get(event) or []:
-            if not isinstance(group, dict):
-                continue
-            for h in group.get("hooks", []):
-                if not isinstance(h, dict):
-                    continue
-                command = h.get("command") or ""
-                for match in _re.finditer(r"\.claude[\\/]hooks[\\/][A-Za-z0-9_.\-]+\.py", command):
-                    referenced.add(match.group(0).replace("\\", "/"))
-
-    untracked_registered: list[str] = []
-    for rel in sorted(referenced):
-        script = target / rel
-        if not script.exists():
-            # Registered-but-missing-on-disk is a distinct defect class; out of
-            # scope for this tracking check (which only flags present-but-untracked).
-            continue
-        ok, _out = _run_cmd(["git", "-C", str(target), "ls-files", "--error-unmatch", rel])
-        if not ok:
-            untracked_registered.append(rel)
-
-    untracked_siblings: list[str] = []
-    if (target / ".claude" / "hooks").is_dir():
-        ok, out = _run_cmd(["git", "-C", str(target), "ls-files", "--others", "--exclude-standard", ".claude/hooks"])
-        if ok and out:
-            for line in out.splitlines():
-                candidate = line.strip().replace("\\", "/")
-                if candidate.endswith(".py"):
-                    untracked_siblings.append(candidate)
-
-    if untracked_registered or untracked_siblings:
-        parts: list[str] = []
-        if untracked_registered:
-            parts.append("registered-but-untracked: " + ", ".join(untracked_registered))
-        if untracked_siblings:
-            parts.append("untracked .claude/hooks/*.py: " + ", ".join(sorted(set(untracked_siblings))))
-        return ToolCheck(
-            name=name,
-            required=False,
-            found=True,
-            status="warning",
-            message="; ".join(parts) + " — run `git add` (registered governance hooks must be committed)",
-        )
-
-    return ToolCheck(
-        name=name,
-        required=False,
-        found=True,
-        status="pass",
-        message="all registered hook scripts are git-tracked",
-    )
-
-
 def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     """WI-5668: WARN while any pre-rename bare skill-directory references remain.
 
-    The GTKB-SKILL-RENAME-REFERENCE-SWEEP program renamed the ``.claude/skills/``
+    The GTKB-SKILL-RENAME-REFERENCE-SWEEP program renamed the ``.agents/skills/``
     directories to a ``gtkb-`` prefix (``DELIB-202667105`` / ``DELIB-202667106``).
     This deterministic completion gate (``GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001``)
     counts remaining tracked references to the bare pre-rename skill dirs and WARNs
@@ -1603,14 +1487,14 @@ def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     intentionally retain bare references are excluded.
     """
     name = "skill-rename reference sweep"
-    skills_dir = target / ".claude" / "skills"
+    skills_dir = target / ".agents" / "skills"
     if not skills_dir.is_dir():
         return ToolCheck(
             name=name,
             required=False,
             found=False,
             status="info",
-            message="no .claude/skills/ directory; nothing to verify",
+            message="no .agents/skills/ directory; nothing to verify",
         )
 
     prefix = "gtkb-"
@@ -1763,23 +1647,9 @@ def _required_bridge_rule_filenames(profile_name: str) -> tuple[str, ...]:
 
 
 def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolCheck:
-    """Check scanner-safe-writer hook registration and log-ignore drift.
+    """Check the authored scanner-safe-writer and its native registration.
 
-    Applies only to bridge-enabled profiles. Reports:
-
-    - ``pass`` (``required=False``): base profile — the hook isn't scaffolded
-      there, so there's no drift to surface.
-    - ``fail``: bridge profile and the hook file itself is missing.
-    - ``warning``: the hook file is present but drift exists — the
-      PreToolUse registration in ``.claude/settings.json`` is missing OR the
-      ``.claude/hooks/*.log`` pattern is missing from ``.gitignore``. Both
-      are remediable via ``gt project upgrade --apply``.
-    - ``pass``: the hook file is present, the PreToolUse registration is
-      present, and the gitignore pattern is present.
-
-    Defensive against malformed ``settings.json`` shape: treats non-dict
-    roots, non-dict ``hooks``, non-list ``PreToolUse``, and non-dict entries
-    as "registration missing" rather than crashing the doctor check.
+    Runtime denial logging is under .groundtruth/runtime, not a projected hook tree.
     """
     profile = get_profile(profile_name)
     if not profile.includes_bridge:
@@ -1793,13 +1663,11 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
 
     # Composite-check inputs are resolved from the managed-artifact
     # registry by canonical IDs. This is the C1 Condition 2 contract —
-    # three stable IDs that must exist and be unique.
+    # the authored hook and native registration must exist and be unique.
     hook_record = find_artifact_by_id("hook.scanner-safe-writer")
     settings_record = find_artifact_by_id("settings.hook.scanner-safe-writer.pretooluse")
-    gitignore_record = find_artifact_by_id("gitignore.hook-logs")
     assert isinstance(hook_record, FileArtifact)
     assert isinstance(settings_record, SettingsHookRegistration)
-    assert isinstance(gitignore_record, GitignorePattern)
 
     hook_file = target / hook_record.target_path
     if not hook_file.exists():
@@ -1840,21 +1708,8 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
                     if registered:
                         break
 
-    gitignore = target / ".gitignore"
-    log_ignored = False
-    if gitignore.exists():
-        try:
-            gi_text = _require_utf8_text(gitignore)
-            log_ignored = gitignore_record.pattern in gi_text
-        except OSError:
-            log_ignored = False
-
-    if not registered or not log_ignored:
-        missing: list[str] = []
-        if not registered:
-            missing.append("settings.json PreToolUse registration")
-        if not log_ignored:
-            missing.append(".gitignore exclusion of .claude/hooks/*.log")
+    if not registered:
+        missing = ["settings.json PreToolUse registration"]
         return ToolCheck(
             name="scanner-safe-writer",
             required=True,
@@ -1868,7 +1723,7 @@ def _check_scanner_safe_writer_drift(target: Path, profile_name: str) -> ToolChe
         required=True,
         found=True,
         status="pass",
-        message="hook registered; log ignored",
+        message="authored hook present and registered",
     )
 
 
@@ -2021,6 +1876,12 @@ def _check_managed_artifact_drift(target: Path, profile_name: str) -> ToolCheck:
             target_path = target / artifact.target_path
             if not target_path.is_file():
                 record("missing", artifact.id, "fail", f"{artifact.target_path} missing")
+                continue
+            if artifact.target_path.startswith(".harness-baseline-configuration/hooks/"):
+                if target_path.resolve() != target_path.absolute():
+                    record("drifted", artifact.id, "fail", "authored hook path is redirected")
+                else:
+                    counts["current"] += 1
                 continue
             template_path = templates_dir / artifact.template_path
             if not template_path.is_file():
@@ -2237,7 +2098,8 @@ def _check_sot_duplicate_guard(target: Path) -> ToolCheck:
                 "duplicate-SoT audit baseline incomplete: "
                 f"registry_count={report.registry_count}, "
                 f"persistent_file_count={report.persistent_file_count}, "
-                f"registered_file_count={report.registered_file_count}"
+                f"registered_file_count={report.registered_file_count}, "
+                f"missing_registry_artifacts={len(report.missing_registry_artifacts)}"
             ),
         )
 
@@ -2352,7 +2214,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
+    skill_md = target / ".agents" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -2365,7 +2227,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             found=False,
             status="warning",
             message=(
-                f".claude/skills/gtkb-bridge-propose/ missing: {', '.join(missing)}. "
+                f".agents/skills/gtkb-bridge-propose/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -2399,8 +2261,8 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".claude" / "skills" / "gtkb-spec-intake" / "SKILL.md"
-    helper_py = target / ".claude" / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
+    skill_md = target / ".agents" / "skills" / "gtkb-spec-intake" / "SKILL.md"
+    helper_py = target / ".agents" / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -2415,7 +2277,7 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             found=False,
             status="warning",
             message=(
-                f".claude/skills/gtkb-spec-intake/ missing: {', '.join(missing)}. "
+                f".agents/skills/gtkb-spec-intake/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -2468,54 +2330,10 @@ def _skill_frontmatter_error(text: str, path: str) -> str | None:
     return None
 
 
-def _check_codex_skill_load_health(target: Path) -> ToolCheck:
-    """Validate generated Codex skill adapters expose loadable frontmatter."""
-    skills_root = target / ".codex" / "skills"
-    if not skills_root.is_dir():
-        return ToolCheck(
-            name="Codex skill load health",
-            required=False,
-            found=False,
-            status="warning",
-            message=".codex/skills missing; Codex skill adapters are not configured",
-        )
-
-    failures: list[str] = []
-    checked = 0
-    for skill_file in sorted(skills_root.glob("*/SKILL.md")):
-        checked += 1
-        rel_path = skill_file.relative_to(target).as_posix()
-        try:
-            text = _require_utf8_text(skill_file)
-        except OSError as exc:
-            failures.append(f"{rel_path}: unreadable: {exc}")
-            continue
-        error = _skill_frontmatter_error(text, rel_path)
-        if error is not None:
-            failures.append(error)
-
-    if failures:
-        preview = "; ".join(failures[:3])
-        suffix = f"; +{len(failures) - 3} more" if len(failures) > 3 else ""
-        return ToolCheck(
-            name="Codex skill load health",
-            required=True,
-            found=True,
-            status="fail",
-            message=f"Codex skill adapter load check failed for {len(failures)} of {checked}: {preview}{suffix}",
-        )
-
-    return ToolCheck(
-        name="Codex skill load health",
-        required=True,
-        found=True,
-        status="pass",
-        message=f"Codex skill adapter load check passed ({checked} adapters)",
-    )
-
-
-def _load_canonical_terminology_config(target: Path, rules_dir: str = ".claude/rules") -> dict[str, object] | None:
-    """Load the projected ``canonical-terminology.toml`` or return ``None`` if absent/malformed.
+def _load_canonical_terminology_config(
+    target: Path, rules_dir: str = ".harness-baseline-configuration/rules"
+) -> dict[str, object] | None:
+    """Load the authored ``canonical-terminology.toml`` or return ``None`` if absent/malformed.
 
     ``None`` means the projection is missing or unreadable; the caller reports
     that as a required failure and points at ``gt project upgrade --apply``.
@@ -2580,33 +2398,21 @@ RETIRED_TERMINOLOGY_CONTRACT_KEYS: tuple[str, ...] = (
 )
 
 
-PROJECTED_RULES_DIRS: tuple[str, ...] = (
-    ".claude/rules",
-    ".codex/rules",
-    ".cursor/rules",
-    ".goose/rules",
-    ".agent/rules",
-)
+def _authored_terminology_rules_dir(target: Path) -> str | None:
+    """The one authored rules directory; generated copies are never a fallback."""
+    rules_dir = ".harness-baseline-configuration/rules"
+    paths = (target / rules_dir / "canonical-terminology.toml", target / rules_dir / "canonical-terminology.md")
+    return rules_dir if any(path.is_file() for path in paths) else None
 
 
-def _projected_terminology_rules_dir(target: Path) -> str | None:
-    """The first projected rules directory carrying terminology guidance, if any harness is selected."""
-    candidates = list(PROJECTED_RULES_DIRS) + sorted(
-        p.relative_to(target).as_posix() for p in target.glob(".api-harness/*/rules") if p.is_dir()
-    )
-    for rules_dir in candidates:
-        guidance = (target / rules_dir / "canonical-terminology.toml", target / rules_dir / "canonical-terminology.md")
-        if any(path.exists() for path in guidance):
-            return rules_dir
-    return None
-
-
-def _check_canonical_terminology(target: Path, profile_name: str, rules_dir: str = ".claude/rules") -> ToolCheck:
-    """Check the projected terminology guidance (GOV-GLOSSARY-AS-DA-READ-SURFACE-001).
+def _check_canonical_terminology(
+    target: Path, profile_name: str, rules_dir: str = ".harness-baseline-configuration/rules"
+) -> ToolCheck:
+    """Check the authored terminology guidance (GOV-GLOSSARY-AS-DA-READ-SURFACE-001).
 
     Canonical definitions are current records read through the native CLI; the
-    projected primer only teaches that retrieval route. The check fails when the
-    projected configuration or primer is missing or malformed, when the
+    authored primer only teaches that retrieval route. The check fails when the
+    authored configuration or primer is missing or malformed, when the
     selected profile is not configured, or when the primer does not name the
     retrieval commands; it warns when the configuration still carries the
     retired prompt-file term contract (required files, startup terms, primer
@@ -2638,7 +2444,7 @@ def _check_canonical_terminology(target: Path, profile_name: str, rules_dir: str
     section = config.get("config")
     defaults = section.get("defaults", {}) if isinstance(section, dict) else {}
     configured = profile_cfg.get("primer_path") or defaults.get("primer_path")
-    primer_rel = str(configured or f"{rules_dir}/canonical-terminology.md").replace("{{HARNESS_RULES_DIR}}", rules_dir)
+    primer_rel = str(configured or f"{rules_dir}/canonical-terminology.md")
     primer_text, unreadable = _read_text_for_check(target / primer_rel, primer_rel)
     if primer_text is None:
         return ToolCheck(
@@ -2682,135 +2488,64 @@ def _check_canonical_terminology(target: Path, profile_name: str, rules_dir: str
 
 
 def _check_canonical_terms_registry(target: Path) -> ToolCheck:
-    """Phase 1 backing-registry check for the Canonical Terminology System.
+    """Read native terminology health and retained collision diagnostics.
 
-    Per ``bridge/gtkb-canonical-terminology-system-context-model-001-005.md``
-    (Codex GO at ``-006``) plus FAB-15: when the ``canonical_terms`` table
-    exists in the project's MemBase, run deterministic generator-freshness
-    check (markdown -> table dry-run) plus collision detection over current
-    platform_core rows.
-
-    Behavior:
-
-    - Pass when the table is empty (Phase 1 backing registry hasn't been
-      seeded yet — that's fine; the markdown remains the canonical source).
-    - Pass when seeded, the generator dry-run is all-unchanged, and no
-      collision findings exist.
-    - Warning when the generator dry-run has pending insert/update/retire
-      operations.
-    - Fail only when collision detection reports a
-      ``platform_core_redefinition``.
-
-    The table-not-present case is also a pass: this check never blocks if
-    the schema upgrade hasn't been applied yet. Run ``gt project upgrade
-    --apply`` to install the table.
+    Current definitions and formal sources live in the authority. A local
+    glossary neither supplies definitions nor triggers a generator/freshness gate.
     """
-    glossary = target / ".claude" / "rules" / "canonical-terminology.md"
-    if not glossary.exists():
-        return ToolCheck(
-            name="canonical terms registry",
-            required=False,
-            found=False,
-            status="pass",
-            message="canonical-terminology.md not present; backing registry check skipped",
-        )
+    from groundtruth_kb.canonical_terms import find_collisions
+    from groundtruth_kb.config import GTConfigError
 
-    db_path = target / "groundtruth.db"
-    if not db_path.exists():
-        return ToolCheck(
-            name="canonical terms registry",
-            required=False,
-            found=False,
-            status="pass",
-            message="groundtruth.db not present; backing registry check skipped",
-        )
-
+    name = "canonical terms registry"
     try:
-        import sqlite3 as _sqlite3
-
-        from groundtruth_kb import canonical_terms as _ct
-    except ImportError as exc:
+        client = _configured_authority_client(target)
+    except (AuthorityClientError, GTConfigError, OSError) as exc:
+        unconfigured = isinstance(exc, AuthorityClientError) and exc.code == "authority_not_configured"
         return ToolCheck(
-            name="canonical terms registry",
+            name=name,
             required=False,
             found=False,
-            status="warning",
-            message=f"canonical_terms module unavailable: {exc}",
+            status="warning" if unconfigured else "fail",
+            message=f"Canonical terminology unverified: {exc}",
         )
-
-    conn = _sqlite3.connect(str(db_path))
     try:
-        # Ensure the schema migration is applied; if not, treat as pass-skip.
-        cur = conn.execute("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'canonical_terms'")
-        if cur.fetchone() is None:
-            return ToolCheck(
-                name="canonical terms registry",
-                required=False,
-                found=False,
-                status="pass",
-                message=("canonical_terms table not yet provisioned — run gt project upgrade --apply"),
+        health = client.request("GET", "/v1/authority/status")
+        if (
+            not isinstance(health, dict)
+            or health.get("status") not in {"pass", "fail"}
+            or any(
+                not isinstance(health.get(key), list) for key in ("ambiguities", "validation_issues", "source_issues")
             )
-
-        plan = _ct.seed_from_markdown(conn, glossary, dry_run=True)
-        pending_ops = [op for op in plan.operations if op.op != "unchanged"]
-        pending_summary: dict[str, int] = {}
-        for op in pending_ops:
-            pending_summary[op.op] = pending_summary.get(op.op, 0) + 1
-
-        terms = _ct.list_terms(conn, include_retired=False)
-        errors_collisions, warnings_collisions = _ct.find_collisions(terms)
-
-        if errors_collisions:
-            details = []
-            for c in errors_collisions:
-                details.append(f"collision:{c.classification}:{c.key[1]}")
-            return ToolCheck(
-                name="canonical terms registry",
-                required=True,
-                found=True,
-                status="fail",
-                message=(
-                    "canonical_terms registry blocking findings: "
-                    f"{len(errors_collisions)} platform_core redefinition(s) — "
-                    f"{'; '.join(details[:10])}"
-                ),
-            )
-
-        if pending_ops or warnings_collisions:
-            details = []
-            for op in pending_ops:
-                details.append(f"freshness:{op.op}:{op.id}")
-            for c in warnings_collisions:
-                details.append(f"collision:{c.classification}:{c.key[1]}")
-            summary_bits = ", ".join(f"{key}={value}" for key, value in sorted(pending_summary.items()))
-            return ToolCheck(
-                name="canonical terms registry",
-                required=False,
-                found=True,
-                status="warning",
-                message=(
-                    "canonical_terms registry generator freshness findings: "
-                    f"{len(pending_ops)} pending sync operation(s)"
-                    f"{f' ({summary_bits})' if summary_bits else ''}, "
-                    f"{len(warnings_collisions)} cross-field/cross-scope collision(s) — "
-                    f"{'; '.join(details[:10])}"
-                ),
-            )
-
+            or type(health.get("active_records")) is not int
+        ):
+            raise AuthorityClientError("invalid_response", "Native terminology status is malformed")
+        terms = [row for row in _page_native_records(client, "/v1/terms") if row.get("lifecycle_status") == "active"]
+        errors, warnings = find_collisions(terms)
+        failed = (
+            health["status"] == "fail"
+            or bool(errors)
+            or any(health[key] for key in ("ambiguities", "validation_issues", "source_issues"))
+        )
+        details = [f"{finding.classification}: {finding.key[1]}" for finding in errors + warnings]
+        for key in ("ambiguities", "validation_issues", "source_issues"):
+            if health[key]:
+                details.append(f"{key}={len(health[key])}")
         return ToolCheck(
-            name="canonical terms registry",
-            required=True,
+            name=name,
+            required=False,
             found=True,
-            status="pass",
-            message=(f"canonical_terms registry OK — {len(terms)} active terms, generator fresh, no collisions"),
+            status="fail" if failed else "warning" if warnings else "pass",
+            message=f"Native terminology: {health['active_records']} active records"
+            + ("; " + "; ".join(details[:5]) if details else ""),
         )
-    finally:
-        conn.close()
-
-
-# -- Bridge dispatch liveness ------------------------------------------
-# Bridge dispatch liveness reads recipients[role].updated_at from the shared
-# dispatch-state.json written by the dispatcher daemon.
+    except (AuthorityClientError, GTConfigError, OSError, ValueError, TypeError) as exc:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="fail",
+            message=f"Native terminology inspection failed: {exc}",
+        )
 
 
 # ── Auto-install ──────────────────────────────────────────────────────
@@ -2883,76 +2618,6 @@ def _try_auto_install(check: ToolCheck) -> ToolCheck:
     return check
 
 
-# ── DA harvest coverage ───────────────────────────────────────────────
-
-# Coverage thresholds (hard-coded per implementation GO condition in
-# bridge/gtkb-da-harvest-coverage-implementation-005.md).
-DA_HARVEST_COVERAGE_WARN_THRESHOLD = 95.0
-DA_HARVEST_COVERAGE_ERROR_THRESHOLD = 80.0
-
-
-def _check_deliberation_search_backend(target: Path) -> ToolCheck:
-    """Fail loudly when mandatory deliberation semantic search is degraded."""
-    check_name = "Deliberation search backend"
-    db_path = target / "groundtruth.db"
-    if not db_path.is_file():
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=False,
-            status="fail",
-            message="Deliberation search backend unavailable: groundtruth.db not found",
-        )
-
-    try:
-        from groundtruth_kb.db import KnowledgeDB
-
-        db = KnowledgeDB(db_path)
-        try:
-            status = db.deliberation_search_backend_status()
-        finally:
-            db.close()
-    except Exception as exc:  # noqa: BLE001  # intentional-catch: doctor checks must report, not crash
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=False,
-            status="fail",
-            message=f"Deliberation search backend probe failed: {exc}",
-        )
-
-    current_count = int(status.get("current_deliberation_count") or 0)
-    indexed_count = int(status.get("indexed_deliberation_count") or 0)
-    chunk_count = int(status.get("indexed_chunk_count") or 0)
-    chroma_path = str(status.get("canonical_chroma_path") or "<unknown>")
-    if status.get("healthy"):
-        return ToolCheck(
-            name=check_name,
-            required=True,
-            found=True,
-            status="pass",
-            message=(
-                "Deliberation search backend healthy: ChromaDB importable; "
-                f"indexed {indexed_count}/{current_count} current deliberations "
-                f"({chunk_count} chunks) at {chroma_path}"
-            ),
-        )
-
-    reason = str(status.get("degradation_reason") or "unknown_degradation")
-    found = bool(status.get("chromadb_importable")) and bool(status.get("index_path_exists"))
-    return ToolCheck(
-        name=check_name,
-        required=True,
-        found=found,
-        status="fail",
-        message=(
-            f"Deliberation search backend degraded ({reason}): "
-            f"indexed {indexed_count}/{current_count} current deliberations "
-            f"({chunk_count} chunks) at {chroma_path}; run `gt deliberations rebuild-index`"
-        ),
-    )
-
-
 def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
     """Resolve installation argv without launching a harness or using the caller's CWD."""
     if not head:
@@ -2969,30 +2634,7 @@ def _normalize_harness_argv_head(head: str, project_root: Path) -> str:
 
 def _native_harness_installations(target: Path) -> list[dict[str, Any]]:
     """Read current installation metadata without a file or SQLite fallback."""
-    from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
-    from groundtruth_kb.config import GTConfig
-
-    harnesses: list[dict[str, Any]] = []
-    config = GTConfig.load(config_path=target / "groundtruth.toml")
-    if not config.authority_url:
-        raise AuthorityClientError("authority_not_configured", "No authority_url is configured")
-    client = AuthorityClient(config.authority_url)
-    after = None
-    while True:
-        result = client.request("GET", "/v1/harnesses", query={"status": "active", "limit": 1000, "after": after})
-        records = result.get("records") if isinstance(result, dict) else None
-        next_after = result.get("next_after") if isinstance(result, dict) else None
-        if not isinstance(records, list) or any(not isinstance(record, dict) for record in records):
-            raise AuthorityClientError("invalid_response", "Harness installation records are malformed")
-        if next_after is not None and (
-            not isinstance(next_after, str) or not next_after or (after and next_after <= after)
-        ):
-            raise AuthorityClientError("invalid_response", "Harness installation pagination did not advance")
-        harnesses.extend(records)
-        if next_after is None:
-            break
-        after = next_after
-    return harnesses
+    return _page_native_records(_configured_authority_client(target), "/v1/harnesses", query={"status": "active"})
 
 
 def _check_harness_launchability(target: Path) -> ToolCheck:
@@ -3067,8 +2709,8 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
     )
 
 
-# The boundary is declared by the projected rule; the neutral AGENTS.md is a pointer, not a boundary surface.
-_HARNESS_SCRATCHPAD_BOUNDARY_DOCS = (Path(".claude") / "rules" / "project-root-boundary.md",)
+# The scratch boundary is declared once by the authored baseline rule.
+_HARNESS_SCRATCHPAD_BOUNDARY_DOCS = (Path(".harness-baseline-configuration") / "rules" / "project-root-boundary.md",)
 _HARNESS_SCRATCHPAD_REQUIRED_TERMS = (
     "harness-local scratchpads",
     "non-authoritative",
@@ -3406,7 +3048,7 @@ def _memory_markdown_is_rule_shaped(text: str) -> bool:
 
 
 def _canonical_authority_rule_source_findings(target: Path) -> list[str]:
-    rules_dir = target / ".claude" / "rules"
+    rules_dir = target / ".harness-baseline-configuration" / "rules"
     if not rules_dir.is_dir():
         return []
 
@@ -3507,169 +3149,7 @@ _ROLE_AUTHORITY_FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = (
 )
 
 
-def _check_da_harvest_coverage(target: Path) -> ToolCheck:
-    """Check DA bridge-thread coverage for active VERIFIED threads.
-
-    Uses the shared helper at ``groundtruth_kb.reporting.harvest_coverage``.
-    Status mapping:
-
-    - coverage_pct ``>=`` ``WARN_THRESHOLD`` (95.0)  → pass
-    - coverage_pct ``>=`` ``ERROR_THRESHOLD`` (80.0) → warning
-    - coverage_pct ``<``  ``ERROR_THRESHOLD``        → fail
-
-    Missing DB or missing bridge directory is treated as a skipped warning
-    rather than a hard fail — this keeps fresh scaffolds green until the
-    consumer project wires its bridge.
-    """
-    bridge_dir = target / "bridge"
-    db_path = target / "groundtruth.db"
-
-    if not bridge_dir.exists() or not db_path.exists():
-        return ToolCheck(
-            name="DA harvest coverage",
-            required=False,
-            found=False,
-            status="warning",
-            message="DA harvest coverage: skipped (bridge directory or groundtruth.db missing)",
-        )
-
-    db = None
-    try:
-        from groundtruth_kb.db import KnowledgeDB
-        from groundtruth_kb.reporting.harvest_coverage import (
-            compute_active_bridge_thread_coverage,
-        )
-
-        db = KnowledgeDB(str(db_path))
-        metrics = compute_active_bridge_thread_coverage(bridge_dir, db)
-    except Exception as exc:  # intentional-catch: validation tool, error -> fail status
-        return ToolCheck(
-            name="DA harvest coverage",
-            required=False,
-            found=True,
-            status="fail",
-            message=f"DA harvest coverage: error computing metrics: {exc}",
-        )
-    finally:
-        if db is not None:
-            db.close()
-
-    pct = float(metrics["coverage_pct"])  # type: ignore[arg-type]
-    num = metrics["numerator_threads"]
-    denom = metrics["denominator_threads"]
-    uncovered_list = metrics["uncovered_thread_names"]
-    assert isinstance(uncovered_list, list)  # noqa: S101 - internal invariant
-    uncovered_preview = ", ".join(uncovered_list[:3])
-    if len(uncovered_list) > 3:
-        uncovered_preview += f", … (+{len(uncovered_list) - 3} more)"
-
-    if pct >= DA_HARVEST_COVERAGE_WARN_THRESHOLD:
-        return ToolCheck(
-            name="DA harvest coverage",
-            required=False,
-            found=True,
-            status="pass",
-            message=f"DA harvest coverage: {pct:.2f}% ({num}/{denom} active VERIFIED threads covered)",
-        )
-
-    if pct >= DA_HARVEST_COVERAGE_ERROR_THRESHOLD:
-        return ToolCheck(
-            name="DA harvest coverage",
-            required=False,
-            found=True,
-            status="warning",
-            message=(
-                f"DA harvest coverage: {pct:.2f}% ({num}/{denom}) below WARN threshold "
-                f"{DA_HARVEST_COVERAGE_WARN_THRESHOLD}% — uncovered: {uncovered_preview}"
-            ),
-        )
-
-    return ToolCheck(
-        name="DA harvest coverage",
-        required=False,
-        found=True,
-        status="fail",
-        message=(
-            f"DA harvest coverage: {pct:.2f}% ({num}/{denom}) below ERROR threshold "
-            f"{DA_HARVEST_COVERAGE_ERROR_THRESHOLD}% — uncovered: {uncovered_preview}"
-        ),
-    )
-
-
 # ── Main entry point ──────────────────────────────────────────────────
-
-
-def _read_bridge_file_status(path: Path) -> str | None:
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
-        stripped = line.strip()
-        if not stripped:
-            continue
-        match = _BRIDGE_FILE_STATUS_RE.match(stripped)
-        return match.group(1).upper() if match else None
-    return None
-
-
-def _status_from_bridge_file(path: Path) -> str | None:
-    try:
-        return _read_bridge_file_status(path)
-    except OSError:
-        return None
-
-
-def _latest_bridge_status_entries(target: Path) -> list[dict[str, str]]:
-    """Return the latest status row for each numbered bridge thread."""
-
-    bridge_dir = target / "bridge"
-    grouped: dict[str, list[tuple[int, str, str]]] = {}
-    for path in bridge_dir.glob("*.md"):
-        match = _BRIDGE_VERSION_FILE_RE.match(path.name)
-        if match is None:
-            continue
-        status = _read_bridge_file_status(path)
-        if status is None:
-            continue
-        grouped.setdefault(match.group(1), []).append((int(match.group(2)), status, f"bridge/{path.name}"))
-
-    entries: list[dict[str, str]] = []
-    for document, versions in sorted(grouped.items()):
-        latest_version, status, rel_path = max(versions, key=lambda item: item[0])
-        entries.append(
-            {
-                "document": document,
-                "status": status,
-                "path": rel_path,
-                "version": str(latest_version),
-            }
-        )
-    return entries
-
-
-def _bridge_file_date(path: Path) -> datetime | None:
-    for line in path.read_text(encoding="utf-8", errors="replace").splitlines()[:80]:
-        match = _BRIDGE_DATE_RE.match(line.strip())
-        if match:
-            try:
-                return datetime.fromisoformat(match.group(1)).replace(tzinfo=UTC)
-            except ValueError:
-                continue
-    return None
-
-
-def _active_authorized_work_item_ids(db: Any) -> set[str]:
-    """Work items whose project is authorized.
-
-    WI-7657: previously read an authorization row's included_work_item_ids
-    list. Authorization is now a field on the project row, and work-item scope
-    is project membership, so the same set comes from joining active
-    memberships to projects whose authorization is 'authorized'.
-    """
-    rows = db._get_conn().execute(
-        """SELECT DISTINCT m.work_item_id
-           FROM current_project_work_item_memberships m
-           JOIN current_projects p ON p.id = m.project_id
-           WHERE m.status = 'active' AND p.authorization = 'authorized'"""
-    )
-    return {str(row[0]) for row in rows if str(row[0]).strip()}
 
 
 def _is_implementation_active_work_item(item: dict[str, Any]) -> bool:
@@ -3678,129 +3158,120 @@ def _is_implementation_active_work_item(item: dict[str, Any]) -> bool:
     return resolution_status in IMPLEMENTATION_ACTIVE_RESOLUTION_STATUSES or stage in IMPLEMENTATION_ACTIVE_STAGES
 
 
-def check_standing_backlog_health(
-    target: Path,
-    *,
-    stale_no_go_days: int = STANDING_BACKLOG_STALE_NO_GO_DAYS,
-    now: datetime | None = None,
-) -> dict[str, Any]:
-    """Return a machine-readable standing-backlog health payload.
+def check_standing_backlog_health(target: Path) -> dict[str, Any]:
+    """Report native backlog and coordination availability (schema version 3).
 
-    Findings use the severity taxonomy required by GTKB-GOV-010, calibrated by
-    GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001:
-    implementation-active orphaned-WI=WARN, stale-NO-GO=WARN,
-    missing-verdict-date=WARN, missing-evidence=FAIL. Unapproved/future WIs do
-    not require PAUTH coverage.
+    GOV-STANDING-BACKLOG-001 and GOV-FILE-BRIDGE-AUTHORITY-001 define the
+    current native sources. Implementation-active work needs current project
+    membership; other open work is counted without per-item membership reads.
+    An absent authority is WARN, invalid/unavailable native evidence is FAIL,
+    and uncovered implementation-active work is WARN. Local stores and bridge
+    files are never inspected. File index, Date-line and age assertions are
+    retired; a valid native NO-GO head alone is not unhealthy state.
     """
+    from urllib.parse import quote
 
-    from groundtruth_kb.db import KnowledgeDB
+    from groundtruth_kb.config import GTConfigError
 
     target = target.resolve()
-    now = now or datetime.now(UTC)
     findings: list[dict[str, Any]] = []
-    non_implementation_uncovered_count = 0
+    non_implementation_open_count = 0
 
-    db_path = target / "groundtruth.db"
-    if not db_path.is_file():
+    client: AuthorityClient | None
+    try:
+        client = _configured_authority_client(target)
+    except (AuthorityClientError, GTConfigError, OSError) as exc:
+        client = None
+        unconfigured = isinstance(exc, AuthorityClientError) and exc.code == "authority_not_configured"
         findings.append(
             {
-                "kind": "missing-evidence",
-                "severity": "FAIL",
-                "message": "groundtruth.db is missing; cannot evaluate open work-item authorization coverage.",
-                "path": "groundtruth.db",
+                "kind": "authority-not-configured" if unconfigured else "missing-evidence",
+                "severity": "WARN" if unconfigured else "FAIL",
+                "path": "groundtruth.toml",
+                "message": (
+                    "No authority_url is configured (groundtruth.toml authority_url or GT_AUTHORITY_URL); "
+                    "open work-item authorization coverage is unverified."
+                )
+                if unconfigured
+                else f"Authority configuration invalid: {exc}",
             }
         )
-    else:
-        db = KnowledgeDB(db_path)
+    if client is not None:
         try:
-            authorized_work_item_ids = _active_authorized_work_item_ids(db)
-            for item in db.get_open_work_items():
+            projects = _page_native_records(client, "/v1/projects")
+            authorized = {
+                row["id"]
+                for row in projects
+                if row.get("authorization") == "authorized" and isinstance(row.get("id"), str)
+            }
+            for item in _page_native_records(client, "/v1/work-items"):
                 item_id = str(item.get("id") or "")
-                if not item_id or item_id in authorized_work_item_ids:
+                resolution_status = str(item.get("resolution_status") or "").strip()
+                if not item_id or resolution_status in WORK_ITEM_TERMINAL_RESOLUTION_STATUSES:
                     continue
                 if not _is_implementation_active_work_item(item):
-                    non_implementation_uncovered_count += 1
+                    non_implementation_open_count += 1
+                    continue
+                detail = client.request("GET", "/v1/work-items/" + quote(item_id, safe=""))
+                if not isinstance(detail, dict) or "membership" not in detail:
+                    raise AuthorityClientError("invalid_response", f"Work item {item_id} membership is missing")
+                membership = detail["membership"]
+                if membership is not None and (
+                    not isinstance(membership, dict)
+                    or not isinstance(membership.get("project_id"), str)
+                    or not membership["project_id"].strip()
+                ):
+                    raise AuthorityClientError("invalid_response", f"Work item {item_id} membership is malformed")
+                project_id = membership["project_id"] if membership is not None else None
+                if project_id in authorized:
                     continue
                 findings.append(
                     {
                         "kind": "orphaned-WI",
                         "severity": "WARN",
                         "work_item_id": item_id,
-                        "project_name": item.get("project_name"),
+                        "project_id": project_id,
                         "resolution_status": item.get("resolution_status"),
+                        "stage": item.get("stage"),
                         "message": (
-                            f"Implementation-active work item {item_id} is not listed in any active "
-                            "project authorization's included_work_item_ids."
+                            f"Implementation-active work item {item_id} is not a member of an authorized project."
                         ),
                     }
                 )
-        except Exception as exc:  # intentional-catch: doctor payload, error -> FAIL finding
+            # Current coordination observations are content-free native facts. A
+            # lawful NO-GO is ordinary coordination, not a backlog failure. The
+            # former file Date/index/age assertions have no current obligation.
+            from groundtruth_kb.bridge.vocabulary import CANONICAL_STATUSES
+
+            report = client.request("GET", "/v1/bridge/state-report")
+            attempts = report.get("attempts") if isinstance(report, dict) else None
+            if not isinstance(attempts, list) or any(
+                not isinstance(row, dict)
+                or not isinstance(row.get("id"), str)
+                or not row["id"].strip()
+                or not isinstance(row.get("disposition"), str)
+                or not row["disposition"].strip()
+                or "head_status" not in row
+                or (row["head_status"] is not None and row["head_status"] not in CANONICAL_STATUSES)
+                for row in attempts
+            ):
+                raise AuthorityClientError("invalid_response", "Native bridge state-report attempts are malformed")
+        except AuthorityClientError as exc:
             findings.append(
                 {
                     "kind": "missing-evidence",
                     "severity": "FAIL",
-                    "message": f"Could not evaluate work-item authorization coverage: {exc}",
-                    "path": "groundtruth.db",
+                    "message": f"Could not evaluate native standing-backlog state: {exc.code}: {exc}",
+                    "path": client.url,
                 }
             )
-        finally:
-            db.close()
-
-    bridge_dir = target / "bridge"
-    if not bridge_dir.is_dir():
-        findings.append(
-            {
-                "kind": "missing-evidence",
-                "severity": "FAIL",
-                "message": "bridge directory is missing; cannot evaluate stale NO-GO bridge entries.",
-                "path": "bridge/",
-            }
-        )
-    else:
-        try:
-            entries = _latest_bridge_status_entries(target)
-            for entry in entries:
-                if entry["status"] != "NO-GO":
-                    continue
-                bridge_file = target / entry["path"]
-                decided_at = _bridge_file_date(bridge_file)
-                if decided_at is None:
-                    findings.append(
-                        {
-                            "kind": "missing-verdict-date",
-                            "severity": "WARN",
-                            "document": entry["document"],
-                            "path": entry["path"],
-                            "message": (
-                                f"Latest NO-GO file {entry['path']} has no parseable explicit Date line; "
-                                "add governed verdict metadata before including it in stale-age calculation."
-                            ),
-                        }
-                    )
-                    continue
-                age_days = (now - decided_at).days
-                if age_days > stale_no_go_days:
-                    findings.append(
-                        {
-                            "kind": "stale-NO-GO",
-                            "severity": "WARN",
-                            "document": entry["document"],
-                            "path": entry["path"],
-                            "age_days": age_days,
-                            "threshold_days": stale_no_go_days,
-                            "message": (
-                                f"Bridge document {entry['document']} is latest NO-GO for "
-                                f"{age_days} days, exceeding threshold {stale_no_go_days}."
-                            ),
-                        }
-                    )
         except Exception as exc:  # intentional-catch: doctor payload, error -> FAIL finding
             findings.append(
                 {
                     "kind": "missing-evidence",
                     "severity": "FAIL",
-                    "message": f"Could not evaluate bridge stale NO-GO state: {exc}",
-                    "path": "bridge/",
+                    "message": f"Could not evaluate native standing-backlog state: {exc}",
+                    "path": client.url,
                 }
             )
 
@@ -3808,19 +3279,19 @@ def check_standing_backlog_health(
     warn_count = sum(1 for finding in findings if finding["severity"] == "WARN")
     status = "fail" if fail_count else "warning" if warn_count else "pass"
     return {
-        "schema_version": 1,
+        "schema_version": 3,
         "check": "standing_backlog_health",
         "status": status,
-        "threshold_days": stale_no_go_days,
         "summary": {
             "finding_count": len(findings),
             "fail_count": fail_count,
             "warn_count": warn_count,
             "orphaned_wi_count": sum(1 for finding in findings if finding["kind"] == "orphaned-WI"),
-            "non_implementation_uncovered_count": non_implementation_uncovered_count,
-            "stale_no_go_count": sum(1 for finding in findings if finding["kind"] == "stale-NO-GO"),
-            "missing_verdict_date_count": sum(1 for finding in findings if finding["kind"] == "missing-verdict-date"),
+            "non_implementation_open_count": non_implementation_open_count,
             "missing_evidence_count": sum(1 for finding in findings if finding["kind"] == "missing-evidence"),
+            "authority_not_configured_count": sum(
+                1 for finding in findings if finding["kind"] == "authority-not-configured"
+            ),
         },
         "findings": findings,
     }
@@ -3835,12 +3306,13 @@ def _check_standing_backlog_health(target: Path) -> ToolCheck:
         message = (
             "Standing backlog health: "
             f"{summary['fail_count']} fail, {summary['warn_count']} warn "
-            f"({summary['finding_count']} findings)"
+            f"({summary['finding_count']} findings): "
+            + "; ".join(finding["message"] for finding in payload["findings"][:3])
         )
     return ToolCheck(
         name="Standing backlog health",
         required=True,
-        found=True,
+        found=not summary["authority_not_configured_count"],
         status="fail" if payload["status"] == "fail" else "warning" if payload["status"] == "warning" else "pass",
         message=message,
     )
@@ -3850,9 +3322,8 @@ def _check_obsolete_reference_purge(target: Path) -> ToolCheck:
     """Warn when an in-window retirement-class artifact lacks a paired purge WI.
 
     Phase 1 (WARN) operationalization of DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
-    (WI-4795). Returns ``warning`` -- never ``fail`` -- per the GO conditions on
-    bridge thread ``gtkb-obsolete-reference-purge-deterministic-check`` (-002);
-    fail-soft to ``warning`` when the check is unavailable.
+    (WI-4795). The current formal Phase-1 obligation is advisory: unpaired
+    retirements and unavailable native inspection return ``warning``.
     """
     check_name = "Obsolete-reference purge pairing"
     scripts_dir = target / "scripts"
@@ -3874,7 +3345,7 @@ def _check_obsolete_reference_purge(target: Path) -> ToolCheck:
                 message=f"Obsolete-reference purge pairing: check unavailable: {exc}",
             )
         try:
-            unpaired = unpaired_retirement_class_artifacts(target)
+            unpaired = unpaired_retirement_class_artifacts(target, client=_configured_authority_client(target))
         except Exception as exc:  # noqa: BLE001 - diagnostic doctor check  # intentional-catch: autogenerated check fix
             return ToolCheck(
                 name=check_name,
@@ -3979,11 +3450,9 @@ def run_doctor(
 
     # Project-level checks
     checks.append(_check_groundtruth_toml(target))
-    checks.append(_check_db_schema(target))
+    checks.append(_check_authority_readiness(target))
     checks.append(_check_application_scope_alignment(target))
     checks.append(_check_core_spec_intake(target))
-    checks.append(_check_hooks(target, profile))
-    checks.append(_check_rules(target, profile))
     checks.append(_check_canonical_terminology(target, profile))
     checks.append(_check_canonical_terms_registry(target))
 
@@ -3995,13 +3464,11 @@ def run_doctor(
 
     if p.includes_bridge:
         checks.append(_check_active_legacy_root_references(target))
-        checks.append(_check_registered_hooks_tracked(target))
         checks.append(_check_skill_rename_reference_sweep(target))
         checks.append(_check_scanner_safe_writer_drift(target, profile))
         checks.append(_check_safety_gate_registration(target))
         checks.append(_check_bridge_propose_skill_present(target, profile))
         checks.append(_check_spec_intake_skill_present(target, profile))
-        checks.append(_check_codex_skill_load_health(target))
         checks.append(_check_managed_artifact_drift(target, profile))
         checks.append(_check_sot_registry_completeness(target))
         checks.append(_check_sot_duplicate_guard(target))
@@ -4013,7 +3480,11 @@ def run_doctor(
         # PARITY-DIFF-WIRED). WARN-only at Slice 3 per Q6; FAIL ramp + CI gate land
         # in Slice 6 after a coverage audit.
         checks.append(_check_harness_projection_conformance(target))
-        checks.append(_check_deliberation_search_backend(target))
+        # D31 (2026-09-19): the deliberation search cache check is retired. Its
+        # surviving duty - a semantic search cache regenerable from the canonical
+        # records - is carried by `gt project chroma regenerate` and the
+        # isolation:chroma-regeneratable check of inspect_native_application;
+        # cache freshness against a local store has no native duty.
         # WI-4795: Phase-1 WARN surface for DCL-OBSOLETE-REFERENCE-PURGE-PAIRING-001
         # (deterministic obsolete-reference-purge pairing check).
         checks.append(_check_obsolete_reference_purge(target))
@@ -4024,7 +3495,10 @@ def run_doctor(
         checks.append(_check_harness_local_scratchpad_boundary(target))
         checks.append(_check_canonical_authority_drift(target))
         checks.append(_check_session_wrap_had_orient(target))
-        checks.append(_check_da_harvest_coverage(target))
+        # D31 (2026-09-19): the harvest coverage percentage check is retired.
+        # Harvest inclusion is pinned natively by TEST-12711 and TEST-12712
+        # (platform_tests/groundtruth_kb/test_close_wrap_contract.py); the
+        # bridge-thread-to-DELIB share against a local store has no native duty.
         checks.append(_check_standing_backlog_health(target))
         checks.append(_check_orphan_citations(target))
         checks.append(_check_ollama_harness(target))

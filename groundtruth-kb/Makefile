@@ -1,7 +1,7 @@
 # Developer automation for groundtruth-kb
 # © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
 
-.PHONY: lint format format-check test test-cov check serve build clean install-dev docstring-cov
+.PHONY: lint format format-check test test-cov check build clean install-dev docstring-cov
 
 lint:
 	ruff check .
@@ -20,9 +20,6 @@ test-cov:
 
 check: lint format-check test
 	@echo "All checks passed."
-
-serve:
-	gt serve
 
 build:
 	python -m build --wheel

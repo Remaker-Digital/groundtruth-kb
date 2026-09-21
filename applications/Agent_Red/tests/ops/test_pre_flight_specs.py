@@ -37,28 +37,21 @@ from unittest.mock import MagicMock, patch
 PROJECT_ROOT = Path(__file__).resolve().parents[4]
 sys.path.insert(0, str(PROJECT_ROOT / "scripts"))
 
-# pre_flight_checklist.py replaces sys.stdout/stderr with UTF-8 wrappers
-# at import time on Windows (if sys.platform == "win32").  This closes
-# pytest's capture file descriptors.  Temporarily override sys.platform
-# to prevent the module-level side effect during import.
-_real_platform = sys.platform
-sys.platform = "linux"  # prevent the win32 stdout/stderr wrapping
-
-
-sys.platform = _real_platform  # restore immediately
-
-from pre_flight_checklist import (  # noqa: E402
-    PROTECTED_BEHAVIORS,
-    AssertionResult,
-    _fail,
-    _pass,
-    _skip,
-    _warn,
-    compute_verdict,
-    phase_a,
-    phase_c,
-    phase_d,
-)
+# Import the real application operator helper without reading host credentials or
+# replacing pytest capture streams. Neither patch escapes this import boundary.
+with patch("scripts._env.load_env_local"), patch.object(sys, "platform", "linux"):
+    from pre_flight_checklist import (
+        PROTECTED_BEHAVIORS,
+        AssertionResult,
+        _fail,
+        _pass,
+        _skip,
+        _warn,
+        compute_verdict,
+        phase_a,
+        phase_c,
+        phase_d,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +154,7 @@ class TestPhaseASnapshotCheck:
 
     @patch("pre_flight_checklist.time.sleep")
     @patch("upgrade_verification.urlopen")
-    def test_phase_c_skips_c10_when_no_snapshot(self, mock_urlopen, mock_sleep):
+    def test_phase_c_skips_c10_when_no_snapshot(self, mock_urlopen, mock_sleep, tmp_path):
         """C.10 is SKIP when Phase A snapshot doesn't exist."""
         mock_resp = MagicMock()
         mock_resp.status = 200
@@ -181,38 +174,28 @@ class TestPhaseASnapshotCheck:
         mock_resp.__exit__ = MagicMock(return_value=False)
         mock_urlopen.return_value = mock_resp
 
-        # Ensure no snapshot exists for the staging tenant
-        snapshot_path = PROJECT_ROOT / "scripts" / "upgrade-results" / "phase_a_staging-001.json"
-        snapshot_existed = snapshot_path.exists()
-
-        # Use a mock for stream_subprocess (tier regression + upgrade verification)
-        with patch("scripts._subprocess_stream.stream_subprocess") as mock_stream:
+        # The tracked historical snapshots are not a fixture or an input to this case.
+        # Use the actual resolved tenant name in an isolated empty operator root.
+        with (
+            patch("pre_flight_checklist.PROJECT_ROOT", tmp_path),
+            patch("pre_flight_checklist.ENVIRONMENTS", {"staging": {"tenant_id": "fixture-tenant"}}),
+            patch("scripts._subprocess_stream.stream_subprocess") as mock_stream,
+        ):
             mock_stream.return_value = MagicMock(
                 returncode=0,
                 stdout="0 passed",
                 duration=0.1,
                 timed_out=False,
             )
-            # Temporarily rename snapshot if it exists
-            temp_path = snapshot_path.with_suffix(".tmp_test_backup")
-            if snapshot_existed:
-                snapshot_path.rename(temp_path)
-            try:
-                results = phase_c(
-                    "agent-red-staging.orangeglacier-f566a4e7.eastus.azurecontainerapps.io",
-                    "test-key",
-                    "test-widget",
-                    "1.60.0",
-                )
-            finally:
-                if snapshot_existed and temp_path.exists():
-                    temp_path.rename(snapshot_path)
+            results = phase_c("staging.example.invalid", "test-key", "test-widget", "1.60.0")
 
-        c10 = [r for r in results if r.id == "C.10"]
+        c10 = [result for result in results if result.id == "C.10"]
         assert len(c10) == 1
-        if not snapshot_existed:
-            assert c10[0].status == "SKIP"
-            assert "snapshot" in c10[0].detail.lower()
+        assert c10[0].status == "SKIP"
+        assert "snapshot" in c10[0].detail.lower()
+        assert "phase_a_fixture-tenant.json" in c10[0].detail
+        assert not (tmp_path / "scripts" / "upgrade-results").exists()
+        assert all("phase-c" not in call.args[0] for call in mock_stream.call_args_list)
 
 
 # ---------------------------------------------------------------------------
@@ -375,9 +358,11 @@ class TestVerdictPhaseC:
 # SPEC-1477: compute_verdict — Phase D tenant provisioning failures
 # ---------------------------------------------------------------------------
 class TestVerdictPhaseD:
-    """SPEC-1477: Phase D failures produce DEPLOYMENT LIVE BUT DEFECTIVE."""
+    """SPEC-1477: Phase D failures are deployment failures (S251 OM-3: ROLLBACK REQUIRED naming Phase D)."""
 
     def test_d_fail_live_but_defective(self):
+        # The case identity predates S251 OM-3, which replaced the "live but defective" verdict with a
+        # rollback verdict; the expectation follows the operator helper's current contract.
         result = compute_verdict(
             {
                 "A": [],
@@ -385,7 +370,7 @@ class TestVerdictPhaseD:
                 "D": [_fail("D.1", "Tenant create failed")],
             }
         )
-        assert "DEFECTIVE" in result
+        assert "ROLLBACK REQUIRED" in result
         assert "Phase D" in result
 
 

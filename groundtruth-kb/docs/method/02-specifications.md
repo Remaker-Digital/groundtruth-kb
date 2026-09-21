@@ -15,33 +15,26 @@ Good specifications:
 
 ## Specification lifecycle
 
-Every specification moves through a defined lifecycle:
+The native specification lifecycle describes whether a formal record is
+current: `active`, `superseded` or `retired`.
 
-```mermaid
-stateDiagram-v2
-    [*] --> specified
-    specified --> implemented: code satisfies requirement
-    implemented --> verified: tests prove satisfaction
-    verified --> retired: business need removed
-    specified --> retired: requirement abandoned
-```
+- **Active:** the record states a current requirement or rule.
+- **Superseded:** a replacement formal record carries the current requirement.
+- **Retired:** the requirement no longer applies.
 
-**Specified**: The requirement has been agreed upon and recorded. No implementation exists yet, or the implementation does not yet satisfy the spec.
+Amendments use the current record version and preserve history. Read the
+current fields and history with `gt spec show <ID> --history --json`.
 
-**Implemented**: The code or configuration that satisfies this specification has been written. The team believes the requirement is met, but it has not been independently verified.
+Implementation and verification evidence are separate from this lifecycle.
+An active specification can describe work that is still unfinished. Its linked
+tests, current results and independently reviewed work establish whether the
+implementation satisfies it. The `implementation_verified_at` marker, when
+applicable, is stamped by the service when an amendment asserts
+`implementation_verified_at: true`; it is not a specification status or a
+substitute for the underlying evidence. See the [CLI reference](../reference/cli.md).
 
-**Verified**: Tests linked to this specification pass, and the implementation has been reviewed. This is the highest confidence state — the spec is satisfied and proven.
-
-**Retired**: The specification is no longer relevant. The business need has changed, or the feature has been removed. Retired specs are preserved in the database (append-only) but excluded from active dashboards and assertion checks.
-
-### Promotion rules
-
-Promotion is always forward: `specified → implemented → verified`. You cannot skip steps. Each promotion is a claim:
-
-- "specified → implemented" claims: *the code now satisfies this requirement*
-- "implemented → verified" claims: *tests prove the code satisfies this requirement*
-
-Governance gates can enforce additional conditions at each transition. For example, architecture decision specs may require non-empty assertions before reaching "implemented" status.
+Do not promote a specification through `specified`, `implemented` or
+`verified`: these are not accepted values of the native `status` field.
 
 ## Specification types
 
@@ -79,7 +72,7 @@ Use protected behaviors for safety-critical constraints: "API keys must never ap
 
 Architecture Decision Records capture cross-cutting technical choices: why a particular database was chosen, why a specific communication pattern was adopted, what alternatives were considered and rejected. They include a `consequences` section documenting known trade-offs.
 
-Design Constraints are machine-checkable rules derived from ADRs. Where an ADR says "we chose SQLite for MemBase because of single-file portability", the corresponding DCL says "MemBase must use SQLite" and carries assertions to verify it. (This pattern is itself codified in ADR-0001: Three-Tier Memory Architecture.)
+Design Constraints are machine-checkable rules derived from ADRs. For example, an ADR can select PostgreSQL behind the native domain service; a corresponding DCL can require callers to use that service and carry executable assertions for the boundary.
 
 For details, see the [Architecture Decisions guide](08-architecture.md).
 
@@ -99,9 +92,17 @@ This discipline prevents the common failure mode where code is written first and
 
 ### Core specification intake
 
-GroundTruth operationalizes spec-first at *project start*, not only when the owner happens to describe a requirement. New projects are enrolled in **core specification intake** by default: GroundTruth detects which of a fixed baseline catalog of application specifications (product identity, application type, tenancy, users/roles, data classification, compliance, security posture, reliability posture, external integrations, AI usage, operational/release path, and first-release non-goals) are still missing, and re-surfaces the single next missing question in `MEMORY.md` at each session start until the baseline is captured, then ceases.
+At project start, read the current project and its linked formal records to
+identify missing requirements. The specification-intake skill classifies the
+owner's text into a temporary candidate, then confirms it into the applicable
+canonical specification or discards it. An inferred candidate does not record
+an owner answer. Re-query the canonical record before proceeding.
 
-Completion is derived from **persisted MemBase evidence**, not a transient session flag: a slot counts as captured only when the owner states it or explicitly marks it not applicable, and an AI-inferred candidate does not suppress the prompt until the owner confirms it. The loop is automation-safe — non-interactive and JSON-safe paths never emit prompts — and carries an explicit opt-out. It is the spec-first discipline applied to the baseline every application needs before implementation begins.
+Capturing a specification does not create implementation work or approve a
+proposal. Create any required work item in its execution project with a linked
+executable test and an active test-plan phase. The project-initialization
+intake options and supported scaffold profiles are documented in the
+[CLI reference](../reference/cli.md#requirement-intake).
 
 ## Spec hierarchies
 
@@ -116,10 +117,10 @@ SPEC-245.2        (child: second sub-requirement)
 
 Hierarchies express decomposition: a high-level requirement broken into verifiable sub-requirements. The parent spec describes the intent; child specs describe the testable pieces.
 
-Utility functions `get_depth()` and `get_parent_id()` help navigate hierarchies:
+The dot notation is a naming convention; the relationship itself is the explicit `parent` field of the child's record, which `gt spec show <ID> --json` reads back:
 
-- `get_depth("SPEC-245.1.3")` → `2`
-- `get_parent_id("SPEC-245.1")` → `"SPEC-245"`
+- `SPEC-245.1.3` → depth `2` (two dot-separated segments below the top-level ID)
+- `SPEC-245.1` → `"parent": "SPEC-245"`
 
 ## Tags and scope
 
@@ -129,7 +130,7 @@ Specifications carry optional `tags` (a list of strings) and a `scope` field for
 - **Scope**: a single string describing the spec's domain. Example: `"billing"`, `"widget"`, `"infrastructure"`
 - **Section**: group specs into logical document sections. Example: `"3.2 Authentication"`
 
-Use tags for cross-cutting concerns (a spec might be tagged both `["api", "security"]`) and scope for primary ownership.
+Use tags for cross-cutting concerns (a spec might be tagged both `["api", "security"]`) and scope for its domain. Scope does not assign a work item to an agent.
 
 ## Common anti-patterns
 

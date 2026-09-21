@@ -4,8 +4,11 @@ on:
   pull_request:
     paths:
       - "groundtruth-kb/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/pull_request_template.md"
       - ".github/workflows/groundtruth-kb-tests.yml"
       - ".harness-baseline-configuration/**"
+      - ".agents/skills/**"
       - "scripts/harness_projection/**"
       - "scripts/check_harness_parity.py"
       - "platform_tests/scripts/test_parity_*.py"
@@ -13,8 +16,11 @@ on:
     branches: [main, develop, "hotfix/**"]
     paths:
       - "groundtruth-kb/**"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/pull_request_template.md"
       - ".github/workflows/groundtruth-kb-tests.yml"
       - ".harness-baseline-configuration/**"
+      - ".agents/skills/**"
       - "scripts/harness_projection/**"
       - "scripts/check_harness_parity.py"
       - "platform_tests/scripts/test_parity_*.py"
@@ -28,6 +34,11 @@ jobs:
   platform-tests:
     name: GroundTruth KB platform tests
     runs-on: ubuntu-latest
+    env:
+      GTKB_RUN_POSTGRES_INTEGRATION: "1"
+      GTKB_TEST_POSTGRES_SERVICE: gtkb_ci
+      PGSERVICEFILE: ${{ runner.temp }}/gtkb-pg-service.conf
+      GTKB_CI_PGDATA: ${{ runner.temp }}/gtkb-pgdata
     steps:
       - uses: actions/checkout@v4
 
@@ -41,7 +52,36 @@ jobs:
       - name: Install GroundTruth KB test dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install "./groundtruth-kb[dev,search,web]"
+          python -m pip install "./groundtruth-kb[dev,search,authority]"
+
+      - name: Check community feedback contract
+        working-directory: groundtruth-kb
+        run: |
+          python -m ruff check tests/test_community_feedback_spec1875.py
+          python -m ruff format --check tests/test_community_feedback_spec1875.py
+          python -m pytest tests/test_community_feedback_spec1875.py -q --tb=short
+
+      - name: Start disposable PostgreSQL for native tests
+        shell: bash
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql
+          postgres_bin="$(find /usr/lib/postgresql -mindepth 3 -maxdepth 3 -type f -name initdb -printf '%h\n' | sort -V | tail -n 1)"
+          test -x "$postgres_bin/initdb"
+          test -x "$postgres_bin/pg_ctl"
+          test ! -e "$GTKB_CI_PGDATA"
+          printf 'GTKB_CI_POSTGRES_BIN=%s\n' "$postgres_bin" >> "$GITHUB_ENV"
+          "$postgres_bin/initdb" -D "$GTKB_CI_PGDATA" --username=postgres --auth-local=trust --auth-host=trust
+          "$postgres_bin/pg_ctl" -D "$GTKB_CI_PGDATA" -l "$RUNNER_TEMP/gtkb-postgres.log" -o "-h 127.0.0.1 -p 55434" -w start
+          cat > "$PGSERVICEFILE" <<'GTKB_SERVICE'
+          [gtkb_ci]
+          host=127.0.0.1
+          port=55434
+          dbname=postgres
+          user=postgres
+          GTKB_SERVICE
+          "$postgres_bin/psql" "service=$GTKB_TEST_POSTGRES_SERVICE" -X -v ON_ERROR_STOP=1 -tAc \
+            "SELECT CASE WHEN inet_server_addr() = '127.0.0.1'::inet AND inet_server_port() = 55434 AND current_database() = 'postgres' THEN 1 ELSE 0 END" | grep -qx 1
 
       - name: Canonical harness derivation
         run: |
@@ -52,6 +92,19 @@ jobs:
         run: |
           mkdir -p .pytest-results
           python -m pytest tests/ -q --tb=short --junitxml=.pytest-results/groundtruth-kb-tests.xml
+
+      - name: Stop the owned disposable PostgreSQL cluster
+        if: always()
+        shell: bash
+        run: |
+          if [ -n "${GTKB_CI_POSTGRES_BIN:-}" ] && [ -f "$GTKB_CI_PGDATA/postmaster.pid" ]; then
+            postgres_pid="$(head -n 1 "$GTKB_CI_PGDATA/postmaster.pid")"
+            test "$postgres_pid" -gt 1
+            test "$(sed -n '2p' "$GTKB_CI_PGDATA/postmaster.pid")" = "$GTKB_CI_PGDATA"
+            test "$(readlink -f "/proc/$postgres_pid/exe")" = "$(readlink -f "$GTKB_CI_POSTGRES_BIN/postgres")"
+            tr '\0' '\n' < "/proc/$postgres_pid/cmdline" | grep -Fxq -- "$GTKB_CI_PGDATA"
+            "$GTKB_CI_POSTGRES_BIN/pg_ctl" -D "$GTKB_CI_PGDATA" -m fast -w stop
+          fi
 
       - name: Upload pytest results
         if: always()

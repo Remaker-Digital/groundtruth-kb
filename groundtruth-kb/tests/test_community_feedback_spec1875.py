@@ -1,4 +1,4 @@
-"""SPEC-1875 community feedback harvesting loop coverage."""
+"""SPEC-1875 community feedback coverage of the real host-repository carriers."""
 
 from __future__ import annotations
 
@@ -8,69 +8,67 @@ from typing import Any
 import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT.parent
 
 
 def _read(relative_path: str) -> str:
     return (ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def _load_yaml(relative_path: str) -> dict[str, Any]:
-    return yaml.safe_load(_read(relative_path))
+def _repo_read(relative_path: str) -> str:
+    return (REPO_ROOT / relative_path).read_text(encoding="utf-8")
 
 
-def _field_by_id(form: dict[str, Any]) -> dict[str, dict[str, Any]]:
-    return {item["id"]: item for item in form.get("body", []) if isinstance(item, dict) and "id" in item}
+def _issue_template(relative_path: str) -> tuple[dict[str, Any], str]:
+    template = _repo_read(relative_path)
+    assert template.startswith("---\n")
+    frontmatter, body = template[4:].split("\n---\n", 1)
+    return yaml.safe_load(frontmatter), body.lower()
 
 
 def test_bug_report_issue_form_captures_required_feedback() -> None:
-    form = _load_yaml(".github/ISSUE_TEMPLATE/bug_report.yml")
+    metadata, body = _issue_template(".github/ISSUE_TEMPLATE/bug_report.md")
 
-    assert form["name"] == "Bug Report"
-    assert "bug" in form["labels"]
-
-    fields = _field_by_id(form)
-    for field_id in ("component", "expected", "actual", "reproduction"):
-        assert field_id in fields
-        assert fields[field_id]["validations"]["required"] is True
-
-    assert fields["component"]["type"] == "dropdown"
-    assert "Knowledge DB (db.py)" in fields["component"]["attributes"]["options"]
-    assert "Minimal steps to reproduce" in fields["reproduction"]["attributes"]["description"]
+    assert metadata["name"] == "Bug Report"
+    assert "bug" in metadata["labels"]
+    for heading in ("## description", "## steps to reproduce", "## expected behavior", "## actual behavior"):
+        assert heading in body
+    assert "**surface:**" in body
+    assert "**scope:** gtkb" in body or "**scope:** gt-kb" in body
+    assert "gt-kb platform / agent red application / other adopter" in body
 
 
 def test_feature_request_issue_form_captures_method_feedback_shape() -> None:
-    form = _load_yaml(".github/ISSUE_TEMPLATE/feature_request.yml")
+    metadata, body = _issue_template(".github/ISSUE_TEMPLATE/feature_request.md")
 
-    assert form["name"] == "Feature Request"
-    assert "enhancement" in form["labels"]
-
-    fields = _field_by_id(form)
-    for field_id in ("problem", "approach", "scope"):
-        assert field_id in fields
-        assert fields[field_id]["validations"]["required"] is True
-
-    assert "problem or limitation" in fields["problem"]["attributes"]["description"]
-    assert "tradeoffs" in fields["approach"]["attributes"]["description"]
-    assert fields["scope"]["type"] == "dropdown"
+    assert metadata["name"] == "Feature Request"
+    assert "enhancement" in metadata["labels"]
+    for heading in ("## problem / motivation", "## proposed solution", "## scope", "## alternatives considered"):
+        assert heading in body
+    assert "tradeoffs" in body
+    assert "method-feedback" in body
+    assert "hosted application" in body
 
 
 def test_pull_request_template_requires_problem_rationale_and_testing_evidence() -> None:
-    template = _read(".github/pull_request_template.md").lower()
+    template = _repo_read(".github/pull_request_template.md").lower()
 
-    for required in ("## problem", "## approach", "## rationale", "## testing"):
+    for required in ("## problem", "## approach", "## rationale", "## testing evidence"):
         assert required in template
-
     assert "existing tests pass" in template
     assert "new tests added" in template
     assert "assertions still pass" in template
+    assert "platform configuration, governance, bridge, dashboard, or workflow change" in template
 
 
 def test_contributing_documents_monthly_method_feedback_triage_loop() -> None:
     contributing = _read("CONTRIBUTING.md")
     lower = contributing.lower()
 
-    assert "template=bug_report.yml" in contributing
-    assert "template=feature_request.yml" in contributing
+    for template in ("bug_report.md", "feature_request.md"):
+        assert f"template={template}" in contributing
+        assert f"template={template}" in _read("docs/contributing.md")
+        assert (REPO_ROOT / ".github" / "ISSUE_TEMPLATE" / template).is_file()
     assert "method-feedback" in contributing
     assert "triaged monthly" in lower
     assert "first monday of each month" in lower
@@ -97,10 +95,20 @@ def test_code_of_conduct_declares_scope_and_reporting_contact() -> None:
 
 
 def test_package_ci_guards_feedback_loop_artifacts_with_ruff_and_pytest() -> None:
-    workflow = _load_yaml(".github/workflows/ci.yml")
-    test_base_steps = workflow["jobs"]["test-base"]["steps"]
-    run_blocks = "\n".join(step.get("run", "") for step in test_base_steps if isinstance(step, dict))
-
-    assert "ruff check ." in run_blocks
-    assert "ruff format --check ." in run_blocks
-    assert "pytest -v --tb=short" in run_blocks
+    workflow = yaml.safe_load(_repo_read(".github/workflows/groundtruth-kb-tests.yml"))
+    triggers = workflow.get("on") or workflow[True]
+    for event in ("pull_request", "push"):
+        assert ".github/ISSUE_TEMPLATE/**" in triggers[event]["paths"]
+        assert ".github/pull_request_template.md" in triggers[event]["paths"]
+        assert "groundtruth-kb/**" in triggers[event]["paths"]
+    steps = workflow["jobs"]["platform-tests"]["steps"]
+    feedback_step = next(step for step in steps if step.get("name") == "Check community feedback contract")
+    assert feedback_step["working-directory"] == "groundtruth-kb"
+    assert not feedback_step.get("continue-on-error", False)
+    assert "python -m ruff check tests/test_community_feedback_spec1875.py" in feedback_step["run"]
+    assert "python -m ruff format --check tests/test_community_feedback_spec1875.py" in feedback_step["run"]
+    assert "python -m pytest tests/test_community_feedback_spec1875.py -q --tb=short" in feedback_step["run"]
+    package_step = next(step for step in steps if step.get("name") == "Run GroundTruth KB platform tests")
+    assert package_step["working-directory"] == "groundtruth-kb"
+    assert "python -m pytest tests/ -q --tb=short" in package_step["run"]
+    assert steps.index(feedback_step) < steps.index(package_step)

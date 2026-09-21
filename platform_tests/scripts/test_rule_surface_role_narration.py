@@ -1,7 +1,7 @@
 """Authored successor instructions and their actual local Markdown closure.
 
 This text check is separate from native binding/claim behavior and actual-host
-qualification. It discovers always-projected baseline rules and follows linked
+qualification. It discovers authored baseline rules and follows linked
 resources without requiring those resources to appear in a frozen file list.
 """
 
@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import re
-import tomllib
 from collections.abc import Iterable
 from pathlib import Path
 
@@ -19,35 +18,30 @@ DEFAULT_PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PROJECT_ROOT = Path(os.environ.get("GTKB_ROLE_NARRATION_ROOT", DEFAULT_PROJECT_ROOT)).resolve()
 
 SOURCE_MATRIX = (
-    ".harness-baseline-configuration/AGENTS.md",
+    "AGENTS.md",
     ".harness-baseline-configuration/rules/bridge-essential.md",
     ".harness-baseline-configuration/rules/canonical-terminology.md",
     ".harness-baseline-configuration/rules/file-bridge-protocol.md",
     ".harness-baseline-configuration/rules/operating-model.md",
     ".harness-baseline-configuration/rules/session-bootstrap.md",
     ".harness-baseline-configuration/rules/way-of-working.md",
-    ".harness-baseline-configuration/skills/gtkb-bridge/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-harness-parity-review/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-hygiene-investigation/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-hygiene-sweep/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-session-wrap/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-session-wrap-scan/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-session-wrap/references/audit-checklist.md",
-    ".harness-baseline-configuration/skills/gtkb-session-wrap/references/handoff-template.md",
-    ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md",
+    ".agents/skills/gtkb-bridge/SKILL.md",
+    ".agents/skills/gtkb-harness-parity-review/SKILL.md",
+    ".agents/skills/gtkb-hygiene-investigation/SKILL.md",
+    ".agents/skills/gtkb-hygiene-sweep/SKILL.md",
+    ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md",
+    ".agents/skills/gtkb-session-wrap/SKILL.md",
+    ".agents/skills/gtkb-session-wrap-scan/SKILL.md",
+    ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+    ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+    ".agents/skills/gtkb-verify/SKILL.md",
     "groundtruth-kb/docs/method/06-dual-agent.md",
     "groundtruth-kb/docs/method/07-sessions.md",
     "groundtruth-kb/docs/method/12-file-bridge-automation.md",
     "groundtruth-kb/docs/method/14-lifecycle.md",
-    "groundtruth-kb/templates/project/AGENTS.md",
-    "groundtruth-kb/templates/rules/bridge-essential.md",
-    "groundtruth-kb/templates/rules/canonical-terminology.md",
-    "groundtruth-kb/templates/rules/file-bridge-protocol.md",
     "groundtruth-kb/templates/rules/prime-bridge-collaboration-protocol.md",
-    "groundtruth-kb/templates/skills/gtkb-bridge/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md",
-    ".harness-baseline-configuration/skills/gtkb-proposal-review/SKILL.md",
+    ".agents/skills/gtkb-bridge-propose/SKILL.md",
+    ".agents/skills/gtkb-proposal-review/SKILL.md",
 )
 
 MARKDOWN_LINK_RE = re.compile(r"\[[^\]]+\]\(([^)]+)\)")
@@ -83,7 +77,7 @@ RECEIPT_REQUIREMENTS = (
     r"successor.{0,80}(?:own claim|fresh claim)",
 )
 POSITIVE_REQUIREMENTS = {
-    ".harness-baseline-configuration/AGENTS.md": (
+    "AGENTS.md": (
         r"ephemeral.{0,30}(?:agent )?contexts",
         r"role is immutable",
         r"claims the next artifact",
@@ -93,7 +87,6 @@ POSITIVE_REQUIREMENTS = {
     ".harness-baseline-configuration/rules/bridge-essential.md": RECEIPT_REQUIREMENTS,
     ".harness-baseline-configuration/rules/way-of-working.md": RECEIPT_REQUIREMENTS,
     ".harness-baseline-configuration/rules/operating-model.md": RECEIPT_REQUIREMENTS,
-    "groundtruth-kb/templates/rules/bridge-essential.md": RECEIPT_REQUIREMENTS,
     "groundtruth-kb/templates/rules/prime-bridge-collaboration-protocol.md": RECEIPT_REQUIREMENTS,
 }
 
@@ -139,13 +132,11 @@ def _continuity_violations(paths: Iterable[Path]) -> dict[str, list[str]]:
 
 
 def _instruction_seeds(root: Path) -> set[Path]:
-    profiles = tomllib.loads((root / "scripts/harness_projection/profiles.toml").read_text(encoding="utf-8"))
-    deferred = set(profiles["baseline"].get("deferred_rules", []))
     rules = root / ".harness-baseline-configuration/rules"
     assert rules.is_dir(), "the canonical rule source is missing"
-    projected_rules = {p for p in rules.rglob("*.md") if p.name not in deferred}
-    assert projected_rules, "the ordinary projected rule closure is empty"
-    return {root / relative for relative in SOURCE_MATRIX} | projected_rules
+    authored_rules = set(rules.rglob("*.md"))
+    assert authored_rules, "the authored rule closure is empty"
+    return {root / relative for relative in SOURCE_MATRIX} | authored_rules
 
 
 def test_canonical_instruction_closure_routes_each_artifact_to_a_fresh_role_bound_session() -> None:
@@ -201,18 +192,15 @@ def test_unlisted_recursive_resource_cannot_escape_the_instruction_check(tmp_pat
         _discover_linked_sources(tmp_path.resolve(), [seed.resolve()])
 
 
-def test_a_new_always_projected_rule_is_included_without_a_matrix_amendment(tmp_path: Path) -> None:
-    profiles = tmp_path / "scripts/harness_projection/profiles.toml"
-    profiles.parent.mkdir(parents=True)
-    profiles.write_text('[baseline]\ndeferred_rules = ["deferred.md"]\n', encoding="utf-8")
+def test_a_new_authored_rule_is_included_without_a_matrix_amendment(tmp_path: Path) -> None:
     rules = tmp_path / ".harness-baseline-configuration/rules"
     rules.mkdir(parents=True)
     added = rules / "new-control.md"
     added.write_text("New control", encoding="utf-8")
-    deferred = rules / "deferred.md"
-    deferred.write_text("Explicit activity input", encoding="utf-8")
+    activity = rules / "activity.md"
+    activity.write_text("Explicit activity input", encoding="utf-8")
     seeds = _instruction_seeds(tmp_path)
-    assert added in seeds and deferred not in seeds
+    assert added in seeds and activity in seeds
 
 
 @pytest.mark.parametrize(
