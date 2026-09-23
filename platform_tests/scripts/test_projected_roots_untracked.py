@@ -35,10 +35,13 @@ BASELINE = ".harness-baseline-configuration"
 SKILLS_ROOT = ".agents/skills"
 ROOT_CARRIERS = ("AGENTS.md", "CLAUDE.md", ".goosehints")
 # The tracked baseline after the D15 move: rules (32 after c107 retired active-workspace.md) + hooks incl.
-# manifest.toml and _hook_context.py (11) + routing.toml; goose-execution-floor.toml is untracked. 15.8 refreshes
+# manifest.toml and _hook_context.py (11) + routing.toml + goose-execution-floor.toml, which the gated commit
+# a3d2291 added as work product: it is the canonical Goose execution floor (scripts/goose_harness.py reads it and
+# config/registry/sot-artifacts.toml declares it, and the harness refuses to run when it is absent). 15.8 refreshes
 # TEST-12566 to this.
 TRACKED_BASELINE_SHAPE = {"rules": 32, "hooks": 11}
-TRACKED_BASELINE_FILES = 44
+TRACKED_BASELINE_SINGLETONS = ("routing.toml", "goose-execution-floor.toml")
+TRACKED_BASELINE_FILES = 45
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -147,7 +150,11 @@ def test_tracked_source_shape_after_the_d15_move() -> None:
         for kind in TRACKED_BASELINE_SHAPE
     }
     assert {kind: len(paths) for kind, paths in shape.items()} == TRACKED_BASELINE_SHAPE, shape
-    assert baseline == {*shape["rules"], *shape["hooks"], f"{BASELINE}/routing.toml"}, sorted(baseline)
+    assert baseline == {
+        *shape["rules"],
+        *shape["hooks"],
+        *(f"{BASELINE}/{name}" for name in TRACKED_BASELINE_SINGLETONS),
+    }, sorted(baseline)
     assert len(baseline) == TRACKED_BASELINE_FILES
 
     assert _tracked(*ROOT_CARRIERS) == set(ROOT_CARRIERS)

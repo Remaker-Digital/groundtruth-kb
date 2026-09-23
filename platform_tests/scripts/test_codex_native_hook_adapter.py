@@ -90,6 +90,59 @@ def run(runtime, data, *, event="PreToolUse", args=(), timeout=8):
     return json.loads(result.stdout)
 
 
+def windows_command(event="PreToolUse", args=(), timeout=8):
+    """The rendering Codex uses on Windows, taken from the projector's own registration."""
+    engine = _load_projector(ROOT)
+    profile = {**engine.load_profiles()["harnesses"]["codex"], "name": "codex"}
+    gaps = []
+    hook = {"script": "probe.py", "args": list(args)}
+    rendered = engine._native_cwd_hook_command(profile, hook, event, timeout, {}, gaps)
+    assert not gaps
+    escaped = engine._powershell_expansion_safe(rendered)
+    assert escaped.replace("`$", "$").replace("``", "`") == rendered
+    return escaped
+
+
+def run_through_powershell(runtime, data, *, event="PreToolUse", args=(), timeout=8):
+    """Codex runs a command hook through the session shell, which is PowerShell on Windows, as ONE argument."""
+    root, _ = runtime
+    result = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-Command",
+            windows_command(event, args, timeout),
+        ],
+        cwd=root.parent,
+        input=data if isinstance(data, str) else json.dumps(data, ensure_ascii=False),
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        env={**os.environ, "GTKB_NATIVE_CONTEXT_ID": "stale-alias", "GTKB_PROJECT_ROOT": "foreign-root"},
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+    )
+    assert result.returncode == 0, (result.returncode, result.stdout[-400:], result.stderr[-400:])
+    return json.loads(result.stdout)
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="the Windows rendering needs a Windows PowerShell shell")
+@pytest.mark.parametrize("event", ["PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Stop"])
+def test_windows_rendering_runs_under_a_powershell_shell_with_literal_arguments(runtime, event):
+    """A registration Codex cannot parse is a failed hook it then ignores; this is the case that catches it."""
+    root, _ = runtime
+    supplied = payload(root, event)
+    args = ("argument with spaces", "a&b;literal", "an'apostrophe", "café")
+    assert run_through_powershell(runtime, supplied, event=event, args=args) == {}
+    observed = json.loads((root / "observed.json").read_text())
+    assert observed["payload"] == {**supplied, "project_root": str(root)}
+    assert observed["native"] == supplied["session_id"]
+    assert observed["root"] == str(root) and observed["harness"] == "codex"
+    assert observed["args"] == [*args, "--harness", "codex"]
+    assert not (root / "nested cwd/café.py").exists()
+
+
 @pytest.mark.parametrize("event", ["PreToolUse", "PostToolUse", "SessionStart", "UserPromptSubmit", "Stop"])
 def test_rendered_native_events_preserve_identity_utf8_cwd_and_literal_arguments(runtime, event):
     root, _ = runtime

@@ -93,6 +93,23 @@ def _commands(value: Any):
             yield from _commands(child)
 
 
+def _windows_commands(value: Any):
+    """Windows-specific registrations (``commandWindows``), which Codex prefers on Windows."""
+    if isinstance(value, dict):
+        if isinstance(value.get("commandWindows"), str):
+            yield value["commandWindows"]
+        for child in value.values():
+            yield from _windows_commands(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _windows_commands(child)
+
+
+def _unescape_powershell(command: str) -> str:
+    """Inverse of the projector's expansion-safe escape, so one contract checks both renderings."""
+    return command.replace("`$", "$").replace("``", "`")
+
+
 def _arguments(command: str) -> list[str]:
     """Quote-stripped, slash-normalized argument list of a registered command."""
     return [part.strip("\"'").replace("\\", "/") for part in shlex.split(command, posix=False)]
@@ -355,12 +372,31 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
             if not events:
                 issues.append(_issue("missing_hook_event", rel, "No declared native event for this hook"))
             for event in events:
-                commands = _commands(_registration_events(profile, registration).get(event, []))
+                registered = _registration_events(profile, registration).get(event, [])
+                commands = list(_commands(registered))
                 referencing = [command for command in commands if _references_script(command, rel, project_dir_var)]
                 if not referencing:
                     issues.append(_issue("missing_hook_registration", rel, f"No exact hook path argument at {event}"))
                 elif not all(_carries_identity(command, rel, project_dir_var, harness) for command in referencing):
                     issues.append(_issue("missing_identity_argument", rel, f"No '--harness {harness}' at {event}"))
+                # Codex prefers commandWindows on Windows, so drift there would silently replace what the ordinary
+                # command declares: it must unescape to exactly one of them and carry the same identity (D46).
+                for windows_command in _windows_commands(registered):
+                    plain = _unescape_powershell(windows_command)
+                    if not _references_script(plain, rel, project_dir_var):
+                        continue
+                    if plain not in commands:
+                        issues.append(
+                            _issue("windows_registration_drift", rel, f"commandWindows differs from command at {event}")
+                        )
+                    elif not _carries_identity(plain, rel, project_dir_var, harness):
+                        issues.append(
+                            _issue(
+                                "missing_identity_argument",
+                                rel,
+                                f"No '--harness {harness}' at {event} (commandWindows)",
+                            )
+                        )
         if installed:
             issues.extend(_installed_issues(root, str(config_dir), plan))
     except (KeyError, OSError, ValueError, SyntaxError, RuntimeError) as error:

@@ -651,6 +651,16 @@ def _native_cwd_hook_command(profile: dict, hook: dict, event: str, timeout: int
     return 'powershell.exe -NoProfile -NonInteractive -Command "' + bootstrap + '" ' + " ".join(quoted)
 
 
+def _powershell_expansion_safe(command: str) -> str:
+    """Return `command` such that one PowerShell expansion pass reproduces it verbatim.
+
+    A command hook reaches Codex's session shell as a single argument. Windows PowerShell treats that argument as an
+    expandable string, so an unescaped ``$name`` is replaced by an empty value and the surviving text no longer
+    parses. Doubling backticks first keeps an escape from being eaten by the same pass.
+    """
+    return command.replace("`", "``").replace("$", "`$")
+
+
 def render_hooks_registration(
     profile: dict, manifest: dict, tokens: dict[str, str], gaps: list[str]
 ) -> tuple[str, str] | None:
@@ -732,6 +742,11 @@ def render_hooks_registration(
                     profile, hook, native_event, _projected_timeout(profile, hook) or 30, tokens, gaps
                 )
             entry = {"type": "command", "command": command}
+            if mode == "native_cwd_hooks_json":
+                # Codex runs a command hook through the session shell and hands it the command as one argument;
+                # on Windows that shell is PowerShell, which expands the text before parsing it. The escaped copy
+                # survives exactly one expansion pass and is the one Codex uses on Windows (owner ruling D46).
+                entry["commandWindows"] = _powershell_expansion_safe(command)
             timeout = _projected_timeout(profile, hook)
             if timeout is not None:
                 entry["timeout"] = timeout
