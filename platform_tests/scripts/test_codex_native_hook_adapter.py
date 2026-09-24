@@ -94,12 +94,17 @@ def windows_command(event="PreToolUse", args=(), timeout=8):
     """The rendering Codex uses on Windows, taken from the projector's own registration."""
     engine = _load_projector(ROOT)
     profile = {**engine.load_profiles()["harnesses"]["codex"], "name": "codex"}
+    profile["hook_events"] = {"probe_event": event}
     gaps = []
-    hook = {"script": "probe.py", "args": list(args)}
-    rendered = engine._native_cwd_hook_command(profile, hook, event, timeout, {}, gaps)
+    hook = {"script": "probe.py", "event": "probe_event", "args": list(args), "timeout_seconds": timeout}
+    registration = engine.render_hooks_registration(profile, {"hook": [hook]}, {}, gaps)
     assert not gaps
-    escaped = engine._powershell_expansion_safe(rendered)
-    assert escaped.replace("`$", "$").replace("``", "`") == rendered
+    assert registration is not None
+    value = json.loads(registration[1])
+    assert set(value) == {"description", "hooks"}
+    handler = value["hooks"][event][0]["hooks"][0]
+    escaped = handler["commandWindows"]
+    assert escaped.replace("`$", "$").replace("``", "`") == handler["command"]
     return escaped
 
 

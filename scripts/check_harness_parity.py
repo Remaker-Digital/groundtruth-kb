@@ -359,6 +359,15 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
         manifest = tomllib.loads((base / profiles["baseline"]["hook_manifest"]).read_text(encoding="utf-8"))
         registration_path = profile.get("hooks_json_path")
         registration = json.loads(plan.writes[registration_path]) if registration_path in plan.writes else {}
+        if profile.get("hooks_projection") == "native_cwd_hooks_json":
+            # Codex HooksFile (0.156.1) rejects unknown root fields before loading any handler.
+            if not isinstance(registration, dict) or set(registration) - {"description", "hooks"}:
+                raise ValueError("Codex hooks.json accepts only description and hooks root fields")
+            description = registration.get("description")
+            if description is not None and not isinstance(description, str):
+                raise ValueError("Codex hooks.json description must be a string or null")
+            if not isinstance(registration.get("hooks", {}), dict):
+                raise ValueError("Codex hooks.json hooks must be an object")
         project_dir_var = profile["project_dir_var"]
         for hook in manifest.get("hook", []):
             script = str(_relative(hook["script"]))

@@ -274,6 +274,46 @@ def test_codex_projection_idempotent_and_clean() -> None:
         assert ".claude/" not in command, "codex registration emits a foreign harness root"
 
 
+def test_codex_registration_conforms_to_native_hook_file_schema() -> None:
+    # Independent names and types from Codex rust-v0.156.1 config/src/hook_config.rs.
+    plan = project_harness.build_plan("codex")
+    assert not plan.gaps
+    value = json.loads(plan.writes[".codex/hooks.json"])
+    assert set(value) == {"description", "hooks"}
+    assert isinstance(value["description"], str)
+    assert "PROJECTION, NOT CANONICAL" in value["description"]
+    assert isinstance(value["hooks"], dict) and value["hooks"]
+    assert set(value["hooks"]) <= {
+        "PreToolUse",
+        "PermissionRequest",
+        "PostToolUse",
+        "PreCompact",
+        "PostCompact",
+        "SessionStart",
+        "SessionEnd",
+        "UserPromptSubmit",
+        "SubagentStart",
+        "SubagentStop",
+        "Stop",
+        "Interrupt",
+    }
+    for groups in value["hooks"].values():
+        assert isinstance(groups, list) and groups
+        for group in groups:
+            assert isinstance(group, dict) and set(group) <= {"matcher", "hooks"}
+            if "matcher" in group:
+                assert isinstance(group["matcher"], str)
+            assert isinstance(group["hooks"], list) and group["hooks"]
+            for handler in group["hooks"]:
+                assert set(handler) <= {"type", "command", "commandWindows", "timeout"}
+                assert handler["type"] == "command"
+                assert isinstance(handler["command"], str) and handler["command"]
+                assert isinstance(handler["commandWindows"], str) and handler["commandWindows"]
+                if "timeout" in handler:
+                    assert type(handler["timeout"]) is int
+                    assert 0 <= handler["timeout"] < 2**64
+
+
 def test_antigravity_projection_idempotent_and_clean() -> None:
     plan_a = project_harness.build_plan("antigravity")
     plan_b = project_harness.build_plan("antigravity")

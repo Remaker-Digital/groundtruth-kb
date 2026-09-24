@@ -753,7 +753,9 @@ def render_hooks_registration(
             group = {"matcher": matcher, "hooks": [entry]} if matcher else {"hooks": [entry]}
             events_out.setdefault(native_event, []).append(group)
         payload = {
-            "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
+            "description"
+            if mode == "native_cwd_hooks_json"
+            else "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
             "hooks": events_out,
         }
         return profile["hooks_json_path"], json.dumps(payload, indent=2) + "\n"

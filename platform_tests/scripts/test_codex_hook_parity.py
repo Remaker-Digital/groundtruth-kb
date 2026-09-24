@@ -104,7 +104,7 @@ def test_codex_conformance_cli_reports_installed_drift_and_preserves_bytes(tree,
 
 
 @pytest.mark.parametrize(
-    "damage", ["missing", "invalid_json", "disabled", "missing_route", "wrong_matcher", "duplicate"]
+    "damage", ["missing", "invalid_json", "unsupported_root_field", "missing_route", "wrong_matcher", "duplicate"]
 )
 def test_codex_missing_or_changed_registration_is_not_qualified(tree, damage):
     path = tree / ".codex/hooks.json"
@@ -114,7 +114,7 @@ def test_codex_missing_or_changed_registration_is_not_qualified(tree, damage):
     elif damage == "invalid_json":
         path.write_text("{", encoding="utf-8")
     else:
-        if damage == "disabled":
+        if damage == "unsupported_root_field":
             value["disableAllHooks"] = True
         elif damage == "missing_route":
             value["hooks"]["PreToolUse"] = []
@@ -128,6 +128,32 @@ def test_codex_missing_or_changed_registration_is_not_qualified(tree, damage):
     assert result["status"] == "fail", result
     assert any(i["code"] in {"missing_output", "changed_output"} for i in issues(result))
     assert (path.read_bytes() if path.exists() else None) == before
+
+
+@pytest.mark.parametrize("installed", [False, True])
+@pytest.mark.parametrize("damage", ["_comment", "disableAllHooks", "description_type", "hooks_type", "root_type"])
+def test_codex_rejects_invalid_native_schema_even_when_installed_matches_plan(tree, monkeypatch, installed, damage):
+    engine = parity._load_projector(tree)
+    plan = engine.build_plan("codex")
+    path = ".codex/hooks.json"
+    value = json.loads(plan.writes[path])
+    if damage in {"_comment", "disableAllHooks"}:
+        value[damage] = True
+    elif damage == "description_type":
+        value["description"] = 1
+    elif damage == "hooks_type":
+        value["hooks"] = []
+    else:
+        value = []
+    plan.writes[path] = json.dumps(value) + "\n"
+    (tree / path).write_text(plan.writes[path], encoding="utf-8", newline="\n")
+    before = (tree / path).read_bytes()
+    monkeypatch.setattr(engine, "build_plan", lambda _name: plan)
+    monkeypatch.setattr(parity, "_load_projector", lambda _root: engine)
+    result = report(tree, installed=installed)
+    assert result["status"] == "fail", result
+    assert any(i["code"] == "invalid_projection" and "Codex hooks.json" in i["message"] for i in issues(result))
+    assert (tree / path).read_bytes() == before
 
 
 def test_codex_bridge_gate_is_registered_once_for_each_native_effect_tool(tree):
