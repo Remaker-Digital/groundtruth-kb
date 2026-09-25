@@ -21,6 +21,7 @@ HELPER_MODULES = (
     "platform_tests/groundtruth_kb/finalization_fixtures.py",
     "platform_tests/groundtruth_kb/postgres_fixtures.py",
     "platform_tests/groundtruth_kb/cli/registry_cli_fixtures.py",
+    "platform_tests/scripts/openrouter_fixtures.py",
     "platform_tests/scripts/provider_fixtures.py",
     "platform_tests/scripts/sot_hook_fixtures.py",
 )

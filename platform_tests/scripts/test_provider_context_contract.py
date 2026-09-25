@@ -124,6 +124,15 @@ def test_goose_launcher_exports_harness_identity_without_role_or_inherited_conte
     floor = tmp_path / goose_harness.FLOOR_CONFIG_RELATIVE_PATH
     floor.parent.mkdir(parents=True)
     floor.write_bytes((ROOT / goose_harness.FLOOR_CONFIG_RELATIVE_PATH).read_bytes())
+    # Observer B74: the launcher also resolves the Goose profile's hook interpreter on the child PATH before a spawn.
+    profiles = tmp_path / goose_harness.PROFILES_RELATIVE_PATH
+    profiles.parent.mkdir(parents=True)
+    profiles.write_bytes((ROOT / goose_harness.PROFILES_RELATIVE_PATH).read_bytes())
+    interpreter = tmp_path / "bin" / ("sh.exe" if os.name == "nt" else "sh")
+    interpreter.parent.mkdir()
+    interpreter.write_bytes(b"")
+    interpreter.chmod(0o755)
+    monkeypatch.setenv("PATH", str(interpreter.parent) + os.pathsep + os.environ.get("PATH", ""))
     launches = []
 
     def launch(command, **kwargs):

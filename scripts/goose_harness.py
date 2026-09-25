@@ -14,9 +14,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
+import tomllib
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 
@@ -40,6 +42,7 @@ GOOSE_CLI = "goose"
 # Canonical execution-floor contract (neutral baseline); there is no second
 # configuration tree and no silent fallback when the file is absent.
 FLOOR_CONFIG_RELATIVE_PATH = Path(".harness-baseline-configuration") / "goose-execution-floor.toml"
+PROFILES_RELATIVE_PATH = Path("scripts") / "harness_projection" / "profiles.toml"
 
 
 class GooseHarnessError(RuntimeError):
@@ -144,6 +147,31 @@ def _load_floor_config(project_root: Path) -> ExecutionFloorConfig:
     return ExecutionFloorConfig.from_toml(config_path)
 
 
+def require_hook_interpreter(project_root: Path, env: Mapping[str, str]) -> str:
+    """Resolve the Goose profile's declared hook interpreter on the child's PATH (observer B74).
+
+    Goose runs every GT-KB hook command through it. When it is missing every hook fails at spawn and Goose 1.45.0
+    lets each tool call run, before any GT-KB code could answer, so a session started without it would be unenforced.
+    The launcher refuses instead.
+    """
+    try:
+        profiles = tomllib.loads((project_root / PROFILES_RELATIVE_PATH).read_text(encoding="utf-8"))
+        interpreter = profiles["harnesses"]["goose"].get("hook_interpreter")
+    except (OSError, KeyError, tomllib.TOMLDecodeError) as exc:
+        raise GooseHarnessError(f"the Goose projection profile is unreadable: {exc}") from exc
+    if not isinstance(interpreter, str) or not interpreter:
+        raise GooseHarnessError("the Goose projection profile declares no hook interpreter")
+    path = next((value for key, value in env.items() if key.upper() == "PATH"), "")
+    resolved = shutil.which(interpreter, path=path)
+    if resolved is None:
+        raise GooseHarnessError(
+            f"Goose runs GT-KB's hooks through {interpreter!r}, which is not on PATH; without it every hook fails and "
+            "every tool call would run unenforced, so the session is refused (on Windows, Git for Windows' usr\\bin "
+            f"supplies {interpreter}.exe)"
+        )
+    return resolved
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_arg_parser()
@@ -155,6 +183,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     # child so an absent contract fails here, not after a model run.
     try:
         floor_config = _load_floor_config(project_root)
+        # Observer B74: refuse a session whose hooks could not run, before any model call.
+        require_hook_interpreter(project_root, child_environment())
     except GooseHarnessError as exc:
         print(f"goose_harness: {exc}", file=sys.stderr)
         return 1

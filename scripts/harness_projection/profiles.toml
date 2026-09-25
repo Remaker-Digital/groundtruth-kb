@@ -53,14 +53,46 @@ project_dir_var = "GOOSE_PROJECT_DIR"
 skills_discovery = "pointer_stubs"
 skills_stub_dir = ".goose/skills"
 hooks_projection = "plugin_hooks_json"
-# Goose-native hook registration: shell commands consuming JSON on stdin,
-# registered at plugins/gtkb/hooks/hooks.json. Only PreToolUse and Stop can
+# Goose-native hook registration (goose-docs.ai hooks guide): a hook-only project
+# plugin, discovered at <project>/.agents/plugins/<name>/ through its plugin.json
+# manifest, with hooks at hooks/hooks.json in the nested form
+# {"hooks": {Event: [{"hooks": [{type, command, timeout, on_failure}]}]}}.
+# .goose/plugins is not a discovery path, so the plugin lives in a declared extra
+# output root (owner ruling D52). Goose skips a plugin's whole hooks.json on a
+# malformed configuration, so only documented keys are rendered. Goose honors a
+# PreToolUse denial only as exit 2 with stderr or {"decision":"block"}; the
+# adapter translates GT-KB's Claude-style answers. Only PreToolUse and Stop can
 # block; other events are registered non-blocking.
-hooks_json_path = ".goose/plugins/gtkb/hooks/hooks.json"
+extra_output_roots = [".agents/plugins/gtkb"]
+hooks_json_path = ".agents/plugins/gtkb/hooks/hooks.json"
+plugin_manifest_path = ".agents/plugins/gtkb/plugin.json"
+stdin_adapter = "scripts/goose_hook_adapter.py"
+# Goose runs hook commands through sh from the session's folder and sets
+# ${PLUGIN_ROOT}; commands anchor on it so the folder Goose was started in
+# cannot misdirect them (measured on 1.45.0, c111 Goose probe).
+plugin_root_var = "PLUGIN_ROOT"
+# The interpreter Goose runs every hook command through is a named prerequisite
+# of Goose enforcement (observer B74). Without it on PATH every hook fails at
+# spawn and Goose 1.45.0 lets each tool call run, before any GT-KB code could
+# answer; on Windows, Git for Windows' usr\bin supplies sh.exe. GT-KB's Goose
+# launcher (scripts/goose_harness.py) refuses to start and `gt project doctor`
+# fails when it does not resolve.
+hook_interpreter = "sh"
+# Goose's documented fail-safe for a PreToolUse hook that fails or times out
+# (default allow; PreToolUse only). Goose 1.45.0 did not apply it to a timeout,
+# a spawn failure or exit 1 (c111 Goose probe), so the adapter itself answers
+# every failure of its own with exit 2; the field stays for later versions.
+blocking_failure_policy = { on_failure = "block" }
+blocking_failure_policy_events = ["PreToolUse"]
+# A hook that exceeds its timeout is also a pass on 1.45.0, so each command hands
+# the adapter a deadline this many seconds below the hook's projected timeout;
+# a target that has not answered by then is refused by the adapter itself.
+adapter_deadline_margin_seconds = 2
 # Projected copy of the retired implementation-start gate wrapper (owner ruling
 # 2026-09-07, canon v8.92); the baseline source is gone, so the render no longer
-# owns it and the engine removes it here.
-leftover_paths = [".goose/hooks/implementation-start-gate.py"]
+# owns it and the engine removes it here. The undiscovered .goose/plugins
+# registration is retired the same way.
+leftover_paths = [".goose/hooks/implementation-start-gate.py", ".goose/plugins/gtkb/hooks/hooks.json"]
 # Neutral lifecycle events -> Goose hook event names.
 [harnesses.goose.hook_events]
 pre_tool_use = "PreToolUse"
@@ -71,6 +103,11 @@ turn_end = "Stop"
 [harnesses.goose.blocking_events]
 # Goose honors deny results only on these events.
 supported = ["PreToolUse", "Stop"]
+[harnesses.goose.plugin_manifest]
+# plugin.json: Goose discovers a plugin directory by its manifest; only documented fields.
+name = "gtkb"
+version = "1.0.0"
+description = "GT-KB effect gate hooks. PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project."
 
 [harnesses.claude]
 config_dir = ".claude"

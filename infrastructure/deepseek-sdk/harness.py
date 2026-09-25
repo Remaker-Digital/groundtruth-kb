@@ -38,6 +38,14 @@ SOURCE = Path(__file__).resolve().parent
 GUARD = SOURCE / "gtkb_guard.mjs"
 CliRunner = Callable[[list[str]], dict[str, Any]]
 
+# Default model route (owner rulings D51, D53-D55): OpenRouter's GT-KB preset through the runtime's provider-neutral pi-ai
+# route. The DeepSeek-specific provider is refused by OpenRouter (its reasoning effort conflicts with the preset's reasoning
+# budget) and could forward a session log; the pi-ai route sends neither. The credential is named, never written.
+OPENROUTER_PROVIDER = "gtkb-openrouter"
+OPENROUTER_KEY_NAME = "GTKB_OPENROUTER_API_KEY"
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_MODEL = "@preset/gtkb-openrouter-deepseek-v4-flash"
+
 
 class LauncherError(RuntimeError):
     def __init__(self, code: int, message: str) -> None:
@@ -145,6 +153,55 @@ def write_patch(home: Path) -> Path:
     return patch
 
 
+def write_route_patch(home: Path, model: str) -> Path:
+    """Insert the provider-neutral pi-ai route into the tool-minimal profile; the model is declared by hand.
+
+    The profile keeps its two guarded tools (str_replace_editor and pwsh); only the provider row is added.
+    """
+    patch = home / "gtkb-openrouter.patch.yml"
+    patch.write_text(
+        "- insert:\n"
+        "    - id: llm-pi-ai\n"
+        "      name: '@deepseek-ai/dsh-llm-pi-ai'\n"
+        "      config:\n"
+        "        providers:\n"
+        f"          {OPENROUTER_PROVIDER}:\n"
+        "            displayName: GT-KB OpenRouter\n"
+        f"            apiKeyEnv: {OPENROUTER_KEY_NAME}\n"
+        "            api: openai-completions\n"
+        f"            baseURL: {OPENROUTER_BASE_URL}\n"
+        "            models:\n"
+        f"              - id: {json.dumps(model)}\n",
+        encoding="utf-8",
+    )
+    return patch
+
+
+def openrouter_credential(root: Path, environment: dict[str, str]) -> dict[str, str]:
+    """Return {GTKB_OPENROUTER_API_KEY: value} from the environment or GT-KB's own .env.local loader.
+
+    The value is placed only in the runtime's environment, never in a report, log or message.
+    """
+    value = environment.get(OPENROUTER_KEY_NAME, "")
+    if not value:
+        try:
+            spec = importlib.util.spec_from_file_location("gtkb_env_loader", root / "scripts" / "_env.py")
+            if spec is None or spec.loader is None:
+                raise ImportError("scripts/_env.py is unavailable")
+            loader = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(loader)
+            value = loader.load_env_local(check_only=True).get(OPENROUTER_KEY_NAME, "")
+        except Exception as error:  # intentional-catch: any loader failure is a typed startup failure without the value
+            raise LauncherError(
+                EXIT_STARTUP_FAILED, f"GT-KB's credential loader failed: {type(error).__name__}"
+            ) from error
+    if not value:
+        raise LauncherError(
+            EXIT_STARTUP_FAILED, f"{OPENROUTER_KEY_NAME} is not set in the environment or in GT-KB's .env.local"
+        )
+    return {OPENROUTER_KEY_NAME: value}
+
+
 def run_session(
     installation: dict[str, Any],
     *,
@@ -157,6 +214,7 @@ def run_session(
     model: str,
     timeout_seconds: float,
     environment: dict[str, str],
+    credential: dict[str, str] | None = None,
 ) -> dict[str, Any]:
     """Start the pinned runtime with the guard, run one turn, and always reap the process."""
     from deepseek_harness.api import DeepSeekHarness, DeepSeekHarnessConfig
@@ -164,8 +222,12 @@ def run_session(
 
     home.mkdir(parents=True, exist_ok=True)
     guard_log = home / "guard-decisions.jsonl"
+    patches = [str(write_patch(home))]
+    if provider == OPENROUTER_PROVIDER:
+        patches.append(str(write_route_patch(home, model)))
     env = {
         **environment,
+        **(credential or {}),
         "GT_PROJECT_ROOT": str(root),
         "GTKB_NATIVE_CONTEXT_ID": native_context_id,
         "GTKB_GUARD_PYTHON": str(root / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe"),
@@ -179,7 +241,7 @@ def run_session(
         cwd=str(cwd),
         dsh_bin=str(installation["executable"]),
         profile=installation["profile"],
-        patches=(str(write_patch(home)),),
+        patches=tuple(patches),
         dsh_home=str(home),
         env=env,
         initialize_timeout_seconds=60,
@@ -238,8 +300,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--document", required=True, help="Assigned bridge document (attempt id)")
     parser.add_argument("--version", type=int, required=True, help="Version the context must deliver")
     parser.add_argument("--task-file", type=Path, required=True, help="UTF-8 task text supplied by the dispatcher")
-    parser.add_argument("--provider", default="deepseek-official")
-    parser.add_argument("--model", default="deepseek-v4-flash")
+    parser.add_argument(
+        "--provider",
+        default=OPENROUTER_PROVIDER,
+        help=f"Model route (default: {OPENROUTER_PROVIDER}, OpenRouter with {OPENROUTER_KEY_NAME}; "
+        "deepseek-official uses the runtime's DeepSeek provider)",
+    )
+    parser.add_argument("--model", default=DEFAULT_MODEL, help=f"Model or OpenRouter preset (default: {DEFAULT_MODEL})")
     parser.add_argument("--timeout-seconds", type=float, default=3600.0)
     parser.add_argument(
         "--home",
@@ -265,6 +332,10 @@ def main(argv: list[str] | None = None) -> int:
                 "infrastructure/deepseek-sdk/runtime-env/Scripts/python.exe",
             )
         installation = verify_installation()
+        # Needed only for a model turn. Resolved before binding so a missing credential never leaves a bound context
+        # without a turn; it reaches only the runtime's environment, never the gt CLI or the report.
+        needs_credential = args.provider == OPENROUTER_PROVIDER and not args.no_prompt
+        credential = openrouter_credential(root, environment) if needs_credential else None
         cli = cli_runner(root, args.config, environment)
         binding = bind_context(cli, native_context_id, args.init)
         report.update(session_context_id=binding["session_context_id"], role=binding["role"])
@@ -282,6 +353,7 @@ def main(argv: list[str] | None = None) -> int:
             model=args.model,
             timeout_seconds=args.timeout_seconds,
             environment=environment,
+            credential=credential,
         )
         if args.no_prompt:
             code = EXIT_DELIVERED

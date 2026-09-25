@@ -2006,6 +2006,95 @@ with its cause; nothing is inferred locally.
 
 ---
 
+## Home and Services Commands
+
+GT-KB Home is the DeepSeek Harness Web UI served on `127.0.0.1:3080` as GT-KB's
+primary interface (owner rulings D54, D58, D59). The Home UI's controls call only
+these commands; they are owner actions in the browser, never model tools.
+
+### gt home start
+
+Start the Home server after proving its GT-KB guard and plugin are active.
+
+```
+gt home start
+```
+
+Runs `infrastructure/deepseek-web/home.py start`: verifies the pinned
+installation, writes the pinned profile manifest into the Home state folder
+(`%LOCALAPPDATA%/GT-KB/home`), proves the composed configuration contains the
+GT-KB rows, starts the server detached and waits for the guard's and the
+plugin's activation lines and the ready line; otherwise it stops what it
+started and fails. The OpenRouter credential is passed by name only.
+
+---
+
+### gt home stop
+
+Stop the Home server (graceful teardown first).
+
+```
+gt home stop
+```
+
+---
+
+### gt home status
+
+Report whether the Home server is running and answering.
+
+```
+gt home status
+```
+
+---
+
+### gt home open
+
+Open the Home UI in the default browser, starting the server first if needed.
+
+```
+gt home open
+```
+
+The loopback sign-in URL is handed only to the browser, never printed.
+
+---
+
+### gt services status
+
+Report each service's state and which actions apply.
+
+```
+gt services status [NAME] [--json]
+```
+
+Services: `authority`, `home`, `dashboard`, `ollama`, `postgresql`.
+
+---
+
+### gt services start
+
+Start one service and wait for its readiness where it has one.
+
+```
+gt services start NAME [--json]
+```
+
+---
+
+### gt services stop
+
+Stop one service so that it stays stopped: its logon task is paused until the
+next start. Stopping `postgresql` usually needs an administrator and makes the
+authority unavailable until it restarts.
+
+```
+gt services stop NAME [--json]
+```
+
+---
+
 ## Local Governance and Repository Commands
 
 Local operations on the selected project checkout. None of these commands
@@ -2236,6 +2325,23 @@ Both documents are validated and compared as `gt controls show` renders
 them. The JSON result carries `before_sha256`, `after_sha256`, `controls`
 (only the keys whose definition differs, each as `{"before", "after"}`) and
 `invariants` (`before` and `after` lists). Read-only.
+
+---
+
+### gt controls propose
+
+Write a complete proposed artifact that changes one control's value and show
+its diff; nothing is applied.
+
+```
+gt controls propose --control <id> --value <value> --output <toml>
+```
+
+The current artifact is edited with its formatting preserved, validated as a
+whole (units, bounds and invariants) and written to `--output`; the JSON result
+is the `gt controls diff` result plus `proposal`. Apply it with `gt controls set
+--input <toml> --expected-sha256 <before_sha256>`. The GT-KB Home configuration
+page uses this path so every change is previewed before it is applied.
 
 ---
 
@@ -2472,6 +2578,7 @@ gt [--config <path>] [--version]
 │   └── work-item <WORK_ITEM_ID> [--json]
 ├── controls
 │   ├── diff --input
+│   ├── propose --control --value --output
 │   ├── set --input --expected-sha256
 │   ├── show
 │   └── validate [--input]
@@ -2508,6 +2615,11 @@ gt [--config <path>] [--version]
 │   ├── project <HARNESS> [--validate | --check | --dry-run]
 │   ├── record --id --fields-file --expected-version --actor --change-reason [--json]
 │   └── show <HARNESS_ID> [--history] [--json]
+├── home
+│   ├── open
+│   ├── start
+│   ├── status
+│   └── stop
 ├── hygiene
 │   └── worktrees [--root] [--integration-ref] [--json]
 ├── kb
@@ -2570,6 +2682,10 @@ gt [--config <path>] [--version]
 ├── service
 │   ├── serve [--port]
 │   └── status [--json]
+├── services
+│   ├── start NAME [--json]
+│   ├── status [NAME] [--json]
+│   └── stop NAME [--json]
 ├── session
 │   ├── bind --native-context-id --init-keyword [--json]
 │   └── show --native-context-id [--json]
@@ -2682,6 +2798,7 @@ primary interface._
 | Command | Description |
 | --- | --- |
 | `gt controls diff` | Compare current and proposed control definitions and invariants without writing. |
+| `gt controls propose` | Write a complete proposed artifact changing one value and show its diff; nothing is applied. |
 | `gt controls set` | Validate and atomically replace the selected artifact for subsequent operations. |
 | `gt controls show` | Show exact live values, units, metadata, invariants and source identity as JSON. |
 | `gt controls validate` | Validate the canonical artifact or an explicit proposed TOML file without writing. |
@@ -2745,6 +2862,15 @@ primary interface._
 | `gt harness project` | Derive one harness configuration from the selected project's canonical baseline. |
 | `gt harness record` | Apply a version-checked harness record amendment and return canonical readback. |
 | `gt harness show` | Read one current harness installation record. |
+
+### gt home
+
+| Command | Description |
+| --- | --- |
+| `gt home open` | Open the Home UI in the default browser, starting the server first if needed. |
+| `gt home start` | Start the Home server after proving its GT-KB guard and plugin are active. |
+| `gt home status` | Report whether the Home server is running and answering. |
+| `gt home stop` | Stop the Home server (graceful teardown first). |
 
 ### gt hygiene
 
@@ -2833,6 +2959,14 @@ primary interface._
 | --- | --- |
 | `gt service serve` | Serve an initialized PostgreSQL domain on IPv4 loopback only. |
 | `gt service status` | Read status from the configured service; never open a client database. |
+
+### gt services
+
+| Command | Description |
+| --- | --- |
+| `gt services start` | Start one service and wait for its readiness where it has one. |
+| `gt services status` | Report each service's state and which actions apply. |
+| `gt services stop` | Stop one service so that it stays stopped (its logon task is paused until the next start). |
 
 ### gt session
 

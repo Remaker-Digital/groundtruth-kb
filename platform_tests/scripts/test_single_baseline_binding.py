@@ -45,6 +45,12 @@ legitimate use exist in-tree and are deliberately excluded:
     ``.agents/commands`` and a bare ``.agents`` root binding stay retired.
   - ``src.agents.containers.*`` — Python module paths for Agent Red's agent
     containers. Dotted module names, not filesystem baseline paths.
+  - ``.agents/plugins`` — the host plugin discovery tree (owner ruling D52):
+    Goose discovers a project's hook plugin only at ``.agents/plugins/<name>/``,
+    so the projector renders GT-KB's Goose plugin there as a declared extra
+    output root. It holds generated output, never a baseline source, so a
+    reference to it binds no generator to a source root. The detector excludes
+    exactly that segment, as it does ``skills``.
 
 (A third class, the opt-in ``Path.home() / ".agents"`` extension-discovery path
 of the SQLite-era startup generator, left the tree with that generator in 2026-09.)
@@ -95,15 +101,16 @@ FORBIDDEN_FILES = (".harness-baseline-configuration/AGENTS.md",)
 # The lookbehind excludes dotted module names: in `src.agents.containers` the
 # `.agents` is preceded by a word character, so it never matches.
 #
-# The two trailing lookaheads exclude the D15 skills source in both shapes
-# (`.agents/skills...`, `.agents\skills...`, `Path(".agents") / "skills"`); the
-# segment must be exactly `skills`, so `.agents/skills-archive/` still fires.
+# The trailing lookaheads exclude the D15 skills source and the D52 plugin
+# discovery tree in both shapes (`.agents/skills...`, `.agents\plugins...`,
+# `Path(".agents") / "skills"`); the segment must be exactly `skills` or
+# `plugins`, so `.agents/skills-archive/` and `.agents/plugins-old/` still fire.
 _BINDING_RE = re.compile(
     r"(?<![\w.])"  # not preceded by word char or dot -> excludes `src.agents`
     r"\.agents"
     r"(?=[\"'/\\])"  # used as a path: quoted segment, or followed by a separator
-    r"(?![/\\]+skills(?![\w-]))"  # ... unless it is the D15 skills source
-    r"(?![\"'][\s)]*/\s*[\"']skills[\"'])"  # ... also in its `Path(".agents") / "skills"` shape
+    r"(?![/\\]+(?:skills|plugins)(?![\w-]))"  # ... unless the D15 skills source or the D52 plugin tree
+    r"(?![\"'][\s)]*/\s*[\"'](?:skills|plugins)[\"'])"  # ... also in the `Path(".agents") / "skills"` shape
 )
 
 # Files permitted to mention a retired baseline for reasons other than binding.
@@ -228,6 +235,7 @@ def test_no_source_file_binds_a_retired_baseline_path() -> None:
         "path = Path('.agents\\\\rules')",
         'root = Path(".agents")',
         'prefix=".agents/skills-archive/"',
+        'prefix=".agents/plugins-old/"',
     ],
 )
 def test_detector_fires_on_a_reintroduced_binding(synthetic: str) -> None:
@@ -263,6 +271,22 @@ def test_detector_allows_the_d15_skills_source(skills_source: str) -> None:
     """
     assert not _retired_baseline_bindings(skills_source), (
         f"detector flagged a binding to the D15 skills source as retired: {skills_source!r}"
+    )
+
+
+@pytest.mark.parametrize(
+    "plugin_output",
+    [
+        'extra_output_roots = [".agents/plugins/gtkb"]',
+        'storage_path = ".agents/plugins/gtkb/hooks/hooks.json"',
+        "Goose discovers its hook plugin only under .agents/plugins/<name>/",
+        'PLUGINS = Path(".agents") / "plugins"',
+    ],
+)
+def test_detector_allows_the_d52_plugin_output_root(plugin_output: str) -> None:
+    """D52: the Goose hook plugin renders under ``.agents/plugins/gtkb``, projector output rather than a baseline source."""
+    assert not _retired_baseline_bindings(plugin_output), (
+        f"detector flagged the D52 plugin output root as a retired baseline binding: {plugin_output!r}"
     )
 
 

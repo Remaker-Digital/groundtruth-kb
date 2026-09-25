@@ -3317,24 +3317,6 @@ notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint
 
 
 [[artifacts]]
-id = "wi5441-member-groundtruth-kb-templates-claude-md-24341019ff"
-domain = "control_surface"
-lifecycle = "active"
-storage_path = "groundtruth-kb/templates/CLAUDE.md"
-coverage_mode = "exact"
-authority_spec_id = "GOV-PLATFORM-SOT-REGISTRY-001"
-mutation_api = "Governed bridge-authorized source edit; direct owner in-place content edit remains valid"
-versioning_policy = "git_tracked"
-backup_policy = "git_tracked"
-restore_action = "git_restore"
-health_check_function = ""
-owner_role = "shared"
-depends_on = []
-forbidden_substitutes = []
-notes = "Deterministically admitted by WI-5441 observers: package_and_entrypoint, registered_dependency_closure."
-
-
-[[artifacts]]
 id = "wi5441-member-groundtruth-kb-templates-hooks-bridge-compliance-4b96c6fa64"
 domain = "control_surface"
 lifecycle = "active"
@@ -6490,7 +6472,7 @@ notes = "Non-authoritative native output. Its own profile and the neutral baseli
 id = "derived-69d26f19d26a9bb38df1"
 domain = "control_surface"
 lifecycle = "generated"
-storage_path = ".goose/plugins/gtkb/hooks/hooks.json"
+storage_path = ".agents/plugins/gtkb/hooks/hooks.json"
 coverage_mode = "exact"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
 mutation_api = "gt harness project goose; source .harness-baseline-configuration and scripts/harness_projection/profiles.toml"
@@ -6646,4 +6628,20 @@ restore_action = "visibility_only"
 depends_on = []
 forbidden_substitutes = []
 notes = "Bounded operational denial diagnostics, never authority or projected configuration. Existing GTKB_GATE_DENIALS_PATH redirects test diagnostics. Missing historical log content is not reconstructed; current hooks create new diagnostic output when needed. Program/runtime retention governs cleanup."
+coverage_mode = "exact"
+[[artifacts]]
+id = "derived-077eac92d3b2ea832ab5"
+domain = "control_surface"
+lifecycle = "generated"
+storage_path = ".agents/plugins/gtkb/plugin.json"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "gt harness project goose; source .harness-baseline-configuration and scripts/harness_projection/profiles.toml"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+health_check_function = "gt harness project goose --check"
+owner_role = "automated_only"
+restore_action = "regenerate_from_source"
+depends_on = []
+forbidden_substitutes = []
+notes = "Non-authoritative native output: the manifest by which Goose discovers GT-KB's hook plugin (owner ruling D52). Its own profile determines its contents; no peer harness supplies input."
 coverage_mode = "exact"

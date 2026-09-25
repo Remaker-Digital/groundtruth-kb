@@ -295,7 +295,7 @@ def test_goose_registers_gates_without_a_matcher(generated_harness_root: Path) -
     string: it never had one, and every PreToolUse hook already receives every
     tool event.
     """
-    projection = generated_harness_root / ".goose" / "plugins" / "gtkb" / "hooks" / "hooks.json"
+    projection = generated_harness_root / ".agents" / "plugins" / "gtkb" / "hooks" / "hooks.json"
     entries = json.loads(projection.read_text(encoding="utf-8"))["hooks"].get("PreToolUse", [])
     assert entries, "goose PreToolUse registration is empty"
     assert not any("matcher" in entry for entry in entries)

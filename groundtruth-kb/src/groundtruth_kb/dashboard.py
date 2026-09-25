@@ -6,6 +6,7 @@ from __future__ import annotations
 import base64
 import contextlib
 import hashlib
+import http.client
 import json
 import logging
 import math
@@ -2906,7 +2907,9 @@ def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: floa
                 raise RuntimeError("grafana_verifier_exited_before_readiness")
             try:
                 health = request("/api/health", min(2, max(0.1, deadline - time.monotonic())))
-            except (OSError, ValueError):
+            except (OSError, ValueError, http.client.HTTPException):
+                # Not ready yet. Until Grafana binds its port, a loopback connect can land on its own ephemeral
+                # source port and read its own request line back as the status line (BadStatusLine).
                 time.sleep(0.1)
                 continue
             if health.get("database") == "ok":
@@ -2920,7 +2923,7 @@ def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: floa
             settings = request(f"/api/plugins/{SQLITE_PLUGIN_ID}/settings", 5)
         except urllib.error.HTTPError as error:
             raise ValueError(f"grafana_plugin_verification_http_{error.code}") from None
-        except (OSError, ValueError):
+        except (OSError, ValueError, http.client.HTTPException):
             raise ValueError("grafana_plugin_verification_unavailable") from None
         expected = {"id": SQLITE_PLUGIN_ID, "signature": "valid", "signatureType": "community", "signatureOrg": "frser"}
         if (

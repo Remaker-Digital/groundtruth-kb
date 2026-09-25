@@ -15,6 +15,13 @@ from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 
+# The arrival oracle (N-28): the reference callback must reach the stalled authority within this window. Owner decision
+# D60 (2026-09-25) widened it from 10 s to 20 s. The callback follows about 56 sequential Git launches, and this host's
+# process creation intermittently slows about fourfold, which put two installed runs' arrivals past 10 s. The product's
+# five-second callback deadline and every assertion are unchanged. B86 records the observed wait against the window on
+# every execution, so a pass also measures its margin.
+ARRIVAL_WINDOW_SECONDS = 20
+
 
 def pending_invocation_report(pending, submitted_at, wait_seconds=15):
     """Describe the pending CLI invocation for an arrival-failure message (N-28 capture); never raises."""
@@ -177,15 +184,22 @@ def test_stalled_commit_callback_releases_reference_lock_without_advancing_head(
             submitted_at = time.monotonic()
             pending = pool.submit(invoke, config, message)
             try:
-                if not received.wait(10):
+                if not received.wait(ARRIVAL_WINDOW_SECONDS):
                     # N-28: an arrival failure alone does not say what the CLI did. Release the never-contacted
                     # authority, give the invocation a bounded chance to finish and carry its outcome in the
-                    # failure message. The oracle (arrival within 10 s) is unchanged.
+                    # failure message. The oracle is arrival within ARRIVAL_WINDOW_SECONDS (D60).
                     release.set()
+                    report = pending_invocation_report(pending, submitted_at)
+                    late = [round(row[2] - submitted_at, 3) for row in requests]
+                    record_property("callback_arrival_window_seconds", ARRIVAL_WINDOW_SECONDS)
+                    record_property("callback_arrival_seconds", late[0] if late else None)
                     pytest.fail(
-                        "Reference callback did not contact the stalled authority within 10s; "
-                        + pending_invocation_report(pending, submitted_at)
+                        f"Reference callback did not contact the stalled authority within {ARRIVAL_WINDOW_SECONDS}s; "
+                        + report
+                        + (f"; the callback arrived {late[0]}s after submission" if late else "; no callback arrived")
                     )
+                record_property("callback_arrival_window_seconds", ARRIVAL_WINDOW_SECONDS)
+                record_property("callback_arrival_seconds", round(requests[0][2] - submitted_at, 3))
                 assert lock.is_file(), "Git must hold the selected branch lock during its prepared callback"
                 assert base(checkout) == parent
                 result = pending.result(timeout=10)
@@ -217,7 +231,7 @@ def test_stalled_commit_callback_releases_reference_lock_without_advancing_head(
         assert not worker.is_alive()
 
 
-def test_timed_out_real_callback_finishes_before_recovery(commit_environment, monkeypatch):
+def test_timed_out_real_callback_finishes_before_recovery(commit_environment, monkeypatch, record_property):
     from concurrent.futures import ThreadPoolExecutor
 
     from groundtruth_kb.postgres_kernel import PostgresKernelError
@@ -257,9 +271,14 @@ def test_timed_out_real_callback_finishes_before_recovery(commit_environment, mo
     monkeypatch.setattr(NativeProjectFinalization, "_check_commit_locked", delayed)
     monkeypatch.setattr(NativeProjectFinalization, "_project", observe_recovery)
     with ThreadPoolExecutor(max_workers=1) as pool:
+        submitted_at = time.monotonic()
         pending = pool.submit(invoke, config, message)
         try:
-            assert entered.wait(40), "the real commit callback did not arrive"
+            arrived = entered.wait(40)
+            # B86: the observed wait against this test's own (unchanged) arrival window, on every execution.
+            record_property("callback_arrival_window_seconds", 40)
+            record_property("callback_arrival_seconds", round(time.monotonic() - submitted_at, 3) if arrived else None)
+            assert arrived, "the real commit callback did not arrive"
             assert lock.is_file(), "Git must hold its selected reference lock during the callback"
             deadline = time.monotonic() + 10
             while lock.exists() and time.monotonic() < deadline:

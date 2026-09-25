@@ -47,6 +47,7 @@ def generated_harness_root(tmp_path_factory):
         "scripts/lo_file_safety_payloads.py",
         "scripts/antigravity_hook_adapter.py",
         "scripts/codex_hook_adapter.py",
+        "scripts/goose_hook_adapter.py",
         "scripts/implementation_start_gate.py",
     ):
         target = root / relative

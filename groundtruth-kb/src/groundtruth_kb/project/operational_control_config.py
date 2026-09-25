@@ -526,6 +526,24 @@ def catalog_dict(catalog: OperationalControlCatalog) -> dict[str, Any]:
     }
 
 
+def propose_operational_control_value(project_root: Path, control_id: str, value: str) -> bytes:
+    """Return the canonical artifact with one control's value replaced, formatting preserved and the whole validated.
+
+    Nothing is written; the result is a complete proposed artifact for `diff` and `set` (the GT-KB Home configuration
+    page's edit path). Units, bounds and invariants are enforced by the same validation as any proposal.
+    """
+    import tomlkit
+
+    document = tomlkit.parse(_read(_safe_path(project_root)).decode("utf-8"))
+    matches = [table for table in document.get("controls", []) if table.get("id") == control_id]
+    if len(matches) != 1:
+        _fail("unknown_control", f"the artifact has no single control {control_id!r}")
+    matches[0]["value"] = str(value)
+    proposed = tomlkit.dumps(document).encode("utf-8")
+    validate_operational_control_bytes(proposed)
+    return proposed
+
+
 def diff_operational_controls(project_root: Path, proposed: bytes) -> dict[str, Any]:
     before = catalog_dict(load_operational_control_catalog(project_root))
     after = catalog_dict(validate_operational_control_bytes(proposed))

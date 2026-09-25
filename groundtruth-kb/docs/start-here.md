@@ -6,9 +6,15 @@ the [bootstrap guide](bootstrap.md) for the concrete setup sequence.
 
 ## What you need
 
-Use Python 3.11 or newer and Git, a configured GT-KB host with a reachable
-native authority, and the harnesses you intend to use. Install the package
-version selected for that host and confirm the CLI:
+Use Python 3.11 or newer, Node.js 20 or newer and Git, a configured GT-KB host
+with a reachable native authority, and any additional harnesses you intend to
+use. Goose runs GT-KB's hooks through `sh`: on Windows keep Git for Windows'
+`usr\bin` on PATH, because without it every Goose tool call runs unenforced.
+GT-KB's Goose launcher refuses to start and `gt project doctor` fails when `sh`
+is missing. A Goose Desktop session you start directly is enforced only while
+`sh` is on the PATH it inherits; GT-KB cannot refuse that session, so run
+`gt project doctor` after any change to PATH. Install the package version
+selected for that host and confirm the CLI:
 
 ```powershell
 gt --version
@@ -16,6 +22,24 @@ gt --help
 ```
 
 `gt --version` prints `gt, version 0.7.0rc1` for the current package.
+
+## Open GT-KB Home
+
+GT-KB Home is GT-KB's primary interface: the DeepSeek Harness Web UI, installed
+with GT-KB, started at logon like GT-KB's authority and kept running, on
+`127.0.0.1:3080` only. The operator installs and registers it once (see
+`infrastructure/deepseek-web/README.md`); the first start opens it, and
+afterwards:
+
+```powershell
+gt home open
+```
+
+Every Home session runs under GT-KB's effect gate. Settings holds GT-KB's own
+pages: status and the dashboard, services (start and stop), and the operational
+controls (preview, then apply). The Home is GT-KB's default interactive
+harness; other harnesses remain available through their projected
+configuration.
 
 A harness does not determine an agent's role. Prime Builder and Loyal Opposition
 are separate session roles established by the supplied initialization marker.
@@ -97,6 +121,9 @@ instructions; a particular branch name is not itself deployment authority.
 | Read native coordination | `gt bridge state-report --json` |
 | Preview managed application updates | `gt project upgrade <APPLICATION> --project-id <PROJECT> --host-root <host> --json` |
 | Operate the derived dashboard | `gt dashboard --help` |
+| Open GT-KB Home | `gt home open` |
+| Inspect, start or stop GT-KB's services | `gt services status --json` |
+| Preview an operational-control change | `gt controls propose --control <ID> --value <VALUE> --output <FILE>` |
 
 Select the intended configuration with `gt --config <path>`. A service failure
 remains a failed or unavailable native operation; local files and caches do not

@@ -6,6 +6,11 @@ Track specifications, tests, work items, and architecture decisions with
 append-only versioning. Built for teams that need traceable, auditable
 engineering decisions.
 
+**GT-KB Home** is GT-KB's primary interface: the DeepSeek Harness Web UI,
+installed with GT-KB and started at logon, with every session under GT-KB's effect gate
+and GT-KB's own pages for status, the dashboard, services and operational
+controls. Open it with `gt home open`; see [Start Here](start-here.md).
+
 ## At a Glance
 
 | Capability | Description |
@@ -61,12 +66,13 @@ path. The [Bootstrap Guide](bootstrap.md) is a 9-step technical reference.
 The pip package includes the CLI, project scaffolding, and `gt dashboard`
 commands for a local Grafana operations dashboard.
 
+- **GT-KB Home** (`gt home`) — the primary interface, with services (`gt services`) and operational controls (`gt controls`)
 - **CLI** (`gt`) — init, seed, assert, summary, history, config, project management
 - **Operations Dashboard** (`gt dashboard`) — local Grafana operations dashboard: init, install, start, stop, refresh, serve
 - **Automation and CI/CD** — `gt assert --triggered-by github-actions` and the `--json` envelopes of the `gt` record verbs (`gt spec list --json`, `gt spec show <ID> --json`)
 - **Project Scaffolding** — three profiles for different team configurations
 - **CI Templates** — test, build, and deploy workflow templates
-- **Process Templates** — CLAUDE.md, MEMORY.md, hooks, and rules
+- **Process Templates** — MEMORY.md, hooks, and rules
 - **File Bridge Setup** — dual-agent coordination templates (Prime Builder + Loyal Opposition)
 - **Azure Readiness Taxonomy** - opt-in enterprise SaaS readiness vocabulary, categories, and verification model
 

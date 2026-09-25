@@ -264,6 +264,9 @@ def _discover(root: Path, diagnostics: list[dict[str, Any]]) -> tuple[dict[str, 
         except OSError as exc:
             _diagnostic(diagnostics, path.name, "path_unavailable", type(exc).__name__)
     generated_roots = set(GENERATED_ROOT_RELS)
+    # A manifest may declare paths under its configuration root and under the profile's declared extra output roots
+    # (owner ruling D52: Goose discovers its hook plugin only under .agents/plugins/<name>/), never elsewhere.
+    owned_roots: dict[str, tuple[str, ...]] = {}
     profile_path = root / "scripts/harness_projection/profiles.toml"
     if profile_path.exists():
         try:
@@ -275,15 +278,25 @@ def _discover(root: Path, diagnostics: list[dict[str, Any]]) -> tuple[dict[str, 
                 if profile.get("status") == "profile_pending":
                     continue
                 name = profile["config_dir"]
+                extra = profile.get("extra_output_roots", [])
                 if (
                     not isinstance(name, str)
                     or "\\" in name
                     or ":" in name
                     or any(p in {"", ".", ".."} for p in name.split("/"))
                     or PurePosixPath(name).parts[0] not in GENERATED_ROOT_RELS
+                    or not isinstance(extra, list)
+                    or any(
+                        not isinstance(value, str)
+                        or "\\" in value
+                        or ":" in value
+                        or any(p in {"", ".", ".."} for p in value.split("/"))
+                        for value in extra
+                    )
                 ):
                     raise ValueError("unsafe projection destination")
                 configured.add(name)
+                owned_roots[name] = (name, *extra)
             generated_roots -= {
                 base for base in GENERATED_ROOT_RELS if any(name.startswith(base + "/") for name in configured)
             }
@@ -316,6 +329,7 @@ def _discover(root: Path, diagnostics: list[dict[str, Any]]) -> tuple[dict[str, 
                 raise ValueError("invalid projection manifest")
             paths[manifest.relative_to(root).as_posix()] = "derived"
             declared = payload["paths"]
+            prefixes = tuple(owned + "/" for owned in owned_roots.get(rel, (rel,)))
             for name in declared:
                 if (
                     not isinstance(name, str)
@@ -323,7 +337,7 @@ def _discover(root: Path, diagnostics: list[dict[str, Any]]) -> tuple[dict[str, 
                     or ":" in name
                     or any(ord(c) < 32 for c in name)
                     or any(p in {"", ".", ".."} for p in name.split("/"))
-                    or not name.startswith(rel + "/")
+                    or not name.startswith(prefixes)
                 ):
                     raise ValueError("invalid projection path")
             for name in sorted(set(declared)):

@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 import click
@@ -13,6 +13,9 @@ import click
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.postgres_kernel import canonical_json_bytes, parse_json_bytes
+
+if TYPE_CHECKING:
+    from groundtruth_kb.services_control import Installation
 
 
 def _config(ctx: click.Context) -> GTConfig:
@@ -1051,6 +1054,134 @@ def dashboard_serve(
 
 
 NATIVE_COMMANDS["dashboard"] = dashboard_group
+
+
+@click.group("services")
+def services_group() -> None:
+    """Start, stop and inspect GT-KB's local services (authority, home, dashboard, ollama, postgresql)."""
+
+
+def _services_installation(ctx: click.Context) -> Installation:
+    from groundtruth_kb.services_control import installation_from_config  # local import keeps CLI start-up light
+
+    config = _config(ctx)
+    return installation_from_config(Path(config.project_root), config.authority_url)
+
+
+@services_group.command("status")
+@click.argument("name", required=False)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def services_status(ctx: click.Context, name: str | None, json_output: bool) -> None:
+    """Report each service's state and which actions apply."""
+    from groundtruth_kb.services_control import ServiceControlError, as_json, status
+
+    try:
+        _emit(as_json(status(_services_installation(ctx), only=name)), json_output)
+    except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+@services_group.command("start")
+@click.argument("name")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def services_start(ctx: click.Context, name: str, json_output: bool) -> None:
+    """Start one service and wait for its readiness where it has one."""
+    from groundtruth_kb.services_control import ServiceControlError, start
+
+    try:
+        _emit(start(_services_installation(ctx), name), json_output)
+    except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+@services_group.command("stop")
+@click.argument("name")
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def services_stop(ctx: click.Context, name: str, json_output: bool) -> None:
+    """Stop one service so that it stays stopped (its logon task is paused until the next start)."""
+    from groundtruth_kb.services_control import ServiceControlError, stop
+
+    try:
+        _emit(stop(_services_installation(ctx), name), json_output)
+    except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
+        raise click.ClickException(str(error)) from error
+
+
+NATIVE_COMMANDS["services"] = services_group
+
+
+@click.group("home")
+def home_group() -> None:
+    """GT-KB Home: the DeepSeek Harness Web UI as GT-KB's primary interface (127.0.0.1:3080)."""
+
+
+def _home_script(ctx: click.Context) -> tuple[Path, Path]:
+    from groundtruth_kb.services_control import installation_from_config
+
+    installation = installation_from_config(Path(_config(ctx).project_root), None)
+    return installation.python, installation.home_script
+
+
+def _home(ctx: click.Context, action: str) -> subprocess.CompletedProcess[str]:
+    python, script = _home_script(ctx)
+    if not script.is_file():
+        raise click.ClickException(f"The GT-KB Home launcher is missing: {script}")
+    return subprocess.run(
+        [str(python), "-B", str(script), action],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        timeout=180,
+    )
+
+
+@home_group.command("start")
+@click.pass_context
+def home_start(ctx: click.Context) -> None:
+    """Start the Home server after proving its GT-KB guard and plugin are active."""
+    result = _home(ctx, "start")
+    click.echo(result.stdout.strip() or result.stderr.strip())
+    ctx.exit(result.returncode)
+
+
+@home_group.command("stop")
+@click.pass_context
+def home_stop(ctx: click.Context) -> None:
+    """Stop the Home server (graceful teardown first)."""
+    result = _home(ctx, "stop")
+    click.echo(result.stdout.strip() or result.stderr.strip())
+    ctx.exit(result.returncode)
+
+
+@home_group.command("status")
+@click.pass_context
+def home_status(ctx: click.Context) -> None:
+    """Report whether the Home server is running and answering."""
+    result = _home(ctx, "status")
+    click.echo(result.stdout.strip() or result.stderr.strip())
+    ctx.exit(result.returncode)
+
+
+@home_group.command("open")
+@click.pass_context
+def home_open(ctx: click.Context) -> None:
+    """Open the Home UI in the default browser, starting the server first if needed."""
+    import webbrowser
+
+    if _home(ctx, "url").returncode != 0 and _home(ctx, "start").returncode != 0:
+        raise click.ClickException("The GT-KB Home server could not be started; see: gt home status")
+    result = _home(ctx, "url")
+    if result.returncode != 0:
+        raise click.ClickException("The GT-KB Home server is not running; see: gt home status")
+    webbrowser.open(result.stdout.strip())  # the loopback sign-in URL goes only to the browser, never to the terminal
+    click.echo("Opened GT-KB Home: http://127.0.0.1:3080/")
+
+
+NATIVE_COMMANDS["home"] = home_group
 
 
 @click.group("core-specs")

@@ -198,9 +198,21 @@ def test_empty_root_reprojection_reconstructs_exact_owned_files(tmp_path, monkey
     monkeypatch.setattr(project_harness, "PROFILES_PATH", tmp_path / "scripts/harness_projection/profiles.toml")
     monkeypatch.setattr(project_harness, "APPLICATION_NAME", None)
     config = tmp_path / config_dir
-    assert not config.exists()
+    # Owned files live in config_dir and in any declared extra output root (D52: Goose's .agents/plugins/gtkb).
+    roots = [tmp_path / root for root in project_harness.owned_roots(dict(profiles["harnesses"][harness]))]
+    assert roots[0] == config and not any(root.exists() for root in roots)
+
+    def owned_files() -> dict[str, bytes]:
+        return {
+            path.relative_to(tmp_path).as_posix(): path.read_bytes()
+            for root in roots
+            if root.exists()
+            for path in root.rglob("*")
+            if path.is_file()
+        }
+
     assert project_harness.run(harness, "write") == 0
-    before = {path.relative_to(tmp_path).as_posix(): path.read_bytes() for path in config.rglob("*") if path.is_file()}
+    before = owned_files()
     ownership = json.loads(before[config_dir + "/.projection-manifest.json"])
     classes = ownership["classes"]
     assert set(classes) == {"registration", "pointer", "ownership"}
@@ -211,8 +223,8 @@ def test_empty_root_reprojection_reconstructs_exact_owned_files(tmp_path, monkey
     assert before
     for relative in before:
         (tmp_path / relative).unlink()
-    assert not any(path.is_file() for path in config.rglob("*"))
+    assert not owned_files()
     assert project_harness.run(harness, "write") == 0
-    after = {path.relative_to(tmp_path).as_posix(): path.read_bytes() for path in config.rglob("*") if path.is_file()}
+    after = owned_files()
     assert after == before
     assert project_harness.run(harness, "check") == 0

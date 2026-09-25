@@ -19,7 +19,7 @@ RETIRED_GATE_TOKEN = "implementation-start-gate"
 REGISTRATION_SURFACES = (
     Path(".claude") / "settings.json",
     Path(".cursor") / "hooks.json",
-    Path(".goose") / "plugins" / "gtkb" / "hooks" / "hooks.json",
+    Path(".agents") / "plugins" / "gtkb" / "hooks" / "hooks.json",  # Goose's discovered plugin (D52)
     Path(".codex") / "hooks.json",
 )
 

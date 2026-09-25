@@ -605,6 +605,10 @@ service alone leaves the CLI refusing. Three files start the service unattended:
   task, then waits for readiness with the probe above and fails, naming the number of probes and the task state, when
   the service does not answer within the window. Registration is an owner action of the same kind as
   `register-service.ps1` for PostgreSQL.
+- GT-KB Home, GT-KB's primary interface, starts at logon through its own task `GTKB-Home`, the same trigger as
+  `GTKB-DomainService`. It is installed and
+  registered in the same owner step with `infrastructure\deepseek-web\install.py` and
+  `infrastructure\deepseek-web\register-home-task.ps1`; see `infrastructure\deepseek-web\README.md`.
 
 Copy `operator-config.example.toml` to `operator-config.toml` and set `[postgresql] service` to the credential entry the
 service process uses (`gtkb_authority`). Verify after registration (PowerShell):

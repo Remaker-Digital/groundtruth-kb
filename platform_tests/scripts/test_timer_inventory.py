@@ -610,6 +610,48 @@ def test_profile_selected_nested_projection_outputs_are_scanned(fixture_root: Pa
     ]
 
 
+def _plugin_root_profile(root: Path, declared: list[str]) -> None:
+    import json
+
+    _write(
+        root / "scripts/harness_projection/profiles.toml",
+        '[harnesses.goose]\nconfig_dir=".goose"\nextra_output_roots=[".agents/plugins/gtkb"]\n',
+    )
+    _write(
+        root / ".goose/.projection-manifest.json",
+        json.dumps(
+            {
+                "engine": "scripts/harness_projection/project_harness.py",
+                "baseline_root": ".harness-baseline-configuration",
+                "paths": declared,
+            }
+        ),
+    )
+
+
+def test_declared_extra_output_root_outputs_are_scanned(fixture_root: Path) -> None:
+    """Owner ruling D52: Goose's manifest declares its plugin files under .agents/plugins/gtkb/, outside .goose/."""
+    _plugin_root_profile(fixture_root, [".agents/plugins/gtkb/hooks/hooks.json", ".goose/rules/poll.md"])
+    _write(fixture_root / ".agents/plugins/gtkb/hooks/hooks.json", '{"hooks": {"timeout": 5}}')
+    _write(fixture_root / ".goose/rules/poll.md", "timeout=3\n")
+    payload = ti.build_inventory(fixture_root)
+    assert payload["coverage"]["status"] == "declared_inputs_read"
+    assert sorted((r["file"], str(r["value"])) for r in payload["derived_records"]) == [
+        (".agents/plugins/gtkb/hooks/hooks.json", "5"),
+        (".goose/rules/poll.md", "3"),
+    ]
+
+
+def test_a_manifest_path_outside_every_owned_root_is_refused(fixture_root: Path) -> None:
+    _plugin_root_profile(fixture_root, [".agents/skills/x/SKILL.md"])
+    _write(fixture_root / ".agents/skills/x/SKILL.md", "timeout=7\n")
+    payload = ti.build_inventory(fixture_root)
+    assert not payload["derived_records"]
+    assert [(d["file"], d["code"]) for d in payload["coverage"]["diagnostics"]] == [
+        (".goose/.projection-manifest.json", "projection_unavailable")
+    ]
+
+
 def test_application_data_documents_and_conversations_are_not_read(
     fixture_root: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

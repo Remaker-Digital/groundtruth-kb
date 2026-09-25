@@ -1,0 +1,8 @@
+{
+  "name": "gtkb-deepseek-web",
+  "private": true,
+  "description": "GT-KB Home: the pinned DeepSeek Harness Web UI (owner rulings D54, D56, D58)",
+  "dependencies": {
+    "@deepseek-ai/dsh": "0.1.2-rc.1"
+  }
+}

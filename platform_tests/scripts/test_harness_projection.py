@@ -374,22 +374,47 @@ def _assert_optional_hook_registration(harness: str, native_event: str, *, event
     after_hooks = json.loads(added[1])["hooks"]
     assert {event: entries for event, entries in after_hooks.items() if event != native_event} == before_hooks
     entries = after_hooks[native_event]
-    assert len(entries) == 1 and "qualification-notification.py" in entries[0]["command"]
-    assert not entries[0].get("blocking") and not entries[0].get("failClosed")
+    # Flat hosts register the action itself; Goose nests it in a rule ({"hooks": [action]}).
+    actions = [action for entry in entries for action in entry.get("hooks", [entry])]
+    assert len(entries) == 1 and len(actions) == 1 and "qualification-notification.py" in actions[0]["command"]
+    assert not actions[0].get("blocking") and not actions[0].get("failClosed") and not actions[0].get("on_failure")
     assert json.dumps(manifest, sort_keys=True) == original
 
 
 def test_projected_hooks_registration_is_native():
+    """Goose's documented plugin (D52, F9): plugin.json plus nested hooks/hooks.json at .agents/plugins/gtkb/.
+
+    Goose 1.45.0 skips a plugin's whole hooks.json on a malformed configuration, so only documented keys appear; each
+    command runs the Goose adapter (exit 2 on every denial or failure) anchored on ${PLUGIN_ROOT}.
+    """
     plan = project_harness.build_plan("goose")
-    hooks_json = plan.writes.get(".goose/plugins/gtkb/hooks/hooks.json")
+    assert ".goose/plugins/gtkb/hooks/hooks.json" not in plan.writes, "the undiscovered path is retired"
+    hooks_json = plan.writes.get(".agents/plugins/gtkb/hooks/hooks.json")
     assert hooks_json is not None, "goose plugin hooks.json not rendered"
-    assert set(json.loads(hooks_json)["hooks"]) == {"PreToolUse"}
+    payload = json.loads(hooks_json)
+    assert set(payload) == {"hooks"}
+    assert set(payload["hooks"]) == {"PreToolUse"}
     _assert_optional_hook_registration("goose", "Stop")
     _assert_optional_hook_registration("goose", "PostToolUse", event="post_tool_use")
     assert "$CLAUDE_PROJECT_DIR" not in hooks_json
-    for command in _commands(json.loads(hooks_json)):
-        assert f" -B {HOOKS_ROOT}/" in command or f" -B {SHARED_GATE} " in command, command
+    manifest = tomllib.loads((BASELINE / "hooks/manifest.toml").read_text(encoding="utf-8"))
+    rules = payload["hooks"]["PreToolUse"]
+    assert len(rules) == len(manifest["hook"])
+    for rule, hook in zip(rules, manifest["hook"], strict=True):
+        assert set(rule) == {"hooks"} and len(rule["hooks"]) == 1, rule
+        action = rule["hooks"][0]
+        assert set(action) <= {"type", "command", "timeout", "on_failure"} and action["type"] == "command", action
+        assert action.get("on_failure") == ("block" if hook.get("blocking") else None), (hook["script"], action)
+    anchor = "${PLUGIN_ROOT}/../../.."
+    for command in _commands(payload):
+        assert command.startswith(
+            f'"{anchor}/groundtruth-kb/.venv/Scripts/python.exe" -B "{anchor}/scripts/goose_hook_adapter.py" '
+        ), command
+        assert f" {HOOKS_ROOT}/" in command or f" {SHARED_GATE} " in command, command
         assert command.endswith(" --harness goose"), command
+    plugin = json.loads(plan.writes[".agents/plugins/gtkb/plugin.json"])
+    assert set(plugin) == {"name", "version", "description"} and plugin["name"] == "gtkb"
+    assert "PROJECTION, NOT CANONICAL" in plugin["description"]
 
 
 def test_unresolved_token_is_projector_gap(tmp_path, monkeypatch):
@@ -405,6 +430,24 @@ def test_pending_profile_fails_closed(monkeypatch):
     monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
     with pytest.raises(project_harness.ProjectionError):
         project_harness.build_plan("fixture-pending")
+
+
+def test_a_shell_run_hook_projection_without_a_declared_interpreter_is_a_gap(monkeypatch):
+    """Observers B74 and B76: Goose spawns every hook through a shell the profile declares for its checkers.
+
+    Without ``hook_interpreter`` the launcher, the doctor and the installer have nothing to verify, so the
+    projector refuses to render the hook registration (a gap fails the projection closed).
+    """
+    profiles = project_harness.load_profiles()
+    goose = profiles["harnesses"]["goose"]
+    assert goose["hooks_projection"] == "plugin_hooks_json" and goose["hook_interpreter"] == "sh"
+    hooks_json = goose["hooks_json_path"]
+    assert hooks_json in project_harness.build_plan("goose").writes
+    del goose["hook_interpreter"]
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
+    plan = project_harness.build_plan("goose")
+    assert any(gap.startswith("missing_hook_interpreter: goose:") for gap in plan.gaps), plan.gaps
+    assert hooks_json not in plan.writes
 
 
 def test_normalize_planned_rel_strips_dot_slash_without_lstripping_baseline_dot():
@@ -603,9 +646,12 @@ def _expected_command(harness: str, profile: dict, target: str, timeout: int | N
         shape = f'"${var}/groundtruth-kb/.venv/Scripts/pythonw.exe" -B "${var}/{target}" --harness {harness}'
         return re.compile("^" + re.escape(shape) + "$")
     if mode == "plugin_hooks_json":
-        return re.compile(
-            "^" + re.escape(f'"groundtruth-kb/.venv/Scripts/python.exe" -B {target} --harness {harness}') + "$"
-        )
+        anchor = "${" + profile["plugin_root_var"] + "}/../../.."
+        adapter = profile["stdin_adapter"]
+        head = f'"{anchor}/groundtruth-kb/.venv/Scripts/python.exe" -B "{anchor}/{adapter}" '
+        # A hook with a projected timeout hands the adapter its deadline (see test_goose_plugin_projection).
+        deadline = r"(?:--deadline \d+ )?" if profile.get("adapter_deadline_margin_seconds") is not None else ""
+        return re.compile("^" + re.escape(head) + deadline + re.escape(f"{target} --harness {harness}") + "$")
     if mode == "hooks_json":
         adapter = profile["stdin_adapter"]
         shape = f'"groundtruth-kb/.venv/Scripts/python.exe" -B {adapter} {target} --harness {harness}'

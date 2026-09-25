@@ -35,7 +35,6 @@ _NON_SCAFFOLDED_TEMPLATE_FILES: frozenset[str] = frozenset(
         # Documentation rendered from strings, not file-copied.
         "MEMORY.md",
         "README.md",
-        "CLAUDE.md",
         "BRIDGE-INVENTORY.md",
         # The registry files themselves are not their own scaffold targets.
         "managed-artifacts.toml",

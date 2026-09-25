@@ -2709,6 +2709,98 @@ def _check_harness_launchability(target: Path) -> ToolCheck:
     )
 
 
+# Hook projections whose host runs every hook command through a shell interpreter the profile must declare
+# (``hook_interpreter``): Goose's plugin hooks, spawned by Goose 1.45.0 through ``sh`` (finding F9).
+_SHELL_RUN_HOOK_PROJECTIONS = frozenset({"plugin_hooks_json"})
+
+
+def _check_hook_interpreters(target: Path) -> ToolCheck:
+    """Observers B74 and B76: an installed projection whose host runs hook commands through a shell needs it.
+
+    Goose 1.45.0 runs every GT-KB hook through ``sh``. When it does not resolve, every hook fails at spawn and the
+    host lets each tool call run unenforced. A missing interpreter, an installed plugin-hook projection without a
+    declared interpreter, and unreadable projection profiles are therefore required failures, never a degradation to
+    allow. A Goose Desktop session started directly is enforced only while the interpreter is on the PATH it
+    inherits; GT-KB cannot refuse such a session, which is why this check is the install- and doctor-time gate.
+    """
+    import tomllib
+
+    name = "Harness hook interpreters"
+    profiles_path = target / "scripts/harness_projection/profiles.toml"
+    if not profiles_path.is_file():
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=False,
+            status="info",
+            message="Harness hook interpreters: no projection profiles to check",
+        )
+    try:
+        harnesses = tomllib.loads(_require_utf8_text(profiles_path, "scripts/harness_projection/profiles.toml"))[
+            "harnesses"
+        ]
+        if not isinstance(harnesses, dict) or not all(isinstance(row, dict) for row in harnesses.values()):
+            raise TypeError("harnesses must be a table of profile tables")
+    except (DoctorCheckReadError, KeyError, TypeError, tomllib.TOMLDecodeError) as exc:
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=False,
+            status="fail",
+            message=(
+                "Harness hook interpreters cannot be verified: the projection profiles are unreadable "
+                f"({exc}), so an installed host's hooks may not run"
+            ),
+        )
+    installed: list[str] = []
+    missing: list[str] = []
+    for harness, profile in sorted(harnesses.items()):
+        config_dir = profile.get("config_dir")
+        if not isinstance(config_dir, str) or not (target / config_dir / ".projection-manifest.json").is_file():
+            continue
+        interpreter = profile.get("hook_interpreter")
+        if profile.get("hooks_projection") in _SHELL_RUN_HOOK_PROJECTIONS and (
+            not isinstance(interpreter, str) or not interpreter
+        ):
+            missing.append(
+                f"{harness} runs its GT-KB hooks through a shell but its profile declares no hook_interpreter"
+            )
+            continue
+        if not isinstance(interpreter, str) or not interpreter:
+            continue
+        installed.append(f"{harness} ({interpreter})")
+        if shutil.which(interpreter) is None:
+            missing.append(f"{harness} runs its GT-KB hooks through {interpreter!r}, which is not on PATH")
+    if missing:
+        return ToolCheck(
+            name=name,
+            required=True,
+            found=False,
+            status="fail",
+            message=(
+                "Harness hook interpreters: "
+                + "; ".join(missing)
+                + ". Without it every hook fails and every tool call runs unenforced"
+                " (on Windows, Git for Windows' usr\\bin supplies sh.exe)"
+            ),
+        )
+    if not installed:
+        return ToolCheck(
+            name=name,
+            required=False,
+            found=True,
+            status="info",
+            message="Harness hook interpreters: no installed projection declares one",
+        )
+    return ToolCheck(
+        name=name,
+        required=False,
+        found=True,
+        status="pass",
+        message="Harness hook interpreters resolve: " + ", ".join(installed),
+    )
+
+
 # The scratch boundary is declared once by the authored baseline rule.
 _HARNESS_SCRATCHPAD_BOUNDARY_DOCS = (Path(".harness-baseline-configuration") / "rules" / "project-root-boundary.md",)
 _HARNESS_SCRATCHPAD_REQUIRED_TERMS = (
@@ -3492,6 +3584,8 @@ def run_doctor(
         # target's argv head so a WinError-2-class launch regression surfaces
         # in the doctor rather than as a silent exit-127 in dispatch logs.
         checks.append(_check_harness_launchability(target))
+        # Observer B74: an installed Goose projection is unenforced without its hook interpreter (sh).
+        checks.append(_check_hook_interpreters(target))
         checks.append(_check_harness_local_scratchpad_boundary(target))
         checks.append(_check_canonical_authority_drift(target))
         checks.append(_check_session_wrap_had_orient(target))

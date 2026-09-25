@@ -90,6 +90,10 @@ MANIFEST
 !scripts/lib/*.py
 scripts/lib/__pycache__/
 scripts/lib/**/*.py[cod]
+# The GT-KB Home plugin's lib/ is also TRACKED source (owner rulings D58, D59):
+# its host and browser modules are hand-written JavaScript, not a build output.
+!infrastructure/deepseek-web/plugins/gtkb-home/lib/
+!infrastructure/deepseek-web/plugins/gtkb-home/lib/*.js
 .pytest_cache/
 # Pytest sandbox/basetemp directories produced by --basetemp= flag.
 # Codex + Prime sessions generate these under per-thread names.
@@ -303,6 +307,15 @@ stripe
 /.codex/
 /.cursor/
 /.goose/
+# A declared extra projection root (owner ruling D52, 2026-09-24): Goose discovers
+# project plugins only at .agents/plugins/<name>/, so its GT-KB hook plugin renders
+# there. The pre-commit hook already refuses every .agents/ postimage outside
+# .agents/skills/, so this rule and that refusal agree.
+/.agents/plugins/gtkb/
+# Operator installation records: per-machine state written by the DeepSeek SDK and
+# GT-KB Home installers (their package trees are ignored or self-ignored).
+/infrastructure/deepseek-sdk/installed.json
+/infrastructure/deepseek-web/installed.json
 
 .kiro/
 cookies.txt

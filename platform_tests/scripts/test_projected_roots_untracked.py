@@ -63,6 +63,16 @@ def _profile_dirs() -> dict[str, str]:
     }
 
 
+def _extra_output_roots() -> dict[str, list[str]]:
+    """Owner ruling D52: output roots a profile owns outside its config_dir (Goose's hook plugin root)."""
+    payload = tomllib.loads(PROFILES.read_text(encoding="utf-8"))
+    return {
+        name: list(profile.get("extra_output_roots", []))
+        for name, profile in payload["harnesses"].items()
+        if profile.get("status") != "profile_pending"
+    }
+
+
 def _ignore_matches(paths: list[str]) -> dict[str, tuple[str, str] | None]:
     """Map each path to (source, pattern) of the ignore rule that matches it, or None."""
     result = _git("check-ignore", "-v", "--no-index", "--non-matching", "--", *paths)
@@ -89,13 +99,26 @@ def test_projector_root_is_ignored_by_one_anchored_rule_at_the_repository_root(r
         assert match == (".gitignore", f"/{root}/"), (path, match)
 
 
+def test_extra_output_roots_are_ignored_by_one_anchored_rule() -> None:
+    """D52: Goose discovers its hook plugin only under ``.agents/plugins/gtkb/``; that generated root is ignored by its
+    own anchored rule, so the tracked skills source beside it (``.agents/skills``) stays unignored."""
+    extra = {name: roots for name, roots in _extra_output_roots().items() if roots}
+    assert extra == {"goose": [".agents/plugins/gtkb"]}
+    for root in extra["goose"]:
+        samples = [f"{root}/plugin.json", f"{root}/hooks/hooks.json"]
+        for path, match in _ignore_matches(samples).items():
+            assert match == (".gitignore", f"/{root}/"), (path, match)
+
+
 def test_every_declared_projection_path_is_ignored() -> None:
+    extra = _extra_output_roots()
     for name, config_dir in _profile_dirs().items():
+        owned = tuple(f"{root}/" for root in (config_dir, *extra[name]))
         manifest = ROOT / config_dir / ".projection-manifest.json"
         paths = [f"{config_dir}/.projection-manifest.json"]
         if manifest.is_file():
             declared = json.loads(manifest.read_text(encoding="utf-8"))["paths"]
-            assert declared and all(path.startswith(config_dir + "/") for path in declared), name
+            assert declared and all(path.startswith(owned) for path in declared), name
             paths.extend(declared)
         unignored = [path for path, match in _ignore_matches(paths).items() if match is None]
         assert unignored == [], (name, unignored)

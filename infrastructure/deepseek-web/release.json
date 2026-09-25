@@ -1,0 +1,16 @@
+{
+  "product": "DeepSeek Harness Web UI",
+  "package": "@deepseek-ai/dsh",
+  "version": "0.1.2-rc.1",
+  "sdk_runtime_version": "0.1.2rc1",
+  "lockfile_sha256": "1b679ac44bb8af3096f78e146f4857efea8fc54a7a00d70cceda7c7de98e94e5",
+  "node_minimum_major": 20,
+  "node_qualified": "24.11.1",
+  "profile_manifest": {
+    "bundles": [
+      "@deepseek-ai/dsh-base",
+      "@deepseek-ai/dsh-web-app"
+    ],
+    "patchReload": "startup"
+  }
+}

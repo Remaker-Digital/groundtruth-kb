@@ -1255,6 +1255,29 @@ def controls_diff(ctx: click.Context, input_path: Path) -> None:
     click.echo(json.dumps(_controls_call(ctx, "diff", input_path, None), indent=2, sort_keys=True))
 
 
+@controls_group.command("propose")
+@click.option("--control", "control_id", required=True, help="Control id, as listed by controls show.")
+@click.option("--value", required=True, help="Proposed value in the control's unit.")
+@click.option("--output", "output_path", type=click.Path(dir_okay=False, path_type=Path), required=True)
+@click.pass_context
+def controls_propose(ctx: click.Context, control_id: str, value: str, output_path: Path) -> None:
+    """Write a complete proposed artifact changing one value and show its diff; nothing is applied."""
+    from groundtruth_kb.project.operational_control_config import (
+        OperationalControlConfigError,
+        diff_operational_controls,
+        propose_operational_control_value,
+    )
+
+    try:
+        root = _resolve_config(ctx).project_root
+        proposed = propose_operational_control_value(root, control_id, value)
+        output_path.write_bytes(proposed)
+        diff = diff_operational_controls(root, proposed)
+    except (GTConfigError, OperationalControlConfigError, OSError) as exc:
+        raise click.ClickException(str(exc)) from exc
+    click.echo(json.dumps({"proposal": str(output_path), **diff}, indent=2, sort_keys=True))
+
+
 @controls_group.command("set")
 @click.option("--input", "input_path", type=click.Path(exists=True, dir_okay=False, path_type=Path), required=True)
 @click.option(

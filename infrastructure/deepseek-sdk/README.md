@@ -4,8 +4,8 @@ The official DeepSeek Harness SDK runs as an independent GT-KB harness from this
 directory. `release.json` pins the two official wheels, the runtime executable
 digest and the dependency versions; `install.py` creates the private
 `runtime-env` from verified wheels and refuses an existing one; `installed.json`
-records what was installed. Nothing here selects a canonical backend, stores a
-credential or registers the harness.
+records what was installed. Nothing here stores a credential or registers the
+harness; the launcher's default model route is described below.
 
 ```powershell
 uv run --python 3.14 python infrastructure/deepseek-sdk/install.py --root E:\GT-KB --wheel-dir <offline wheels>
@@ -19,8 +19,19 @@ tool guard that routes every editor and PowerShell effect through
 `scripts/implementation_start_gate.py`, hence `gt bridge check-effects`), and exits
 0 only when `gt bridge check-delivery` confirms this context's exact delivery.
 Startup, binding and delivery failures, interruptions and installation drift are
-distinct nonzero exit codes; the JSON report contains no message content. The
-model's credential is read by the runtime from its environment and never printed.
+distinct nonzero exit codes; the JSON report contains no message content.
+
+The default model route (owner rulings D51, D53-D55) is OpenRouter's GT-KB preset
+`@preset/gtkb-openrouter-deepseek-v4-flash` through the runtime's provider-neutral
+pi-ai route: `gtkb-openrouter.patch.yml` inserts only the `llm-pi-ai` provider row
+into the tool-minimal `sdk-minimal` profile, so the guarded tool surface stays
+`str_replace_editor` and `pwsh`. The credential `GTKB_OPENROUTER_API_KEY` comes from
+the environment or GT-KB's own `.env.local` loader, is resolved before binding (a
+model turn without it exits 2 and binds nothing), reaches only the runtime's
+environment and is never printed or written. `--provider deepseek-official --model
+deepseek-v4-flash` selects the runtime's DeepSeek provider instead, which reads its
+own credential from the environment; OpenRouter refuses that provider's request
+shape.
 The runtime home (the SDK's `dsh_home`, the guard patch and the guard decision log)
 defaults to the bound context's own scratch directory,
 `scratchpad/<session context>/deepseek-sdk/<native context id>`, which the native

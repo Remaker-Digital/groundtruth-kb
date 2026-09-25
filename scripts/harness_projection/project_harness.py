@@ -334,12 +334,43 @@ def _identity_args(profile: dict) -> list[str]:
     return ["--harness", profile["name"]]
 
 
+def _plugin_root_anchor(profile: dict) -> str:
+    """Project-root anchor for a host that runs hooks from the session's folder but exposes its plugin directory.
+
+    Goose sets ${PLUGIN_ROOT} for hook commands; the plugin directory is the manifest's parent, so the project root is
+    that many levels up. Derived from the profile alone (no host discovery), so renders stay reproducible.
+    """
+    variable = profile.get("plugin_root_var")
+    manifest = profile.get("plugin_manifest_path")
+    if not variable or not isinstance(manifest, str):
+        return ""
+    return "${" + str(variable) + "}" + "/.." * len(PurePosixPath(manifest).parent.parts)
+
+
+def _adapter_deadline(profile: dict, hook: dict) -> int | None:
+    """Seconds the adapter allows its target: the projected timeout less the profile's margin, where both are declared."""
+    margin = profile.get("adapter_deadline_margin_seconds")
+    timeout = _projected_timeout(profile, hook)
+    if margin is None or timeout is None or not profile.get("stdin_adapter"):
+        return None
+    return max(1, timeout - int(margin))
+
+
 def _hook_command(profile: dict, hook: dict, tokens: dict[str, str], gaps: list[str]) -> str:
     windowless = bool(profile.get("windowless_hooks"))
     interpreter = projected_interpreter(windowless=windowless)
     target = _hook_target(hook, profile)
     adapter = runtime_relative(str(profile["stdin_adapter"])) if profile.get("stdin_adapter") else ""
-    if adapter:
+    anchor = _plugin_root_anchor(profile)
+    if anchor:
+        # The session's working folder cannot matter: interpreter and adapter resolve from the plugin's own location.
+        interpreter = f"{anchor}/{interpreter}"
+        adapter = f'"{anchor}/{adapter}"' if adapter else ""
+        target = target if adapter else f'"{anchor}/{target}"'
+    deadline = _adapter_deadline(profile, hook)
+    if adapter and deadline is not None:
+        command = f'"{interpreter}" -B {adapter} --deadline {deadline} {target}'
+    elif adapter:
         command = f'"{interpreter}" -B {adapter} {target}'
     else:
         command = f'"{interpreter}" -B {target}'
@@ -358,6 +389,26 @@ def _is_bytecode_leftover(rel: str) -> bool:
     """
     parts = rel.split("/")
     return "__pycache__" in parts or rel.endswith(tuple(_JUNK_SUFFIXES))
+
+
+def extra_output_roots(profile: dict) -> list[str]:
+    """Owned roots a profile declares besides config_dir (D52: a host's documented discovery path).
+
+    validate_profile() fails closed on any invalid declaration, so this returns the raw declared list.
+    """
+    roots = profile.get("extra_output_roots") or []
+    return [str(root) for root in roots] if isinstance(roots, list) else []
+
+
+def owned_roots(profile: dict) -> list[str]:
+    """config_dir followed by the declared extra output roots: every root this harness's outputs may occupy."""
+    config_dir = str(profile.get("config_dir") or "").strip()
+    return ([config_dir] if config_dir else []) + extra_output_roots(profile)
+
+
+def owning_root(rel: str, profile: dict) -> str | None:
+    """The owned root a manifest path lies under, or None when it lies outside every owned root."""
+    return next((root for root in owned_roots(profile) if rel.startswith(root + "/")), None)
 
 
 def apply_leftover_removes(plan: Plan, profile: dict) -> None:
@@ -409,19 +460,25 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
                 ):
                     raise ValueError("projection manifest does not describe this harness's generated outputs")
                 for rel in previous["paths"]:
+                    root = owning_root(rel, profile) if isinstance(rel, str) else None
                     if (
                         not isinstance(rel, str)
                         or "\\" in rel
                         or ":" in rel
                         or ".." in PurePosixPath(rel).parts
                         or rel != PurePosixPath(rel).as_posix()
-                        or not rel.startswith(config_dir + "/")
+                        or root is None
                     ):
                         raise ValueError("projection manifest contains a path outside this harness's output directory")
                     if rel in owned or rel in seen:
                         continue
+                    # A declared extra root (D52) gets the same containment as config_dir: a local directory,
+                    # never linked, and every retired file resolving inside it.
+                    root_path = output_root() / root
+                    if root_path.is_symlink() or getattr(root_path, "is_junction", lambda: False)():
+                        raise ValueError("an owned output root is linked; cleanup requires a local output directory")
                     target = output_root() / rel
-                    if target.is_symlink() or not target.resolve().is_relative_to(projection_root.resolve()):
+                    if target.is_symlink() or not target.resolve().is_relative_to(root_path.resolve()):
                         raise ValueError("retired output is linked or escapes this harness's output directory")
                     if target.exists() and not target.is_file():
                         raise ValueError("a retired output is not a file; directory cleanup requires explicit scope")
@@ -430,8 +487,15 @@ def apply_leftover_removes(plan: Plan, profile: dict) -> None:
                         plan.removes.append(rel)
             except (OSError, UnicodeError, ValueError) as error:
                 plan.gaps.append(f"Cannot reconcile retired outputs for {profile.get('name')!r}: {error}")
-        if projection_root.is_dir():
-            stale = list(projection_root.rglob("__pycache__")) + list(projection_root.rglob("*.pyc"))
+        # config_dir keeps its original sweep; a declared extra root (D52) is swept only as a local directory.
+        for root_path in [projection_root, *(output_root() / root for root in extra_output_roots(profile))]:
+            if root_path != projection_root and (
+                root_path.is_symlink() or getattr(root_path, "is_junction", lambda: False)()
+            ):
+                continue
+            if not root_path.is_dir():
+                continue
+            stale = list(root_path.rglob("__pycache__")) + list(root_path.rglob("*.pyc"))
             for path in sorted(stale):
                 if not path.exists():
                     continue
@@ -692,30 +756,42 @@ def render_hooks_registration(
             events_out.setdefault(native_event, []).append(entry)
         return profile["hooks_json_path"], json.dumps({"gtkb": events_out}, indent=2) + "\n"
     if mode == "plugin_hooks_json":
+        # Goose plugin hooks (goose-docs.ai hooks guide): {"hooks": {Event: [{"hooks": [{type, command, timeout,
+        # on_failure}]}]}}, one rule per manifest hook with no matcher (the adapter decides per tool). Goose skips a
+        # plugin's whole hooks.json on a malformed configuration, so only documented keys are rendered: no _comment
+        # (the projection notice is carried by the plugin manifest) and no non-Goose "blocking" key.
+        # Goose spawns every hook command through a shell (finding F9; observers B74 and B76). The profile's
+        # "hook_interpreter" names it for the launcher, the doctor and the installer, which refuse when it does not
+        # resolve; a projection without the declaration would leave them nothing to check, so it is a gap.
+        interpreter = profile.get("hook_interpreter")
+        if not isinstance(interpreter, str) or not interpreter.strip():
+            gaps.append(
+                f"missing_hook_interpreter: {profile.get('name')}: plugin_hooks_json hooks run through a shell "
+                "the profile must declare"
+            )
+            return None
         events: dict[str, list[dict]] = {}
         blocking_ok = set(profile.get("blocking_events", {}).get("supported", []))
+        policy = profile.get("blocking_failure_policy")
+        policy_events = set(profile.get("blocking_failure_policy_events") or [])
         for hook in manifest.get("hook", []):
             native_event = profile.get("hook_events", {}).get(hook["event"])
             if native_event is None:
                 gaps.append(f"hook {hook['script']}: no native event for {hook['event']}")
                 continue
-            interpreter = projected_interpreter(windowless=False)
-            command = f'"{interpreter}" -B {_hook_target(hook, profile)}'
-            for arg in hook.get("args", []):
-                command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
-            command += " " + " ".join(_identity_args(profile))
-            entry: dict = {"command": command}
+            action: dict = {"type": "command", "command": _hook_command(profile, hook, tokens, gaps)}
             timeout = _projected_timeout(profile, hook)
             if timeout is not None:
-                entry["timeout"] = timeout
-            if hook.get("blocking") and native_event in blocking_ok:
-                entry["blocking"] = True
-            events.setdefault(native_event, []).append(entry)
-        payload = {
-            "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
-            "hooks": events,
-        }
-        return profile["hooks_json_path"], json.dumps(payload, indent=2) + "\n"
+                action["timeout"] = timeout
+            if hook.get("blocking") and native_event in blocking_ok and native_event in policy_events:
+                if not isinstance(policy, dict) or not policy:
+                    gaps.append(
+                        f"hook {hook['script']}: blocking {native_event} needs the profile's blocking_failure_policy"
+                    )
+                    continue
+                action.update(policy)
+            events.setdefault(native_event, []).append({"hooks": [action]})
+        return profile["hooks_json_path"], json.dumps({"hooks": events}, indent=2) + "\n"
     if mode in {"settings_json", "native_cwd_hooks_json"}:
         if mode == "native_cwd_hooks_json":
             adapter_path = PROJECT_ROOT / profile["stdin_adapter"]
@@ -858,6 +934,36 @@ def render_pointer_files(profile: dict, plan: Plan) -> None:
         plan.writes[f"{config_dir}/{rel}"] = value
 
 
+PLUGIN_MANIFEST_FIELDS = frozenset({"name", "version", "description"})
+
+
+def render_plugin_manifest(profile: dict, plan: Plan) -> None:
+    """Write a declared host plugin manifest (Goose plugin.json) with its documented fields only (D52).
+
+    Goose discovers a plugin directory by its manifest, so a hook-only plugin needs one; it lies in an owned root.
+    """
+    rel = profile.get("plugin_manifest_path")
+    fields = profile.get("plugin_manifest")
+    if rel is None and fields is None:
+        return
+    if not _is_relative_output_path(rel) or owning_root(str(rel), profile) is None:
+        plan.gaps.append(f"invalid_plugin_manifest_path: {profile['name']}: {rel!r}")
+        return
+    if (
+        not isinstance(fields, dict)
+        or not {"name", "version"} <= set(fields)
+        or set(fields) - PLUGIN_MANIFEST_FIELDS
+        or not all(isinstance(value, str) and value.strip() for value in fields.values())
+    ):
+        plan.gaps.append(
+            f"invalid_plugin_manifest: {profile['name']}: name and version are required; only {sorted(PLUGIN_MANIFEST_FIELDS)}"
+        )
+        return
+    plan.writes[str(rel)] = (
+        json.dumps({key: fields[key] for key in ("name", "version", "description") if key in fields}, indent=2) + "\n"
+    )
+
+
 def classify_write(rel: str, profile: dict) -> str | None:
     """Acceptance class of one planned write (D34 line 29); None means unclassified.
 
@@ -869,6 +975,8 @@ def classify_write(rel: str, profile: dict) -> str | None:
     if rel == f"{config_dir}/.projection-manifest.json":
         return "ownership"
     if profile.get("hooks_projection") and rel == profile.get("hooks_json_path"):
+        return "registration"
+    if profile.get("plugin_manifest_path") and rel == profile.get("plugin_manifest_path"):
         return "registration"
     if "config_toml" in profile and rel == f"{config_dir}/config.toml":
         return "registration"
@@ -899,6 +1007,40 @@ def validate_profile(profile: dict, plan: Plan) -> None:
     pointer_files = profile.get("pointer_files")
     if pointer_files is not None and not isinstance(pointer_files, dict):
         plan.gaps.append(f"invalid_pointer_file: {profile['name']}: pointer_files must be a table")
+    _validate_output_roots(profile, plan)
+
+
+def _roots_overlap(first: str, second: str) -> bool:
+    return first == second or first.startswith(second + "/") or second.startswith(first + "/")
+
+
+def _validate_output_roots(profile: dict, plan: Plan) -> None:
+    """Fail closed unless every owned root is contained and exclusive, and the registration lies in one (D52).
+
+    A declared extra root is a plain relative directory that overlaps neither the neutral baseline, the one skills
+    source, Git metadata, nor any registered harness's config directory or declared roots (its own included).
+    """
+    declared = profile.get("extra_output_roots")
+    if declared is not None and (not isinstance(declared, list) or not all(isinstance(root, str) for root in declared)):
+        plan.gaps.append(f"invalid_extra_output_roots: {profile['name']}: must be a list of relative directory paths")
+        return
+    protected = [BASELINE_ROOT_NAME, SKILLS_ROOT_NAME, ".git"]
+    for name, other in (load_profiles().get("harnesses") or {}).items():
+        other = other or {}
+        if other.get("config_dir"):
+            protected.append(str(other["config_dir"]))
+        if name != profile["name"] and isinstance(other.get("extra_output_roots"), list):
+            protected.extend(str(root) for root in other["extra_output_roots"])
+    for root in declared or []:
+        if not _is_relative_output_path(root):
+            plan.gaps.append(f"invalid_extra_output_root: {profile['name']}: {root!r}")
+            continue
+        clash = next((item for item in protected if _roots_overlap(root, item)), None)
+        if clash is not None:
+            plan.gaps.append(f"extra_output_root_overlaps: {profile['name']}: {root} overlaps {clash}")
+    registration = profile.get("hooks_json_path")
+    if profile.get("hooks_projection") and isinstance(registration, str) and owning_root(registration, profile) is None:
+        plan.gaps.append(f"hooks_json_path_outside_owned_roots: {profile['name']}: {registration}")
 
 
 def _contains_baseline_payload(path: Path) -> bool:
@@ -991,6 +1133,7 @@ def build_plan(harness: str) -> Plan:
         rendered = render_hooks_registration(profile, {**manifest, "hook": valid_hooks}, tokens, plan.gaps)
         if rendered is not None:
             plan.writes[rendered[0]] = rendered[1]
+    render_plugin_manifest(profile, plan)
 
     if "config_toml" in profile:
         rel_out = f"{profile['config_dir']}/config.toml"
@@ -1144,10 +1287,13 @@ def run(harness: str, mode: str) -> int:
         finally:
             tmp_target.unlink(missing_ok=True)
     removed = 0
-    config_dir = str((load_profiles()["harnesses"].get(harness) or {}).get("config_dir") or "").strip()
+    registered = dict(load_profiles()["harnesses"].get(harness) or {})
+    config_dir = str(registered.get("config_dir") or "").strip()
     config_root = output_root() / config_dir if config_dir else None
     for rel in plan.removes:
-        if remove_planned_path(output_root() / rel, config_root):
+        # Empty parents are swept only up to the owned root holding the path (config_dir or a declared extra root).
+        root = owning_root(rel, registered)
+        if remove_planned_path(output_root() / rel, output_root() / root if root else config_root):
             removed += 1
     print(f"PROJECTED {harness}: {len(plan.writes)} files, {removed} leftovers removed")
     return 0

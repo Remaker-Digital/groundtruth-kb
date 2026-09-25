@@ -1,0 +1,38 @@
+# GT-KB Home configuration for the DeepSeek Harness Web UI (owner rulings D54, D58, D59).
+# Committed source, not a projection: the one GT-KB-specific layer over the pinned web bundles, passed with --patch by
+# home.py. Relative plugin names resolve against this file; machine paths come from the environment home.py sets.
+#
+# Model route: OpenRouter's GT-KB preset through the provider-neutral pi-ai route, credential by name only
+# (GTKB_OPENROUTER_API_KEY); the DeepSeek-specific provider is not used (OpenRouter refuses its request shape).
+- id: agent-default-model
+  config:
+    provider: gtkb-openrouter
+    model: "@preset/gtkb-openrouter-deepseek-v4-flash"
+- id: llm-pi-ai
+  config:
+    providers:
+      gtkb-openrouter:
+        displayName: GT-KB OpenRouter
+        apiKeyEnv: GTKB_OPENROUTER_API_KEY
+        api: openai-completions
+        baseURL: https://openrouter.ai/api/v1
+        models:
+          - id: "@preset/gtkb-openrouter-deepseek-v4-flash"
+# The DeepSeek-specific provider is off: OpenRouter refuses its request shape, it would ask for a second credential typed
+# into the UI, and it is the only route that sends the harness's anonymous id and plugin inventory.
+- id: llm-deepseek
+  disabled: true
+# GT-KB branding replaces the upstream brand (the upstream MIT notices ship in THIRD-PARTY-NOTICES.md).
+- id: ui-brand-official
+  disabled: true
+- insert:
+    # Every effect-bearing tool call of every Home session passes GT-KB's effect gate; fails closed.
+    - id: gtkb-home-effect-guard
+      name: ./gtkb_home_guard.mjs
+    # Remaker Digital branding, attribution, title, the /gtkb controls channel and the loopback control route.
+    - id: gtkb-home
+      name: ./plugins/gtkb-home/lib/index.js
+      config:
+        gtArgv: !!js >-
+          [process.env.GTKB_GUARD_PYTHON, '-m', 'groundtruth_kb']
+        gtCwd: !!js process.env.GTKB_HOME_ROOT

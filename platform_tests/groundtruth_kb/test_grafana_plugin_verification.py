@@ -1,6 +1,7 @@
 """Installer refusal/publication contracts; real pinned verifier is opt-in below."""
 
 import hashlib
+import http.client
 import io
 import json
 import os
@@ -76,10 +77,15 @@ def verifier(tmp_path, monkeypatch):
             if request.full_url.endswith("/api/health"):
                 if state.get("unavailable"):
                     raise OSError("not ready")
+                if state.get("self_connected", 0):
+                    state["self_connected"] -= 1
+                    raise http.client.BadStatusLine("GET /api/health HTTP/1.1")
                 body = state["health"]
             else:
                 if "http_error" in state:
                     raise urllib.error.HTTPError(request.full_url, state["http_error"], "refused", {}, None)
+                if state.get("settings_protocol_error"):
+                    raise http.client.BadStatusLine("garbled status line")
                 if state.get("change"):
                     (plugin / "module.js").write_bytes(b"changed during verification")
                 if state.get("change_binary"):
@@ -175,6 +181,21 @@ def test_skipping_download_never_skips_plugin_identity(verifier, metadata):
 def test_observation_cannot_describe_changed_bytes(verifier, change):
     verifier[change] = True
     refused(verifier, "changed")
+
+
+def test_a_self_connected_readiness_probe_is_retried_not_failed(verifier):
+    """c112-full-20260924T2040 installed #161: before Grafana binds its port, a loopback connect can land on its own
+    ephemeral source port and read its own request line back as the status line. That is "not ready yet"."""
+    verifier["self_connected"] = 2
+    assert dashboard.install_grafana(verifier["paths"], skip_download=True, skip_plugin=True) == verifier["binary"]
+    assert verifier["self_connected"] == 0
+    assert json.loads(verifier["observation"].read_text())["plugin_verification"] == "verified"
+    assert len(verifier["spawned"]) == 1 and verifier["stopped"] == [123456]
+
+
+def test_a_malformed_settings_response_is_a_legible_refusal(verifier):
+    verifier["settings_protocol_error"] = True
+    refused(verifier, "grafana_plugin_verification_unavailable")
 
 
 def test_verifier_version_must_match_pin(verifier):

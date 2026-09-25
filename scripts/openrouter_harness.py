@@ -4,7 +4,8 @@
 Re-based (cloud-harness template slice 2, WI-5078) onto the shared, config-driven
 ``cloud_harness_base`` runtime per ``ADR-CLOUD-HARNESS-TEMPLATE-001``. This module is
 now the OpenRouter *adopter*: it declares the OpenRouter :class:`AdopterProfile`
-(direct-cloud endpoint, ``OPENROUTER_API_KEY`` token auth via an Authorization header,
+(direct-cloud endpoint, ``GTKB_OPENROUTER_API_KEY`` token auth via an Authorization header, falling back to the
+conventional ``OPENROUTER_API_KEY``,
 ``openai-chat`` dialect, guard-adapter hook tier) and provides the CLI entry point.
 All connection/retry/guard/author-metadata/tool-loop machinery lives in
 ``cloud_harness_base``; the thin wrappers below preserve this module's historical public
@@ -92,7 +93,7 @@ _OPENROUTER_PROFILE = base.AdopterProfile(
     author_identity=AUTHOR_IDENTITY,
     author_harness_id=AUTHOR_HARNESS_ID,
     default_endpoint=DEFAULT_ENDPOINT,
-    auth_env_key="OPENROUTER_API_KEY",
+    auth_env_key="GTKB_OPENROUTER_API_KEY",
     provider_routing_key="openrouter",
     routing_config_path=ROUTING_CONFIG_PATH,
     native_hook_settings_path=NATIVE_HOOK_SETTINGS_PATH,
@@ -294,9 +295,13 @@ def main(argv: Sequence[str] | None = None) -> int:
         except ImportError:
             pass
 
-    api_key = os.environ.get("OPENROUTER_API_KEY")
+    # GT-KB's own named credential (.env.local, GOV-ENV-LOCAL-AUTHORITY-001) first; the conventional name as fallback.
+    api_key = os.environ.get("GTKB_OPENROUTER_API_KEY") or os.environ.get("OPENROUTER_API_KEY")
     if not api_key:
-        print("openrouter_harness: OPENROUTER_API_KEY environment variable is not set.", file=sys.stderr)
+        print(
+            "openrouter_harness: GTKB_OPENROUTER_API_KEY is not set, and the OPENROUTER_API_KEY environment variable is not set.",
+            file=sys.stderr,
+        )
         return 1
 
     try:

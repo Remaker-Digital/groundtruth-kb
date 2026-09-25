@@ -17,6 +17,12 @@ scripts are read in place from ``.agents/skills`` and
 projector's output; this checker pins their bytes (``declared_pointer_drift``) in
 both modes, so the doctor conformance check and the release-candidate gate refuse
 a pointer that grows back into a canon carrier.
+
+A target owns its configuration root plus any declared ``extra_output_roots``
+(owner ruling D52: Goose discovers its hook plugin only at
+``.agents/plugins/<name>/``). Writes, removals, declared paths and the installed
+unmanaged-output walk are confined to those owned roots; an owned root may not be
+redirected, overlap another target's owned roots, or overlap ``.agents/skills``.
 """
 
 from __future__ import annotations
@@ -207,7 +213,15 @@ def _token_residue_issues(root: Path, engine) -> list[dict[str, str]]:
     return issues
 
 
-def _installed_issues(root: Path, config_dir: str, plan) -> list[dict[str, str]]:
+def _owned_roots(profile: dict) -> list[PurePosixPath]:
+    """The target's configuration root plus any declared extra output roots (owner ruling D52), in declaration order."""
+    extra = profile.get("extra_output_roots") or []
+    if not isinstance(extra, list):
+        raise ValueError("extra_output_roots must be a list of repository-relative directories")
+    return [_relative(profile["config_dir"]), *(_relative(value) for value in extra)]
+
+
+def _installed_issues(root: Path, owned: list[PurePosixPath], plan) -> list[dict[str, str]]:
     issues = []
     for rel, content in plan.writes.items():
         path = root / rel
@@ -221,16 +235,21 @@ def _installed_issues(root: Path, config_dir: str, plan) -> list[dict[str, str]]
         path = root / rel
         if path.exists() or path.is_symlink():
             issues.append(_issue("retired_output", rel, "The projector identified stale generated output"))
-    for parent, dirs, files in os.walk(root / config_dir, followlinks=False):
-        for name in list(dirs):
-            path = Path(parent) / name
-            if path.resolve() != path:
-                dirs.remove(name)
-                issues.append(_issue("redirected_output", path.relative_to(root).as_posix(), "Redirected directory"))
-        for name in files:
-            rel = (Path(parent) / name).relative_to(root).as_posix()
-            if rel not in plan.writes and not any(PurePosixPath(rel).is_relative_to(p) for p in plan.removes):
-                issues.append(_issue("unmanaged_output", rel, "Unmanaged bytes require classification; preserve them"))
+    for owned_root in owned:
+        for parent, dirs, files in os.walk(root / str(owned_root), followlinks=False):
+            for name in list(dirs):
+                path = Path(parent) / name
+                if path.resolve() != path:
+                    dirs.remove(name)
+                    issues.append(
+                        _issue("redirected_output", path.relative_to(root).as_posix(), "Redirected directory")
+                    )
+            for name in files:
+                rel = (Path(parent) / name).relative_to(root).as_posix()
+                if rel not in plan.writes and not any(PurePosixPath(rel).is_relative_to(p) for p in plan.removes):
+                    issues.append(
+                        _issue("unmanaged_output", rel, "Unmanaged bytes require classification; preserve them")
+                    )
     return issues
 
 
@@ -243,14 +262,20 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
         if profile.get("status") == "profile_pending":
             raise ValueError("The declared target has no implemented renderer")
         config_dir = _relative(profile["config_dir"])
-        if (root / str(config_dir)).resolve() != root / str(config_dir):
-            raise ValueError("The selected configuration root is redirected")
+        owned = _owned_roots(profile)
+        for owned_root in owned:
+            if (root / str(owned_root)).resolve() != root / str(owned_root):
+                raise ValueError(f"The selected output root is redirected: {owned_root}")
+            skills = PurePosixPath(SKILLS_ROOT)
+            if owned_root.is_relative_to(skills) or skills.is_relative_to(owned_root):
+                raise ValueError(f"An output root overlaps the canonical skills root: {owned_root}")
         for other_name, other in profiles["harnesses"].items():
             if other_name == harness:
                 continue
-            other_root = _relative(other["config_dir"])
-            if config_dir.is_relative_to(other_root) or other_root.is_relative_to(config_dir):
-                raise ValueError(f"Configuration roots overlap: {harness}, {other_name}")
+            for other_root in _owned_roots(other):
+                for owned_root in owned:
+                    if owned_root.is_relative_to(other_root) or other_root.is_relative_to(owned_root):
+                        raise ValueError(f"Output roots overlap: {harness}, {other_name}")
         discovery = profile.get("skills_discovery")
         if discovery not in SKILLS_DISCOVERY:
             raise ValueError("skills_discovery must be 'agents_skills' or 'pointer_stubs'")
@@ -265,18 +290,18 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
                 raise ValueError(f"pointer_files value for {key!r} must be text")
             declared[f"pointer_files.{key}"] = f"{config_dir}/{_relative(key)}"
         for key, value in declared.items():
-            if not _relative(value).is_relative_to(config_dir):
-                raise ValueError(f"{key} escapes this target's configuration root")
+            if not any(_relative(value).is_relative_to(owned_root) for owned_root in owned):
+                raise ValueError(f"{key} escapes this target's output roots")
         plan = engine.build_plan(harness)
         issues.extend(_issue("projector_gap", ENGINE, gap) for gap in plan.gaps)
         for rel in plan.writes:
-            if not _relative(rel).is_relative_to(config_dir):
+            if not any(_relative(rel).is_relative_to(owned_root) for owned_root in owned):
                 raise ValueError(f"Planned effect escapes the selected target: {rel}")
         exact_retired = {_relative(rel) for rel in profile.get("leftover_paths", [])}
-        active_roots = [_relative(row["config_dir"]) for row in profiles["harnesses"].values()]
+        active_roots = [owned_root for row in profiles["harnesses"].values() for owned_root in _owned_roots(row)]
         for rel in plan.removes:
             path = _relative(rel)
-            if path.is_relative_to(config_dir):
+            if any(path.is_relative_to(owned_root) for owned_root in owned):
                 continue
             # A moved target may retire its explicitly classified former files.
             # This does not permit writes outside its root, directory sweeps,
@@ -407,7 +432,7 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
                             )
                         )
         if installed:
-            issues.extend(_installed_issues(root, str(config_dir), plan))
+            issues.extend(_installed_issues(root, owned, plan))
     except (KeyError, OSError, ValueError, SyntaxError, RuntimeError) as error:
         issues.append(_issue("invalid_projection", harness, str(error)))
     result["status"] = "fail" if issues else "pass"

@@ -178,6 +178,15 @@ def _from_claude_response(payload: dict[str, Any]) -> dict[str, Any]:
     return extra
 
 
+def _native_context_id(payload: dict[str, Any]) -> str:
+    """Return Cursor's own conversation identifier, the native context of every hook event."""
+    for key in ("conversation_id", "session_id"):
+        value = payload.get(key)
+        if isinstance(value, str) and value.strip():
+            return value.strip()
+    return ""
+
+
 def main() -> int:
     if len(sys.argv) < 2:
         return _deny("cursor_hook_adapter: missing target hook script")
@@ -189,6 +198,13 @@ def main() -> int:
     payload = _read_payload()
     adapted_in = _to_claude_pretooluse(payload)
     env = os.environ.copy()
+    # The effect gate takes the native context from GTKB_NATIVE_CONTEXT_ID; the rebuilt Claude-style payload has no
+    # session_id. Cursor's conversation_id is the actual context and overrides any inherited value.
+    native = _native_context_id(payload)
+    if native:
+        env["GTKB_NATIVE_CONTEXT_ID"] = native
+    else:
+        env.pop("GTKB_NATIVE_CONTEXT_ID", None)  # never act under an inherited identity
     env.setdefault("GTKB_PROJECT_ROOT", str(PROJECT_ROOT))
     env.setdefault("GTKB_HARNESS_NAME", "cursor")
     env.setdefault("GTKB_HARNESS_ID", "E")

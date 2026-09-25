@@ -90,6 +90,7 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
         "cursor_hook_adapter.py",
         "antigravity_hook_adapter.py",
         "codex_hook_adapter.py",
+        "goose_hook_adapter.py",
         "lo_file_safety_payloads.py",
     ):
         shutil.copyfile(ROOT / "scripts" / name, scripts / name)
@@ -132,6 +133,12 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
     )
     env[profile["project_dir_var"]] = str(tmp_path)
     expanded = commands[0].replace("$" + profile["project_dir_var"], str(tmp_path))
+    if profile.get("plugin_root_var"):
+        # Goose expands ${PLUGIN_ROOT} to the plugin directory and exports it (finding F9); commands anchor on it.
+        plugin_root = tmp_path / Path(profile["plugin_manifest_path"]).parent
+        plugin_root.mkdir(parents=True, exist_ok=True)
+        expanded = expanded.replace("${" + profile["plugin_root_var"] + "}", plugin_root.as_posix())
+        env[profile["plugin_root_var"]] = str(plugin_root)
     argv = [part.strip('"') for part in shlex.split(expanded, posix=False)]
     # The hosts run relative commands from the project directory. Windows
     # CreateProcess does not use subprocess cwd to resolve the executable.
@@ -183,6 +190,21 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
             else:
                 call = {"name": "write_to_file", "args": {"TargetFile": str(path), "CodeContent": "never written"}}
             payload = {"conversationId": context, "workspacePaths": [str(tmp_path)], "toolCall": call}
+        if harness == "goose":
+            # Goose 1.45.0's own PreToolUse shapes (finding F9); the adapter normalizes them for the gate.
+            if command:
+                tool_name, tool_input = "shell", {"command": command}
+            elif tool == "Edit":
+                tool_name, tool_input = "edit", {"path": str(path), "before": "old", "after": "new"}
+            else:
+                tool_name, tool_input = "write", {"path": str(path), "content": "never written by the gate"}
+            payload = {
+                "event": "PreToolUse",
+                "session_id": context,
+                "tool_name": tool_name,
+                "tool_input": tool_input,
+                "working_dir": str(cwd or tmp_path),
+            }
         completed = subprocess.run(
             argv,
             input=json.dumps(payload),
@@ -195,6 +217,12 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
             creationflags=flags,
         )
         assert completed.returncode in {0, 2}, completed.stderr
+        if harness == "goose":
+            # Goose honours only exit 2 with the reason on stderr; an allow is a silent exit 0.
+            assert completed.returncode == (0 if allowed else 2), completed.stderr
+            assert completed.stdout == ""
+            assert bool(completed.stderr.strip()) is not allowed, completed.stderr
+            return {"returncode": completed.returncode, "reason": completed.stderr.strip()}
         result = json.loads(completed.stdout)
         if harness == "antigravity":
             assert completed.returncode == 0, result
@@ -248,7 +276,8 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
             preimages = {path: path.read_bytes() for path in protected}
             check(checkout / "code.py", allowed=True)
             check(checkout / "code.py", tool="Edit", allowed=True)
-            check(checkout / "code.py", tool="MultiEdit", allowed=True)
+            if harness != "goose":  # Goose has no multi-edit tool
+                check(checkout / "code.py", tool="MultiEdit", allowed=True)
             # Bridge messages are authored in this context's scratch space and
             # delivered by the CLI. Neither a new raw file nor an overwrite is
             # an ordinary implementation effect, regardless of its prose.
@@ -263,7 +292,7 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
             if harness == "codex":
                 check("code.py", tool="Edit", cwd=checkout, allowed=True)
                 check("foreign_tracked.txt", tool="Edit", cwd=checkout)
-            if harness != "antigravity":
+            if harness not in {"antigravity", "goose"}:  # neither host has a delete tool
                 check(checkout / "code.py", tool="Delete", allowed=True)
             check(tmp_path / "code.py")
             check(checkout / "foreign_tracked.txt")
