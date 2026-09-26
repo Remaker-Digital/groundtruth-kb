@@ -329,14 +329,10 @@ window.__ModuleLoader__.load({
 			const px = size ?? 24;
 			return jsx("img", { src: MARK, alt: "Remaker Digital", width: px, height: px, style: { display: "block", borderRadius: 4 } });
 		}
+		// The owner's call (2026-09-25): only "GT-KB" beside the mark, at the sidebar's own brand size and on one line; the
+		// two-line name with "by Remaker Digital" was too large for the sidebar header and was cut off.
 		function BrandName() {
-			return jsxs("span", {
-				style: { display: "flex", flexDirection: "column", lineHeight: 1.1 },
-				children: [
-					jsx("strong", { style: { fontSize: "1.05em", letterSpacing: "0.02em" }, children: "GT-KB" }),
-					jsx("span", { style: { fontSize: "0.7em", opacity: 0.72 }, children: "by Remaker Digital" }),
-				],
-			});
+			return jsx("span", { style: { fontWeight: 600, letterSpacing: "0.02em", whiteSpace: "nowrap" }, children: "GT-KB" });
 		}
 		function HeroMark({ size }) {
 			const px = size ?? 72;
@@ -358,6 +354,25 @@ window.__ModuleLoader__.load({
 			return () => observer.disconnect();
 		}
 
+		// The conversation hero's headline is upstream's slogan: a locale string with no slot (pinned bundle:
+		// t("hero.headline") in a span whose module class ends in "_headlineText"), and the locale service refuses a
+		// second dictionary for a namespace it already holds. The owner titles it "GroundTruth Knowledge Base"
+		// (2026-09-25). This observer sets the text node's value in place, so React keeps its own node, in any locale.
+		const HEADLINE = "GroundTruth Knowledge Base";
+		const UPSTREAM_HEADLINES = new Set(["Into the Unknown", "探索未至之境"]);
+		function keepHeroHeadline() {
+			const retitle = () => {
+				for (const span of document.querySelectorAll('span[class*="_headlineText"]')) {
+					const text = span.firstChild;
+					if (text && text.nodeType === 3 && UPSTREAM_HEADLINES.has(text.nodeValue)) text.nodeValue = HEADLINE;
+				}
+			};
+			const observer = new MutationObserver(retitle);
+			observer.observe(document.body, { childList: true, characterData: true, subtree: true });
+			retitle();
+			return () => observer.disconnect();
+		}
+
 		const SECTIONS = [
 			{ id: "gtkb", order: 1, label: "GT-KB", page: StatusPage },
 			{ id: "gtkb-services", order: 2, label: "GT-KB services", page: ServicesPage },
@@ -366,6 +381,7 @@ window.__ModuleLoader__.load({
 		const inject = ["slots", "connection"];
 		function apply(ctx) {
 			ctx.effect(keepProductTitle, "gtkb-home: product title");
+			ctx.effect(keepHeroHeadline, "gtkb-home: hero headline");
 			ctx.slots.inject("sidebar.brand.mark", () => ctx.slots.inject("sidebar.brand.name", function* () {
 				yield ctx.slots.register({ name: "sidebar.brand.mark" }, BrandMark);
 				yield ctx.slots.register({ name: "sidebar.brand.name" }, BrandName);

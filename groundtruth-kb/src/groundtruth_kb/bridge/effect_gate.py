@@ -72,6 +72,45 @@ GIT_FINALIZATION_CHAINING_MARKERS = (";", "&&", "||", "|")
 
 GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
 
+# Owner decision D61 (2026-09-25, observer B90): starting and stopping GT-KB's services, Home and dashboard, and
+# replacing its operational controls, are owner operations, done from the GT-KB Home's controls page or the owner's own
+# terminal. They are neither file nor Git effects, so the gate passed them for any agent shell. It now refuses them in
+# every harness context, bound or not, whatever the target. Read-only forms stay allowed (gt services status, gt
+# controls show, Get-ScheduledTask, Get-Service, schtasks /query).
+GT_OWNER_OPERATIONS = {
+    "services": frozenset({"start", "stop"}),
+    "home": frozenset({"start", "stop"}),
+    "dashboard": frozenset({"start", "stop", "serve"}),
+    "controls": frozenset({"set"}),
+}
+GT_GLOBAL_OPTIONS_WITH_VALUES = frozenset({"--config"})
+GT_MODULES = frozenset({"groundtruth_kb", "groundtruth_kb.cli"})
+# GT-KB's scheduled tasks and Windows service share this prefix (GTKB-DomainService, GTKB-Home, GTKB-Ollama-Serve,
+# GTKB-BaseBackup, gtkb-postgresql); a wildcard such as 'GTKB*' names them too.
+GTKB_TASK_OR_SERVICE_NAME_RE = re.compile(r"gtkb(?:-[a-z0-9-]+|-?\*[a-z0-9*-]*)", re.IGNORECASE)
+SERVICE_CONTROL_CMDLETS = frozenset(
+    {
+        "start-scheduledtask",
+        "stop-scheduledtask",
+        "enable-scheduledtask",
+        "disable-scheduledtask",
+        "register-scheduledtask",
+        "unregister-scheduledtask",
+        "set-scheduledtask",
+        "start-service",
+        "stop-service",
+        "restart-service",
+        "set-service",
+        "suspend-service",
+        "resume-service",
+        "new-service",
+        "remove-service",
+    }
+)
+SCHTASKS_CHANGING_SWITCHES = frozenset({"/run", "/end", "/change", "/delete", "/create"})
+SC_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue", "config", "delete", "create", "failure"})
+NET_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue"})
+
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
@@ -609,6 +648,93 @@ def _has_direct_git_effect_signal(command: str) -> bool:
     if _direct_git_effect(command) is not None:
         return True
     return any(_direct_git_effect(stage) is not None for stage in _split_pipeline_stages(command))
+
+
+def _gt_owner_operation(tokens: list[str]) -> str | None:
+    """Name the GT-KB owner operation these tokens run through gt or python -m groundtruth_kb, if any."""
+    words = [_clean_shell_token(token) for token in tokens]
+    executable = _executable_name(words[0])
+    index = 1
+    if executable in _PYTHON_EXECUTABLE_NAMES or executable.startswith("python"):
+        while index < len(words) and words[index].startswith("-") and words[index] != "-m":
+            index += 1
+        if index + 1 >= len(words) or words[index] != "-m" or words[index + 1] not in GT_MODULES:
+            return None
+        index += 2
+    elif executable not in {"gt", "gt.exe"}:
+        return None
+    group_and_action: list[str] = []
+    while index < len(words) and len(group_and_action) < 2:
+        word = words[index]
+        if word in GT_GLOBAL_OPTIONS_WITH_VALUES:
+            index += 2
+            continue
+        index += 1
+        if not word.startswith("-"):
+            group_and_action.append(word.lower())
+    if len(group_and_action) == 2 and group_and_action[1] in GT_OWNER_OPERATIONS.get(group_and_action[0], ()):
+        return "gt " + " ".join(group_and_action)
+    return None
+
+
+def _service_control_verb(tokens: list[str]) -> str | None:
+    """Name the service or scheduled-task change these tokens make, if any; its target is checked separately."""
+    words = [_clean_shell_token(token).lower() for token in tokens]
+    executable = _executable_name(words[0])
+    if executable in SERVICE_CONTROL_CMDLETS:
+        return executable
+    if executable in {"schtasks", "schtasks.exe"} and SCHTASKS_CHANGING_SWITCHES.intersection(words[1:]):
+        return "schtasks"
+    if executable in {"sc", "sc.exe"} and len(words) > 1 and words[1] in SC_CHANGING_VERBS:
+        return f"sc {words[1]}"
+    if executable in {"net", "net.exe", "net1", "net1.exe"} and len(words) > 1 and words[1] in NET_CHANGING_VERBS:
+        return f"net {words[1]}"
+    return None
+
+
+def _names_gtkb_task_or_service(command: str) -> bool:
+    """True when any argument of the command is a GT-KB task or service name (also as -Name:value or -Name=value)."""
+    for token in _shell_split(command, punctuation=True) or []:
+        for part in re.split(r"[=:,]", _clean_shell_token(token)):
+            if GTKB_TASK_OR_SERVICE_NAME_RE.fullmatch(part.strip("\"'")):
+                return True
+    return False
+
+
+def _owner_operation(command: str, *, _depth: int = 0) -> str | None:
+    """Name the GT-KB owner operation a shell command performs, following nested shells as the Git rule does.
+
+    An uninspectable nested command (encoded or empty) is already refused by the direct Git rule.
+    """
+    if _depth > 4:
+        return None
+    names_gtkb = _names_gtkb_task_or_service(command)
+    for stage in _split_pipeline_stages(command):
+        nested, recognized_wrapper = _nested_shell_command(stage)
+        if recognized_wrapper:
+            found = _owner_operation(nested, _depth=_depth + 1) if nested else None
+            if found is not None:
+                return found
+            continue
+        tokens = _shell_split(stage)
+        if not tokens:
+            continue
+        verb_index = _shell_verb_index(tokens)
+        if verb_index is None:
+            continue
+        relevant = tokens[verb_index:]
+        found = _gt_owner_operation(relevant)
+        if found is not None:
+            return found
+        verb = _service_control_verb(relevant)
+        if verb is not None and names_gtkb:
+            return f"{verb} on a GT-KB task or service"
+    return None
+
+
+def _owner_operation_from_payload(payload: dict[str, Any]) -> str | None:
+    command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
+    return _owner_operation(command) if command else None
 
 
 def _arg_value(args: list[str], flag: str) -> str | None:
@@ -1427,6 +1553,13 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         return blocked(
             "direct_git_effect_requires_lifecycle",
             "Use the ordinary gt project commit or gt bridge worktree/publish-work operation for Git effects.",
+        )
+    owner_operation = _owner_operation_from_payload(payload)
+    if owner_operation is not None:
+        return blocked(
+            "owner_operation_only",
+            f"{owner_operation} is an owner operation (D61): the owner performs it from the GT-KB Home's controls "
+            "or their own terminal.",
         )
     root = _project_root(payload)
     cwd = Path(str(payload.get("cwd") or root)).absolute()

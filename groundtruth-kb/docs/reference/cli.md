@@ -2012,6 +2012,13 @@ GT-KB Home is the DeepSeek Harness Web UI served on `127.0.0.1:3080` as GT-KB's
 primary interface (owner rulings D54, D58, D59). The Home UI's controls call only
 these commands; they are owner actions in the browser, never model tools.
 
+Starting and stopping services, the Home and the dashboard, and `gt controls set`,
+are owner operations (owner ruling D61). GT-KB's effect gate refuses them from an
+agent's shell in every harness, whatever the target, and also refuses direct changes
+to GT-KB's scheduled tasks and Windows service. The owner runs them from the Home's
+controls page or their own terminal. The read-only forms (`gt services status`,
+`gt home status`, `gt controls show`) stay available to agents.
+
 ### gt home start
 
 Start the Home server after proving its GT-KB guard and plugin are active.
