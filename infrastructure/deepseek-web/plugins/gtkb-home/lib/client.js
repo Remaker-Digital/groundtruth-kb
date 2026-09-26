@@ -17,7 +17,7 @@ window.__ModuleLoader__.load({
 			ui = {};
 		}
 		const MARK = "/gtkb-home/mark.svg";
-		const ATTRIBUTION = "GT-KB by Remaker Digital · Built on DeepSeek Harness (MIT License)";
+		const ATTRIBUTION = "GroundTruth KB by Remaker Digital · Built on DeepSeek Harness (MIT License)";
 		const TONE = { ok: "#2e9e5b", warn: "#c98a14", error: "#d4412e", info: "inherit" };
 		const STATUS_TONE = { PASS: "ok", running: "ok", WARN: "warn", UNKNOWN: "warn", unknown: "warn", FAIL: "error", stopped: "error" };
 		const DOT = { ok: "done", warn: "warning", error: "error", busy: "ongoing" };
@@ -123,8 +123,8 @@ window.__ModuleLoader__.load({
 				style: CARD,
 				children: [
 					jsxs("div", { children: [
-						jsx("div", { style: { fontWeight: 600 }, children: "GT-KB dashboard" }),
-						jsx("div", { style: { fontSize: 12, opacity: 0.75 }, children: evidence.last_refresh ? `Last refreshed ${when(evidence.last_refresh)}` :"Not refreshed yet. Start the dashboard on the GT-KB services page." }),
+						jsx("div", { style: { fontWeight: 600 }, children: "GTKB dashboard" }),
+						jsx("div", { style: { fontSize: 12, opacity: 0.75 }, children: evidence.last_refresh ? `Last refreshed ${when(evidence.last_refresh)}` :"Not refreshed yet. Start the dashboard on the GTKB services page." }),
 					] }),
 					jsxs("div", { style: { marginLeft: "auto", display: "flex", gap: 14, fontSize: 13 }, children: [
 						jsx("a", { href: evidence.grafana_url, target: "_blank", rel: "noopener noreferrer", children: "Open dashboard" }),
@@ -141,7 +141,7 @@ window.__ModuleLoader__.load({
 			return jsxs("div", {
 				style: PAGE,
 				children: [
-					jsx(PageHeader, { title: "GT-KB status", subtitle, onRefresh: load, busy: state.loading }),
+					jsx(PageHeader, { title: "GTKB status", subtitle, onRefresh: load, busy: state.loading }),
 					jsx(Notice, { notice: state.error ? { tone: "error", text: state.error } : null }),
 					jsx(DashboardCard, { evidence: dashboard }),
 					jsx("table", { style: TABLE, children: jsx("tbody", { children: rows.map((row) => jsxs("tr", {
@@ -160,7 +160,7 @@ window.__ModuleLoader__.load({
 
 		// ---- GT-KB services: start and stop ----
 		const SERVICES = {
-			authority: { title: "Authority", stop: "Governed sessions, the effect gate and GT-KB status reads fail until it is started again. Its logon task stays paused until then." },
+			authority: { title: "Authority", stop: "Governed sessions, the effect gate and GroundTruth KB status reads fail until it is started again. Its logon task stays paused until then." },
 			home: { title: "Home", stop: null },
 			dashboard: { title: "Dashboard", stop: "The dashboard refresh service and Grafana stop; the dashboard links do not open until it is started again." },
 			ollama: { title: "Ollama", stop: "Local models are unavailable until it is started again. Its logon task stays paused until then." },
@@ -191,7 +191,7 @@ window.__ModuleLoader__.load({
 			return jsxs("div", {
 				style: PAGE,
 				children: [
-					jsx(PageHeader, { title: "GT-KB services", subtitle: "Start or stop the services GT-KB runs on this computer.", onRefresh: load, busy: state.loading || busy !== null }),
+					jsx(PageHeader, { title: "GTKB services", subtitle: "Start or stop the services GroundTruth KB runs on this computer.", onRefresh: load, busy: state.loading || busy !== null }),
 					jsx(Notice, { notice: state.error ? { tone: "error", text: state.error } : notice }),
 					jsx("table", { style: TABLE, children: jsx("tbody", { children: rows.map((row) => jsxs("tr", {
 						style: ROW,
@@ -260,7 +260,7 @@ window.__ModuleLoader__.load({
 				style: PAGE,
 				children: [
 					jsx(PageHeader, {
-						title: "GT-KB configuration",
+						title: "GTKB configuration",
 						subtitle: state.data ? `Operational controls · ${state.data.source_reference}` : (state.loading ? "Reading gt controls show…" : ""),
 						onRefresh: load,
 						busy: state.loading || busy,
@@ -305,7 +305,7 @@ window.__ModuleLoader__.load({
 					jsx(Dialog, {
 						open: proposal !== null,
 						title: "Apply this configuration change?",
-						description: "GT-KB validated the complete proposed controls file, including its bounds and invariants. Applying replaces the live file only if it has not changed since this preview.",
+						description: "GroundTruth KB validated the complete proposed controls file, including its bounds and invariants. Applying replaces the live file only if it has not changed since this preview.",
 						onClose: () => setProposal(null),
 						footer: jsxs(React.Fragment, { children: [
 							jsx(Button, { variant: "outline", autoFocus: true, disabled: busy, onClick: () => setProposal(null), children: "Cancel" }),
@@ -329,20 +329,20 @@ window.__ModuleLoader__.load({
 			const px = size ?? 24;
 			return jsx("img", { src: MARK, alt: "Remaker Digital", width: px, height: px, style: { display: "block", borderRadius: 4 } });
 		}
-		// The owner's call (2026-09-25): only "GT-KB" beside the mark, at the sidebar's own brand size and on one line; the
+		// The owner's call (2026-09-25; D62 2026-09-26): only "GTKB" beside the mark, at the sidebar's own brand size and on one line; the
 		// two-line name with "by Remaker Digital" was too large for the sidebar header and was cut off.
 		function BrandName() {
-			return jsx("span", { style: { fontWeight: 600, letterSpacing: "0.02em", whiteSpace: "nowrap" }, children: "GT-KB" });
+			return jsx("span", { style: { fontWeight: 600, letterSpacing: "0.02em", whiteSpace: "nowrap" }, children: "GTKB" });
 		}
 		function HeroMark({ size }) {
 			const px = size ?? 72;
-			return jsx("img", { src: MARK, alt: "GT-KB by Remaker Digital", width: px, height: px, style: { borderRadius: 10 } });
+			return jsx("img", { src: MARK, alt: "GTKB by Remaker Digital", width: px, height: px, style: { borderRadius: 10 } });
 		}
 
 		// The layout projects "<session title> — DeepSeek Harness" into document.title from a hard-coded product name; the
 		// host rewrites the index title, and this observer keeps the product name GT-KB's whenever the shell sets it.
 		const UPSTREAM_PRODUCT = "DeepSeek Harness";
-		const PRODUCT = "GT-KB Home";
+		const PRODUCT = "GTKB Home";
 		function keepProductTitle() {
 			const retitle = () => {
 				if (document.title.includes(UPSTREAM_PRODUCT)) document.title = document.title.replace(UPSTREAM_PRODUCT, PRODUCT);
@@ -356,9 +356,9 @@ window.__ModuleLoader__.load({
 
 		// The conversation hero's headline is upstream's slogan: a locale string with no slot (pinned bundle:
 		// t("hero.headline") in a span whose module class ends in "_headlineText"), and the locale service refuses a
-		// second dictionary for a namespace it already holds. The owner titles it "GroundTruth Knowledge Base"
+		// second dictionary for a namespace it already holds. The owner titles it "GroundTruth KB" (D62)
 		// (2026-09-25). This observer sets the text node's value in place, so React keeps its own node, in any locale.
-		const HEADLINE = "GroundTruth Knowledge Base";
+		const HEADLINE = "GroundTruth KB";
 		const UPSTREAM_HEADLINES = new Set(["Into the Unknown", "探索未至之境"]);
 		function keepHeroHeadline() {
 			const retitle = () => {
@@ -374,9 +374,9 @@ window.__ModuleLoader__.load({
 		}
 
 		const SECTIONS = [
-			{ id: "gtkb", order: 1, label: "GT-KB", page: StatusPage },
-			{ id: "gtkb-services", order: 2, label: "GT-KB services", page: ServicesPage },
-			{ id: "gtkb-configuration", order: 3, label: "GT-KB controls", page: ConfigurationPage },
+			{ id: "gtkb", order: 1, label: "GTKB", page: StatusPage },
+			{ id: "gtkb-services", order: 2, label: "GTKB services", page: ServicesPage },
+			{ id: "gtkb-configuration", order: 3, label: "GTKB controls", page: ConfigurationPage },
 		];
 		const inject = ["slots", "connection"];
 		function apply(ctx) {

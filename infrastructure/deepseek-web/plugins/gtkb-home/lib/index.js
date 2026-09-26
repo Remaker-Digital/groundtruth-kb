@@ -2,7 +2,7 @@
 //
 // - Serves the Remaker Digital marks from this package's assets at exact routes (public static images), including the
 //   tab icon /favicon.svg, a GT-KB web manifest, and the third-party notices at /gtkb-home/notices.
-// - Rewrites the page title to "GT-KB Home" (the client keeps it that way at run time).
+// - Rewrites the page title to "GTKB Home" (the client keeps it that way at run time).
 // - Registers the authenticated RPC channel /gtkb behind the shell's Host/Origin fence and the owner's browser cookie.
 //   Every endpoint runs one fixed `gt` argument vector (no shell string) with a scrubbed environment and returns its
 //   JSON: status, services status/start/stop (not the Home itself), controls show, and a configuration change as
@@ -27,8 +27,8 @@ const ASSETS = {
 };
 const MANIFEST = JSON.stringify({
   id: '/',
-  name: 'GT-KB Home',
-  short_name: 'GT-KB',
+  name: 'GTKB Home',
+  short_name: 'GTKB',
   start_url: '/',
   scope: '/',
   display: 'fullscreen',
@@ -170,7 +170,7 @@ export function apply(ctx, config = {}) {
   });
   publicText('/manifest.webmanifest', 'application/manifest+json', MANIFEST);
   publicText('/gtkb-home/notices', 'text/plain; charset=utf-8', readFileSync(new URL('../../../THIRD-PARTY-NOTICES.md', import.meta.url)));
-  ctx.webServer.tapIndex((html) => html.replace(/<title>[^<]*<\/title>/, '<title>GT-KB Home</title>'));
+  ctx.webServer.tapIndex((html) => html.replace(/<title>[^<]*<\/title>/, '<title>GTKB Home</title>'));
   ctx.webServer.register({
     kind: 'exact',
     path: '/gtkb-home/control/shutdown',

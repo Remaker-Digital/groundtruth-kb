@@ -27,7 +27,7 @@ const EDITOR_EFFECTS = new Set(['create', 'str_replace', 'insert']);
 
 function required(variable) {
   const value = process.env[variable];
-  if (!value) throw new Error(`GT-KB Home guard: ${variable} is not set`);
+  if (!value) throw new Error(`GroundTruth KB guard: ${variable} is not set`);
   return value;
 }
 
@@ -42,11 +42,11 @@ export function classify(execution) {
   const args = execution.arguments ?? {};
   const header = execution.agent?.session?.header;
   if (READ_ONLY.has(tool) || ORCHESTRATION.has(tool)) return { kind: 'allow' };
-  if (NETWORK.has(tool)) return { kind: 'deny', reason: 'GT-KB: network tools are disabled in GT-KB Home until the owner enables them' };
+  if (NETWORK.has(tool)) return { kind: 'deny', reason: 'GroundTruth KB: network tools are disabled in the Home until the owner enables them' };
   const context = header?.id;
   const cwd = header?.cwd;
   if (typeof context !== 'string' || context.length === 0 || typeof cwd !== 'string' || cwd.length === 0) {
-    return { kind: 'deny', reason: 'GT-KB: the tool call carries no session identity or workspace' };
+    return { kind: 'deny', reason: 'GroundTruth KB: the tool call carries no session identity or workspace' };
   }
   let toolInput;
   let claudeTool;
@@ -58,14 +58,14 @@ export function classify(execution) {
     toolInput = { file_path: absolute(cwd, args.file_path ?? args.path) };
   } else if (tool === 'str_replace_editor') {
     if (args.command === 'view') return { kind: 'allow' };
-    if (!EDITOR_EFFECTS.has(args.command)) return { kind: 'deny', reason: 'GT-KB: unknown editor effect' };
+    if (!EDITOR_EFFECTS.has(args.command)) return { kind: 'deny', reason: 'GroundTruth KB: unknown editor effect' };
     claudeTool = args.command === 'create' ? 'Write' : 'Edit';
     toolInput = { file_path: absolute(cwd, args.path) };
   } else if (tool === 'pwsh' || tool === 'bash') {
     claudeTool = 'Bash';
     toolInput = { command: args.command };
   } else {
-    return { kind: 'deny', reason: `GT-KB: the tool ${tool} is not recognized by the GT-KB gate` };
+    return { kind: 'deny', reason: `GroundTruth KB: the tool ${tool} is not recognized by the effect gate` };
   }
   return { kind: 'gate', payload: { tool_name: claudeTool, tool_input: toolInput, cwd, session_id: context } };
 }
@@ -97,16 +97,16 @@ function runGate(settings, payload, signal) {
       signal?.removeEventListener?.('abort', abort);
       done(verdict);
     };
-    const abort = () => { child.kill(); finish({ allowed: false, reason: 'GT-KB guard: the call was cancelled' }); };
-    const timer = setTimeout(() => { child.kill(); finish({ allowed: false, reason: 'GT-KB guard: the effect gate timed out' }); }, GATE_TIMEOUT_MS);
+    const abort = () => { child.kill(); finish({ allowed: false, reason: 'GroundTruth KB guard: the call was cancelled' }); };
+    const timer = setTimeout(() => { child.kill(); finish({ allowed: false, reason: 'GroundTruth KB guard: the effect gate timed out' }); }, GATE_TIMEOUT_MS);
     signal?.addEventListener?.('abort', abort, { once: true });
     child.stdout.on('data', (chunk) => { stdout += chunk; });
-    child.on('error', (error) => finish({ allowed: false, reason: `GT-KB guard: ${error.message}` }));
+    child.on('error', (error) => finish({ allowed: false, reason: `GroundTruth KB guard: ${error.message}` }));
     child.on('close', (status) => {
       let parsed;
       try { parsed = JSON.parse(stdout); } catch { parsed = undefined; }
       const allowed = status === 0 && parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed) && Object.keys(parsed).length === 0;
-      finish({ allowed, status, reason: allowed ? null : (parsed?.hookSpecificOutput?.permissionDecisionReason || 'GT-KB guard: native effect check failed') });
+      finish({ allowed, status, reason: allowed ? null : (parsed?.hookSpecificOutput?.permissionDecisionReason || 'GroundTruth KB guard: native effect check failed') });
     });
     child.stdin.end(JSON.stringify({ ...payload, project_root: settings.root }));
   });
@@ -140,8 +140,8 @@ export function apply(ctx) {
     if (plan.kind === 'gate') {
       const approved = approvals.get(execution.callId);
       approvals.delete(execution.callId);
-      if (approved === undefined) return 'GT-KB guard: the effect was not checked by the GT-KB gate';
-      if (approved !== JSON.stringify(execution.arguments ?? {})) return 'GT-KB guard: the arguments changed after the GT-KB gate approved them';
+      if (approved === undefined) return 'GroundTruth KB guard: the effect was not checked by the effect gate';
+      if (approved !== JSON.stringify(execution.arguments ?? {})) return 'GroundTruth KB guard: the arguments changed after the effect gate approved them';
     }
     return undefined;
   });

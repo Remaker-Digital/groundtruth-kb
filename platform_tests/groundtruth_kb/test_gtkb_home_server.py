@@ -47,7 +47,7 @@ def test_the_patch_is_the_one_gtkb_layer_over_the_pinned_web_bundles():
     assert by_id["agent-default-model"]["config"] == {"provider": "gtkb-openrouter", "model": PRESET}
     provider = by_id["llm-pi-ai"]["config"]["providers"]["gtkb-openrouter"]
     assert provider == {
-        "displayName": "GT-KB OpenRouter",
+        "displayName": "GTKB OpenRouter",
         "apiKeyEnv": "GTKB_OPENROUTER_API_KEY",
         "api": "openai-completions",
         "baseURL": "https://openrouter.ai/api/v1",

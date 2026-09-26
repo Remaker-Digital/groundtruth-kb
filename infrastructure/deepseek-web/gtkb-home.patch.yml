@@ -12,7 +12,7 @@
   config:
     providers:
       gtkb-openrouter:
-        displayName: GT-KB OpenRouter
+        displayName: GTKB OpenRouter
         apiKeyEnv: GTKB_OPENROUTER_API_KEY
         api: openai-completions
         baseURL: https://openrouter.ai/api/v1
