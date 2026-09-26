@@ -110,6 +110,10 @@ SERVICE_CONTROL_CMDLETS = frozenset(
 SCHTASKS_CHANGING_SWITCHES = frozenset({"/run", "/end", "/change", "/delete", "/create"})
 SC_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue", "config", "delete", "create", "failure"})
 NET_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue"})
+# A command the gate cannot inspect: nested past the inspection cap, or a recognized shell wrapper whose command is
+# encoded or empty. The Git rule and the owner-operation rule each fail closed on it (observer B102), so neither rule's
+# refusal depends on the other running first.
+UNINSPECTABLE_SHELL_COMMAND = "<uninspectable-shell-command>"
 
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
@@ -472,6 +476,31 @@ def _split_pipeline_stages(command: str) -> list[str]:
     return [s.strip() for s in stages if s.strip()]
 
 
+def _split_command_stages(command: str) -> list[str]:
+    """Split a command into the commands it runs, for the Git rule and the owner-operation rule.
+
+    As `_split_pipeline_stages`, and also at a single `&`: cmd's command separator, and the background operator of
+    bash and PowerShell 7, both start another command. A redirection is not a separator (`2>&1`, `>&2`, `<&3`,
+    `&>file`, `&>>file`), and PowerShell's leading call operator (`& gt.exe ...`) leaves only an empty stage, which is
+    dropped. The file-effect analysis keeps `_split_pipeline_stages`.
+    """
+    stages: list[str] = []
+    for stage in _split_pipeline_stages(command):
+        masked = _mask_quoted_spans(stage, mask_double=False)
+        start = 0
+        for i, ch in enumerate(masked):
+            if ch != "&":
+                continue
+            before = masked[i - 1] if i else ""
+            after = masked[i + 1] if i + 1 < len(masked) else ""
+            if (before and before in "<>|") or after == ">":
+                continue
+            stages.append(stage[start:i])
+            start = i + 1
+        stages.append(stage[start:])
+    return [s.strip() for s in stages if s.strip()]
+
+
 def _shell_split(command: str, *, punctuation: bool = False) -> list[str] | None:
     if not command:
         return []
@@ -630,13 +659,18 @@ def _is_direct_git_invocation(stage: str) -> bool:
 
 def _direct_git_effect(stage: str, *, _depth: int = 0) -> str | None:
     if _depth > 4:
-        return "<uninspectable-shell-command>"
+        return UNINSPECTABLE_SHELL_COMMAND
     if not _is_direct_git_invocation(stage):
         nested, recognized_wrapper = _nested_shell_command(stage)
         if recognized_wrapper:
             if not nested:
-                return "<uninspectable-shell-command>"
-            return _direct_git_effect(nested, _depth=_depth + 1)
+                return UNINSPECTABLE_SHELL_COMMAND
+            # A nested command can itself be a chain (`bash -c 'cd x && git commit'`); each command in it is checked.
+            for nested_stage in _split_command_stages(nested) or [nested]:
+                found = _direct_git_effect(nested_stage, _depth=_depth + 1)
+                if found is not None:
+                    return found
+            return None
         return None
     subcommand = _direct_git_subcommand(stage)
     if subcommand in DIRECT_GIT_READ_ONLY_SUBCOMMANDS:
@@ -647,7 +681,7 @@ def _direct_git_effect(stage: str, *, _depth: int = 0) -> str | None:
 def _has_direct_git_effect_signal(command: str) -> bool:
     if _direct_git_effect(command) is not None:
         return True
-    return any(_direct_git_effect(stage) is not None for stage in _split_pipeline_stages(command))
+    return any(_direct_git_effect(stage) is not None for stage in _split_command_stages(command))
 
 
 def _gt_owner_operation(tokens: list[str]) -> str | None:
@@ -702,17 +736,21 @@ def _names_gtkb_task_or_service(command: str) -> bool:
 
 
 def _owner_operation(command: str, *, _depth: int = 0) -> str | None:
-    """Name the GT-KB owner operation a shell command performs, following nested shells as the Git rule does.
+    """Name the GT-KB owner operation a shell command performs, following nested shells and chains as the Git rule does.
 
-    An uninspectable nested command (encoded or empty) is already refused by the direct Git rule.
+    Like the Git rule, it fails closed on its own (observer B102): a command nested past the inspection cap, or a
+    recognized shell wrapper whose command is encoded or empty, returns UNINSPECTABLE_SHELL_COMMAND, so this rule's
+    refusal does not depend on the Git rule running first.
     """
     if _depth > 4:
-        return None
+        return UNINSPECTABLE_SHELL_COMMAND
     names_gtkb = _names_gtkb_task_or_service(command)
-    for stage in _split_pipeline_stages(command):
+    for stage in _split_command_stages(command) or [command]:
         nested, recognized_wrapper = _nested_shell_command(stage)
         if recognized_wrapper:
-            found = _owner_operation(nested, _depth=_depth + 1) if nested else None
+            if not nested:
+                return UNINSPECTABLE_SHELL_COMMAND
+            found = _owner_operation(nested, _depth=_depth + 1)
             if found is not None:
                 return found
             continue
@@ -1495,7 +1533,7 @@ def _direct_git_effect_from_payload(payload: dict[str, Any]) -> str | None:
     subcommand = _direct_git_effect(command)
     if subcommand is not None:
         return subcommand
-    for stage in _split_pipeline_stages(command):
+    for stage in _split_command_stages(command):
         subcommand = _direct_git_effect(stage)
         if subcommand is not None:
             return subcommand
@@ -1555,6 +1593,12 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "Use the ordinary gt project commit or gt bridge worktree/publish-work operation for Git effects.",
         )
     owner_operation = _owner_operation_from_payload(payload)
+    if owner_operation == UNINSPECTABLE_SHELL_COMMAND:
+        return blocked(
+            "owner_operation_only",
+            "A shell command that is encoded, empty or nested too deeply to inspect may hide an owner operation (D61): "
+            "the owner performs those from the GT-KB Home's controls or their own terminal.",
+        )
     if owner_operation is not None:
         return blocked(
             "owner_operation_only",

@@ -4,6 +4,10 @@ Starting and stopping GT-KB's services, Home and dashboard, and replacing its op
 Git effects, so the gate passed them for any agent shell before D61. These cases pin the refusal, its reach through
 nested and chained shell commands and shell-free argument vectors, and the read-only forms that stay allowed. The gate
 classifies command text only; no service, task or control is touched here.
+
+c115 adds the single `&` as a command separator (cmd's separator, the background operator of bash and PowerShell 7),
+nesting to the inspection cap, and the rule's own fail-closed refusal of commands it cannot inspect (observer B102), so
+the refusal does not depend on the Git rule running first. Redirections such as `2>&1` stay what they are.
 """
 
 from __future__ import annotations
@@ -54,6 +58,12 @@ def test_gt_owner_operations_are_refused(tmp_path: Path, command: str, operation
         "Write-Output ok; gt services stop authority",
         "gt services status | Out-String; gt dashboard stop",
         ["gt", "services", "stop", "authority"],
+        "echo ok & gt services stop authority",
+        'cmd /c "echo ok & gt services stop authority"',
+        "cmd /c echo ok & gt home stop",
+        "bash -c 'echo ok & gt dashboard stop'",
+        "cmd /c cmd /c gt services stop authority",
+        "cmd /c cmd /c cmd /c cmd /c gt controls set --input p.toml --expected-sha256 00",
     ],
 )
 def test_nested_chained_and_shell_free_owner_operations_are_refused(tmp_path: Path, command: object) -> None:
@@ -61,6 +71,44 @@ def test_nested_chained_and_shell_free_owner_operations_are_refused(tmp_path: Pa
 
     assert result["decision"] == "block"
     assert result["reason_code"] == "owner_operation_only"
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "cmd /c " * 5 + "gt services stop authority",
+        "cmd /c " * 7 + "gt home stop",
+        "pwsh -EncodedCommand ZwB0AA==",
+        "cmd /c",
+        'cmd /c "echo ok & pwsh -EncodedCommand ZwB0AA=="',
+    ],
+)
+def test_the_owner_rule_refuses_commands_it_cannot_inspect_on_its_own(
+    tmp_path: Path, command: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The Git rule runs first and refuses these too; with it out of the way the owner rule must still refuse them.
+    assert gate._owner_operation(command) == gate.UNINSPECTABLE_SHELL_COMMAND
+    assert _decide(tmp_path, command)["decision"] == "block"
+    monkeypatch.setattr(gate, "_direct_git_effect_from_payload", lambda payload: None)
+
+    result = _decide(tmp_path, command)
+
+    assert result["decision"] == "block"
+    assert result["reason_code"] == "owner_operation_only"
+    assert "may hide an owner operation" in str(result["reason"])
+
+
+@pytest.mark.parametrize(
+    "command",
+    [
+        "gt services status 2>&1",
+        "gt home status >&2",
+        "gt controls show |& cat",
+        "cmd /c gt services status & gt home status",
+    ],
+)
+def test_redirections_and_read_only_chains_are_not_owner_operations(tmp_path: Path, command: str) -> None:
+    assert _decide(tmp_path, command) == {}
 
 
 @pytest.mark.parametrize(
