@@ -28,7 +28,7 @@ image, not an installation, service-health, or end-to-end workflow test.
 
 | Visible control or message | How to read it |
 | --- | --- |
-| **Choose workspace** | Start here to select the workspace you intend to use. The composer explicitly asks for a workspace before starting. |
+| **Choose workspace** | Start here to choose the intended working directory. A follow-up capture now illustrates the [Windows directory picker](Get-Started#the-windows-directory-picker), including Select Folder and Cancel. The composer asks for a workspace before starting; the confirmation result remains untested. |
 | **Choose a workspace to start** | This is a prerequisite message in the prompt composer, not an instruction to type a workspace path into the prompt. |
 | **Standard mode** | A mode selector is shown with this value. The separate [Agent presets guide](Agent-Presets) now illustrates a built-in Standard mode and its advertised capabilities. Selection behavior and scope still need testing; a preset is not a governed role or project authorization. |
 | **New Session** | The sidebar's session entry point. The capture does not show the subsequent session flow. |
@@ -38,7 +38,9 @@ image, not an installation, service-health, or end-to-end workflow test.
 The capture also contains icon-only controls beside **Workspaces** and inside the
 composer. Their tooltips, accessible names, keyboard behavior, and resulting
 dialogs have not been inspected; this guide does not assign them unverified
-functions.
+functions. The separate directory-picker capture is documented through the
+labeled **Choose workspace** route; it does not establish what the sidebar's
+folder-shaped icon does.
 
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in

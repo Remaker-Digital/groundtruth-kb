@@ -31,17 +31,56 @@ selected. Its prompt composer says **Choose a workspace to start**.
 Owner-supplied screenshot received 2026-09-26; exact build/version not shown.
 See [GTKB Home](GTKB-Home) for the visible-control guide.
 
-1. Select **Choose workspace** above the composer.
-2. Choose the intended existing workspace. If it is not available, use the
-   supported application-registration route described below; do not create an
-   unrelated project just to get past the empty screen.
-3. Before entering a prompt, check that the intended workspace is selected. If
-   the composer remains unavailable, use [Troubleshooting](Troubleshooting) and
-   [Support](Support).
+### The Windows directory picker
 
-The image documents the empty state only. Workspace selection, any provider or
+The next supplied capture shows a Windows **Select Workspace Directory** dialog
+over Home. It has a location breadcrumb, a directory list, a **Folder** field,
+and **Select Folder** and **Cancel** buttons.
+
+![Windows Select Workspace Directory dialog over GTKB Home, browsing the E drive with GT-KB highlighted and shown in the Folder field; Select Folder and Cancel are visible, while Home still says Choose a workspace to start.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-workspace-picker.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. Drive labels and folder names are machine-specific
+examples. The highlighted `GT-KB` directory is the existing operator's example,
+not a required directory name, fresh-install default, or instruction to rename
+anything. The capture stops before confirmation: it does not show a selected
+workspace in Home or a successful first session. No folder was opened, selected,
+created, or registered by the documentation reviewer.
+
+1. Select **Choose workspace** above the composer.
+2. In **Select Workspace Directory**, navigate to the intended existing working
+   directory. Check both the location breadcrumb and **Folder** field; a similar
+   name on another drive or in another checkout may be a different workspace.
+3. If the intended directory is shown, use **Select Folder** to submit it. Use
+   **Cancel** to leave the picker without submitting a selection. Neither action
+   was exercised in this review; their resulting state still needs testing.
+4. After returning to Home, verify that the intended workspace is shown before
+   entering a prompt. If it is not shown, the path is wrong, an error appears,
+   or the composer remains unavailable, use
+   [Troubleshooting](Troubleshooting#a-folder-is-highlighted-but-home-still-needs-a-workspace)
+   and [Support](Support). Do not infer success from a highlighted folder alone.
+
+Choose the directory for the work you actually intend to do. Do not select a
+drive root, backup, temporary run folder, or the GTKB host directory merely
+because it appears in this example. When working on an already registered
+application, check that the intended directory matches its registered root.
+The exact registration relationship and acceptance rules still need a tested
+reference; the picker is not proof of Git-repository discovery or registration.
+
+The dialog also exposes **New folder**, but creating a directory is not the
+same as cloning a repository, registering an application, creating a governed
+project, or authorizing work. If a directory cannot be found or accessed, first
+check its location and the supported access route. Do not create an unrelated
+folder/project or change permissions simply to get past the picker. Application
+registration, when actually needed, is the separate procedure described below.
+
+The confirmed workspace view, cancellation behavior, persistence, provider or
 credential setup, and a successful first response still need a version-pinned
-walkthrough. **Standard mode** is visible; the separate [Agent presets
+walkthrough. See the [workspace picker review checklist](Known-Issues#workspace-picker-review).
+
+### Understand the session mode and permissions
+
+**Standard mode** is visible; the separate [Agent presets
 guide](Agent-Presets) now shows a matching built-in preset marked **In use** and
 describes the four visible built-in modes. Their selection behavior, effective
 scope, and effects on active sessions still need testing. A preset does not

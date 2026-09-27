@@ -125,6 +125,7 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
         "assets/gtkb-services.png",
         "assets/gtkb-settings-general.png",
         "assets/gtkb-status.png",
+        "assets/gtkb-workspace-picker.png",
     ],
 )
 def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str, asset_name: str) -> None:
@@ -169,6 +170,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
         "assets/gtkb-models.png": b"\x89PNG\r\n\x1a\n\x00\xfamodels\r\n",
         "assets/gtkb-plugins.png": b"\x89PNG\r\n\x1a\n\x00\xf9plugins\r\n",
         "assets/gtkb-agent-presets.png": b"\x89PNG\r\n\x1a\n\x00\xf8presets\r\n",
+        "assets/gtkb-workspace-picker.png": b"\x89PNG\r\n\x1a\n\x00\xf7workspace\r\n",
     }
     for name, content in assets.items():
         (source_dir / name).write_bytes(content)
@@ -177,7 +179,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
 
     rows = module.update_pages(source_dir, wiki_dir)
 
-    assert len(rows) == 9
+    assert len(rows) == 10
     assert all(row["post_update_status"] == "current" for row in rows)
     for name, content in assets.items():
         assert (wiki_dir / name).read_bytes() == content
@@ -198,14 +200,15 @@ def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> N
     (source_dir / "assets" / "gtkb-models.png").write_bytes(b"\x89PNG\r\n\xfa")
     (source_dir / "assets" / "gtkb-plugins.png").write_bytes(b"\x89PNG\r\n\xf9")
     (source_dir / "assets" / "gtkb-agent-presets.png").write_bytes(b"\x89PNG\r\n\xf8")
+    (source_dir / "assets" / "gtkb-workspace-picker.png").write_bytes(b"\x89PNG\r\n\xf7")
     (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
 
     assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["dry_run"] is True
     assert result["summary"]["page_count"] == 1
-    assert result["summary"]["asset_count"] == 8
-    assert result["summary"]["drift_count"] == 9
+    assert result["summary"]["asset_count"] == 9
+    assert result["summary"]["drift_count"] == 10
     assert all(row["planned_action"] == "write" for row in result["pages"])
     assert not wiki_dir.exists()
 

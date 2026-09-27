@@ -30,10 +30,12 @@ This page records material adoption gaps, not every internal development item.
   the provider list and Add/Edit entry points. The [Plugins guide](Plugins)
   illustrates the collapsed configuration sections and Plugin list tab. The
   [Agent presets guide](Agent-Presets) now covers the four visible built-in
-  modes and custom-authoring entry point. The workspace picker, selected
-  workspace, mode-selection and permission behavior, provider Add/Edit dialogs,
-  model selection, expanded plugin controls, plugin inventory, preset selection
-  and custom authoring, and a successful first session still need version-pinned
+  modes and custom-authoring entry point. [Get started](Get-Started#the-windows-directory-picker)
+  now illustrates the Windows directory picker before confirmation. The
+  confirmed workspace view, selection/cancellation and persistence behavior,
+  mode-selection and permission behavior, provider Add/Edit dialogs, model
+  selection, expanded plugin controls, plugin inventory, preset selection and
+  custom authoring, and a successful first session still need version-pinned
   coverage and interaction checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
@@ -54,6 +56,25 @@ the image. The improvements below are recommendations, not shipped features.
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
 | **Should** | The captured empty state does not show a completed-session sequence. | Add a selected-workspace image and a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the demonstrated result. |
 | **Don't** | The browser displays Home, a **Preview** label, and an empty session list. | Do not treat this as proof of installation completeness, service readiness, missing canonical work, or a successful governed workflow. Check those outcomes separately. |
+
+## Workspace picker review
+
+The owner-supplied screenshot received 2026-09-26 shows a Windows **Select
+Workspace Directory** dialog over Home, with a highlighted directory and
+**Select Folder** and **Cancel** buttons. It closes the missing-picker-image
+gap, not the confirmed-selection or first-response gap. No folder-selection
+interaction or application-registration operation was performed for this review.
+See [Get started](Get-Started#the-windows-directory-picker).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | The breadcrumb is on the E drive and Folder contains GT-KB; other directories are visible. | Explain how to choose the intended working directory and display/verify its resolved path after confirmation. Test nested paths, similar names on different drives/checkouts, and names with spaces or non-ASCII characters. Do not imply that the example host root is every user's application workspace. |
+| **Must** | The dialog selects a directory and also exposes New folder. | Document the actual relationship between directory selection, workspace state, registered application roots, and Git repositories. Establish what exists or changes at each step; creating or selecting a folder does not by itself prove application registration, project creation, or project authorization. |
+| **Must** | Select Folder and Cancel are visible, but neither outcome is shown. | Test confirmation and cancellation in a separate test workspace, including the resulting Home state and restoration of focus. Test missing/inaccessible paths and rejected selections with a useful error, no silent fallback to another root, and no unintended partial setup. |
+| **Must** | Home still says Choose a workspace to start behind the open picker. | Show the confirmed workspace and expected composer state, and qualify when readiness changes. Document persistence after reopening Home and the effect on new versus active sessions, keeping preset/model choices distinct. An open picker is not a completed selection. |
+| **Should** | The picker is a native Windows dialog, while the initiating interface is in a browser. | Make this transition clear in Get Started and a short first-session video. Use a non-sensitive example directory, demonstrate the confirmation checkpoint, and measure whether a new user can complete it without operator coaching. |
+| **Should** | The dialog contains keyboard navigation controls, a path field, and drive/network entries. | Verify accessible names, keyboard navigation, cancellation, and return of focus to Home. State the qualified platform and storage support; native dialog entries alone do not establish support for every browser, cloud drive, removable drive, or network location. |
+| **Don't** | A machine-specific directory is highlighted, with no subsequent Home result. | Do not treat this as a successful session, a required installation path, a cloned or registered repository, a healthy host, or permission to expose all files. Do not publish private directory content or credential-bearing paths in follow-up captures. |
 
 ## Settings review
 

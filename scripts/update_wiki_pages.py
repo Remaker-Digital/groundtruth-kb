@@ -56,6 +56,7 @@ WIKI_ASSET_ALLOWLIST = frozenset(
         "assets/gtkb-services.png",
         "assets/gtkb-settings-general.png",
         "assets/gtkb-status.png",
+        "assets/gtkb-workspace-picker.png",
     }
 )
 

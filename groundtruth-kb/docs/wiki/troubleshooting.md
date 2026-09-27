@@ -37,6 +37,25 @@ gt --config E:\GTKB\groundtruth.toml services status --json
 - Check whether port 3080 is already owned by another process.
 - Use `gt home open` to obtain a current launch URL; do not reuse an old URL.
 
+## A folder is highlighted but Home still needs a workspace
+
+In the documented [Windows picker](Get-Started#the-windows-directory-picker),
+highlighting a directory leaves the dialog open; the background Home still asks
+for a workspace. The highlight is not evidence that Home accepted a selection.
+If you intend to submit that directory, first check the breadcrumb and Folder
+field, then use **Select Folder**. Check the returned Home state and intended
+path before entering a prompt. Use **Cancel** if you do not intend to select it.
+These outcomes still need release-specific interaction qualification.
+
+If the intended folder cannot be found, check its actual location. If selection
+fails or the composer remains unavailable, record the installed version, whether
+Select Folder or Cancel was used, expected result, displayed result, and redacted
+error for [Support](Support). Keep private directory names and contents out of
+public captures. Do not select a broader directory, create an unrelated
+project, edit generated configuration, restart services, or change permissions
+as a substitute for diagnosing the selection failure. Directory access and
+application registration are separate questions.
+
 ## Home reports Overall UNKNOWN
 
 Open **Settings → GTKB** and read the explanation for each row, not only the

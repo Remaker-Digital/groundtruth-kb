@@ -15,9 +15,14 @@ them, not replace them.
    The initial [Home screen guide](GTKB-Home), illustrated [General Settings
    reference](Settings), [Models/provider list guide](Models), and [Agent presets
    overview](Agent-Presets) are available; the complete sequence still needs
-   validation and additional screenshots. Explain the tested built-in preset
-   choice and what In use means without treating it as a governed role or a
-   permission level. Do not require custom-preset authoring for routine first use.
+   validation and additional screenshots. The [Windows directory picker](Get-Started#the-windows-directory-picker)
+   is now illustrated before confirmation; demonstrate Select Folder, Cancel,
+   the confirmed path in Home, and the resulting composer state only after
+   those outcomes are tested. Use a non-sensitive sample working directory and
+   distinguish folder selection from application registration. Explain the
+   tested built-in preset choice and what In use means without treating it as a
+   governed role or permission level. Do not require custom-preset authoring for
+   routine first use.
    Explain Add provider versus Add a custom provider, the status indicator, and
    where model selection occurs. Keep real keys off-camera, identify usage and
    data-destination implications, and use non-sensitive sample content. Include
