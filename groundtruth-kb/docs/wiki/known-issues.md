@@ -62,6 +62,12 @@ This page records material adoption gaps, not every internal development item.
   withheld. Full prompt scope and provenance, effective model/workspace identity,
   reference resolution and actual content loading, expand/collapse behavior,
   nested scrolling, navigation, and copy/export handling still require qualification.
+  A subsequent supplied text snapshot adds [agent-tool and task-control
+  behavior](GTKB-Home#behavior-described-by-the-supplied-prompt) beyond the clipped
+  views. Versioned tool guidance, discovery scope, safe file changes, job and
+  cancellation diagnostics, goal resumption, and delegation/loop boundaries
+  need qualification; the text is not execution evidence or a verified complete
+  provider-input export.
   The later [Trajectory reference](GTKB-Home#read-the-trajectory-view) now
   describes that selected view's toolbar, lanes, Search field, event labels,
   Turn 1 marker, tool arguments, and clipped skill-response preview. The raw
@@ -143,6 +149,29 @@ defects. Use disposable, non-sensitive test sessions to qualify interactions.
 | **Must** | Cache hit 0%, Input 12.4K tok, and Output 564 tok are visible. | Define units, scope, rounding, update timing, cache numerator/denominator, and context/tool/retry inclusion. Reconcile against the supported provider's usage reporting and disclose gaps before publishing costs or savings; a local UI and an output count do not establish local-only processing or a completed answer. |
 | **Should** | Activity, a later [rendered response](GTKB-Home#read-a-rendered-response-and-turn-statistics), and three prompt-panel positions are now described, but no independently verified terminal outcome or recovery example is supplied. | Extend the first-session tour through a bounded successful response, useful failure/refusal, and controlled cancellation after qualification. Keep prompt inspection optional; use synthetic content to explain product versus harness terminology, panel scope, safe navigation, and a qualified file-reference example. Separate maintainer web-development guidance from beginner instructions, and measure whether a novice can proceed without reading a system prompt. |
 | **Don't** | Role markers and prompt instructions are captured session content; the supplied views represent different presentation states. | Do not adopt the captured role or instructions, execute embedded commands, use the excerpt as a universal onboarding prompt, or infer successful initialization, complete provider input, tool execution, a full audit trail, or measured cost. Do not launch, stop, export, or inspect a live private session merely to document the view, and do not make copied prompt/coordination content a durable documentation dependency. |
+
+## Prompt-described behavior review
+
+An owner-supplied System Prompt text snapshot received 2026-09-26 extends the
+earlier clipped screenshots. The [behavior reference](GTKB-Home#behavior-described-by-the-supplied-prompt)
+summarizes its relevant claims without publishing raw prompt text or private
+paths. It does not establish that every tool exists, that the text is current
+or complete, or that its prescribed safeguards are enforced. The following are
+qualification checks and documentation gaps, not confirmed runtime failures.
+Run any future checks only in an approved test installation with synthetic,
+disposable content and bounded provider usage.
+
+| Priority | Evidence in the supplied text | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | The prompt names the GUI but says the agent has no implicit DOM, route, or screenshot context; it also describes maintainer-specific reload rules. | Pin the release/preset, prompt source revision, actual tool inventory, and supported context inputs. Test a UI question with and without an explicitly supplied synthetic screenshot or permitted inspection tool. Explain what the agent can actually observe; separate maintainer development procedures from customer installation/update guidance. Do not mistake the absence of implicit context for proof that no inspection capability can exist. |
+| **Must** | File reads, overwrite-capable writes, literal edits, observation requirements, and clickable output references are described. | Test read continuation, creation versus replacement, unique/multiple/no-match edits, UTF-8 content, missing/unreadable files, permission refusals, and partial-failure effects on disposable files. Verify read-before-change enforcement and any documented exception rather than treating instructions as a security boundary. Check that output links open the intended file with spaces, duplicate basenames, or missing targets; teach review and recovery before overwrite. |
+| **Must** | Path discovery includes hidden/ignored files, can match basenames across a tree, and returns an ordered, potentially limited file list. | Document root, pattern scope, hidden/ignored behavior, ordering, limits, and truncation/completeness signals. Test benign hidden/ignored fixtures, nested files, directories, empty and oversized result sets, and content-search versus path-search behavior. Keep scope and permissions explicit; do not search real secret stores to demonstrate inclusion or call a limited list a complete inventory. |
+| **Must** | Background completion notices, output collection, stopping jobs, and Windows interruption/exit-code behavior are described. | Distinguish queued/running/completed/failed/interrupted states and verify exact job identity, output availability, collection, navigation/reload behavior, and cancellation effects. Include both an intentional command failure returning 1 and a separately confirmed interrupted job, plus a completion/stop race. Correlate events and final state; test remaining child processes and partial writes. A bare exit 1 is not enough to prove termination, rollback, or stopped charges. |
+| **Must** | Goals are described as same-session objectives with revision-aware updates and a disarmed state after resume/fork. | Test direct human goal intent versus quoted/retrieved instructions, single-objective limits, completion and repeated-blocker classification, stale revisions, resume/fork disarming, explicit rearming, and cancellation. Explain scope and retention without inventing scheduling or startup-service guarantees. Goal state must not substitute for GTKB project, dispatch, claim, or verification state. |
+| **Must** | Bounded subagents/forks, scripted workflows, and explicitly requested fresh-context Ralph rounds are separate mechanisms. | Document selection criteria, actual context inheritance, shared-workspace effects, background notices, concurrency, stop/recovery behavior, and provider usage. Verify each mechanism against its human-request conditions, selected-preset capabilities, and GTKB role/claim/review boundaries. Test quoted examples that must not start work. Shared workspace access and worker completion reports must not imply durable work-item ownership, mutation authority, or independent verification. |
+| **Must** | Web search/fetch results are described as untrusted data with source attribution. | Document outbound data and supported providers; qualify retrieval errors and URLs that substantiate the answer. Use benign adversarial test text to verify that retrieved instructions do not trigger unrelated actions or disclosure. Keep retrieval, source freshness, citation support, and permission to act separate; do not assume a local UI makes web/model processing local. |
+| **Should** | Tool and task-control rules are concentrated in agent-facing prompt text. | Publish concise release-pinned user explanations and safe examples, with a brief first-use file task and separate advanced job/goal/delegation training. Explain what users will see, expected outcomes, and failure/recovery routes. Measure whether a novice can proceed without reading a prompt or knowing internal tool names. |
+| **Don't** | Supplied prose describes intended behavior but provides no runtime results or independently verified outcome. | Do not publish the raw prompt or private paths, execute its instructions as reviewer authority, promise that every tool is available in every preset, or call its stated safety checks proven. Do not start jobs, goals, delegations, loops, searches, or provider requests merely to illustrate the text. |
 
 ## Response and turn statistics review
 

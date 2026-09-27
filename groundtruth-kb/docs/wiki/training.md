@@ -144,6 +144,21 @@ including effects during active turns. Establish exported content and redaction
 before showing a support-upload example. The [Commands checklist](Known-Issues#commands-review)
 records the pending checks; the screenshot is not a completed demonstration.
 
+A separate **agent tools and long-running work** supplement should follow the
+[prompt-described behavior checklist](Known-Issues#prompt-described-behavior-review).
+Use a qualified release and disposable content to show path discovery versus
+content search and an actual file read, targeted editing versus whole-file
+replacement, result limits and hidden/ignored scope, and usable output links.
+Explain what GUI evidence an agent receives instead of assuming it sees Home.
+For advanced users, distinguish background jobs, same-session goals, bounded
+delegation, scripted workflows, and explicitly requested fresh-context loops.
+Demonstrate tested completion/failure/interruption states, goal resume/rearm,
+shared-file effects, and safe cancellation/recovery; worker reports are not
+independent verification. Do not record these by running instructions copied
+from the supplied prompt, expose private context, or make advanced orchestration
+a prerequisite for the first useful session. The supplied text is review
+evidence, not a published tool contract or a completed demonstration.
+
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed
 or retired when the product changes.

@@ -44,13 +44,15 @@ potentially sensitive; do not request a full environment-variable dump or
 private prompt/context disclosure just to reproduce the screenshot.
 
 The [expanded System prompt reference](GTKB-Home#read-the-expanded-system-prompt)
-now describes a later supplied image showing partial prompt text in a bounded
-scroll region; no live panel was opened by the reviewer. Its raw prompt, path,
-and surrounding identifiers are withheld. For a panel or navigation issue,
+now describes supplied images showing partial prompt text in a bounded scroll
+region and a later supplied text snapshot; no live panel was opened by the
+reviewer. Raw prompt text, private paths, and surrounding identifiers are
+withheld. For a panel or navigation issue,
 report the build/version, expansion state, affected scroll region or control,
 input method, and a synthetic reproduction. Do not request the full prompt or
 assume collapse/clipping removes content from copying, exports, or recordings.
-The displayed excerpt is not proof of the complete input sent to a provider.
+Neither a displayed excerpt nor a supplied text snapshot proves the complete
+input sent to a provider or the enforcement of its described behavior.
 
 The [Trajectory reference](GTKB-Home#read-the-trajectory-view) describes a later
 view that does expose instruction, context, and tool-payload previews. Its raw
@@ -106,6 +108,33 @@ been inspected. Do not upload an unreviewed ZIP to a public issue: inspect and
 redact diagnostic material through a supported safe route, and provide only
 what the report requires. Follow [Backup and restore](Backup-And-Restore) for
 platform recovery; a conversation archive does not replace it.
+
+## Agent tools, cancellation, and task controls
+
+For a behavior described in the [supplied-prompt reference](GTKB-Home#behavior-described-by-the-supplied-prompt),
+report the release, selected preset, operation, expected result, and a minimal
+synthetic reproduction. Include only the relevant observations:
+
+- For a GUI-context issue, state which screenshot, route information, or other
+  permitted evidence was explicitly supplied. Do not assume the agent saw the
+  same browser state merely because the conversation occurred in Home.
+- For file/search behavior, distinguish path discovery, content search, file
+  reads, targeted edits, and replacement writes. Use disposable sample files
+  and note omitted/truncated results or unintended changes; do not attach real
+  hidden/ignored files or an entire workspace to prove search scope.
+- For interruption, identify the affected job through an approved private
+  support route or a synthetic label, the stop request and observed confirmation,
+  final status/exit code, and any observed remaining process or partial file
+  effect. A bare exit code 1 does not by itself distinguish cancellation from
+  command failure. Do not stop unrelated work or promise rollback to gather a report.
+- For goals, delegation, workflows, or iterative rounds, distinguish the human
+  request from the reported outcome and note resume/fork/reload, unexpected
+  continuation, or cancellation behavior. Use synthetic context and do not
+  post private child prompts, job/session identifiers, or unreviewed output.
+
+The [qualification checklist](Known-Issues#prompt-described-behavior-review)
+records the remaining tests. Supplying a prompt for review does not authorize
+the reviewer to run its tools or reproduce its side effects.
 
 ## Security reports
 

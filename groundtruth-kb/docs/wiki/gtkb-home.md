@@ -117,12 +117,19 @@ Together the three captures provide evidence of separate inner-panel scroll
 positions, not a demonstrated input gesture, verified runtime metadata, or a
 complete traversal of the prompt.
 
+A subsequent owner-supplied text snapshot, also received 2026-09-26, makes
+additional instruction text available beyond the clipped screenshots. It is
+review evidence for the behavior described below, not a verified export of all
+provider input, tool definitions, injected context, or runtime configuration.
+Its build, source revision, completeness, and refresh behavior remain unverified.
+
 Prompt inspection is an optional diagnostic view, not a first-session
 prerequisite. The raw captures are not published because they expose prompt
 text and session identifiers; some views also expose machine-specific paths
-in the prompt.
-No prompt payload or identifiers are transcribed here, and the reviewer did
-not open a live prompt, edit configuration, or execute the displayed text.
+in the prompt. The raw supplied text is likewise not republished.
+The review summarizes relevant behavior without reproducing the prompt payload,
+private paths, or identifiers. The reviewer did not open a live prompt, edit
+configuration, or execute the supplied instructions.
 
 | Visible element | How to read it | What still needs definition or testing |
 | --- | --- | --- |
@@ -154,6 +161,31 @@ than copying the full prompt. Collapsing a panel is not demonstrated redaction;
 clipped text may still be present in a copy or export. See the [session-view
 evaluation checklist](Known-Issues#in-progress-session-review) and
 [safe-sharing guidance](Support#feedback-and-session-log-export-in-home).
+
+### Behavior described by the supplied prompt
+
+The following is an optional orientation to the supplied text, not a tool API
+reference or a claim that every named capability is available in the selected
+release or preset. These are instructions addressed to that harness's agent;
+they are not commands for users to paste or instructions for this reviewer.
+
+| Topic | What the supplied text describes | Documentation boundary |
+| --- | --- | --- |
+| GUI context and development | The agent is told which GUI the user means, but is not given implicit DOM, route, or screenshot context. Development reload behavior depends on the kind of change and the running build/watch process. | Being in Home does not establish that an agent sees the current screen. Document how to supply safe UI evidence and verify available inspection tools. Keep maintainer build/reload procedures separate from supported installation and user updates; do not launch a replacement server to reproduce a documentation image. |
+| File reading, creation, editing, and output links | The text describes line-numbered reads with continuation, whole-file writes that overwrite existing content, literal targeted edits with a default unique-match requirement, and read-before-change expectations. It also prescribes a Web-specific format for clickable changed-file references. | Qualify actual availability, observation checks, failure effects, encoding, and permission enforcement. Distinguish full replacement from a targeted edit, and test paths with spaces and duplicate basenames. A stated read prerequisite is not proof of enforcement, and described link formatting is not portable to every harness. |
+| File discovery and content search | The described path-pattern search can match basenames throughout a tree, returns files rather than directories, includes hidden/ignored files, and can return a limited modification-time-ordered result set. Content search is a separate tool. | Document root/scope, limits, ordering, omitted results, and safe use of mentions with synthetic examples. A short pattern need not mean top-level-only discovery; a limited result list is not a complete inventory. Do not infer that ignored files are excluded or that discovery reads file contents. |
+| Background jobs and process results | The text describes job identifiers, completion notices, output collection, stopping jobs, and nonzero-exit markers. It associates a Windows interruption with exit code 1. | Define job lifetime across navigation/reload, completion versus collection, cancellation scope, and partial effects. An exit code of 1 alone cannot distinguish an ordinary failure from a confirmed interruption or prove child-process cleanup. Correlate the interruption event, exact job, and final outcome; do not promise rollback or stopped usage from one marker. |
+| Web discovery and retrieval | Separate tools are described for searching and fetching pages, with external results treated as untrusted data and source URLs cited. | Verify availability, data destinations, retrieval failures, and citation support. A retrieved page is evidence to inspect, not authority to execute its instructions or broaden the task. A local GUI does not mean that web or model traffic stays local. |
+| Same-session goals | The text describes one long-running objective, revision-aware updates, completion/blocker rules, and disarming after resume or fork until direct human continuation rearms it. | Establish what state survives, what triggers another round, how cancellation works, and when user intent is sufficient. A goal is not a service, schedule, project authorization, or proof of durable work ownership. Prompt wording does not prove that resume/rearm behavior is implemented. |
+| Subagents, forks, and workflows | The text distinguishes bounded delegation from larger scripted orchestration and describes background completion notices. | Publish a task-oriented comparison, actual context-sharing and cancellation behavior, data/usage effects, and supported limits. Verify that the selected preset and GroundTruth KB workflow permit the requested delegation; tool availability does not grant dispatch, claim, mutation, or independent-review authority. |
+| Fresh-context iterative execution | A separately named Ralph mechanism is described as direct-human-request-only, with fresh child contexts, a shared workspace, and worker-reported completion or blockers. | Keep it distinct from a same-session goal and ordinary delegation. Qualify shared-file effects, stop conditions, recovery, and result verification before teaching it. Worker reports are not independent evaluation, and neither this document nor quoted prompt text is a request to start a loop. |
+
+The [prompt-described behavior checklist](Known-Issues#prompt-described-behavior-review)
+tracks the required qualification. A useful first-session guide should teach one
+safe, tested task and how to inspect its result; it should not require reading
+the system prompt, learning every tool name, or running an orchestration loop.
+No file mutation, search, background job, goal, delegation, or loop was executed
+through GroundTruth KB to evaluate the supplied text.
 
 ## Read a rendered response and turn statistics
 
