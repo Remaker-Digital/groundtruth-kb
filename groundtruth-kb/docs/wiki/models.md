@@ -38,10 +38,11 @@ configuration file is the correct place to paste a secret.
 ## Provider setup is not model selection
 
 The visible entry is a provider configuration label, not a model identifier.
-This capture has no model list, selected model, default-model control, capability
-list, or completed response. It also does not establish whether model choice is
-global, workspace-specific, or session-specific, or whether it belongs in a
-different view.
+This Settings capture has no model list, selected model, default-model control,
+capability list, or completed response. A later Home capture adds a separate
+composer selector with a configuration-looking reference, described below.
+Neither image establishes whether model choice is global, workspace-specific,
+or session-specific.
 
 The **GTKB OpenRouter** name is an example from this installation, not a
 recommendation, a requirement to use that provider, or a complete list of
@@ -52,6 +53,28 @@ connection-test button from this image.
 Model/provider configuration does not assign a governed agent role, change
 session file permissions, or authorize project work. Those are separate
 concepts described in [Settings](Settings) and [Core concepts](Core-Concepts).
+
+## Read the Home composer reference
+
+In the later [selected-workspace Home screenshot](Get-Started#home-with-a-selected-workspace),
+the right-hand composer selector displays the literal text
+`@preset/gtkb-openrouter-deepseek-v4-flash`. A dropdown chevron is visible, but
+this selector is not open. The open menu in that image belongs to **Standard
+mode**, the separate agent-mode choice.
+
+The right-hand label suggests a configured model/provider reference; it is not
+proof of a resolved API model identifier, endpoint, account, available balance,
+successful credential check, or request. Do not infer those values by splitting
+the label, assume it is a shipped default, or paste the full `@preset/...` text
+into a provider's model-ID field. The shared word *preset* needs explanation in
+the product: an agent-mode preset describes tools/prompt/capabilities, whereas
+this reference's exact schema and resolution still need a verified description.
+
+The next setup walkthrough should open the supported selector, explain its
+actual choices and reference mapping, and show the effective provider/model
+before the first request. Document scope, persistence, model availability, and
+failure/recovery behavior. No selector choice or model request was exercised in
+this review. The example name is not a recommendation of a provider or model.
 
 ## Credentials, usage, and data destination
 
@@ -80,8 +103,9 @@ The next illustrated procedure should establish, in a separate test installation
    official guidance and the product's supported interface, without exposing it.
 3. How changes are saved, what the status indicator means, and how errors are
    distinguished from an untested configuration.
-4. Where to select the model and verify the intended provider/model for a new
-   session, including the scope and effect of later changes.
+4. How the Home composer selector and any named references resolve to the
+   intended provider/model for a new session, including the actual choices,
+   scope, and effect of later changes.
 5. A bounded, non-sensitive first request and expected response, followed by
    recovery guidance for authentication, endpoint, model, and usage-limit errors.
 

@@ -28,10 +28,10 @@ image, not an installation, service-health, or end-to-end workflow test.
 
 | Visible control or message | How to read it |
 | --- | --- |
-| **Choose workspace** | Start here to choose the intended working directory. A follow-up capture now illustrates the [Windows directory picker](Get-Started#the-windows-directory-picker), including Select Folder and Cancel. The composer asks for a workspace before starting; the confirmation result remains untested. |
+| **Choose workspace** | Start here to choose the intended working directory. Follow-up captures illustrate the [Windows directory picker](Get-Started#the-windows-directory-picker) and [Home with a selected workspace](Get-Started#home-with-a-selected-workspace). The selected state is visible; the transition, full-path identity, cancellation, and persistence remain untested. |
 | **Choose a workspace to start** | This is a prerequisite message in the prompt composer, not an instruction to type a workspace path into the prompt. |
-| **Standard mode** | A mode selector is shown with this value. The separate [Agent presets guide](Agent-Presets) now illustrates a built-in Standard mode and its advertised capabilities. Selection behavior and scope still need testing; a preset is not a governed role or project authorization. |
-| **New Session** | The sidebar's session entry point. The capture does not show the subsequent session flow. |
+| **Standard mode** | A mode selector is shown with this value. The [Agent presets guide](Agent-Presets#choose-a-mode-from-home) covers the later open Home menu with Standard checked and PTC, Minimal, and Creator also visible. Switching behavior and scope still need testing; a preset is not a governed role or project authorization. |
+| **New Session** | The sidebar's session entry point. A later selected-workspace capture also shows a New Session entry beneath its workspace, but no submitted prompt or response. |
 | **Workspaces / No sessions yet** | The displayed navigation view has no sessions. That does not establish whether canonical projects or work items exist. |
 | **Settings** | The settings entry point is at the lower left. See the illustrated [General Settings reference](Settings) for a separate capture of the open dialog. |
 
@@ -40,7 +40,11 @@ composer. Their tooltips, accessible names, keyboard behavior, and resulting
 dialogs have not been inspected; this guide does not assign them unverified
 functions. The separate directory-picker capture is documented through the
 labeled **Choose workspace** route; it does not establish what the sidebar's
-folder-shaped icon does.
+folder-shaped icon does. The [selected-workspace view](Get-Started#home-with-a-selected-workspace)
+also exposes a separate right-hand composer selector labeled with an
+`@preset/...` reference. Keep the workspace, agent mode, model/provider
+configuration, and session permissions distinct; a visible name or send arrow
+is not a completed first-response test.
 
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in

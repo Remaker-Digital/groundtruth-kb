@@ -30,13 +30,15 @@ This page records material adoption gaps, not every internal development item.
   the provider list and Add/Edit entry points. The [Plugins guide](Plugins)
   illustrates the collapsed configuration sections and Plugin list tab. The
   [Agent presets guide](Agent-Presets) now covers the four visible built-in
-  modes and custom-authoring entry point. [Get started](Get-Started#the-windows-directory-picker)
-  now illustrates the Windows directory picker before confirmation. The
-  confirmed workspace view, selection/cancellation and persistence behavior,
-  mode-selection and permission behavior, provider Add/Edit dialogs, model
-  selection, expanded plugin controls, plugin inventory, preset selection and
-  custom authoring, and a successful first session still need version-pinned
-  coverage and interaction checks.
+  modes and custom-authoring entry point. Get Started illustrates both the
+  [Windows directory picker](Get-Started#the-windows-directory-picker) and
+  [Home with a selected workspace](Get-Started#home-with-a-selected-workspace),
+  including the open mode menu and separate composer reference. The latter
+  capture reveals PTC's complete description. Resolved workspace path,
+  selection/cancellation and persistence behavior, mode-switching and permission
+  behavior, provider Add/Edit dialogs, model-reference resolution and selection,
+  expanded plugin controls, plugin inventory, custom authoring, and a successful
+  first session still need version-pinned coverage and interaction checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
 - Cross-platform host installation is not currently established.
@@ -51,30 +53,31 @@ the image. The improvements below are recommendations, not shipped features.
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
 | **Must** | Workspace selection is required, but no first-run guide or documentation link is visible. | Provide a short in-context path to Get Started. A first-time evaluator should identify the next action and select the intended workspace without source-code inspection or operator coaching. Record time and assistance needed. |
-| **Must** | **Standard mode** is shown without an explanation in this Home view; a later [Agent presets capture](Agent-Presets) supplies descriptions for four built-in modes. | Link the selector to a clear comparison and explain how preset choice takes effect. Verify the advertised capabilities and effects on new versus active sessions; do not treat the label as a governed role or project authorization. |
+| **Must** | **Standard mode** has no explanation while closed; later Settings and [open Home menu captures](Agent-Presets#choose-a-mode-from-home) supply descriptions for four modes and a visible Standard selection. | Make that help discoverable and link to a clear comparison. Explain how mode choice takes effect, verify advertised capabilities and effects on new versus active sessions, and distinguish it from the separate composer reference. Do not treat the label as a governed role or project authorization. |
 | **Must** | Several controls are represented only by icons. | Test accessible names, keyboard focus and activation, and discoverable labels/tooltips. The screenshot cannot establish a pass or failure for those behaviors. |
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
-| **Should** | The captured empty state does not show a completed-session sequence. | Add a selected-workspace image and a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the demonstrated result. |
+| **Should** | A later capture now shows a selected workspace and mode menu, but still no submitted prompt or response. | Continue from that illustrated checkpoint to a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the transition and successful response, and record where assistance was needed. |
 | **Don't** | The browser displays Home, a **Preview** label, and an empty session list. | Do not treat this as proof of installation completeness, service readiness, missing canonical work, or a successful governed workflow. Check those outcomes separately. |
 
 ## Workspace picker review
 
 The owner-supplied screenshot received 2026-09-26 shows a Windows **Select
 Workspace Directory** dialog over Home, with a highlighted directory and
-**Select Folder** and **Cancel** buttons. It closes the missing-picker-image
-gap, not the confirmed-selection or first-response gap. No folder-selection
-interaction or application-registration operation was performed for this review.
-See [Get started](Get-Started#the-windows-directory-picker).
+**Select Folder** and **Cancel** buttons. A later capture shows Home with the
+short workspace name and a New Session entry. These close the picker-image and
+selected-state-image gaps, not interaction qualification or the first-response
+gap. No folder-selection interaction or application-registration operation was
+performed for this review. See [Get started](Get-Started#the-windows-directory-picker).
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
-| **Must** | The breadcrumb is on the E drive and Folder contains GT-KB; other directories are visible. | Explain how to choose the intended working directory and display/verify its resolved path after confirmation. Test nested paths, similar names on different drives/checkouts, and names with spaces or non-ASCII characters. Do not imply that the example host root is every user's application workspace. |
+| **Must** | The picker breadcrumb is on the E drive and Folder contains GT-KB; later Home shows only the short GT-KB name. | Explain how to choose the intended working directory and display/verify its resolved path after confirmation. The matching short name alone does not prove path identity. Test nested paths, similar names on different drives/checkouts, and names with spaces or non-ASCII characters. Do not imply that the example host root is every user's application workspace. |
 | **Must** | The dialog selects a directory and also exposes New folder. | Document the actual relationship between directory selection, workspace state, registered application roots, and Git repositories. Establish what exists or changes at each step; creating or selecting a folder does not by itself prove application registration, project creation, or project authorization. |
-| **Must** | Select Folder and Cancel are visible, but neither outcome is shown. | Test confirmation and cancellation in a separate test workspace, including the resulting Home state and restoration of focus. Test missing/inaccessible paths and rejected selections with a useful error, no silent fallback to another root, and no unintended partial setup. |
-| **Must** | Home still says Choose a workspace to start behind the open picker. | Show the confirmed workspace and expected composer state, and qualify when readiness changes. Document persistence after reopening Home and the effect on new versus active sessions, keeping preset/model choices distinct. An open picker is not a completed selection. |
+| **Must** | Select Folder and Cancel are visible; a later Home image adds a selected state, not a recorded interaction or Cancel result. | Reproduce confirmation and cancellation in a separate test workspace, including the resulting Home state and restoration of focus. Test missing/inaccessible paths and rejected selections with a useful error, no silent fallback to another root, and no unintended partial setup. |
+| **Must** | Later Home displays GT-KB, New Session, a changed composer placeholder, a checked Standard mode, and a separate reference selector. | Use the selected-state image as a checkpoint, then qualify when input/submission becomes ready. Document persistence after reopening Home and the effect on new versus active sessions; keep workspace, agent mode, model/provider reference, and permissions distinct. A send arrow is not proof of successful submission. |
 | **Should** | The picker is a native Windows dialog, while the initiating interface is in a browser. | Make this transition clear in Get Started and a short first-session video. Use a non-sensitive example directory, demonstrate the confirmation checkpoint, and measure whether a new user can complete it without operator coaching. |
 | **Should** | The dialog contains keyboard navigation controls, a path field, and drive/network entries. | Verify accessible names, keyboard navigation, cancellation, and return of focus to Home. State the qualified platform and storage support; native dialog entries alone do not establish support for every browser, cloud drive, removable drive, or network location. |
-| **Don't** | A machine-specific directory is highlighted, with no subsequent Home result. | Do not treat this as a successful session, a required installation path, a cloned or registered repository, a healthy host, or permission to expose all files. Do not publish private directory content or credential-bearing paths in follow-up captures. |
+| **Don't** | A machine-specific directory is highlighted, and a later Home capture shows a matching short name but no prompt or response. | Do not treat these as a successful session, proof of full-path identity, a required installation path, a cloned or registered repository, a healthy host, or permission to expose all files. Do not publish private directory content or credential-bearing paths in follow-up captures. |
 
 ## Settings review
 
@@ -163,7 +166,7 @@ made. See [Models and providers](Models).
 | --- | --- | --- |
 | **Must** | Add provider and Add a custom provider are separate buttons; neither dialog is open. | Explain when to use each route, document actual required fields and supported choices, and qualify a path from an unconfigured installation to a successful first response. Test save, cancel, persistence, duplicate handling, and recovery without exposing keys. |
 | **Must** | The provider entry has a green dot but no visible text status or check time. | Define the indicator and distinguish an entry being present from credentials being valid, a service being reachable, and a model request succeeding. Test missing/invalid credentials, unreachable endpoints, unavailable models, and usage-limit errors with useful next actions. |
-| **Must** | Models is the page title, but the visible content lists a provider and no model identifier. | Document where model selection happens, how to verify the intended provider/model, its scope, and the effect on new versus active sessions. Do not equate a provider display name with a selected model or a full support matrix. |
+| **Must** | Settings lists a provider, while later Home shows a separate composer selector labeled `@preset/gtkb-openrouter-deepseek-v4-flash`; its choices and resolved values are not shown. | Document the actual selector choices and reference-to-provider/model mapping, how to verify the effective endpoint/model/account, scope, and the effect on new versus active sessions. Distinguish this reference from the agent-mode preset; do not treat a display name as an API model ID, working credential, or full support matrix. |
 | **Must** | The helper asks for API keys; no secret-entry or storage details are shown. | Verify masking, save/replacement/removal behavior, storage protection, and redaction from logs, exports, screenshots, and support output. Explain provider-side revocation separately from removing a local entry. Use non-secret placeholders in training. |
 | **Must** | The view does not explain request charges or where model data goes. | Before the first-request step, identify the selected provider/account, endpoint, model, usage limits, and data destination. Link to the provider's current official guidance for the tested setup; do not imply included usage or local-only processing from a local GTKB interface. |
 | **Should** | The existing list is compact and exposes Edit and two Add routes. | Add concise in-context setup guidance and a captioned first-response demonstration tied to Get Started. Test keyboard navigation, accessible button names, and a non-color explanation for the status dot. |
@@ -191,19 +194,20 @@ plugin tool was executed through GTKB for this review. See [Plugins](Plugins).
 
 The owner-supplied **Settings → Agent presets** screenshot received 2026-09-26
 shows four built-in mode cards, **Standard mode** marked **In use**, and a
-custom-preset drafting entry point. It partially closes the earlier mode-label
-documentation gap. It does not establish selection, authoring, persistence, or
-executed capabilities. No preset was changed or drafted. See
-[Agent presets](Agent-Presets).
+custom-preset drafting entry point. A later Home capture shows the four-mode
+menu open, Standard checked, and PTC's complete description. This closes the
+missing-menu-image and clipped-description gaps, not switch behavior,
+authoring, persistence, or executed capabilities. No preset was changed or
+drafted. See [Agent presets](Agent-Presets).
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
 | **Must** | Standard, PTC, Minimal, and Creator have capability descriptions; Minimal names persistent bash and `str_replace_editor`. | Provide a task-oriented comparison, prerequisites, limitations, and tested capabilities for each supported preset. Verify Windows shell requirements and persistence lifetime. Fewer advertised tools do not establish read-only access or a safer permission level. |
-| **Must** | Standard has an In use badge and matches the label on the earlier Home selector. | Define what In use applies to and qualify the selection route, effective preset/model, persistence, and behavior for new versus active sessions. Do not assume a factory default or that a click changes an existing session. |
-| **Must** | The helper defines a preset by tools, prompt, and capabilities, while separate Models, Plugins, and General panes exist. | Explain how preset composition relates to effective plugin settings, model choice, and session permissions. Keep governed roles, project authorization, independent review, and per-artifact claims separate; do not imply durable ownership of work or permission to launch every advertised capability. |
+| **Must** | Standard has an In use badge in Settings and a checkmark in the later open Home menu. | Define the scope of each marker and qualify switching, cancellation, label/checkmark updates, effective preset/model, persistence, and behavior for new versus active sessions. Do not assume a factory default, synchronization across views, or that a click changes an existing session. |
+| **Must** | The helper defines a preset by tools, prompt, and capabilities; Home also has a separate `@preset/...` composer reference. | Explain how agent-mode composition relates to the model/provider reference, effective plugin settings, and session permissions. Keep governed roles, project authorization, independent review, and per-artifact claims separate; do not imply durable ownership of work or permission to launch every advertised capability. |
 | **Must** | The helper offers duplication; Custom offers Draft a custom preset with Creator mode. No authoring result is shown. | Document and test the actual duplicate/draft, review, validation, save/cancel, apply, and recovery routes with non-sensitive examples. Establish storage, scope, and provider usage before recording; do not treat generated prompt/tool configuration as already validated or manually edit generated harness files. |
-| **Must** | Card actions are icon-only in the capture, PTC's description is clipped, and Creator displays the identifier `cordis`. | Verify discoverable labels/tooltips, keyboard operation, accessible names, and the complete PTC description. Explain the acronym and user-facing name/identifier mapping. Do not assign icon functions or fill in clipped text from appearance alone. |
-| **Should** | The overview already gives concise descriptions and a visible active-state badge. | Add a short mode-choice segment to Get Started and the first-session video, based on a tested built-in path. Keep Creator/plugin experiments in an advanced supplement; measure whether a novice can choose appropriately without writing a custom preset. |
+| **Must** | Card actions are icon-only; PTC's Settings card is clipped but its Home menu description now fully mentions one TypeScript program; Creator displays `cordis` in Settings. | Verify discoverable labels/tooltips, keyboard operation, accessible names, and descriptions that remain readable at supported viewport/text sizes. Explain the PTC acronym and user-facing name/identifier mapping; do not infer SDK behavior or icon functions from the text or appearance alone. |
+| **Should** | Both the Settings overview and open Home menu provide descriptions and a visible selected-state marker. | Use the illustrated Home menu in a short mode-choice segment and first-session video, based on a tested built-in path. Keep Creator/plugin experiments in an advanced supplement; measure whether a novice can distinguish mode from model reference and choose appropriately without writing a custom preset. |
 | **Don't** | One historical selection and a scrollable set of capability cards are shown. | Do not infer a complete inventory, a universal default, enforcement, lower cost, provider connectivity, completed custom authoring, or working tools from this capture. Do not launch goals, workflows, searches, commands, or subagents merely to confirm it. |
 
 ## Documentation migration

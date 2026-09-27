@@ -47,6 +47,12 @@ field, then use **Select Folder**. Check the returned Home state and intended
 path before entering a prompt. Use **Cancel** if you do not intend to select it.
 These outcomes still need release-specific interaction qualification.
 
+The later [selected-workspace example](Get-Started#home-with-a-selected-workspace)
+shows the short workspace name above the composer and in the sidebar, with a
+New Session entry. Use that as a visual checkpoint, not proof that a particular
+full path was accepted: the resolved path is not shown. A visible mode checkmark
+or `@preset/...` label also does not prove that a model request will work.
+
 If the intended folder cannot be found, check its actual location. If selection
 fails or the composer remains unavailable, record the installed version, whether
 Select Folder or Cancel was used, expected result, displayed result, and redacted

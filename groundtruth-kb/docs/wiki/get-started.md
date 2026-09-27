@@ -74,17 +74,48 @@ check its location and the supported access route. Do not create an unrelated
 folder/project or change permissions simply to get past the picker. Application
 registration, when actually needed, is the separate procedure described below.
 
-The confirmed workspace view, cancellation behavior, persistence, provider or
-credential setup, and a successful first response still need a version-pinned
-walkthrough. See the [workspace picker review checklist](Known-Issues#workspace-picker-review).
+The following capture adds a selected-workspace view. Cancellation behavior,
+resolved-path verification, persistence, provider or credential setup, and a
+successful first response still need a version-pinned walkthrough. See the
+[workspace picker review checklist](Known-Issues#workspace-picker-review).
+
+### Home with a selected workspace
+
+Home now displays **GT-KB** above the composer and as a workspace in the sidebar,
+with **New Session** beneath it. The mode menu is open. The earlier **Choose a
+workspace to start** message is no longer shown; a partially obscured prompt
+placeholder appears instead.
+
+![GTKB Home with GT-KB displayed above the composer and in the Workspaces sidebar, New Session beneath it, and the mode menu open with Standard mode checked above PTC, Minimal, and Creator. The right-hand composer selector displays @preset/gtkb-openrouter-deepseek-v4-flash; no prompt or response is shown.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-session-modes.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. The workspace name is this installation's example,
+not a required directory name. Only its short name is visible here, not the
+resolved path. This is a captured selected state, not a reviewer-executed test
+of the transition from the picker. No workspace or preset was changed and no
+request was sent for this review.
+
+| Visible label | What to check before the first request |
+| --- | --- |
+| **GT-KB** beside the folder icon | This is the displayed workspace, not a model or project. Verify the intended full working path through the supported workspace interface; this short name alone cannot distinguish similarly named checkouts. |
+| **Standard mode**, checked in the open menu | This is the agent-mode choice. The menu also shows PTC, Minimal, and Creator with descriptions; see [Agent presets](Agent-Presets#choose-a-mode-from-home). A selected label does not establish effective permissions or tested tools. |
+| `@preset/gtkb-openrouter-deepseek-v4-flash` on the right | This is the literal label of a separate composer selector. Its naming suggests a model/provider configuration reference, but its resolved endpoint, model, account, and available choices are not shown. Do not confuse it with the Standard agent-mode preset or copy it as a required model identifier; see [Models and providers](Models#read-the-home-composer-reference). |
+| **New Session** in the sidebar | The captured view has a session entry under the workspace, but no submitted prompt or response. This does not establish a completed session, persisted history, application registration, or a canonical project/work item. |
+
+The open menu obscures part of the composer, including its left-hand controls.
+Do not infer the complete permission label or placeholder from the covered
+text. The visible send arrow does not prove that submission is enabled or that
+a provider request will succeed. Check workspace, mode, permissions, and the
+resolved model/provider separately before using non-sensitive sample content.
 
 ### Understand the session mode and permissions
 
-**Standard mode** is visible; the separate [Agent presets
-guide](Agent-Presets) now shows a matching built-in preset marked **In use** and
-describes the four visible built-in modes. Their selection behavior, effective
-scope, and effects on active sessions still need testing. A preset does not
-assign a governed role. **New Session** is a session entry point, not evidence
+The open **Standard mode** menu above shows four choices and a checkmark beside
+Standard. The separate [Agent presets guide](Agent-Presets) also shows the
+matching built-in card marked **In use**, compares the four descriptions, and
+documents the Home selector. Switching behavior, effective scope, and effects
+on active sessions still need testing. A preset does not assign a governed role.
+**New Session** is a session entry point, not evidence
 that a canonical project or work item has been created. Creating a custom preset
 is not a documented first-session prerequisite.
 
@@ -101,12 +132,14 @@ with a Custom badge and a green dot; it does not show a selected model or prove
 that credentials and requests work. Do not copy that provider name as a required
 configuration or assume that selecting a workspace also selects a working model.
 
+The selected-workspace capture adds a separate right-hand composer selector
+with an `@preset/...` reference, but not its open choices or resolved model.
 Confirm the provider/model route required by your intended workflow using the
 installed release's supported setup procedure. The exact Add/Edit dialogs,
-model-selection location, and first-response sequence still need a verified
-walkthrough. Keep credentials out of prompts and screenshots, confirm any usage
-charges and data destination, and use non-sensitive sample content for the
-first request. If a setup step is missing, use [Support](Support) rather than
+reference resolution and selection behavior, and first-response sequence still
+need a verified walkthrough. Keep credentials out of prompts and screenshots,
+confirm any usage charges and data destination, and use non-sensitive sample
+content for the first request. If a setup step is missing, use [Support](Support) rather than
 guessing an endpoint or manually editing generated harness configuration.
 
 ## 3. Understand the separation

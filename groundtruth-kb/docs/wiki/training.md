@@ -16,15 +16,18 @@ them, not replace them.
    reference](Settings), [Models/provider list guide](Models), and [Agent presets
    overview](Agent-Presets) are available; the complete sequence still needs
    validation and additional screenshots. The [Windows directory picker](Get-Started#the-windows-directory-picker)
-   is now illustrated before confirmation; demonstrate Select Folder, Cancel,
-   the confirmed path in Home, and the resulting composer state only after
-   those outcomes are tested. Use a non-sensitive sample working directory and
-   distinguish folder selection from application registration. Explain the
-   tested built-in preset choice and what In use means without treating it as a
-   governed role or permission level. Do not require custom-preset authoring for
-   routine first use.
+   is illustrated before confirmation, and the [selected-workspace Home view](Get-Started#home-with-a-selected-workspace)
+   now shows the workspace name, a New Session entry, and the open mode menu
+   with Standard checked. Reproduce the transition in a test installation;
+   demonstrate Select Folder, Cancel, resolved-path verification, and composer
+   readiness rather than treating the screenshots as an interaction test. Use
+   a non-sensitive sample directory and distinguish folder selection from
+   application registration. Explain the tested built-in mode choice and what
+   In use/checkmarks mean without treating them as a governed role or permission
+   level. Do not require custom-preset authoring for routine first use.
    Explain Add provider versus Add a custom provider, the status indicator, and
-   where model selection occurs. Keep real keys off-camera, identify usage and
+   how the separate composer reference resolves to the provider/model, distinct
+   from the agent-mode preset. Keep real keys off-camera, identify usage and
    data-destination implications, and use non-sensitive sample content. Include
    session permission scope and the verified busy-input behavior.
 3. **Install and first launch** — a clean Windows installation through a healthy
@@ -58,8 +61,9 @@ to demonstrate that a configuration card exists.
 
 A **custom preset authoring** supplement should demonstrate the verified
 duplicate/Creator workflow, review of the resulting prompt and capabilities,
-save/cancel, explicit application, and recovery. Explain the complete PTC
-description, Minimal mode's Windows shell requirements, and actual icon actions
+save/cancel, explicit application, and recovery. The Home menu now supplies the
+complete PTC description, including one TypeScript program; explain its tested
+tradeoffs, Minimal mode's Windows shell requirements, and actual icon actions
 in the built-in comparison before making recommendations. Keep secrets and
 private prompts out of recordings; a generated preset still needs validation.
 

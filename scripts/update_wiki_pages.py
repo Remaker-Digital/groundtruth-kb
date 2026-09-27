@@ -51,6 +51,7 @@ WIKI_ASSET_ALLOWLIST = frozenset(
         "assets/gtkb-agent-presets.png",
         "assets/gtkb-controls.png",
         "assets/gtkb-home-empty-state.png",
+        "assets/gtkb-home-session-modes.png",
         "assets/gtkb-models.png",
         "assets/gtkb-plugins.png",
         "assets/gtkb-services.png",
