@@ -80,6 +80,17 @@ wall-clock time, or provide private logs or provider credentials to explain a
 number. A reported wait for an assignment is not by itself a runtime failure;
 state the expected next step without publishing private dispatch content.
 
+The [context-usage popover](GTKB-Home#read-the-context-usage-popover) is a separate
+composer display, not a demonstrated expansion of the response Usage label.
+For a context-accounting issue, identify the installed version and selected
+model/reference, the displayed used/capacity values, category estimates, and the
+action after which they were observed. Use a synthetic reproduction rather than
+dumping system prompts, tool definitions/results, or private messages. The
+displayed category estimates do not exactly sum to the headline; report that
+observation without guessing its cause. Context occupancy, usage totals, cache
+figures, and provider quota should not be treated as interchangeable. A low
+percentage does not establish that a run succeeded or that billing has stopped.
+
 A session-log export is not a verified redacted support bundle. Its contents,
 credential handling, destination, and restoration/import capability have not
 been inspected. Do not upload an unreviewed ZIP to a public issue: inspect and

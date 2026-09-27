@@ -239,6 +239,16 @@ elapsed duration. Leave advanced metric interpretation out of first-use setup.
 A version-pinned, reproducible non-sensitive request with a verified outcome and
 clear next step is still needed for the completed Get Started walkthrough.
 
+The circular indicator immediately left of the composer arrow is now identified
+by its [context-usage popover](GTKB-Home#read-the-context-usage-popover), not as an
+activity indicator. The capture shows **7% of context used**, **~17.9K / 262K**,
+and approximate System prompt, Tools, and Messages categories. This describes
+context occupancy, not remaining account credit or the separate response-row
+Usage count. The capacity, estimation method, category reconciliation, and
+opening/dismissal behavior still need qualification; the shown values are not
+universal defaults. Keep the meter optional in first-use guidance, and do not
+invoke compaction or change models merely because it is visible.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator

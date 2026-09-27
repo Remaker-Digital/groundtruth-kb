@@ -82,7 +82,7 @@ reviewer did not send this message or run the displayed skill or shell action.
 | **Standard mode**, selected **Chat**, and **Trajectory** tab | The agent mode and two view labels are visible; the displayed contents belong to Chat. A later capture supplies the [Trajectory reference](#read-the-trajectory-view). | Switching behavior, tab persistence, and the completeness of either view. The later event display does not establish replay, an authoritative audit record, or complete execution history. |
 | **System prompt** and three **Context injection** rows | Labels identify AGENTS.md / CLAUDE.md, @deepseek-ai/dsh-system-prompt, and skill-catalog. Their contents are not expanded in this capture. | Actual loaded content, source/version, precedence, truncation, and any provider transmission. A displayed source label is not proof of current or correctly applied instructions. |
 | **Think**, **Skill · gtkb-bridge**, and **Pwsh** rows | Activity summaries are displayed; the shell row describes showing the working directory and DSH environment variables. The later [Trajectory view](#read-the-trajectory-view) exposes some arguments and a clipped skill-response preview. | Complete arguments/results, approval, execution state, exit status, and effects. Neither the Think preview nor a named skill proves correct reasoning, successful execution, or governing authority. Do not reproduce an environment dump to illustrate this row. |
-| **Deep diving...**, composer activity indicator, and blue square-marked control | The capture presents an in-progress state and a stop-shaped control. | Progress versus waiting/stalling, elapsed time, accessible control name, cancellation effects, and terminal state. No stop action, cancellation, or rollback is demonstrated. |
+| **Deep diving...**, circular composer indicator, and blue square-marked control | The text and square-marked control present an in-progress state. A later [context-usage popover](#read-the-context-usage-popover) identifies the circular indicator's context-related purpose, correcting the earlier activity-indicator description. | Progress versus waiting/stalling, elapsed time, accessible names, cancellation effects, and terminal state. The circular indicator alone is not evidence of activity; no stop action, cancellation, or rollback is demonstrated. |
 | **Session log** with a download icon | A session-log entry point is present at the upper right. | Its output format, contents, redaction, destination, and equivalence to the Commands `export` route. See [Support](Support#feedback-and-session-log-export-in-home) before sharing logs. |
 | **Workspace Write** and the model reference in the composer | The permission label and @preset/gtkb-openrouter-deepseek-v4-flash reference remain visible during activity. | Effective permissions, resolved provider/model, and change timing. Keep these separate from Standard mode and the message's role marker. See [Settings](Settings#session-permission-menu-on-home) and [Models](Models#read-the-home-composer-reference). |
 | **Cache hit 0% · Input 12.4K tok · Output 564 tok** | These are the historical figures displayed beneath the composer. | Per-request/turn/session scope, rounding, update timing, inclusion of context/tool activity, cache definition, and reconciliation with provider usage. Output tokens are not a completed answer, and the figures do not establish a bill or savings. |
@@ -130,13 +130,13 @@ they do not show the complete conversation or all underlying tool results.
 | **10 tool calls · 1 message** with a right-facing chevron | A grouped activity summary and an apparent disclosure control are visible above the response. | Expansion/collapse behavior, scope of the counts, which message is counted, tool outcomes, ordering, retries, and missing/duplicate results. A count of calls is not a count of successful calls. |
 | **Conclusion** and text about waiting for an assignment | The lower capture shows an explicit narrative ending and a stated reason for not proceeding. It adds a next-step explanation, not proof of a completed work item or a verified empty queue. | The next-step wording needs to distinguish role binding, activity selection, and a specific work assignment. An activity marker selects an activity; it does not by itself identify or dispatch work. Do not copy the captured instruction example as a generic onboarding command or select a target from the reported state. |
 | Overlapping-sheets, thumbs-up, thumbs-down, and branching-line icons beneath the answer | Four icon-only controls are visible in the response action row. Their appearance suggests possible purposes, but no tooltip or accessible name is shown. | Exact names and effects, disabled/selected states, keyboard operation, copy scope, feedback destination and consent, and any sharing or branching behavior. Do not label the branching-line icon as Share or Fork, equate these controls with the Commands menu, or assume these actions keep all data local until qualified. |
-| **Usage 128K tok** beside a cylinder-shaped icon | A response-level usage label appears separately from the footer's Input/Output/cache figures. Its location is visible; its accounting scope is not. | Whether Usage is per-message, per-turn, or per-session; which tokens it includes; rounding; click/hover behavior; and reconciliation with the footer and provider reporting. Do not reconstruct the clipped Output value by subtraction or treat this label as a price or bill. |
+| **Usage 128K tok** beside a cylinder-shaped icon | A response-level usage label appears separately from the footer's Input/Output/cache figures and the later [context-usage popover](#read-the-context-usage-popover). These are distinct labeled displays, not interchangeable measurements. | Whether Usage is per-message, per-turn, or per-session; which tokens it includes; rounding; click/hover behavior; and reconciliation with the footer and provider reporting. The context popover is beside the composer, not proof of this Usage label's interaction. Do not reconstruct the clipped Output value by subtraction or treat either display as a price or bill. |
 | Clock icon, **Ran for 1m 48s**, and **18:21** beneath the answer | A duration is now explicitly displayed in the response row, together with a clock-style timestamp. These are historical UI values, not an independently timed run. | What starts/stops the duration, inclusion of waits and tool/model overlap, timestamp event/timezone, accessible details, and relation to LLM/tool times or sidebar age. A numerically plausible sum does not establish metric semantics, and the row does not prove successful execution or a latency guarantee. |
 | Composer upward arrow, permission/model labels, and **Session log** | The upward arrow differs from the earlier square-marked control; the session composer and log entry point remain available on screen. | Whether the turn is terminal, input is enabled or queued, work remains active, and what follow-up or export does. Do not infer successful completion, cancellation, or stopped background work from an icon change alone. |
 | **1 turns · 8 steps** in the footer | The footer exposes turn and step counters alongside the separate ten-call summary. | Definitions, aggregation scope, update timing, and mapping between turns, steps, messages, and tool calls. The differing counts are a documentation question, not proof of a counting defect; one step need not equal one call. |
 | **LLM 37.4s · Tool call 1m11s · TTFT avg 3.1s · 193 tok/s** | These are the displayed historical timing/rate figures. TTFT commonly means time to first token; the release's actual measurement and averaging rules still need documentation. | Start/end boundaries, wall-clock versus accumulated time, overlap, waits/retries, averaging population, and the rate's token/time denominator. Do not sum LLM and tool time into an elapsed duration, infer concurrency, or use one capture as a performance benchmark. |
 | **Cache hit 86% · Input 125K tok · Output 2...** | The footer shows cache/input figures and a visibly truncated Output field. | Cache numerator/denominator, token scope, rounding, provider reconciliation, full Output value, and access to untruncated details. Do not reconstruct the missing digits, subtract figures from earlier captures as a per-request measurement, or infer price, savings, billing, or local-only processing. |
-| Sidebar time changes from **1min** in the upper-response capture to **2min** in the lower-response capture | Relative-looking labels are visible beside the selected session title in the two images. | Which event they measure, refresh/rounding rules, and their relation to the response timestamp/duration and footer. They are not measured end-to-end request durations or proof that the displayed state is current. |
+| Sidebar time shows **1min**, **2min**, then **47min** across the response/context-popover captures | Relative-looking labels appear beside the selected session title, while the displayed response duration remains 1m 48s in the later views. | Which event age measures, refresh/rounding rules, and its relation to the response timestamp/duration and footer. A larger age is not evidence that a request ran that long, stayed active, or that its state report remains current. |
 
 For ordinary use, read the response and distinguish its proposed next action
 from a verified result before acting. For diagnostics, identify the installed
@@ -150,6 +150,44 @@ or evidence that the platform contains no work. Keep role, activity, assignment,
 and completed result distinct. Keep detailed diagnostics optional in that tour.
 See [Support](Support#feedback-and-session-log-export-in-home) before sharing
 response text, screenshots, or session logs.
+
+### Read the context-usage popover
+
+A further owner-supplied capture received 2026-09-26 shows a popover above the
+circular indicator immediately left of the composer's upward arrow. The
+explicit **of context used** label establishes a context-usage purpose; the
+earlier description of that circle as an activity indicator is superseded.
+The capture does not demonstrate whether hover, click, or keyboard focus opens
+it, or how it is dismissed. It is separate from **Usage 128K tok** beneath the
+response and the Input/Output/cache figures in the bottom footer.
+
+The raw image is withheld because the surrounding answer contains session
+identifiers and bridge details. Only the visible popover labels and historical
+estimates are described here. No live context was inspected or changed, and
+no prompt content, tool definitions, or messages were opened for this review.
+
+| Visible element | How to read it | What still needs definition or testing |
+| --- | --- | --- |
+| Circular indicator beside the composer arrow, with a popover above it | The popover gives the indicator an explicit context-related purpose. | Actual opening/dismissal controls, accessible name, keyboard/touch support, focus behavior, and preservation of draft text. Do not describe the ring as a progress spinner or assume that opening it sends a request. |
+| **7% of context used · ~17.9K / 262K** | The UI advertises an approximate used amount against a displayed context capacity, plus a percentage. | Units, tokenizer/estimator, numerator/denominator source, rounding, update timing, input/output reservation, and whether 262K follows the selected model or configuration. This is not a verified model limit, provider quota, billing allowance, persistent-memory size, or guarantee that any prompt under the displayed capacity will succeed. |
+| **System prompt ~1.8K · Tools ~6.9K · Messages ~9.5K** | Three labeled categories with approximate values are shown. Their displayed values sum to about 18.2K, while the headline is about 17.9K. | Category membership, inclusion of tool definitions versus results and hidden/injected content, overlap, estimator rules, and synchronized snapshots. The difference needs explanation; the capture does not establish its cause or justify declaring a token-counting defect. Do not assume the estimates form an exact additive partition. |
+| Gray, purple, and blue legend markers and segments in a horizontal bar | The bar supplies a visual counterpart to the three named categories. | Scale and segment mapping, readable values at zoom, non-color alternatives, threshold/warning behavior, and near-capacity recovery. No warning, automatic compaction, context expansion, or recovery action is demonstrated in this low-usage capture. |
+
+Read this as a context-occupancy display, not a substitute for token-usage or
+cost accounting. The substantially different response-row Usage value is not
+by itself contradictory: the named measurements may have different scope and
+must be defined before comparison. The screenshot does not establish that
+either figure is current, exact, or provider-reconciled.
+
+For a first-session tour, identify the meter and leave detailed interpretation
+optional. Before recommending any capacity-management action, qualify the
+selected release's warnings and recovery behavior, including data effects.
+The [compact command](#commands-menu) is a separately advertised conversation
+action; this popover does not prove that it runs automatically or preserves
+all detail. Never treat low context usage as permission to broaden a task or
+as a measure of remaining account credit. The existing [response and statistics
+checklist](Known-Issues#response-and-turn-statistics-review) includes the pending
+context-specific checks.
 
 ## Read the Trajectory view
 

@@ -83,6 +83,14 @@ them, not replace them.
    and explain any feedback destination or sharing/branching effect before
    showing it. Reconcile response-row metrics with footer scope and timing
    definitions; do not present the supplied values as a benchmark or a bill.
+   The [context-usage popover](GTKB-Home#read-the-context-usage-popover) now
+   identifies the circular composer indicator; do not teach it as a busy
+   spinner. Use a synthetic example to distinguish context occupancy from
+   response/footer usage, explain the approximate category breakdown and source
+   of the displayed capacity, and demonstrate accessible opening/dismissal only
+   after testing. Keep capacity management optional; qualify warning, refusal,
+   compaction, and recovery behavior before showing those flows. Never imply
+   that the meter shows remaining account credit or lossless persistent memory.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent
