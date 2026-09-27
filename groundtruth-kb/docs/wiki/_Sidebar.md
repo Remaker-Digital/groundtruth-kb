@@ -17,6 +17,7 @@
 - [Core concepts](Core-Concepts)
 - [Settings](Settings)
 - [Models and providers](Models)
+- [Plugins](Plugins)
 - [GTKB status](Status)
 - [Services](Services)
 - [GTKB controls](Controls)

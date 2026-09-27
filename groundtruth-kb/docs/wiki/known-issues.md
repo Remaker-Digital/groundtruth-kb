@@ -27,10 +27,12 @@ This page records material adoption gaps, not every internal development item.
   guide](Services) illustrates **Settings → GTKB services** and its visible
   controls. The [GTKB controls reference](Controls) illustrates the operational
   tuning fields and their displayed ranges. The [Models guide](Models) now shows
-  the provider list and Add/Edit entry points. The workspace picker, selected
-  workspace, mode and permission choices, provider Add/Edit dialogs, model
-  selection, remaining settings panes, and a successful first session still need
-  version-pinned coverage and interaction checks.
+  the provider list and Add/Edit entry points. The [Plugins guide](Plugins)
+  illustrates the collapsed configuration sections and Plugin list tab. The
+  workspace picker, selected workspace, mode and permission choices, provider
+  Add/Edit dialogs, model selection, expanded plugin controls, plugin inventory,
+  Agent presets, and a successful first session still need version-pinned
+  coverage and interaction checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
 - Cross-platform host installation is not currently established.
@@ -143,6 +145,24 @@ made. See [Models and providers](Models).
 | **Must** | The view does not explain request charges or where model data goes. | Before the first-request step, identify the selected provider/account, endpoint, model, usage limits, and data destination. Link to the provider's current official guidance for the tested setup; do not imply included usage or local-only processing from a local GTKB interface. |
 | **Should** | The existing list is compact and exposes Edit and two Add routes. | Add concise in-context setup guidance and a captioned first-response demonstration tied to Get Started. Test keyboard navigation, accessible button names, and a non-color explanation for the status dot. |
 | **Don't** | One custom-named entry and a green dot are visible. | Do not publish a key, claim a successful API call, infer a default or required provider, invent endpoint/model values, or run a potentially billable request merely to confirm the screenshot. |
+
+## Plugins review
+
+The owner-supplied **Settings → Plugins** screenshot received 2026-09-26 shows
+**Plugin configuration**, an unselected **Plugin list** tab, and four collapsed
+sections. Plugin configuration already has a UI; the remaining work concerns
+its detailed controls, inventory, and behavior. No settings were changed and no
+plugin tool was executed through GTKB for this review. See [Plugins](Plugins).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Shell, Agent loop, Subagent, and Web search are all collapsed. | Document the actual expanded fields, meanings, defaults versus current values, valid choices/units, and scope. Verify save/cancel, persistence, restoration, error feedback, and effects on active versus new sessions. |
+| **Must** | Plugin list exists, but its contents are not shown. | Establish the real inventory and document identifiers, sources/versions, required versus optional components, and loaded/disabled/error states where supported. Explain actual lifecycle and recovery operations; missing or unclear information remains a finding, not permission to invent controls. |
+| **Must** | Shell says it limits every command the agent runs. | Define the exact limits and enforcement boundary, then test allowed and correctly refused commands in a controlled installation. Verify useful diagnostics and recovery without bypassing intended restrictions; do not treat this helper as a proven sandbox guarantee. |
+| **Must** | Agent loop describes tool-call dispatch, while Subagent describes model choice. | Explain their actual behavior and distinguish it from GTKB workflow dispatch, project authorization, agent-role assignment, and independent review. Test documented selection and scheduling rules; do not imply durable work-item ownership or treat a model setting as delegation permission. |
+| **Must** | Web search names a provider without showing its configuration. | Document the supported setup, data destination, credentials, usage implications, and failure/recovery path. Qualify a non-sensitive search only with the intended provider and limits established; do not expose secrets or infer connectivity from the label. |
+| **Should** | The overview offers short descriptions and collapsed cards, but no expanded example in this capture. | Add a version-pinned capabilities/limits tour and task-oriented examples after behavior is tested. Verify keyboard expansion, focus order, accessible names, and understandable error/status feedback; keep advanced tuning out of routine first-run prerequisites. |
+| **Don't** | Configuration cards are visible, but inventory, values, and tool results are not. | Do not count cards as installed plugins, claim enabled or healthy tools, infer autosave or provider exclusivity, edit generated configuration, or execute commands, searches, or subagents merely to confirm this screenshot. |
 
 ## Documentation migration
 

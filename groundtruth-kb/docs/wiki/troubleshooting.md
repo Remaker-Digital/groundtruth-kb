@@ -100,6 +100,22 @@ error, and expected result for [Support](Support). Do not attach API keys,
 authorization headers, credential-bearing URLs, configuration files, or private
 prompts. The exact provider setup and error-recovery walkthrough remains open.
 
+## A plugin section is visible but a tool is unavailable or refused
+
+The [Plugins overview](Plugins) distinguishes configuration sections from a
+tested inventory and session tool availability. Record the exact tool, installed
+version, expected result, and redacted error. Use the selected release's
+supported inspection route to establish whether the relevant plugin is present,
+enabled, and available in the intended session; do not infer those states from
+a collapsed card.
+
+Compare the refusal with the documented limits and session permissions. A
+correct refusal is not a failure to work around by relaxing limits, switching
+models, or installing an unrelated plugin. If the supported behavior or recovery
+route is unclear, contact [Support](Support). Do not attach keys, private prompts,
+configuration files, or unredacted command output, and do not repeatedly execute
+commands, searches, or subagents to diagnose an unexplained indicator.
+
 ## PostgreSQL does not start
 
 - Inspect the exact `gtkb-postgresql` Windows service configuration.

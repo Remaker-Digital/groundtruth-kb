@@ -39,6 +39,15 @@ out of the first-session prerequisites and record it only after the editing and
 recovery workflow is verified. Do not present the screenshot's values as a
 recommended tuning profile.
 
+A **plugin capabilities and limits** walkthrough should use the [Plugins
+overview](Plugins), then show the actual expanded controls and Plugin list after
+their behavior is verified. Explain supported tool boundaries, correct refusals,
+save/recovery behavior, and provider-backed data/usage implications. Distinguish
+harness tool-call dispatch from GTKB workflow dispatch, and subagent model
+choices from permission to delegate. Keep advanced tuning out of routine
+first-session prerequisites; do not run commands, searches, or subagents simply
+to demonstrate that a configuration card exists.
+
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed
 or retired when the product changes.
