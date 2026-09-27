@@ -25,6 +25,7 @@ def test_wiki_page_name_maps_in_root_source_slug_to_github_wiki_name() -> None:
     assert module.wiki_page_name(Path("release-health.md")) == "Release-Health.md"
     assert module.wiki_page_name(Path("settings.md")) == "Settings.md"
     assert module.wiki_page_name(Path("status.md")) == "Status.md"
+    assert module.wiki_page_name(Path("controls.md")) == "Controls.md"
     assert module.wiki_page_name(Path("azure-enterprise-readiness.md")) == "Azure-Enterprise-Readiness.md"
     assert module.wiki_page_name(Path("Home.md")) == "Home.md"
     assert module.wiki_page_name(Path("_Sidebar.md")) == "_Sidebar.md"
@@ -89,11 +90,13 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
     (source_dir / "_Sidebar.md").write_text("# Sidebar\n", encoding="utf-8")
     (source_dir / "settings.md").write_text("# Settings\n", encoding="utf-8")
     (source_dir / "status.md").write_text("# GTKB status\n", encoding="utf-8")
+    (source_dir / "controls.md").write_text("# GTKB controls\n", encoding="utf-8")
     (source_dir / "scratch.md").write_text("# Scratch\n", encoding="utf-8")
 
     assert {path.name for path in module.source_pages(source_dir)} == {
         "_Sidebar.md",
         "azure-enterprise-readiness.md",
+        "controls.md",
         "Home.md",
         "release-health.md",
         "settings.md",
@@ -105,6 +108,7 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
 @pytest.mark.parametrize(
     "asset_name",
     [
+        "assets/gtkb-controls.png",
         "assets/gtkb-home-empty-state.png",
         "assets/gtkb-services.png",
         "assets/gtkb-settings-general.png",
@@ -149,6 +153,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
         "assets/gtkb-settings-general.png": b"\x89PNG\r\n\x1a\n\x00\xfesettings\r\n",
         "assets/gtkb-status.png": b"\x89PNG\r\n\x1a\n\x00\xfdstatus\r\n",
         "assets/gtkb-services.png": b"\x89PNG\r\n\x1a\n\x00\xfcservices\r\n",
+        "assets/gtkb-controls.png": b"\x89PNG\r\n\x1a\n\x00\xfbcontrols\r\n",
     }
     for name, content in assets.items():
         (source_dir / name).write_bytes(content)
@@ -157,7 +162,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
 
     rows = module.update_pages(source_dir, wiki_dir)
 
-    assert len(rows) == 5
+    assert len(rows) == 6
     assert all(row["post_update_status"] == "current" for row in rows)
     for name, content in assets.items():
         assert (wiki_dir / name).read_bytes() == content
@@ -174,14 +179,15 @@ def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> N
     (source_dir / "assets" / "gtkb-settings-general.png").write_bytes(b"\x89PNG\r\n\xfe")
     (source_dir / "assets" / "gtkb-status.png").write_bytes(b"\x89PNG\r\n\xfd")
     (source_dir / "assets" / "gtkb-services.png").write_bytes(b"\x89PNG\r\n\xfc")
+    (source_dir / "assets" / "gtkb-controls.png").write_bytes(b"\x89PNG\r\n\xfb")
     (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
 
     assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["dry_run"] is True
     assert result["summary"]["page_count"] == 1
-    assert result["summary"]["asset_count"] == 4
-    assert result["summary"]["drift_count"] == 5
+    assert result["summary"]["asset_count"] == 5
+    assert result["summary"]["drift_count"] == 6
     assert all(row["planned_action"] == "write" for row in result["pages"])
     assert not wiki_dir.exists()
 

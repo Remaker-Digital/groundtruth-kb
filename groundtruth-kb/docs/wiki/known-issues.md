@@ -25,9 +25,11 @@ This page records material adoption gaps, not every internal development item.
   illustrates the selected values and visible settings sections. The
   [GTKB status guide](Status) covers **Settings → GTKB**, and the [Services
   guide](Services) illustrates **Settings → GTKB services** and its visible
-  controls. The workspace picker, selected workspace, mode and permission choices,
-  remaining settings panes, and a successful first session still need
-  version-pinned coverage and interaction checks.
+  controls. The [GTKB controls reference](Controls) illustrates the operational
+  tuning fields and their displayed ranges. The workspace picker, selected
+  workspace, mode and permission choices, remaining settings panes, and a
+  successful first session still need version-pinned coverage and interaction
+  checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
 - Cross-platform host installation is not currently established.
@@ -54,8 +56,9 @@ These additional findings use the owner-supplied General Settings screenshot
 received 2026-09-26. The [Settings reference](Settings) records the visible values
 without treating them as shipped defaults or tested behavior. Separate captures
 now illustrate **GTKB** in the [status guide](Status) and **GTKB services** in the
-[Services guide](Services). Neither observation changes what was visible on the
-earlier Home empty state, and service actions remain untested.
+[Services guide](Services), with **GTKB controls** in its own [reference](Controls).
+These observations do not change what was visible on the earlier Home empty
+state, and service actions and configuration edits remain untested.
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
@@ -100,6 +103,26 @@ reconfigured for this review. See the illustrated [Services guide](Services).
 | **Should** | **Refresh** is visible but no last-checked time or probe definition is shown. | Display or make discoverable result age and what was actually checked. Test refresh, pending/error states, keyboard operation, accessible names, and non-color status cues. |
 | **Should** | Existing service controls are inside Settings; no launch shortcut is shown in this capture. | Prioritize a discoverable, supported launch entry and a short operator walkthrough. Evaluate a tray icon only for a demonstrated unmet need, not to duplicate controls already present. The capture cannot establish whether a shortcut exists elsewhere. |
 | **Don't** | Historical green/red states and local addresses appear in a settings screen. | Do not treat this as current health, universal port requirements, missing startup support, or permission to stop a service, install Ollama, expose a listener, or change generated configuration. |
+
+## Operational controls review
+
+The owner-supplied **Settings → GTKB controls** screenshot received 2026-09-26
+shows eight operational fields under **GTKB configuration**, each with a
+description, value, unit, and allowed range. That is useful existing guidance;
+the remaining work concerns safe use and precise meaning, not adding a controls
+page from scratch. See the illustrated [GTKB controls reference](Controls).
+The checks below have not been executed against the running application.
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Editable-looking numeric fields and Refresh are visible, but no Save, Apply, Cancel, or Reset button is shown. | Explain and test the exact save trigger, unsaved/pending/success/error feedback, persistence, and restoration of the previous value. Check blur, Enter, close, and Refresh without assuming any of them saves or discards changes. |
+| **Must** | Values and a path ending in `config/governance/operational-controls.toml` are displayed without a value-source label. | Distinguish definitions, defaults, overrides, and effective runtime values; identify scope, consumers, precedence, and when changes take effect. Verify the actual target of Open configuration file rather than inferring it from the subtitle. |
+| **Must** | Each row displays a numeric allowed range and a seconds or ratio unit. | Test types, precision, units, blank/non-numeric input, boundary values, and out-of-range input through the UI and supported writer. Verify a clear error and no partial configuration change on rejection; do not count a printed range as validation evidence. |
+| **Must** | Minimum and maximum jitter ratios, and initial and maximum backoff values, appear as separate fields. | Define and test cross-field relationships, including individually in-range but incompatible combinations. Verify recovery from a failed combined edit and handling of competing edits without silently losing the operator's change. |
+| **Must** | Descriptions concern probes and checkout-mutex acquisition/retry. | Document the operation and consequence of each control and verify runtime consumption. Do not interpret acquisition wait as lock-holding time, a bridge-claim lease, or ownership of a work item; do not treat increasing a timeout as a fix for an undiagnosed fault. |
+| **Should** | Technical dotted keys, backoff, jitter, and mutex terminology dominate the view. | Preserve the keys but add plain-language labels, impact guidance, and a clearly advanced-operator route. Keep tuning out of the first-session prerequisites; evaluate whether a novice can complete Get Started without changing these fields. |
+| **Should** | Descriptions and units are adjacent to input fields; the capture contains no interaction evidence. | Test keyboard focus/order, accessible names and units, decimal entry, error announcements, and readable layout at zoom. Add a version-pinned tuning/recovery walkthrough after the behavior is verified. |
+| **Don't** | One installation's selected values and ranges are visible. | Do not publish them as universal defaults or a performance recommendation, infer autosave or the button's file target, prescribe manual generated-configuration edits, or test invalid values on an active host. |
 
 ## Documentation migration
 

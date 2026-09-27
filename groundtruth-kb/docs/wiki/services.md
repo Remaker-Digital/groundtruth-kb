@@ -72,8 +72,9 @@ prove that they represent the same component, were checked together, or form a
 contradictory live result. Documentation must map each label to its component,
 endpoint, check, and timestamp before users can reconcile the two views.
 
-The contents of **GTKB controls** have not yet been supplied or tested. Its tab
-name is not evidence of additional service behavior.
+The separate [GTKB controls capture](Controls) now illustrates operational tuning
+fields for Git probes and registry lock acquisition/retry. It is not another
+service Start/Stop panel; editing and runtime effects remain untested.
 
 ## Inspect and operate services
 

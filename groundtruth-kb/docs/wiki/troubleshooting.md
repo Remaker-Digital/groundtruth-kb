@@ -105,6 +105,19 @@ Use the selected release's registration script and verify the task action points
 to the selected installation. Re-registration is an operator mutation; inspect
 the existing task before replacing it.
 
+## A GTKB controls edit does not persist or has an unclear effect
+
+Do not repeatedly change values, increase timeouts, edit a generated file, or
+restart services to guess how saving works. The [GTKB controls reference](Controls)
+documents the captured fields, but the exact save trigger, value precedence,
+and runtime reload behavior still need release-specific verification.
+
+Record the control name, installed version, expected result, displayed result,
+and redacted error. A changed field or refreshed display is not by itself proof
+that a running component used the value. Use the supported recovery procedure;
+if it is unclear, stop making changes and contact [Support](Support). Do not
+attach the whole configuration file.
+
 ## A documented command is missing or refuses valid work
 
 Confirm the installed GTKB version and compare the page's review date. Capture

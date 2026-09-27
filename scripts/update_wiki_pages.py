@@ -20,6 +20,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
         "_Sidebar.md",
         "azure-enterprise-readiness.md",
         "backup-and-restore.md",
+        "controls.md",
         "core-concepts.md",
         "first-governed-change.md",
         "get-started.md",
@@ -44,6 +45,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
 )
 WIKI_ASSET_ALLOWLIST = frozenset(
     {
+        "assets/gtkb-controls.png",
         "assets/gtkb-home-empty-state.png",
         "assets/gtkb-services.png",
         "assets/gtkb-settings-general.png",

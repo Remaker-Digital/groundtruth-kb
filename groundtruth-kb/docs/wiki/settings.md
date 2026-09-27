@@ -10,6 +10,7 @@ GUI; it does not change any settings or document unobserved dropdown options.
 
 For the **GTKB** tab, see the separate illustrated [GTKB status guide](Status).
 For **GTKB services**, see the illustrated [service-management guide](Services).
+For **GTKB controls**, see the illustrated [operational-controls reference](Controls).
 
 ## General Settings
 
@@ -49,10 +50,11 @@ must be checked against the installed release before relying on them.
 The navigation also includes **GTKB**, **GTKB services**, **GTKB controls**,
 **Models**, **Plugins**, and **Agent presets**. Their contents are not visible in
 the General capture. Separate screenshots now document the **GTKB**
-[status pane](Status) and **GTKB services** [panel](Services), including its
-visible Start/Stop controls. Those images establish the displayed interface,
-not current health or tested control behavior. **GTKB controls**, **Models**,
-**Plugins**, and **Agent presets** still need content and interaction coverage.
+[status pane](Status), **GTKB services** [panel](Services), including its visible
+Start/Stop controls, and **GTKB controls** [reference](Controls), including
+numeric values, units, and ranges. Those images establish the displayed
+interface, not current health or tested control behavior. **Models**, **Plugins**,
+and **Agent presets** still need content and interaction coverage.
 The presence of a tab does not establish which providers, plugins, presets, or
 controls are available or configured.
 
@@ -66,6 +68,10 @@ at the top of the dialog. The screenshot does not identify the file opened, its
 scope, or the application used to open it. Do not assume it is `groundtruth.toml`
 or use it as a reason to edit generated harness configuration manually. This
 page does not prescribe a manual configuration-file edit.
+
+The separate [GTKB controls capture](Controls#configuration-path-and-value-source)
+shows an operational-controls path in its subtitle. That does not establish the
+target of this shared dialog-level button, or whether it changes between tabs.
 
 No Save, Apply, or Reset control is visible in the supplied General pane. This
 does not prove that changes are saved automatically or that recovery controls

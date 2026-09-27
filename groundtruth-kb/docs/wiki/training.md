@@ -29,6 +29,13 @@ them, not replace them.
    state. Demonstrate safe service interruption and recovery only after that
    workflow has been tested in a separate qualification installation.
 
+An **advanced operational tuning** supplement should use the
+[GTKB controls reference](Controls) to explain value sources, the actual save
+trigger, validation, runtime effect, and restoration of prior settings. Keep it
+out of the first-session prerequisites and record it only after the editing and
+recovery workflow is verified. Do not present the screenshot's values as a
+recommended tuning profile.
+
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed
 or retired when the product changes.

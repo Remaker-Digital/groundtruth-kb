@@ -27,6 +27,7 @@ the primary interactive interface.
 | Open the primary interface | [GTKB Home](GTKB-Home) |
 | Understand the visible interface settings | [Settings](Settings) |
 | Interpret the status pane and its limitations | [GTKB status](Status) |
+| Understand the advanced operational tuning fields | [GTKB controls](Controls) |
 | Understand the operating model | [Core concepts](Core-Concepts) |
 | Diagnose a problem | [Troubleshooting](Troubleshooting) |
 | Operate the background components | [Services](Services) |

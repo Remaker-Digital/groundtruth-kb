@@ -18,6 +18,7 @@
 - [Settings](Settings)
 - [GTKB status](Status)
 - [Services](Services)
+- [GTKB controls](Controls)
 - [Backup and restore](Backup-and-Restore)
 - [Upgrade](Upgrade)
 - [Uninstall](Uninstall)
