@@ -26,10 +26,11 @@ This page records material adoption gaps, not every internal development item.
   [GTKB status guide](Status) covers **Settings → GTKB**, and the [Services
   guide](Services) illustrates **Settings → GTKB services** and its visible
   controls. The [GTKB controls reference](Controls) illustrates the operational
-  tuning fields and their displayed ranges. The workspace picker, selected
-  workspace, mode and permission choices, remaining settings panes, and a
-  successful first session still need version-pinned coverage and interaction
-  checks.
+  tuning fields and their displayed ranges. The [Models guide](Models) now shows
+  the provider list and Add/Edit entry points. The workspace picker, selected
+  workspace, mode and permission choices, provider Add/Edit dialogs, model
+  selection, remaining settings panes, and a successful first session still need
+  version-pinned coverage and interaction checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
 - Cross-platform host installation is not currently established.
@@ -123,6 +124,25 @@ The checks below have not been executed against the running application.
 | **Should** | Technical dotted keys, backoff, jitter, and mutex terminology dominate the view. | Preserve the keys but add plain-language labels, impact guidance, and a clearly advanced-operator route. Keep tuning out of the first-session prerequisites; evaluate whether a novice can complete Get Started without changing these fields. |
 | **Should** | Descriptions and units are adjacent to input fields; the capture contains no interaction evidence. | Test keyboard focus/order, accessible names and units, decimal entry, error announcements, and readable layout at zoom. Add a version-pinned tuning/recovery walkthrough after the behavior is verified. |
 | **Don't** | One installation's selected values and ranges are visible. | Do not publish them as universal defaults or a performance recommendation, infer autosave or the button's file target, prescribe manual generated-configuration edits, or test invalid values on an active host. |
+
+## Models review
+
+The owner-supplied **Settings → Models** screenshot received 2026-09-26 shows
+API-key guidance, a **GTKB OpenRouter** entry marked **Custom**, a green dot,
+**Edit**, **Add provider**, and **Add a custom provider**. Provider management
+is an existing interface; its complete setup path and status meaning remain
+unverified. No credentials were opened or entered, and no model request was
+made. See [Models and providers](Models).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Add provider and Add a custom provider are separate buttons; neither dialog is open. | Explain when to use each route, document actual required fields and supported choices, and qualify a path from an unconfigured installation to a successful first response. Test save, cancel, persistence, duplicate handling, and recovery without exposing keys. |
+| **Must** | The provider entry has a green dot but no visible text status or check time. | Define the indicator and distinguish an entry being present from credentials being valid, a service being reachable, and a model request succeeding. Test missing/invalid credentials, unreachable endpoints, unavailable models, and usage-limit errors with useful next actions. |
+| **Must** | Models is the page title, but the visible content lists a provider and no model identifier. | Document where model selection happens, how to verify the intended provider/model, its scope, and the effect on new versus active sessions. Do not equate a provider display name with a selected model or a full support matrix. |
+| **Must** | The helper asks for API keys; no secret-entry or storage details are shown. | Verify masking, save/replacement/removal behavior, storage protection, and redaction from logs, exports, screenshots, and support output. Explain provider-side revocation separately from removing a local entry. Use non-secret placeholders in training. |
+| **Must** | The view does not explain request charges or where model data goes. | Before the first-request step, identify the selected provider/account, endpoint, model, usage limits, and data destination. Link to the provider's current official guidance for the tested setup; do not imply included usage or local-only processing from a local GTKB interface. |
+| **Should** | The existing list is compact and exposes Edit and two Add routes. | Add concise in-context setup guidance and a captioned first-response demonstration tied to Get Started. Test keyboard navigation, accessible button names, and a non-color explanation for the status dot. |
+| **Don't** | One custom-named entry and a green dot are visible. | Do not publish a key, claim a successful API call, infer a default or required provider, invent endpoint/model values, or run a potentially billable request merely to confirm the screenshot. |
 
 ## Documentation migration
 

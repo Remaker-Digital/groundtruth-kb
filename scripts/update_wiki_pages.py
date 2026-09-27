@@ -28,6 +28,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
         "gtkb-home.md",
         "install-on-windows.md",
         "known-issues.md",
+        "models.md",
         "product-overview.md",
         "publication.md",
         "release-health.md",
@@ -47,6 +48,7 @@ WIKI_ASSET_ALLOWLIST = frozenset(
     {
         "assets/gtkb-controls.png",
         "assets/gtkb-home-empty-state.png",
+        "assets/gtkb-models.png",
         "assets/gtkb-services.png",
         "assets/gtkb-settings-general.png",
         "assets/gtkb-status.png",

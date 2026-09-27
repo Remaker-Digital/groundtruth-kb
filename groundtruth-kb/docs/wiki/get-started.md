@@ -50,6 +50,22 @@ permission mode for new sessions and conversation preferences. Review that
 distinction before treating any displayed permission value as a project
 authorization or a recommendation to change it.
 
+### Check the model/provider setup for your intended session
+
+**Settings → Models** exposes the provider-management view illustrated in
+[Models and providers](Models). The documented example lists **GTKB OpenRouter**
+with a Custom badge and a green dot; it does not show a selected model or prove
+that credentials and requests work. Do not copy that provider name as a required
+configuration or assume that selecting a workspace also selects a working model.
+
+Confirm the provider/model route required by your intended workflow using the
+installed release's supported setup procedure. The exact Add/Edit dialogs,
+model-selection location, and first-response sequence still need a verified
+walkthrough. Keep credentials out of prompts and screenshots, confirm any usage
+charges and data destination, and use non-sensitive sample content for the
+first request. If a setup step is missing, use [Support](Support) rather than
+guessing an endpoint or manually editing generated harness configuration.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator

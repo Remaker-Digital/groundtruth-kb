@@ -85,6 +85,21 @@ inspect the selected release's supported setup and registration route; do not
 substitute an invented button or automatic installation. If the route cannot be
 found, report that documentation or platform gap through [Support](Support).
 
+## A provider has a green dot but the model request fails
+
+Open the [Models guide](Models) to distinguish the provider entry from the
+selected model and actual request results. The screenshot does not establish
+the green dot's meaning. Confirm the intended provider/model using the supported
+session interface, and use the actual redacted error to distinguish credential,
+endpoint, model-availability, and usage-limit problems.
+
+Do not repeatedly submit requests, expose a key, or replace a working provider
+configuration just to make the indicator agree with expectations. Collect the
+version, provider display name, model identifier if available, exact redacted
+error, and expected result for [Support](Support). Do not attach API keys,
+authorization headers, credential-bearing URLs, configuration files, or private
+prompts. The exact provider setup and error-recovery walkthrough remains open.
+
 ## PostgreSQL does not start
 
 - Inspect the exact `gtkb-postgresql` Windows service configuration.

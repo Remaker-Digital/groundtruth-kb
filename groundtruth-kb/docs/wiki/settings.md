@@ -11,6 +11,7 @@ GUI; it does not change any settings or document unobserved dropdown options.
 For the **GTKB** tab, see the separate illustrated [GTKB status guide](Status).
 For **GTKB services**, see the illustrated [service-management guide](Services).
 For **GTKB controls**, see the illustrated [operational-controls reference](Controls).
+For **Models**, see the illustrated [models and providers guide](Models).
 
 ## General Settings
 
@@ -52,9 +53,11 @@ The navigation also includes **GTKB**, **GTKB services**, **GTKB controls**,
 the General capture. Separate screenshots now document the **GTKB**
 [status pane](Status), **GTKB services** [panel](Services), including its visible
 Start/Stop controls, and **GTKB controls** [reference](Controls), including
-numeric values, units, and ranges. Those images establish the displayed
-interface, not current health or tested control behavior. **Models**, **Plugins**,
-and **Agent presets** still need content and interaction coverage.
+numeric values, units, and ranges. The [Models guide](Models) now illustrates a
+provider entry and the Edit/Add entry points. Those images establish the
+displayed interface, not current health or tested control behavior. Provider
+setup and model selection still need an end-to-end walkthrough; **Plugins** and
+**Agent presets** still need content and interaction coverage.
 The presence of a tab does not establish which providers, plugins, presets, or
 controls are available or configured.
 
