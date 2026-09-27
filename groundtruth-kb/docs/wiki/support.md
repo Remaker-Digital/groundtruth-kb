@@ -53,6 +53,21 @@ text is removed from copying or export, and do not run a command merely because
 it appears in a recorded tool row. The view's Search field is not the sidebar's
 session search; neither establishes a safe support export.
 
+The later [rendered response reference](GTKB-Home#read-a-rendered-response-and-turn-statistics)
+also withholds its raw capture: sensitive identifiers and bridge details can
+appear in ordinary answer text, not only expanded prompts or tool rows. Before
+sharing a screenshot or copied answer, remove details unnecessary to the issue
+through a supported safe route or use a synthetic reproduction. Distinguish
+what the assistant reported from the expected and independently observed result;
+do not publish a full private session merely to substantiate its summary.
+
+For a statistics issue, report the version, relevant counter/metric, full value
+only if safely obtainable, reproduction steps, and whether the display is
+truncated. The visible ten-call summary and eight-step footer use different
+labels and are not by themselves proof of a discrepancy. Do not reconstruct
+the clipped Output value, sum LLM/tool times into wall-clock time, or provide
+private logs or provider credentials to explain a number.
+
 A session-log export is not a verified redacted support bundle. Its contents,
 credential handling, destination, and restoration/import capability have not
 been inspected. Do not upload an unreviewed ZIP to a public issue: inspect and

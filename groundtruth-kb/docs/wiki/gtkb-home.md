@@ -31,7 +31,7 @@ image, not an installation, service-health, or end-to-end workflow test.
 | **Choose workspace** | Start here to choose the intended working directory. Follow-up captures illustrate the [Windows directory picker](Get-Started#the-windows-directory-picker) and [Home with a selected workspace](Get-Started#home-with-a-selected-workspace). The selected state is visible; the transition, full-path identity, cancellation, and persistence remain untested. |
 | **Choose a workspace to start** | This is a prerequisite message in the prompt composer, not an instruction to type a workspace path into the prompt. |
 | **Standard mode** | A mode selector is shown with this value. The [Agent presets guide](Agent-Presets#choose-a-mode-from-home) covers the later open Home menu with Standard checked and PTC, Minimal, and Creator also visible. Switching behavior and scope still need testing; a preset is not a governed role or project authorization. |
-| **New Session** | The sidebar's session entry point. A later selected-workspace capture shows a New Session entry beneath its workspace; a further [in-progress session capture](#read-an-in-progress-session) shows a message and activity, but no completed response. |
+| **New Session** | The sidebar's session entry point. Later captures show a selected workspace, [in-progress activity](#read-an-in-progress-session), and a [rendered response with turn statistics](#read-a-rendered-response-and-turn-statistics). These checkpoints do not qualify the complete first-use sequence. |
 | **Workspaces / No sessions yet** | The displayed navigation view has no sessions. That does not establish whether canonical projects or work items exist. |
 | **Settings** | The settings entry point is at the lower left. See the illustrated [General Settings reference](Settings) for a separate capture of the open dialog. |
 
@@ -88,10 +88,11 @@ reviewer did not send this message or run the displayed skill or shell action.
 | **Cache hit 0% · Input 12.4K tok · Output 564 tok** | These are the historical figures displayed beneath the composer. | Per-request/turn/session scope, rounding, update timing, inclusion of context/tool activity, cache definition, and reconciliation with provider usage. Output tokens are not a completed answer, and the figures do not establish a bill or savings. |
 
 The activity display is a useful orientation checkpoint, not a completed
-first-response test. A qualified walkthrough should next show a bounded,
-non-sensitive request reaching an explicit successful or failed terminal
-state, any relevant tool result, and the supported recovery route. It should
-also distinguish sending or queueing another message from stopping active work;
+first-response test. A later capture now shows a [rendered response and turn
+statistics](#read-a-rendered-response-and-turn-statistics). A qualified walkthrough
+still needs a bounded, non-sensitive request with a verified successful or failed
+outcome, relevant tool results, and the supported recovery route. It should also
+distinguish sending or queueing another message from stopping active work;
 the composer's presence does not establish busy-input behavior.
 
 Treat prompt/context previews, tool details, conversation content, and logs as
@@ -101,6 +102,41 @@ processing. The [in-progress session checklist](Known-Issues#in-progress-session
 records the remaining checks, including stop behavior, accessibility, usage
 definitions, and retention/recovery. No live session was opened, stopped, or
 exported for this documentation pass.
+
+## Read a rendered response and turn statistics
+
+A further owner-supplied capture received 2026-09-26 returns to **Chat** and
+shows a readable assistant response with headings and bullet points. A grouped
+activity summary appears above it, the composer has an upward-arrow control,
+and additional turn/timing figures appear below. This supplies the previously
+missing response-display checkpoint; it is not an independently tested
+initialization, installation, or completed governed workflow.
+
+The raw image is not reproduced because the response includes native/session
+identifiers and bridge details. Those values and details are intentionally not
+transcribed here. Use synthetic content or supported concealment for a public
+illustration. Exact build/version is not visible, and the capture is scrolled;
+it does not show the complete conversation or all underlying tool results.
+
+| Visible element | How to read it | What remains unverified |
+| --- | --- | --- |
+| Selected **Chat**, a rendered response, and **Session bound** / **Bridge state** headings | Home displays the assistant's account of initialization and state, including a claimed readback. This is more than the earlier activity-only view. | Accuracy and freshness of those claims, the underlying results, and the final lifecycle state. Narrative assertions, identifiers, and headings are not independent verification, current canonical state, or instructions for this reviewer to initialize or take work. |
+| **10 tool calls · 1 message** with a right-facing chevron | A grouped activity summary and an apparent disclosure control are visible above the response. | Expansion/collapse behavior, scope of the counts, which message is counted, tool outcomes, ordering, retries, and missing/duplicate results. A count of calls is not a count of successful calls. |
+| Composer upward arrow, permission/model labels, and **Session log** | The upward arrow differs from the earlier square-marked control; the session composer and log entry point remain available on screen. | Whether the turn is terminal, input is enabled or queued, work remains active, and what follow-up or export does. Do not infer successful completion, cancellation, or stopped background work from an icon change alone. |
+| **1 turns · 8 steps** in the footer | The footer exposes turn and step counters alongside the separate ten-call summary. | Definitions, aggregation scope, update timing, and mapping between turns, steps, messages, and tool calls. The differing counts are a documentation question, not proof of a counting defect; one step need not equal one call. |
+| **LLM 37.4s · Tool call 1m11s · TTFT avg 3.1s · 193 tok/s** | These are the displayed historical timing/rate figures. TTFT commonly means time to first token; the release's actual measurement and averaging rules still need documentation. | Start/end boundaries, wall-clock versus accumulated time, overlap, waits/retries, averaging population, and the rate's token/time denominator. Do not sum LLM and tool time into an elapsed duration, infer concurrency, or use one capture as a performance benchmark. |
+| **Cache hit 86% · Input 125K tok · Output 2...** | The footer shows cache/input figures and a visibly truncated Output field. | Cache numerator/denominator, token scope, rounding, provider reconciliation, full Output value, and access to untruncated details. Do not reconstruct the missing digits, subtract figures from earlier captures as a per-request measurement, or infer price, savings, billing, or local-only processing. |
+| **1min** beside the selected sidebar session | A relative-looking time label is visible beside the session title. | Which event it measures, refresh/rounding rules, and its relation to the footer. It is not a measured end-to-end request duration or proof that the displayed state is current. |
+
+For ordinary use, read the response and distinguish its proposed next action
+from a verified result before acting. For diagnostics, identify the installed
+version and the exact metric/control being reported; use the [response and
+statistics checklist](Known-Issues#response-and-turn-statistics-review) rather
+than treating the footer as a performance or cost report. A qualified first-use
+walkthrough must still show a reproducible non-sensitive request, its expected
+outcome, and a useful next step. Keep detailed diagnostics optional in that tour.
+See [Support](Support#feedback-and-session-log-export-in-home) before sharing
+response text, screenshots, or session logs.
 
 ## Read the Trajectory view
 

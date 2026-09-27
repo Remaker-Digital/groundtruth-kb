@@ -186,9 +186,11 @@ release; do not assume a shortcut or enter private text to discover its scope.
 The [in-progress session reference](GTKB-Home#read-an-in-progress-session) now
 shows a submitted message, Chat selected beside Trajectory, context and tool
 activity, **Deep diving...**, a square-marked control, **Session log**, and
-cache/token figures. This closes the missing activity-view illustration gap,
-not the first-completed-response gap. Activity rows and output-token counts do
-not by themselves establish successful tool execution or a finished answer.
+cache/token figures. This closes the missing activity-view illustration gap.
+A later [rendered response](#recognize-a-rendered-response) adds the next display
+checkpoint, but neither capture qualifies the complete first-use sequence.
+Activity rows and output-token counts do not by themselves establish successful
+tool execution or a finished answer.
 
 The captured `::init gtkb pb` message is historical example content, not a
 generic first-use prompt to copy. Do not infer role initialization, authority,
@@ -206,6 +208,25 @@ performance. The raw image is withheld because it exposes instruction/tool
 payload previews. Keep this an optional inspection step, not an onboarding
 prerequisite; do not execute the displayed payloads or confuse Trajectory's
 Search field with the sidebar's session search.
+
+### Recognize a rendered response
+
+The [response and turn-statistics reference](GTKB-Home#read-a-rendered-response-and-turn-statistics)
+now describes a readable assistant answer, a **10 tool calls · 1 message**
+summary, an upward-arrow composer control, and turn/step/timing/cache/token
+figures. The response-display checkpoint is no longer missing. Read the answer,
+then check the expected result through the appropriate supported procedure;
+generated prose claiming initialization is not independent verification.
+
+The raw capture is withheld because it contains session identifiers and bridge
+details. Its reported queue is not an instruction to select work, and its role
+marker is not a universal first prompt. A scrolled response and changed icon do
+not prove every tool succeeded or that all work stopped. The footer's counters
+measure different named quantities whose scope still needs documentation;
+Output is truncated, and the displayed times must not be added into an assumed
+elapsed duration. Leave advanced metric interpretation out of first-use setup.
+A version-pinned, reproducible non-sensitive request with a verified outcome and
+clear next step is still needed for the completed Get Started walkthrough.
 
 ## 3. Understand the separation
 

@@ -55,8 +55,9 @@ them, not replace them.
    Continue into the [in-progress session view](GTKB-Home#read-an-in-progress-session):
    explain Chat versus the [now-described Trajectory view](GTKB-Home#read-the-trajectory-view), context and
    tool activity versus verified outcomes, busy input, Session log privacy,
-   and the scope of cache/token figures. The supplied image ends at **Deep
-   diving...**; it is not the completed-response demonstration. Use a bounded
+   and the scope of cache/token figures. The activity image ends at **Deep
+   diving...**; a later [rendered response and statistics capture](GTKB-Home#read-a-rendered-response-and-turn-statistics)
+   adds the next display checkpoint, not an independently qualified outcome. Use a bounded
    non-sensitive example and show completion, a useful failure/refusal, and
    controlled cancellation only after each route is tested. Do not teach the
    captured role marker as a universal first prompt, infer success from usage
@@ -68,6 +69,13 @@ them, not replace them.
    pairing, and Trajectory search versus sidebar session search. A clipped
    response preview is not a complete successful result. Keep event inspection
    optional and avoid presenting the view as replay or permanent audit storage.
+   For the response checkpoint, use synthetic text without private identifiers
+   or bridge details. Demonstrate the actual disclosure behind the tool-call
+   summary only after testing it, and distinguish a rendered assertion from a
+   verified result. Supply a brief optional glossary for turns, steps, calls,
+   messages, LLM/tool timing, TTFT, token rate, and cache accounting; show how to
+   obtain untruncated values. Do not infer elapsed time by adding footer values,
+   equate differing counters, or treat a composer arrow as proof of completion.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent
