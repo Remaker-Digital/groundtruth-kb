@@ -43,8 +43,11 @@ gt --config E:\GTKB\groundtruth.toml home status
 gt --config E:\GTKB\groundtruth.toml home open
 ```
 
-Confirm that the browser displays the expected GTKB branding and current
-services/status pages. Do not reuse a sign-in URL as a permanent shortcut.
+Confirm that the browser displays the expected GTKB branding, then open
+**Settings → GTKB** and read the [status pane](Status), including the timestamp
+and explanation beside each row. A session **UNKNOWN** caused by missing context
+and a dashboard **PASS** marked **not contacted** do not replace the service and
+canonical-read checks above. Do not reuse a sign-in URL as a permanent shortcut.
 
 ## 5. Run the applicable host doctor
 

@@ -17,6 +17,10 @@ Use [Verify installation](Verify-Installation) and [Services](Services) for the
 host checks. Seeing the browser interface alone does not confirm that all
 required services are healthy.
 
+The **Settings → GTKB** tab contains the [status pane](Status). Read the reason
+beside each result: an unknown session context and a dashboard that has not been
+contacted need different follow-up from a service outage.
+
 ## 2. Choose a workspace
 
 The Preview screen below is the starting point when no workspace has been

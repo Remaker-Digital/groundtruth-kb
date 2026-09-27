@@ -21,7 +21,10 @@ them, not replace them.
 4. **First governed change** — requirement, linked test, proposal, independent
    review, implementation report, verification, and Git result.
 5. **Operator essentials** — services, diagnostics, backup, restore, upgrade,
-   and uninstall.
+   and uninstall. Include **Settings → GTKB** using the [status guide](Status),
+   the difference between unknown session context and service failure, and the
+   distinction between a configured dashboard link, reachability, and data
+   freshness.
 
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed

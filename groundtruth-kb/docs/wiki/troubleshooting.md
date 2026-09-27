@@ -37,6 +37,30 @@ gt --config E:\GTKB\groundtruth.toml services status --json
 - Check whether port 3080 is already owned by another process.
 - Use `gt home open` to obtain a current launch URL; do not reuse an old URL.
 
+## Home reports Overall UNKNOWN
+
+Open **Settings → GTKB** and read the explanation for each row, not only the
+headline. In the documented [status example](Status), the session row says no
+native context id was supplied, while the authority row reports ready. That
+missing context is not, by itself, evidence of a broken host.
+
+If session diagnostics are required, check the real context through the
+supported session workflow. Do not fabricate an identifier or guess a role to
+remove UNKNOWN. If a component itself is unreachable, diagnose that component
+through the service checks above. The full overall-status aggregation rule still
+needs a tested reference.
+
+## Dashboard says PASS but is not reachable or looks old
+
+Check whether the dashboard row also says **not contacted**. If so, that result
+does not prove reachability. Verify the destination for the selected installation
+and inspect the intended dashboard through its supported route.
+
+Compare the overall-status time with the dashboard's own **Last refreshed**
+time. Do not assume that refreshing the status pane regenerates the dashboard,
+or that opening a dashboard makes its data current. Report the exact failing
+route, displayed times, and redacted error through [Support](Support).
+
 ## PostgreSQL does not start
 
 - Inspect the exact `gtkb-postgresql` Windows service configuration.

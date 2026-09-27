@@ -1,12 +1,14 @@
 # Settings
 
-**Status:** Illustrated General Settings reference; interaction checks pending
+**Status:** Illustrated General Settings reference and navigation; interaction checks pending
 
 **Reviewed:** 2026-09-26
 
 Open **Settings** at the lower left of [GTKB Home](GTKB-Home), then select
 **General**. This page describes the supplied view of the integrated harness
 GUI; it does not change any settings or document unobserved dropdown options.
+
+For the **GTKB** tab, see the separate illustrated [GTKB status guide](Status).
 
 ## General Settings
 
@@ -45,7 +47,9 @@ must be checked against the installed release before relying on them.
 
 The navigation also includes **GTKB**, **GTKB services**, **GTKB controls**,
 **Models**, **Plugins**, and **Agent presets**. Their contents are not visible in
-this capture. The presence of a tab does not establish which providers, plugins,
+the General capture. A separate screenshot now documents the **GTKB**
+[status pane](Status); the remaining tabs still need content and interaction
+coverage. The presence of a tab does not establish which providers, plugins,
 presets, or controls are available or configured.
 
 In particular, **GTKB services** is a visible navigation destination, not a

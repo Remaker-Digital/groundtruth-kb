@@ -16,6 +16,7 @@
 
 - [Core concepts](Core-Concepts)
 - [Settings](Settings)
+- [GTKB status](Status)
 - [Services](Services)
 - [Backup and restore](Backup-and-Restore)
 - [Upgrade](Upgrade)
