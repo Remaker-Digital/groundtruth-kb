@@ -37,8 +37,11 @@ image, not an installation, service-health, or end-to-end workflow test.
 
 The capture also contains icon-only controls beside **Workspaces** and inside the
 composer. A later capture identifies the composer's plus-shaped control with a
-**Commands** tooltip and shows the [Commands menu](#commands-menu). The other
-icons' functions, accessible names, and keyboard behavior remain unverified.
+**Commands** tooltip and shows the [Commands menu](#commands-menu). A further
+capture identifies the sliders-shaped control beside **Workspaces**
+as the entry point for [grouping and ordering](#sidebar-grouping-and-ordering).
+The remaining sidebar icons' functions, accessible names, and keyboard behavior
+remain unverified.
 The separate directory-picker capture is documented through the
 labeled **Choose workspace** route; it does not establish what the sidebar's
 folder-shaped icon does. The [selected-workspace view](Get-Started#home-with-a-selected-workspace)
@@ -55,6 +58,41 @@ instruction to broaden access.
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in
 [Known issues](Known-Issues).
+
+## Sidebar grouping and ordering
+
+The sliders-shaped control beside **Workspaces**, between the magnifying-glass
+and folder-shaped icons, has a menu open in this capture. It separates **Group
+by** from **Order by**, with a checkmark in each section. Its partly obscured
+tooltip is not used here to invent a complete button label.
+
+![GTKB Home with the sidebar grouping and ordering menu open beneath the sliders-shaped control beside Workspaces. Group by offers Workspace with a checkmark and In one list; Order by offers Manual and Last updated with a checkmark. The menu covers part of the session list; GT-KB, Standard mode, Workspace Write, and the model reference remain visible in the main view.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-sidebar-options.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. These are the selections visible in this installation,
+not established factory defaults. No sidebar option was changed, session
+reordered, or workspace switched for this documentation pass.
+
+| Section | Visible option | State in the capture | Meaning and remaining questions |
+| --- | --- | --- | --- |
+| **Group by** | **Workspace** | Checked. | Advertises workspace grouping. The image does not demonstrate switching groups, full-path identification, or handling similarly named workspaces. |
+| **Group by** | **In one list** | Not checked. | Advertises an ungrouped list. The resulting view, workspace labels retained there, and return to grouped view are not shown. |
+| **Order by** | **Manual** | Not checked. | Offers manual ordering. The actual method, items affected, keyboard alternative, and saved-order behavior are not shown; do not assume drag-and-drop. |
+| **Order by** | **Last updated** | Checked. | Names an update-based order. Which updates count, sort direction, tie handling, and behavior during active work remain unverified. |
+
+Grouping and ordering are separate navigation choices. **Workspace** here is a
+grouping criterion, not a replacement for the **Choose workspace** control that
+selects the working directory. Do not use sidebar order as evidence of canonical
+work priority, dispatch order, project membership, or an agent's ownership of
+work. See [Core concepts](Core-Concepts) for those distinctions.
+
+The open menu obscures part of the list, so this image does not demonstrate the
+resulting order or a complete session inventory. A tested walkthrough still
+needs to show switching and dismissal, preference scope and persistence,
+retention of the selected session and unsent input, and restoration of a prior
+view. Changing this view is not a first-session prerequisite. Use the
+[sidebar review checklist](Known-Issues#sidebar-grouping-and-ordering-review)
+to qualify these behaviors with non-sensitive sample sessions.
 
 ## Commands menu
 

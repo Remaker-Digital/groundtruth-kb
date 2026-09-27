@@ -164,6 +164,16 @@ untested. The composer also advertises `/ commands, @ files or sessions`, not
 a verified syntax reference. You do not need to compact history, export a log,
 submit feedback, or set a goal just to begin a first-session walkthrough.
 
+### Recognize the sidebar view options
+
+The sliders-shaped control beside **Workspaces** exposes separate **Group by**
+and **Order by** sections. The [sidebar reference](GTKB-Home#sidebar-grouping-and-ordering)
+illustrates Workspace and Last updated checked, with In one list and Manual
+also offered. These organize the navigation view; they are not the working
+directory picker, agent mode, permission setting, or canonical work priority.
+The actual switching, manual-ordering method, and persistence remain untested.
+Leave view customization out of the first-session prerequisites.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator

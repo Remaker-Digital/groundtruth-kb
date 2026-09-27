@@ -42,6 +42,10 @@ This page records material adoption gaps, not every internal development item.
   The [Commands menu](GTKB-Home#commands-menu) identifies the plus-shaped entry
   point and seven commands with helper text; their execution and results remain
   untested.
+  The [sidebar grouping and ordering menu](GTKB-Home#sidebar-grouping-and-ordering)
+  now identifies the sliders-shaped control and shows Workspace and Last updated
+  checked, with In one list and Manual also visible. Switching, actual ordering,
+  and preference persistence remain untested.
   Resolved workspace path, selection/cancellation and persistence behavior,
   mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
@@ -64,10 +68,26 @@ the image. The improvements below are recommendations, not shipped features.
 | --- | --- | --- |
 | **Must** | Workspace selection is required, but no first-run guide or documentation link is visible. | Provide a short in-context path to Get Started. A first-time evaluator should identify the next action and select the intended workspace without source-code inspection or operator coaching. Record time and assistance needed. |
 | **Must** | **Standard mode** has no explanation while closed; later Settings and [open Home menu captures](Agent-Presets#choose-a-mode-from-home) supply descriptions for four modes and a visible Standard selection. | Make that help discoverable and link to a clear comparison. Explain how mode choice takes effect, verify advertised capabilities and effects on new versus active sessions, and distinguish it from the separate composer reference. Do not treat the label as a governed role or project authorization. |
-| **Must** | Several controls are represented only by icons; a later capture supplies a Commands tooltip for the composer's plus-shaped control. | Retain that discoverable label and test accessible names, keyboard focus/activation, and labels for the remaining icons. A visible tooltip is not a screen-reader or keyboard test, but the composer's entry-point purpose is no longer unknown. |
+| **Must** | Several controls are represented only by icons; later captures identify the plus-shaped Commands control and the sidebar's sliders-shaped grouping/ordering control. | Keep their purposes discoverable and test accessible names, keyboard focus/activation, and labels for remaining icons. Commands has a visible tooltip; the sidebar tooltip is partly obscured. Neither image proves keyboard or screen-reader support, but these two controls' purposes are no longer unknown. |
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
 | **Should** | A later capture now shows a selected workspace and mode menu, but still no submitted prompt or response. | Continue from that illustrated checkpoint to a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the transition and successful response, and record where assistance was needed. |
 | **Don't** | The browser displays Home, a **Preview** label, and an empty session list. | Do not treat this as proof of installation completeness, service readiness, missing canonical work, or a successful governed workflow. Check those outcomes separately. |
+
+## Sidebar grouping and ordering review
+
+The owner-supplied screenshot received 2026-09-26 shows **Group by** with
+Workspace checked and In one list available, and **Order by** with Last updated
+checked and Manual available. It establishes the menu and selected labels,
+not a tested sort or preference change. See the [sidebar reference](GTKB-Home#sidebar-grouping-and-ordering).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Group by and Order by are separate sections, each with one checked choice. | Document the scope of both preferences and test every combination using multiple workspaces and sessions. Verify selection markers, dismissal without change, persistence across reload/reopen, and preservation of the active session, working directory, and unsent input. Keep grouping distinct from choosing a workspace or changing project membership. |
+| **Must** | Manual is offered, but no reordering action is shown. | Document and test the actual supported method, which items can be reordered, within-group versus cross-group effects, a keyboard-accessible route, and whether the manual order survives switching away and back. Do not invent drag-and-drop or imply that moving a row transfers a session or work item to another workspace/project. |
+| **Must** | Last updated is checked, but the menu obscures the list and no timestamps or sort direction are shown. | Define the timestamp/event used, direction, tie behavior, and when the display reorders. Test new sessions, messages, ongoing activity, and equal timestamps with a stable, understandable result. Verify that a refresh or reorder does not make a user act on a different session accidentally; sidebar order must not be taught as canonical dispatch priority. |
+| **Must** | The menu is reached through a sliders-shaped icon; its tooltip is partly obscured and checkmarks are visible. | Provide a discoverable accessible label and test keyboard opening, navigation, selection, dismissal, focus return, and announced group/selected state. Check readable labels and menu placement at supported zoom/viewport sizes; a screenshot does not establish keyboard or screen-reader behavior. |
+| **Should** | Workspace grouping and a one-list alternative are available. | Add a short navigation segment using distinct sample workspaces and multiple sessions after the behavior is tested. Check whether a novice can find and return to the intended session, distinguish similarly named workspaces, and restore a preferred view without coaching. Keep this optional for first use. |
+| **Don't** | One historical pair of selections is visible; the list is partly covered. | Do not infer factory defaults, a complete session inventory, actual sort results, persistence, a reordering gesture, file movement, project membership, durable work ownership, or authorization from this view. Do not change live preferences or reorder active sessions merely to document the capture. |
 
 ## Commands review
 

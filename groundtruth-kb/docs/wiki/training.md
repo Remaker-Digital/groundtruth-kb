@@ -42,6 +42,11 @@ them, not replace them.
    Identify the plus-shaped **Commands** entry point using the [menu reference](GTKB-Home#commands-menu);
    keep command discovery brief and do not make advanced conversation controls
    prerequisites for the first response.
+   In the navigation tour, identify the [sidebar grouping and ordering menu](GTKB-Home#sidebar-grouping-and-ordering).
+   Use several non-sensitive sample sessions to demonstrate tested grouping,
+   ordering, and finding the same session again; distinguish view options from
+   selecting the working directory or setting canonical work priority. Keep
+   customization optional, and do not invent a drag gesture for Manual.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent
