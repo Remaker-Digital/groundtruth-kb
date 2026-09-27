@@ -174,6 +174,13 @@ directory picker, agent mode, permission setting, or canonical work priority.
 The actual switching, manual-ordering method, and persistence remain untested.
 Leave view customization out of the first-session prerequisites.
 
+A further [session-search capture](GTKB-Home#sidebar-session-search) shows an
+empty **Search sessions...** field and an X-shaped control. It identifies the
+feature but does not demonstrate a match, its search scope, or how to clear or
+close it. The GT-KB/New Session row shown beneath the empty field is not a
+verified search hit. Use the supported search procedure for the installed
+release; do not assume a shortcut or enter private text to discover its scope.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator

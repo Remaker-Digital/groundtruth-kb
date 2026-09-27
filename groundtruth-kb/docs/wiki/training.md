@@ -47,6 +47,11 @@ them, not replace them.
    ordering, and finding the same session again; distinguish view options from
    selecting the working directory or setting canonical work priority. Keep
    customization optional, and do not invent a drag gesture for Manual.
+   Extend that tour with the [session-search view](GTKB-Home#sidebar-session-search)
+   after its behavior is tested: demonstrate a known match, a no-match case,
+   identifying the correct workspace/session, and returning to the unfiltered
+   list without losing a draft. Explain supported search scope and actual
+   clear/dismiss controls; the empty-field screenshot is not a search test.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent

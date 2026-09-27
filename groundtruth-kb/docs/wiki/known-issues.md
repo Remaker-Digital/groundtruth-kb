@@ -46,6 +46,9 @@ This page records material adoption gaps, not every internal development item.
   now identifies the sliders-shaped control and shows Workspace and Last updated
   checked, with In one list and Manual also visible. Switching, actual ordering,
   and preference persistence remain untested.
+  The [session-search view](GTKB-Home#sidebar-session-search) now illustrates an
+  empty Search sessions field and its X-shaped control. Search scope, matching,
+  result states, and clear/dismiss behavior remain untested.
   Resolved workspace path, selection/cancellation and persistence behavior,
   mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
@@ -68,10 +71,26 @@ the image. The improvements below are recommendations, not shipped features.
 | --- | --- | --- |
 | **Must** | Workspace selection is required, but no first-run guide or documentation link is visible. | Provide a short in-context path to Get Started. A first-time evaluator should identify the next action and select the intended workspace without source-code inspection or operator coaching. Record time and assistance needed. |
 | **Must** | **Standard mode** has no explanation while closed; later Settings and [open Home menu captures](Agent-Presets#choose-a-mode-from-home) supply descriptions for four modes and a visible Standard selection. | Make that help discoverable and link to a clear comparison. Explain how mode choice takes effect, verify advertised capabilities and effects on new versus active sessions, and distinguish it from the separate composer reference. Do not treat the label as a governed role or project authorization. |
-| **Must** | Several controls are represented only by icons; later captures identify the plus-shaped Commands control and the sidebar's sliders-shaped grouping/ordering control. | Keep their purposes discoverable and test accessible names, keyboard focus/activation, and labels for remaining icons. Commands has a visible tooltip; the sidebar tooltip is partly obscured. Neither image proves keyboard or screen-reader support, but these two controls' purposes are no longer unknown. |
+| **Must** | Later captures identify the plus-shaped Commands control, the sidebar's sliders-shaped grouping/ordering control, and an expanded Search sessions field with an X-shaped control. | Keep their purposes discoverable and test accessible names, keyboard focus/activation, and labels for remaining icons. Commands has a visible tooltip; the sidebar tooltip is partly obscured. The search field's purpose is explicit, but its opening route and X action remain untested. None of these images proves keyboard or screen-reader support. |
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
 | **Should** | A later capture now shows a selected workspace and mode menu, but still no submitted prompt or response. | Continue from that illustrated checkpoint to a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the transition and successful response, and record where assistance was needed. |
 | **Don't** | The browser displays Home, a **Preview** label, and an empty session list. | Do not treat this as proof of installation completeness, service readiness, missing canonical work, or a successful governed workflow. Check those outcomes separately. |
+
+## Sidebar session search review
+
+The owner-supplied screenshot received 2026-09-26 shows an empty **Search
+sessions...** field, a magnifying-glass icon, and an X-shaped control. A workspace
+and New Session row remain visible. This establishes the interface, not a query
+or its results. See the [session-search reference](GTKB-Home#sidebar-session-search).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | The placeholder says Search sessions, without a scope description or entered query. | Document supported search fields and scope: titles and/or conversation content, current versus other workspaces, and which retained sessions are included. Verify those boundaries with synthetic sessions and state query processing/logging behavior before using sensitive text. Do not assume full-text, knowledge-base, or canonical work-item search. |
+| **Must** | No matching result, count, loading state, or no-results message is shown. | Test known matches and non-matches, case/substring behavior, spaces, non-ASCII text, duplicate names, and renamed or newly updated sessions. Explain when matching runs and distinguish no results from loading or failure with useful recovery. Measure response time at a representative session count; do not publish an unmeasured speed claim. |
+| **Must** | An X-shaped control appears even with an empty field; no opening, clearing, dismissal, or keyboard action is demonstrated. | Establish the actual opening route, X behavior for empty/nonempty queries, clear/dismiss actions, and any supported shortcuts. Test keyboard focus, accessible labels, announced results, selection, and focus return. Verify whether the query persists after navigating or reopening Home, without losing the current session or unsent input. |
+| **Must** | GT-KB and New Session remain visible with an empty query; separate captures expose grouping and ordering options. | Verify result identity and workspace context, including similarly named sessions across workspaces. Test search with both grouping modes and ordering choices, opening the intended result, clearing search, and returning to the previous view. Avoid stale results or list movement directing an action to a different session. |
+| **Should** | The search field provides a readable purpose, but no successful example is illustrated. | Add a short find-and-return example to the navigation tour using non-sensitive sample sessions, including a no-match case. Check that a novice can locate the intended session and recover the unfiltered view without coaching; keep search optional for the first response. |
+| **Don't** | The field is empty and the visible rows have no demonstrated relation to a query. | Do not call these rows search hits, assert a complete inventory, infer full-text or local-only processing, invent shortcuts or X behavior, treat an empty result as data loss, or enter private queries merely to document this capture. Session navigation does not establish work ownership, authorization, or canonical search results. |
 
 ## Sidebar grouping and ordering review
 

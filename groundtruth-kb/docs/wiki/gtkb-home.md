@@ -40,8 +40,9 @@ composer. A later capture identifies the composer's plus-shaped control with a
 **Commands** tooltip and shows the [Commands menu](#commands-menu). A further
 capture identifies the sliders-shaped control beside **Workspaces**
 as the entry point for [grouping and ordering](#sidebar-grouping-and-ordering).
-The remaining sidebar icons' functions, accessible names, and keyboard behavior
-remain unverified.
+A separate [session-search capture](#sidebar-session-search) now shows the
+expanded **Search sessions...** field. Its opening/closing interactions,
+accessible names, and keyboard behavior remain unverified.
 The separate directory-picker capture is documented through the
 labeled **Choose workspace** route; it does not establish what the sidebar's
 folder-shaped icon does. The [selected-workspace view](Get-Started#home-with-a-selected-workspace)
@@ -58,6 +59,38 @@ instruction to broaden access.
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in
 [Known issues](Known-Issues).
+
+## Sidebar session search
+
+The sidebar now shows an empty **Search sessions...** field beneath **New
+Session**, with a magnifying-glass icon on the left and an X-shaped control on
+the right. **GT-KB** and its **New Session** entry remain visible below it. No
+query text, matching result, result count, or no-results message is shown.
+
+![GTKB Home with an empty Search sessions... field in the sidebar below New Session, a magnifying-glass icon at the field's left, and an X-shaped control at its right. GT-KB and a New Session row remain below. The main composer shows GT-KB, Standard mode, Workspace Write, and the model reference; no search query, prompt, or response is present.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-session-search.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. The field's placeholder identifies the intended search
+subject as sessions. No query was entered, result opened, field cleared, or
+search dismissed for this documentation pass.
+
+| Visible element | What the capture establishes | What remains unverified |
+| --- | --- | --- |
+| **Search sessions...** field and magnifying-glass icon | A session-search interface is open with no entered query. | How it is opened, whether matching uses titles or conversation content, current-workspace versus wider scope, search timing, and query processing/storage. |
+| X-shaped control | An icon is present at the right of the empty field. | Its label and whether it clears text, closes search, or behaves differently when a query is present. Do not teach it as a delete action or assume Escape has the same effect. |
+| **GT-KB / New Session** below the field | A workspace group and session row are visible while the query is empty. | These are not demonstrated matches, a complete inventory, or evidence that results include every workspace or retained session. |
+
+This is session navigation, not a demonstrated search of canonical work items,
+projects, source files, or the knowledge base. The capture also does not
+establish that searches run locally or that queries are never logged or sent
+elsewhere. Use non-sensitive sample text when qualifying the search flow.
+
+A complete walkthrough needs an entered query, a known match, a no-match case,
+and the supported way to clear or dismiss search and return to the previous
+view. Verify the intended session and workspace before resuming work; similar
+names are not sufficient identity. Test the interaction with [grouping and
+ordering](#sidebar-grouping-and-ordering), preservation of unsent input, and
+query persistence separately. See the [session-search checklist](Known-Issues#sidebar-session-search-review).
 
 ## Sidebar grouping and ordering
 
