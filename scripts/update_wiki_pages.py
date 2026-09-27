@@ -18,6 +18,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
         "Home.md",
         "_Footer.md",
         "_Sidebar.md",
+        "agent-presets.md",
         "azure-enterprise-readiness.md",
         "backup-and-restore.md",
         "controls.md",
@@ -47,6 +48,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
 )
 WIKI_ASSET_ALLOWLIST = frozenset(
     {
+        "assets/gtkb-agent-presets.png",
         "assets/gtkb-controls.png",
         "assets/gtkb-home-empty-state.png",
         "assets/gtkb-models.png",

@@ -13,8 +13,11 @@ them, not replace them.
 2. **Home and the first session** — choose a workspace, explain the actual mode
    choices, show any required provider setup, and demonstrate the first response.
    The initial [Home screen guide](GTKB-Home), illustrated [General Settings
-   reference](Settings), and [Models/provider list guide](Models) are available;
-   the complete sequence still needs validation and additional screenshots.
+   reference](Settings), [Models/provider list guide](Models), and [Agent presets
+   overview](Agent-Presets) are available; the complete sequence still needs
+   validation and additional screenshots. Explain the tested built-in preset
+   choice and what In use means without treating it as a governed role or a
+   permission level. Do not require custom-preset authoring for routine first use.
    Explain Add provider versus Add a custom provider, the status indicator, and
    where model selection occurs. Keep real keys off-camera, identify usage and
    data-destination implications, and use non-sensitive sample content. Include
@@ -47,6 +50,13 @@ harness tool-call dispatch from GTKB workflow dispatch, and subagent model
 choices from permission to delegate. Keep advanced tuning out of routine
 first-session prerequisites; do not run commands, searches, or subagents simply
 to demonstrate that a configuration card exists.
+
+A **custom preset authoring** supplement should demonstrate the verified
+duplicate/Creator workflow, review of the resulting prompt and capabilities,
+save/cancel, explicit application, and recovery. Explain the complete PTC
+description, Minimal mode's Windows shell requirements, and actual icon actions
+in the built-in comparison before making recommendations. Keep secrets and
+private prompts out of recordings; a generated preset still needs validation.
 
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed

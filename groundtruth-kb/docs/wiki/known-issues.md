@@ -29,9 +29,11 @@ This page records material adoption gaps, not every internal development item.
   tuning fields and their displayed ranges. The [Models guide](Models) now shows
   the provider list and Add/Edit entry points. The [Plugins guide](Plugins)
   illustrates the collapsed configuration sections and Plugin list tab. The
-  workspace picker, selected workspace, mode and permission choices, provider
-  Add/Edit dialogs, model selection, expanded plugin controls, plugin inventory,
-  Agent presets, and a successful first session still need version-pinned
+  [Agent presets guide](Agent-Presets) now covers the four visible built-in
+  modes and custom-authoring entry point. The workspace picker, selected
+  workspace, mode-selection and permission behavior, provider Add/Edit dialogs,
+  model selection, expanded plugin controls, plugin inventory, preset selection
+  and custom authoring, and a successful first session still need version-pinned
   coverage and interaction checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
@@ -47,7 +49,7 @@ the image. The improvements below are recommendations, not shipped features.
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
 | **Must** | Workspace selection is required, but no first-run guide or documentation link is visible. | Provide a short in-context path to Get Started. A first-time evaluator should identify the next action and select the intended workspace without source-code inspection or operator coaching. Record time and assistance needed. |
-| **Must** | **Standard mode** is shown without an explanation in this view. | Explain each actual mode, its effects, and any relationship to governed work. Verify the explanation against the selected release; do not infer capabilities from the label. |
+| **Must** | **Standard mode** is shown without an explanation in this Home view; a later [Agent presets capture](Agent-Presets) supplies descriptions for four built-in modes. | Link the selector to a clear comparison and explain how preset choice takes effect. Verify the advertised capabilities and effects on new versus active sessions; do not treat the label as a governed role or project authorization. |
 | **Must** | Several controls are represented only by icons. | Test accessible names, keyboard focus and activation, and discoverable labels/tooltips. The screenshot cannot establish a pass or failure for those behaviors. |
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
 | **Should** | The captured empty state does not show a completed-session sequence. | Add a selected-workspace image and a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the demonstrated result. |
@@ -163,6 +165,25 @@ plugin tool was executed through GTKB for this review. See [Plugins](Plugins).
 | **Must** | Web search names a provider without showing its configuration. | Document the supported setup, data destination, credentials, usage implications, and failure/recovery path. Qualify a non-sensitive search only with the intended provider and limits established; do not expose secrets or infer connectivity from the label. |
 | **Should** | The overview offers short descriptions and collapsed cards, but no expanded example in this capture. | Add a version-pinned capabilities/limits tour and task-oriented examples after behavior is tested. Verify keyboard expansion, focus order, accessible names, and understandable error/status feedback; keep advanced tuning out of routine first-run prerequisites. |
 | **Don't** | Configuration cards are visible, but inventory, values, and tool results are not. | Do not count cards as installed plugins, claim enabled or healthy tools, infer autosave or provider exclusivity, edit generated configuration, or execute commands, searches, or subagents merely to confirm this screenshot. |
+
+## Agent presets review
+
+The owner-supplied **Settings → Agent presets** screenshot received 2026-09-26
+shows four built-in mode cards, **Standard mode** marked **In use**, and a
+custom-preset drafting entry point. It partially closes the earlier mode-label
+documentation gap. It does not establish selection, authoring, persistence, or
+executed capabilities. No preset was changed or drafted. See
+[Agent presets](Agent-Presets).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Standard, PTC, Minimal, and Creator have capability descriptions; Minimal names persistent bash and `str_replace_editor`. | Provide a task-oriented comparison, prerequisites, limitations, and tested capabilities for each supported preset. Verify Windows shell requirements and persistence lifetime. Fewer advertised tools do not establish read-only access or a safer permission level. |
+| **Must** | Standard has an In use badge and matches the label on the earlier Home selector. | Define what In use applies to and qualify the selection route, effective preset/model, persistence, and behavior for new versus active sessions. Do not assume a factory default or that a click changes an existing session. |
+| **Must** | The helper defines a preset by tools, prompt, and capabilities, while separate Models, Plugins, and General panes exist. | Explain how preset composition relates to effective plugin settings, model choice, and session permissions. Keep governed roles, project authorization, independent review, and per-artifact claims separate; do not imply durable ownership of work or permission to launch every advertised capability. |
+| **Must** | The helper offers duplication; Custom offers Draft a custom preset with Creator mode. No authoring result is shown. | Document and test the actual duplicate/draft, review, validation, save/cancel, apply, and recovery routes with non-sensitive examples. Establish storage, scope, and provider usage before recording; do not treat generated prompt/tool configuration as already validated or manually edit generated harness files. |
+| **Must** | Card actions are icon-only in the capture, PTC's description is clipped, and Creator displays the identifier `cordis`. | Verify discoverable labels/tooltips, keyboard operation, accessible names, and the complete PTC description. Explain the acronym and user-facing name/identifier mapping. Do not assign icon functions or fill in clipped text from appearance alone. |
+| **Should** | The overview already gives concise descriptions and a visible active-state badge. | Add a short mode-choice segment to Get Started and the first-session video, based on a tested built-in path. Keep Creator/plugin experiments in an advanced supplement; measure whether a novice can choose appropriately without writing a custom preset. |
+| **Don't** | One historical selection and a scrollable set of capability cards are shown. | Do not infer a complete inventory, a universal default, enforcement, lower cost, provider connectivity, completed custom authoring, or working tools from this capture. Do not launch goals, workflows, searches, commands, or subagents merely to confirm it. |
 
 ## Documentation migration
 

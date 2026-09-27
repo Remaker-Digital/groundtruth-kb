@@ -13,6 +13,7 @@ For **GTKB services**, see the illustrated [service-management guide](Services).
 For **GTKB controls**, see the illustrated [operational-controls reference](Controls).
 For **Models**, see the illustrated [models and providers guide](Models).
 For **Plugins**, see the illustrated [plugin configuration overview](Plugins).
+For **Agent presets**, see the illustrated [built-in modes guide](Agent-Presets).
 
 ## General Settings
 
@@ -40,8 +41,9 @@ not replace the review requirements in [Core concepts](Core-Concepts).
 Do not infer the precise file boundary, permitted operations, or approval-prompt
 behavior from the name **Workspace Write** alone. Those details need a tested
 permission-mode reference. The **Standard mode** selector on Home is a
-differently labeled control; its relationship to the Permission setting has not
-been established by these screenshots.
+differently labeled control. The [Agent presets capture](Agent-Presets) now
+describes a matching built-in preset's tools and capabilities; it does not
+establish the permission boundary or interaction with the Permission setting.
 
 The Permission helper explicitly refers to new sessions. Do not assume a change
 will alter an already running session. The effect and persistence of changes
@@ -57,10 +59,11 @@ Start/Stop controls, and **GTKB controls** [reference](Controls), including
 numeric values, units, and ranges. The [Models guide](Models) now illustrates a
 provider entry and the Edit/Add entry points. The [Plugins guide](Plugins)
 illustrates four collapsed configuration sections and the separate Plugin list
-tab. Those images establish the displayed interface, not current health or
-tested control behavior. Provider setup, model selection, expanded plugin
-controls, and the plugin inventory still need walkthroughs; **Agent presets**
-still needs content and interaction coverage.
+tab. The [Agent presets guide](Agent-Presets) illustrates four built-in cards,
+Standard mode marked In use, and a custom-authoring entry point. These images
+now cover the landing views of all seven settings sections, not every control
+or interaction. Provider setup, model selection, expanded plugin controls, the
+plugin inventory, preset selection, and custom authoring still need walkthroughs.
 The presence of a tab does not establish which providers, plugins, presets, or
 controls are available or configured.
 

@@ -39,6 +39,10 @@ authorization are separate concerns. Use [Models and providers](Models) for the
 captured provider-management entry points and [Settings](Settings) for session
 permission guidance.
 
+For the visible built-in compositions of tools, prompt, and capabilities, see
+[Agent presets](Agent-Presets). A preset card's capability description does not
+replace inspection of the actual plugin inventory or effective settings.
+
 In particular, **Agent loop** refers here to tool-call dispatch. Do not identify
 it with **Dispatcher Next** or infer project authorization from it. Likewise,
 **Subagent** model controls do not assign governed roles, grant ownership of a

@@ -41,9 +41,13 @@ See [GTKB Home](GTKB-Home) for the visible-control guide.
 
 The image documents the empty state only. Workspace selection, any provider or
 credential setup, and a successful first response still need a version-pinned
-walkthrough. **Standard mode** is visible, but the image does not establish its
-behavior or any governed role. **New Session** is a session entry point, not
-evidence that a canonical project or work item has been created.
+walkthrough. **Standard mode** is visible; the separate [Agent presets
+guide](Agent-Presets) now shows a matching built-in preset marked **In use** and
+describes the four visible built-in modes. Their selection behavior, effective
+scope, and effects on active sessions still need testing. A preset does not
+assign a governed role. **New Session** is a session entry point, not evidence
+that a canonical project or work item has been created. Creating a custom preset
+is not a documented first-session prerequisite.
 
 The [Settings reference](Settings) shows the General pane, including the default
 permission mode for new sessions and conversation preferences. Review that

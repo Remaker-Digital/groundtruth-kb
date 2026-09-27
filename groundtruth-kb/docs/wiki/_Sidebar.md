@@ -18,6 +18,7 @@
 - [Settings](Settings)
 - [Models and providers](Models)
 - [Plugins](Plugins)
+- [Agent presets](Agent-Presets)
 - [GTKB status](Status)
 - [Services](Services)
 - [GTKB controls](Controls)

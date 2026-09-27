@@ -30,7 +30,7 @@ image, not an installation, service-health, or end-to-end workflow test.
 | --- | --- |
 | **Choose workspace** | Start here to select the workspace you intend to use. The composer explicitly asks for a workspace before starting. |
 | **Choose a workspace to start** | This is a prerequisite message in the prompt composer, not an instruction to type a workspace path into the prompt. |
-| **Standard mode** | A mode selector is shown with this value. Do not treat its label as proof of a governed agent role or project authorization. Mode options and their effects still need a tested reference. |
+| **Standard mode** | A mode selector is shown with this value. The separate [Agent presets guide](Agent-Presets) now illustrates a built-in Standard mode and its advertised capabilities. Selection behavior and scope still need testing; a preset is not a governed role or project authorization. |
 | **New Session** | The sidebar's session entry point. The capture does not show the subsequent session flow. |
 | **Workspaces / No sessions yet** | The displayed navigation view has no sessions. That does not establish whether canonical projects or work items exist. |
 | **Settings** | The settings entry point is at the lower left. See the illustrated [General Settings reference](Settings) for a separate capture of the open dialog. |

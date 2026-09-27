@@ -28,6 +28,7 @@ the primary interactive interface.
 | Understand the visible interface settings | [Settings](Settings) |
 | Understand provider setup and model-selection gaps | [Models and providers](Models) |
 | Understand the plugin configuration entry points | [Plugins](Plugins) |
+| Compare the visible built-in agent modes | [Agent presets](Agent-Presets) |
 | Interpret the status pane and its limitations | [GTKB status](Status) |
 | Understand the advanced operational tuning fields | [GTKB controls](Controls) |
 | Understand the operating model | [Core concepts](Core-Concepts) |
