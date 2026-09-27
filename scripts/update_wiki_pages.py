@@ -13,7 +13,33 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SOURCE_DIR = PROJECT_ROOT / "groundtruth-kb" / "docs" / "wiki"
 DEFAULT_WIKI_DIR = PROJECT_ROOT / ".tmp" / "groundtruth-kb.wiki"
 WIKI_REPOSITORY_URL = "https://github.com/Remaker-Digital/groundtruth-kb.wiki.git"
-WIKI_SOURCE_ALLOWLIST = frozenset({"Home.md", "release-health.md"})
+WIKI_SOURCE_ALLOWLIST = frozenset(
+    {
+        "Home.md",
+        "_Footer.md",
+        "_Sidebar.md",
+        "azure-enterprise-readiness.md",
+        "backup-and-restore.md",
+        "core-concepts.md",
+        "first-governed-change.md",
+        "get-started.md",
+        "git-integration.md",
+        "gtkb-home.md",
+        "install-on-windows.md",
+        "known-issues.md",
+        "product-overview.md",
+        "publication.md",
+        "release-health.md",
+        "services.md",
+        "support.md",
+        "system-requirements.md",
+        "training.md",
+        "troubleshooting.md",
+        "uninstall.md",
+        "upgrade.md",
+        "verify-installation.md",
+    }
+)
 
 
 def _sha256_text(text: str) -> str:
@@ -30,8 +56,8 @@ def _resolve_in_root(path: Path, project_root: Path) -> Path:
 
 def wiki_page_name(source_path: Path) -> str:
     """Map an in-root wiki source markdown file to its GitHub Wiki page file."""
-    if source_path.name == "Home.md":
-        return "Home.md"
+    if source_path.name in {"Home.md", "_Footer.md", "_Sidebar.md"}:
+        return source_path.name
     words = [part for part in source_path.stem.replace("_", "-").split("-") if part]
     title = "-".join(word[:1].upper() + word[1:] for word in words)
     return f"{title}.md"

@@ -342,6 +342,8 @@ cookies.txt
 # =============================================================================
 agent-red.wiki/
 wiki/
+!groundtruth-kb/docs/wiki/
+!groundtruth-kb/docs/wiki/*.md
 
 # =============================================================================
 # Research / Scratch Data

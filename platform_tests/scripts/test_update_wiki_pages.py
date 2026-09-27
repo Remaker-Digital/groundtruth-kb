@@ -23,6 +23,8 @@ def test_wiki_page_name_maps_in_root_source_slug_to_github_wiki_name() -> None:
     assert module.wiki_page_name(Path("release-health.md")) == "Release-Health.md"
     assert module.wiki_page_name(Path("azure-enterprise-readiness.md")) == "Azure-Enterprise-Readiness.md"
     assert module.wiki_page_name(Path("Home.md")) == "Home.md"
+    assert module.wiki_page_name(Path("_Sidebar.md")) == "_Sidebar.md"
+    assert module.wiki_page_name(Path("_Footer.md")) == "_Footer.md"
 
 
 def test_compare_pages_distinguishes_current_missing_and_different(tmp_path: Path) -> None:
@@ -41,7 +43,7 @@ def test_compare_pages_distinguishes_current_missing_and_different(tmp_path: Pat
 
     assert rows["Release-Health.md"]["status"] == "current"
     assert rows["Home.md"]["status"] == "missing"
-    assert "Azure-Enterprise-Readiness.md" not in rows
+    assert rows["Azure-Enterprise-Readiness.md"]["status"] == "different"
 
 
 def test_update_pages_copies_from_source_without_pushing(tmp_path: Path) -> None:
@@ -73,24 +75,30 @@ def test_script_no_longer_targets_agent_red_temp_wiki() -> None:
     assert "groundtruth-kb.wiki" in text
 
 
-def test_source_pages_only_includes_intentional_release_wiki_sources(tmp_path: Path) -> None:
+def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: Path) -> None:
     module = _load_module()
     source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
     source_dir.mkdir(parents=True)
     (source_dir / "release-health.md").write_text("# Release Health\n", encoding="utf-8")
     (source_dir / "azure-enterprise-readiness.md").write_text("# Azure draft\n", encoding="utf-8")
+    (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
+    (source_dir / "_Sidebar.md").write_text("# Sidebar\n", encoding="utf-8")
     (source_dir / "scratch.md").write_text("# Scratch\n", encoding="utf-8")
 
-    assert [path.name for path in module.source_pages(source_dir)] == ["release-health.md"]
+    assert [path.name for path in module.source_pages(source_dir)] == [
+        "_Sidebar.md",
+        "azure-enterprise-readiness.md",
+        "Home.md",
+        "release-health.md",
+    ]
 
 
-def test_readmes_reference_main_branch_and_release_health_source() -> None:
+def test_readmes_route_customers_to_the_wiki_and_reviewed_source() -> None:
     root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     package_readme = (REPO_ROOT / "groundtruth-kb" / "README.md").read_text(encoding="utf-8")
 
-    assert "branch=develop" not in root_readme
-    assert "branch=main" in root_readme
-    assert "groundtruth-kb/docs/wiki/release-health.md" in root_readme
+    assert "github.com/Remaker-Digital/groundtruth-kb/wiki" in root_readme
+    assert "groundtruth-kb/docs/wiki/" in root_readme
     assert "docs/wiki/release-health.md" in package_readme
     assert "scripts/update_wiki_pages.py compare" in package_readme
     assert "Agent Red" not in package_readme
