@@ -31,6 +31,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
         "publication.md",
         "release-health.md",
         "services.md",
+        "settings.md",
         "support.md",
         "system-requirements.md",
         "training.md",
@@ -40,7 +41,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
         "verify-installation.md",
     }
 )
-WIKI_ASSET_ALLOWLIST = frozenset({"assets/gtkb-home-empty-state.png"})
+WIKI_ASSET_ALLOWLIST = frozenset({"assets/gtkb-home-empty-state.png", "assets/gtkb-settings-general.png"})
 
 
 def _resolve_in_root(path: Path, project_root: Path) -> Path:

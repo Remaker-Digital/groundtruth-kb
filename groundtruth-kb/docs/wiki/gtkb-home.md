@@ -33,7 +33,7 @@ image, not an installation, service-health, or end-to-end workflow test.
 | **Standard mode** | A mode selector is shown with this value. Do not treat its label as proof of a governed agent role or project authorization. Mode options and their effects still need a tested reference. |
 | **New Session** | The sidebar's session entry point. The capture does not show the subsequent session flow. |
 | **Workspaces / No sessions yet** | The displayed navigation view has no sessions. That does not establish whether canonical projects or work items exist. |
-| **Settings** | The settings entry point is at the lower left. Its contents are not shown in this capture. |
+| **Settings** | The settings entry point is at the lower left. See the illustrated [General Settings reference](Settings) for a separate capture of the open dialog. |
 
 The capture also contains icon-only controls beside **Workspaces** and inside the
 composer. Their tooltips, accessible names, keyboard behavior, and resulting

@@ -11,9 +11,11 @@ them, not replace them.
 
 1. **What GroundTruth KB is** — a three-minute product and boundary overview.
 2. **Home and the first session** — choose a workspace, explain the actual mode
-   choices, show the required provider setup, and demonstrate the first response.
-   The initial [Home screen guide](GTKB-Home) is available; the complete sequence
-   still needs validation and additional screenshots.
+   choices, show any required provider setup, and demonstrate the first response.
+   The initial [Home screen guide](GTKB-Home) and illustrated
+   [General Settings reference](Settings) are available; the complete sequence
+   still needs validation and additional screenshots. Include session permission
+   scope and the verified busy-input behavior in the demonstration.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent

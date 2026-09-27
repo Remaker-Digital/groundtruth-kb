@@ -15,6 +15,7 @@
 ## Learn and operate
 
 - [Core concepts](Core-Concepts)
+- [Settings](Settings)
 - [Services](Services)
 - [Backup and restore](Backup-and-Restore)
 - [Upgrade](Upgrade)

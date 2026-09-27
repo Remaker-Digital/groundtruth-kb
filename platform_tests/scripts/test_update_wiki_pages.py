@@ -23,6 +23,7 @@ def test_wiki_page_name_maps_in_root_source_slug_to_github_wiki_name() -> None:
     module = _load_module()
 
     assert module.wiki_page_name(Path("release-health.md")) == "Release-Health.md"
+    assert module.wiki_page_name(Path("settings.md")) == "Settings.md"
     assert module.wiki_page_name(Path("azure-enterprise-readiness.md")) == "Azure-Enterprise-Readiness.md"
     assert module.wiki_page_name(Path("Home.md")) == "Home.md"
     assert module.wiki_page_name(Path("_Sidebar.md")) == "_Sidebar.md"
@@ -85,6 +86,7 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
     (source_dir / "azure-enterprise-readiness.md").write_text("# Azure draft\n", encoding="utf-8")
     (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
     (source_dir / "_Sidebar.md").write_text("# Sidebar\n", encoding="utf-8")
+    (source_dir / "settings.md").write_text("# Settings\n", encoding="utf-8")
     (source_dir / "scratch.md").write_text("# Scratch\n", encoding="utf-8")
 
     assert {path.name for path in module.source_pages(source_dir)} == {
@@ -92,15 +94,16 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
         "azure-enterprise-readiness.md",
         "Home.md",
         "release-health.md",
+        "settings.md",
     }
 
 
 @pytest.mark.parametrize("status", ["missing", "different", "current"])
-def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str) -> None:
+@pytest.mark.parametrize("asset_name", ["assets/gtkb-home-empty-state.png", "assets/gtkb-settings-general.png"])
+def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str, asset_name: str) -> None:
     module = _load_module()
     source_dir = tmp_path / "source"
     wiki_dir = tmp_path / "wiki"
-    asset_name = "assets/gtkb-home-empty-state.png"
     source_asset = source_dir / asset_name
     source_asset.parent.mkdir(parents=True)
     content = b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
@@ -129,20 +132,24 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
     module = _load_module()
     source_dir = tmp_path / "source"
     wiki_dir = tmp_path / "wiki"
-    asset_name = "assets/gtkb-home-empty-state.png"
     (source_dir / "assets").mkdir(parents=True)
-    content = b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
-    (source_dir / asset_name).write_bytes(content)
+    assets = {
+        "assets/gtkb-home-empty-state.png": b"\x89PNG\r\n\x1a\n\x00\xffhome\r\n",
+        "assets/gtkb-settings-general.png": b"\x89PNG\r\n\x1a\n\x00\xfesettings\r\n",
+    }
+    for name, content in assets.items():
+        (source_dir / name).write_bytes(content)
     (source_dir / "assets" / "private-capture.png").write_bytes(b"do not publish")
-    (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
+    (source_dir / "settings.md").write_text("# Settings\n", encoding="utf-8")
 
     rows = module.update_pages(source_dir, wiki_dir)
 
-    assert len(rows) == 2
+    assert len(rows) == 3
     assert all(row["post_update_status"] == "current" for row in rows)
-    assert (wiki_dir / asset_name).read_bytes() == content
+    for name, content in assets.items():
+        assert (wiki_dir / name).read_bytes() == content
     assert not (wiki_dir / "assets" / "private-capture.png").exists()
-    assert (wiki_dir / "Home.md").read_text(encoding="utf-8") == "# Home\n"
+    assert (wiki_dir / "Settings.md").read_text(encoding="utf-8") == "# Settings\n"
 
 
 def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> None:
@@ -151,14 +158,15 @@ def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> N
     wiki_dir = tmp_path / ".tmp" / "groundtruth-kb.wiki"
     (source_dir / "assets").mkdir(parents=True)
     (source_dir / "assets" / "gtkb-home-empty-state.png").write_bytes(b"\x89PNG\r\n\xff")
+    (source_dir / "assets" / "gtkb-settings-general.png").write_bytes(b"\x89PNG\r\n\xfe")
     (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
 
     assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["dry_run"] is True
     assert result["summary"]["page_count"] == 1
-    assert result["summary"]["asset_count"] == 1
-    assert result["summary"]["drift_count"] == 2
+    assert result["summary"]["asset_count"] == 2
+    assert result["summary"]["drift_count"] == 3
     assert all(row["planned_action"] == "write" for row in result["pages"])
     assert not wiki_dir.exists()
 

@@ -41,6 +41,11 @@ walkthrough. **Standard mode** is visible, but the image does not establish its
 behavior or any governed role. **New Session** is a session entry point, not
 evidence that a canonical project or work item has been created.
 
+The [Settings reference](Settings) shows the General pane, including the default
+permission mode for new sessions and conversation preferences. Review that
+distinction before treating any displayed permission value as a project
+authorization or a recommendation to change it.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator
