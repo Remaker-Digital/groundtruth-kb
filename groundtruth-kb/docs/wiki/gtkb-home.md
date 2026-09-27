@@ -109,25 +109,34 @@ In **Chat**, **System prompt** appears above the user message and grouped
 tool-call summary. A further owner-supplied capture received 2026-09-26 shows
 it expanded, with a downward chevron and a bounded monospaced text region.
 This adds an expanded-panel example; the exact build/version and the action
-that opened it are not shown. Only the upper portion of the text is visible.
+that opened it are not shown. A follow-up capture shows a later excerpt and
+a lower position of the inner scrollbar, while the panel header and surrounding
+conversation appear in the same positions. Together they provide evidence of
+separate inner-panel scroll positions, not a demonstrated input gesture or a
+complete traversal of the prompt.
 
 Prompt inspection is an optional diagnostic view, not a first-session
-prerequisite. The raw capture is not published because it exposes prompt text,
-a machine-specific path, and session identifiers in the surrounding answer.
+prerequisite. The raw captures are not published because they expose prompt
+text and session identifiers; the earlier view also exposes a machine-specific
+path in the prompt.
 No prompt payload or identifiers are transcribed here, and the reviewer did
 not open a live prompt, edit configuration, or execute the displayed text.
 
 | Visible element | How to read it | What still needs definition or testing |
 | --- | --- | --- |
 | **System prompt**, downward chevron, and open text region | The panel is visibly expanded. No editing or save control is demonstrated. | Opening/collapse behavior, accessible name and expanded state, keyboard activation, focus return, persistence across reload/session changes, and draft preservation. Do not describe this as a prompt editor or assume collapse changes the agent's input. |
-| Monospaced text with an inner vertical scrollbar near the top | A portion of the prompt is readable within a separately bounded region; the bottom is clipped. | Whether this is an initial snapshot, current assembled prompt, or another representation; source/version, refresh timing, completeness, and relationship to Context injection, tools, messages, provider requests, and the context meter. Test with known synthetic content. Visible text alone does not prove what was transmitted, applied, or counted. |
-| Main conversation scrollbar and a separate circular down-chevron control above the composer | The capture exposes both an inner prompt scroll region and conversation navigation affordances. The down-chevron is separate from the composer's upward arrow. | Exact accessible name, destination, availability, keyboard behavior, nested-scroll handling, focus/scroll restoration, and behavior as new messages arrive. Do not label it Jump to latest or assume it resumes generation, follows new output, or sends a message until tested. |
+| Monospaced text and an inner vertical scrollbar at different positions in two captures | The follow-up reveals a later portion within the same bounded panel; the surrounding conversation appears stationary. Text is still clipped, so neither view supplies the whole prompt. | Scroll input method and edge behavior, completeness, and whether the text is an initial snapshot, current assembled prompt, or another representation. Define source/version, refresh timing, and relationship to Context injection, tools, messages, provider requests, and the context meter. Visible text alone does not prove what was transmitted, applied, or counted. |
+| Main conversation scrollbar and a separate circular down-chevron control above the composer | The pair illustrates distinct prompt and conversation scroll regions; it does not show the down-chevron being activated. That control is separate from the composer's upward arrow. | Exact accessible name and destination, mouse/touch/keyboard access, focus and scroll restoration, behavior at either end of the inner panel, and interaction with new messages. Do not label the down-chevron Jump to latest or assume it resumes generation, follows new output, or sends a message until tested. |
 
 The visible wording refers to the underlying harness and a local checkout.
 Explain how those terms relate to GroundTruth KB without treating the shown
 path as a required installation location or the selected workspace. Neither
 the displayed instruction text nor a role marker elsewhere in the capture
 changes the reader's task or grants permission to execute it.
+The follow-up exposes maintainer-oriented web-development guidance. Its presence
+in a prompt is not a tested installation or update procedure. Publish supported
+user procedures separately, and keep maintainer-only build steps out of the
+beginner's required path.
 
 For support, report the version, view state, and a synthetic reproduction rather
 than copying the full prompt. Collapsing a panel is not demonstrated redaction;
