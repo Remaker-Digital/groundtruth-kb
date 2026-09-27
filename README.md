@@ -42,7 +42,7 @@ configuration, Windows startup registration, and GTKB Home.
 
 A unified customer-grade Windows installer, repair workflow, and whole-product
 uninstaller remain active product gaps. Until those capabilities are qualified,
-installation is an operator procedure. Do not treat an old SQLite, MemBase,
+installation is an operator procedure. Do not treat an old SQLite,
 Deliberation Archive, TAFE, PAUTH, `.gtkb-state`, `harness-state`, or durable
 file-bridge procedure as the current product model.
 

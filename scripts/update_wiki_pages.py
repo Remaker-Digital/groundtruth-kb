@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Compare or update GT-KB GitHub Wiki pages from in-root source docs."""
+"""Compare or update GroundTruth KB Wiki pages and assets from in-root source docs."""
 
 from __future__ import annotations
 
@@ -40,10 +40,7 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
         "verify-installation.md",
     }
 )
-
-
-def _sha256_text(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+WIKI_ASSET_ALLOWLIST = frozenset({"assets/gtkb-home-empty-state.png"})
 
 
 def _resolve_in_root(path: Path, project_root: Path) -> Path:
@@ -67,35 +64,45 @@ def source_pages(source_dir: Path) -> list[Path]:
     return sorted(path for path in source_dir.glob("*.md") if path.is_file() and path.name in WIKI_SOURCE_ALLOWLIST)
 
 
-def _read_text(path: Path) -> str:
+def _publication_files(source_dir: Path) -> list[tuple[Path, str, str]]:
+    files = [(path, wiki_page_name(path), "page") for path in source_pages(source_dir)]
+    files.extend(
+        (source_dir / name, name, "asset") for name in sorted(WIKI_ASSET_ALLOWLIST) if (source_dir / name).is_file()
+    )
+    return files
+
+
+def _read_content(path: Path, kind: str) -> bytes:
     try:
-        return path.read_text(encoding="utf-8")
+        if kind == "asset":
+            return path.read_bytes()
+        return path.read_text(encoding="utf-8").encode("utf-8")
     except FileNotFoundError:
-        return ""
+        return b""
 
 
 def compare_pages(source_dir: Path = DEFAULT_SOURCE_DIR, wiki_dir: Path = DEFAULT_WIKI_DIR) -> list[dict[str, Any]]:
-    """Return per-page source-vs-wiki comparison rows."""
+    """Return source-vs-wiki rows for allowlisted pages and their binary assets."""
     rows: list[dict[str, Any]] = []
-    for source_path in source_pages(source_dir):
-        wiki_name = wiki_page_name(source_path)
+    for source_path, wiki_name, kind in _publication_files(source_dir):
         wiki_path = wiki_dir / wiki_name
-        source_text = _read_text(source_path)
-        wiki_text = _read_text(wiki_path)
+        source_content = _read_content(source_path, kind)
+        wiki_content = _read_content(wiki_path, kind)
         if not wiki_path.exists():
             status = "missing"
-        elif source_text != wiki_text:
+        elif source_content != wiki_content:
             status = "different"
         else:
             status = "current"
         rows.append(
             {
                 "source": str(source_path),
+                "kind": kind,
                 "wiki_page": wiki_name,
                 "wiki_path": str(wiki_path),
                 "status": status,
-                "source_sha256": _sha256_text(source_text),
-                "wiki_sha256": _sha256_text(wiki_text) if wiki_path.exists() else "",
+                "source_sha256": hashlib.sha256(source_content).hexdigest(),
+                "wiki_sha256": hashlib.sha256(wiki_content).hexdigest() if wiki_path.exists() else "",
             }
         )
     return rows
@@ -107,13 +114,17 @@ def update_pages(
     *,
     dry_run: bool = False,
 ) -> list[dict[str, Any]]:
-    """Copy source pages into the in-root wiki checkout and return comparison rows."""
+    """Copy allowlisted pages and assets into the wiki checkout, without pushing."""
     before = compare_pages(source_dir, wiki_dir)
     if not dry_run:
         wiki_dir.mkdir(parents=True, exist_ok=True)
-        for source_path in source_pages(source_dir):
-            target = wiki_dir / wiki_page_name(source_path)
-            target.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
+        for source_path, wiki_name, kind in _publication_files(source_dir):
+            target = wiki_dir / wiki_name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if kind == "asset":
+                target.write_bytes(source_path.read_bytes())
+            else:
+                target.write_text(source_path.read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     after = compare_pages(source_dir, wiki_dir)
     status_by_page = {row["wiki_page"]: row["status"] for row in after}
     return [
@@ -133,7 +144,8 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
         counts[status] = counts.get(status, 0) + 1
     return {
         "repository": WIKI_REPOSITORY_URL,
-        "page_count": len(rows),
+        "page_count": sum(1 for row in rows if row.get("kind") != "asset"),
+        "asset_count": sum(1 for row in rows if row.get("kind") == "asset"),
         "status_counts": dict(sorted(counts.items())),
         "drift_count": sum(1 for row in rows if row.get("status") != "current"),
     }
@@ -147,9 +159,9 @@ def _print_human(
     updated: bool = False,
 ) -> None:
     summary = _summary(rows)
-    print(f"GT-KB wiki source: {source_dir}")
-    print(f"GT-KB wiki checkout: {wiki_dir}")
-    print(f"Pages: {summary['page_count']} drift: {summary['drift_count']}")
+    print(f"GroundTruth KB wiki source: {source_dir}")
+    print(f"GroundTruth KB wiki checkout: {wiki_dir}")
+    print(f"Pages: {summary['page_count']} assets: {summary['asset_count']} drift: {summary['drift_count']}")
     for row in rows:
         action = f" -> {row['planned_action']}" if updated else ""
         print(f"{row['status']:>9}{action}  {row['wiki_page']}")

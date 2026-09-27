@@ -39,7 +39,7 @@ A working host also requires the native PostgreSQL installation, the GTKB domain
 service, configuration, and GTKB Home. The present installation procedure is an
 operator procedure while a unified installer is developed.
 
-Do not use retired SQLite, MemBase, Deliberation Archive, TAFE, PAUTH,
+Do not use retired SQLite, Deliberation Archive, TAFE, PAUTH,
 `.gtkb-state`, `harness-state`, or durable file-bridge instructions as a current
 installation or authority model.
 

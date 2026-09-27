@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
 from pathlib import Path
 
 import pytest
@@ -85,12 +87,98 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
     (source_dir / "_Sidebar.md").write_text("# Sidebar\n", encoding="utf-8")
     (source_dir / "scratch.md").write_text("# Scratch\n", encoding="utf-8")
 
-    assert [path.name for path in module.source_pages(source_dir)] == [
+    assert {path.name for path in module.source_pages(source_dir)} == {
         "_Sidebar.md",
         "azure-enterprise-readiness.md",
         "Home.md",
         "release-health.md",
-    ]
+    }
+
+
+@pytest.mark.parametrize("status", ["missing", "different", "current"])
+def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "source"
+    wiki_dir = tmp_path / "wiki"
+    asset_name = "assets/gtkb-home-empty-state.png"
+    source_asset = source_dir / asset_name
+    source_asset.parent.mkdir(parents=True)
+    content = b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
+    source_asset.write_bytes(content)
+    if status != "missing":
+        target = wiki_dir / asset_name
+        target.parent.mkdir(parents=True)
+        target.write_bytes(content if status == "current" else b"stale image")
+
+    rows = module.compare_pages(source_dir, wiki_dir)
+
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "asset"
+    assert rows[0]["wiki_page"] == asset_name
+    assert rows[0]["status"] == status
+    assert rows[0]["source_sha256"] == hashlib.sha256(content).hexdigest()
+    if status == "current":
+        assert rows[0]["wiki_sha256"] == rows[0]["source_sha256"]
+    elif status == "missing":
+        assert rows[0]["wiki_sha256"] == ""
+    else:
+        assert rows[0]["wiki_sha256"] == hashlib.sha256(b"stale image").hexdigest()
+
+
+def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "source"
+    wiki_dir = tmp_path / "wiki"
+    asset_name = "assets/gtkb-home-empty-state.png"
+    (source_dir / "assets").mkdir(parents=True)
+    content = b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
+    (source_dir / asset_name).write_bytes(content)
+    (source_dir / "assets" / "private-capture.png").write_bytes(b"do not publish")
+    (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
+
+    rows = module.update_pages(source_dir, wiki_dir)
+
+    assert len(rows) == 2
+    assert all(row["post_update_status"] == "current" for row in rows)
+    assert (wiki_dir / asset_name).read_bytes() == content
+    assert not (wiki_dir / "assets" / "private-capture.png").exists()
+    assert (wiki_dir / "Home.md").read_text(encoding="utf-8") == "# Home\n"
+
+
+def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
+    wiki_dir = tmp_path / ".tmp" / "groundtruth-kb.wiki"
+    (source_dir / "assets").mkdir(parents=True)
+    (source_dir / "assets" / "gtkb-home-empty-state.png").write_bytes(b"\x89PNG\r\n\xff")
+    (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
+
+    assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["dry_run"] is True
+    assert result["summary"]["page_count"] == 1
+    assert result["summary"]["asset_count"] == 1
+    assert result["summary"]["drift_count"] == 2
+    assert all(row["planned_action"] == "write" for row in result["pages"])
+    assert not wiki_dir.exists()
+
+
+def test_cli_compare_fails_on_asset_drift_and_passes_after_update(tmp_path: Path, capsys) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
+    asset_name = "assets/gtkb-home-empty-state.png"
+    (source_dir / "assets").mkdir(parents=True)
+    (source_dir / asset_name).write_bytes(b"\x89PNG\r\n\xff")
+    args = ["--project-root", str(tmp_path), "--json"]
+
+    assert module.main(["compare", *args]) == 1
+    assert module.main(["update", *args]) == 0
+    capsys.readouterr()
+    assert module.main(["compare", *args]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["summary"]["page_count"] == 0
+    assert result["summary"]["asset_count"] == 1
+    assert result["summary"]["drift_count"] == 0
 
 
 def test_readmes_route_customers_to_the_wiki_and_reviewed_source() -> None:

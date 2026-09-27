@@ -6,10 +6,22 @@
 The GitHub Wiki is GTKB's customer-facing product-documentation home.
 
 Reviewed source lives in `groundtruth-kb/docs/wiki/` in the main repository.
-`scripts/update_wiki_pages.py` compares and copies the allowlisted pages into a
-local clone of `https://github.com/Remaker-Digital/groundtruth-kb.wiki.git`.
+`scripts/update_wiki_pages.py` compares and copies allowlisted pages and image
+assets into a local clone of
+`https://github.com/Remaker-Digital/groundtruth-kb.wiki.git`.
 The Wiki repository is a publication target, not an independently authored
 second manual.
+
+Screenshot source lives in `groundtruth-kb/docs/wiki/assets/`. Each published
+image is explicitly allowlisted in the publisher; unrelated local captures are
+not copied. Asset comparison uses the original bytes and SHA-256 hashes. The
+publisher copies assets unchanged and does not push Git commits.
+
+Pages embed the published Wiki asset URL, so repository previews and the Wiki
+use the same image. Retain useful alternative text and a caption with the capture
+or receipt date, release/build when known, and the state shown. Identify an
+unknown version rather than infer it. Check for credentials, private paths,
+customer data, and unrelated browser content before publishing each capture.
 
 ## Surface responsibilities
 
@@ -29,7 +41,7 @@ describe the Wiki as a mirror are superseded by this decision.
 Before publication or release:
 
 1. compare repository source with a fresh Wiki clone;
-2. validate internal Wiki links;
+2. validate internal Wiki links and rendered images, including alternative text;
 3. scan current pages for retired terminology and forbidden paths;
 4. verify commands against the selected release;
 5. confirm that historical material is visibly labeled; and

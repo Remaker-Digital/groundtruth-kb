@@ -53,5 +53,5 @@ That Git commit activates the work and establishes terminality.
 
 Canonical records are served by the native PostgreSQL domain service through
 supported CLI and service APIs. Do not use retired SQLite/`groundtruth.db`,
-MemBase, Deliberation Archive, PAUTH, DECISION records, raw coordination tables,
+Deliberation Archive, PAUTH, DECISION records, raw coordination tables,
 or persistent bridge content as current authority.

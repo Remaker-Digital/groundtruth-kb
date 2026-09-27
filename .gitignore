@@ -344,6 +344,8 @@ agent-red.wiki/
 wiki/
 !groundtruth-kb/docs/wiki/
 !groundtruth-kb/docs/wiki/*.md
+!groundtruth-kb/docs/wiki/assets/
+!groundtruth-kb/docs/wiki/assets/gtkb-home-empty-state.png
 
 # =============================================================================
 # Research / Scratch Data
