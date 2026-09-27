@@ -43,6 +43,15 @@ underlying content and tool outputs were not opened. Treat those details as
 potentially sensitive; do not request a full environment-variable dump or
 private prompt/context disclosure just to reproduce the screenshot.
 
+The [expanded System prompt reference](GTKB-Home#read-the-expanded-system-prompt)
+now describes a later supplied image showing partial prompt text in a bounded
+scroll region; no live panel was opened by the reviewer. Its raw prompt, path,
+and surrounding identifiers are withheld. For a panel or navigation issue,
+report the build/version, expansion state, affected scroll region or control,
+input method, and a synthetic reproduction. Do not request the full prompt or
+assume collapse/clipping removes content from copying, exports, or recordings.
+The displayed excerpt is not proof of the complete input sent to a provider.
+
 The [Trajectory reference](GTKB-Home#read-the-trajectory-view) describes a later
 view that does expose instruction, context, and tool-payload previews. Its raw
 capture is deliberately not published. Before sharing a diagnostic view or

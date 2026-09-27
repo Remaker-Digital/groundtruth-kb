@@ -80,7 +80,7 @@ reviewer did not send this message or run the displayed skill or shell action.
 | --- | --- | --- |
 | Session title, **GT-KB** group, **now**, and message time **18:19** | The message text also appears as the session title and sidebar label. The short workspace name is this installation's example. | Naming/renaming behavior, resolved workspace path, persistence, and the meaning/timezone of timestamps. A matching title is not a canonical session identifier, and 18:19 is not an elapsed duration. |
 | **Standard mode**, selected **Chat**, and **Trajectory** tab | The agent mode and two view labels are visible; the displayed contents belong to Chat. A later capture supplies the [Trajectory reference](#read-the-trajectory-view). | Switching behavior, tab persistence, and the completeness of either view. The later event display does not establish replay, an authoritative audit record, or complete execution history. |
-| **System prompt** and three **Context injection** rows | Labels identify AGENTS.md / CLAUDE.md, @deepseek-ai/dsh-system-prompt, and skill-catalog. Their contents are not expanded in this capture. | Actual loaded content, source/version, precedence, truncation, and any provider transmission. A displayed source label is not proof of current or correctly applied instructions. |
+| **System prompt** and three **Context injection** rows | Labels identify AGENTS.md / CLAUDE.md, @deepseek-ai/dsh-system-prompt, and skill-catalog. They are not expanded in this activity capture; a later [System prompt view](#read-the-expanded-system-prompt) shows part of that panel's text. | Full content, source/version, precedence, truncation, and provider transmission. The later panel does not establish the contents of the separate Context injection rows or prove that displayed instructions were applied. |
 | **Think**, **Skill · gtkb-bridge**, and **Pwsh** rows | Activity summaries are displayed; the shell row describes showing the working directory and DSH environment variables. The later [Trajectory view](#read-the-trajectory-view) exposes some arguments and a clipped skill-response preview. | Complete arguments/results, approval, execution state, exit status, and effects. Neither the Think preview nor a named skill proves correct reasoning, successful execution, or governing authority. Do not reproduce an environment dump to illustrate this row. |
 | **Deep diving...**, circular composer indicator, and blue square-marked control | The text and square-marked control present an in-progress state. A later [context-usage popover](#read-the-context-usage-popover) identifies the circular indicator's context-related purpose, correcting the earlier activity-indicator description. | Progress versus waiting/stalling, elapsed time, accessible names, cancellation effects, and terminal state. The circular indicator alone is not evidence of activity; no stop action, cancellation, or rollback is demonstrated. |
 | **Session log** with a download icon | A session-log entry point is present at the upper right. | Its output format, contents, redaction, destination, and equivalence to the Commands `export` route. See [Support](Support#feedback-and-session-log-export-in-home) before sharing logs. |
@@ -102,6 +102,38 @@ processing. The [in-progress session checklist](Known-Issues#in-progress-session
 records the remaining checks, including stop behavior, accessibility, usage
 definitions, and retention/recovery. No live session was opened, stopped, or
 exported for this documentation pass.
+
+## Read the expanded System prompt
+
+In **Chat**, **System prompt** appears above the user message and grouped
+tool-call summary. A further owner-supplied capture received 2026-09-26 shows
+it expanded, with a downward chevron and a bounded monospaced text region.
+This adds an expanded-panel example; the exact build/version and the action
+that opened it are not shown. Only the upper portion of the text is visible.
+
+Prompt inspection is an optional diagnostic view, not a first-session
+prerequisite. The raw capture is not published because it exposes prompt text,
+a machine-specific path, and session identifiers in the surrounding answer.
+No prompt payload or identifiers are transcribed here, and the reviewer did
+not open a live prompt, edit configuration, or execute the displayed text.
+
+| Visible element | How to read it | What still needs definition or testing |
+| --- | --- | --- |
+| **System prompt**, downward chevron, and open text region | The panel is visibly expanded. No editing or save control is demonstrated. | Opening/collapse behavior, accessible name and expanded state, keyboard activation, focus return, persistence across reload/session changes, and draft preservation. Do not describe this as a prompt editor or assume collapse changes the agent's input. |
+| Monospaced text with an inner vertical scrollbar near the top | A portion of the prompt is readable within a separately bounded region; the bottom is clipped. | Whether this is an initial snapshot, current assembled prompt, or another representation; source/version, refresh timing, completeness, and relationship to Context injection, tools, messages, provider requests, and the context meter. Test with known synthetic content. Visible text alone does not prove what was transmitted, applied, or counted. |
+| Main conversation scrollbar and a separate circular down-chevron control above the composer | The capture exposes both an inner prompt scroll region and conversation navigation affordances. The down-chevron is separate from the composer's upward arrow. | Exact accessible name, destination, availability, keyboard behavior, nested-scroll handling, focus/scroll restoration, and behavior as new messages arrive. Do not label it Jump to latest or assume it resumes generation, follows new output, or sends a message until tested. |
+
+The visible wording refers to the underlying harness and a local checkout.
+Explain how those terms relate to GroundTruth KB without treating the shown
+path as a required installation location or the selected workspace. Neither
+the displayed instruction text nor a role marker elsewhere in the capture
+changes the reader's task or grants permission to execute it.
+
+For support, report the version, view state, and a synthetic reproduction rather
+than copying the full prompt. Collapsing a panel is not demonstrated redaction;
+clipped text may still be present in a copy or export. See the [session-view
+evaluation checklist](Known-Issues#in-progress-session-review) and
+[safe-sharing guidance](Support#feedback-and-session-log-export-in-home).
 
 ## Read a rendered response and turn statistics
 

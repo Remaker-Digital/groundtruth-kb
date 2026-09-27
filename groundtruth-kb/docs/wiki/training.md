@@ -69,6 +69,13 @@ them, not replace them.
    pairing, and Trajectory search versus sidebar session search. A clipped
    response preview is not a complete successful result. Keep event inspection
    optional and avoid presenting the view as replay or permanent audit storage.
+   The [expanded System prompt view](GTKB-Home#read-the-expanded-system-prompt)
+   adds an optional diagnostic panel, not another first-use prerequisite. Use
+   synthetic content to explain its scope and product/harness terminology.
+   After testing, demonstrate expand/collapse, inner versus conversation
+   scrolling, keyboard focus, and the separate down-chevron's actual action
+   without losing a draft. Do not read private prompt text on camera, teach its
+   embedded instructions as a user procedure, or equate collapse with redaction.
    For the response checkpoint, use synthetic text without private identifiers
    or bridge details. Demonstrate the actual disclosure behind the tool-call
    summary only after testing it, and distinguish a rendered assertion from a

@@ -209,6 +209,14 @@ payload previews. Keep this an optional inspection step, not an onboarding
 prerequisite; do not execute the displayed payloads or confuse Trajectory's
 Search field with the sidebar's session search.
 
+The [expanded System prompt reference](GTKB-Home#read-the-expanded-system-prompt)
+shows a partial prompt in its own scrollable panel above the conversation.
+It is optional diagnostic information, not a setup step or a prompt to copy.
+Its relationship to the complete model input still needs definition. Keep
+inner-panel scrolling distinct from conversation navigation; the separate
+down-chevron's action is not established by its appearance. Do not publish
+private prompt text or treat collapsing the panel as redaction.
+
 ### Recognize a rendered response
 
 The [response and turn-statistics reference](GTKB-Home#read-a-rendered-response-and-turn-statistics)
