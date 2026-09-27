@@ -53,7 +53,7 @@ them, not replace them.
    list without losing a draft. Explain supported search scope and actual
    clear/dismiss controls; the empty-field screenshot is not a search test.
    Continue into the [in-progress session view](GTKB-Home#read-an-in-progress-session):
-   explain Chat versus the as-yet-unillustrated Trajectory view, context and
+   explain Chat versus the [now-described Trajectory view](GTKB-Home#read-the-trajectory-view), context and
    tool activity versus verified outcomes, busy input, Session log privacy,
    and the scope of cache/token figures. The supplied image ends at **Deep
    diving...**; it is not the completed-response demonstration. Use a bounded
@@ -61,6 +61,13 @@ them, not replace them.
    controlled cancellation only after each route is tested. Do not teach the
    captured role marker as a universal first prompt, infer success from usage
    counts, or reveal private prompts, environment values, or unreviewed logs.
+   Use synthetic or safely concealed content for any Trajectory illustration;
+   the supplied raw capture is not published because it exposes instruction
+   and tool-payload previews. After behavior is tested, explain Duration/Turns/Calls,
+   lane colors/scales, event categories and turn boundaries, tool request/result
+   pairing, and Trajectory search versus sidebar session search. A clipped
+   response preview is not a complete successful result. Keep event inspection
+   optional and avoid presenting the view as replay or permanent audit storage.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent

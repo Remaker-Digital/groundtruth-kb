@@ -198,6 +198,15 @@ completion or failure, explain waiting and cancellation, and preserve the
 distinction between UI activity and canonical results. Keep private prompt,
 context, tool output, and unreviewed session logs out of public reports.
 
+A later capture supplies a [Trajectory view reference](GTKB-Home#read-the-trajectory-view):
+Duration/Turns/Calls controls, Input/Model/Tools lanes, labeled event rows, a
+turn marker, and a separate Search field. It shows some tool-request details
+and a clipped skill-response preview, not a completed first response or measured
+performance. The raw image is withheld because it exposes instruction/tool
+payload previews. Keep this an optional inspection step, not an onboarding
+prerequisite; do not execute the displayed payloads or confuse Trajectory's
+Search field with the sidebar's session search.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator

@@ -54,6 +54,12 @@ This page records material adoption gaps, not every internal development item.
   indicators, a square-marked control, Session log, and cache/token figures.
   It does not show a completed response, tool result, or confirmed role binding;
   view interactions, cancellation, logging, and usage definitions remain open.
+  The later [Trajectory reference](GTKB-Home#read-the-trajectory-view) now
+  describes that selected view's toolbar, lanes, Search field, event labels,
+  Turn 1 marker, tool arguments, and clipped skill-response preview. The raw
+  capture is withheld from publication because it exposes instruction/tool
+  payloads. A safe illustration and tested view/search/timing/result behavior
+  remain needed; a response fragment is not proof of a completed workflow.
   Resolved workspace path, selection/cancellation and persistence behavior,
   mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
@@ -94,7 +100,7 @@ defects. Use disposable, non-sensitive test sessions to qualify interactions.
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
-| **Must** | Chat is selected; Trajectory and System prompt are visible but their alternate/expanded contents are not shown. | Explain each supported view and control, then test switching, expansion/dismissal, keyboard focus, accessible labels, and readable layout at zoom. Preserve session selection, scroll position where intended, and unsent input; do not invent replay or audit guarantees for Trajectory. |
+| **Must** | Chat is selected in this capture; a later [Trajectory capture](GTKB-Home#read-the-trajectory-view) now exposes that alternate view's toolbar, lanes, and event rows. Expanded System prompt content is not established here. | Explain each supported view and control, then test switching, expansion/dismissal, keyboard focus, accessible labels, and readable layout at zoom. Preserve session selection, scroll position where intended, and unsent input; do not invent replay or audit guarantees for Trajectory. |
 | **Must** | Context injection labels, a clipped Think preview, a Skill row, and a Pwsh summary appear without tool results. | Distinguish context sources and versions, activity summaries, requested/running/completed/failed tool states, approvals, outputs, and exit status. Test useful error/refusal feedback and safe display/redaction with synthetic content. Explain source precedence and truncation without treating labels as proof of compliance or reprinting private prompts/environment values. |
 | **Must** | Deep diving..., an activity indicator, and a square-marked blue control appear, but no final response or elapsed duration does. | Provide understandable running, waiting, stalled/error, completed, and cancelled states with next actions. Verify the actual stop label and effect on model generation, running tools/child processes, queued input, and partial changes; show when cancellation is confirmed and how to recover. Do not promise rollback, process termination, or stopped billing from the icon alone. |
 | **Must** | A composer, permission/model labels, a session title matching the submitted marker, and time labels remain visible during activity. | Test busy-message queue/steer behavior and its General setting, supported permission/model changes, title/path/session identity, reload/reconnect and history retention, and preservation of drafts. Explain timestamps rather than reading them as duration. Ensure titles and activity rows are not presented as canonical role, authorization, claim, or durable work-item ownership evidence. |
@@ -102,6 +108,24 @@ defects. Use disposable, non-sensitive test sessions to qualify interactions.
 | **Must** | Cache hit 0%, Input 12.4K tok, and Output 564 tok are visible. | Define units, scope, rounding, update timing, cache numerator/denominator, and context/tool/retry inclusion. Reconcile against the supported provider's usage reporting and disclose gaps before publishing costs or savings; a local UI and an output count do not establish local-only processing or a completed answer. |
 | **Should** | There is now a real activity-view illustration, but no explicit terminal outcome or recovery example. | Extend the short first-session tour through a bounded successful response, a useful failure/refusal, and a controlled cancellation after those paths are qualified. Explain the activity labels in plain language, link to written recovery guidance, and measure whether a novice understands when to wait, intervene, or seek help. |
 | **Don't** | The role marker is captured message/title content; the screenshot stops during activity. | Do not treat the screenshot as an instruction to initialize the reviewer, a copy-and-run onboarding prompt, successful canonical initialization, proof of tool execution, completion, a full audit trail, measured cost, or permission to inspect live private context. Do not launch, stop, or export an active session merely to document this view. |
+
+## Trajectory review
+
+The owner-supplied capture received 2026-09-26 shows **Trajectory** selected,
+a lane display and toolbar, labeled event rows, some tool arguments, and a
+clipped skill-response preview. The source image and its instruction/tool
+payloads are not republished. See the [written Trajectory reference](GTKB-Home#read-the-trajectory-view).
+These are pending evaluation checks, not evidence of a confirmed runtime defect.
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Trajectory and Chat are separate views of the displayed session; a Turn 1 marker appears among categorized rows. | Explain event categories, ordering, turn boundaries, live updates, and retention/truncation limits. Compare both views against a controlled session with known inputs and outcomes; test switching, reload/reconnect, and preservation of the selected session, scroll state, and drafts. Do not equate UI labels with canonical identity or authority. |
+| **Must** | Duration, Turns, and Calls appear above Input/Model/Tools lanes, without numeric timings or a visible explanatory legend. | Define each control's actual behavior, selected state, units, scale/origin, color meaning, segment-to-event mapping, and overlap semantics. Test with known measured calls, waits, and concurrent activity where supported. Distinguish wall-clock time, model latency, tool time, and token/cost metrics; do not diagnose slowness or assert parallel execution from bar widths/positions alone. |
+| **Must** | Trajectory has its own empty Search field, while the sidebar separately offers session search. | Document the actual search scope, fields and hidden/clipped content searched, matching/filtering/navigation behavior, clear/no-match/error states, live-update behavior, and query handling. Test known matches, duplicates, non-ASCII input, and non-matches with synthetic events. Verify keyboard access and focus return; do not assume that this field searches every session or canonical record. |
+| **Must** | One tool row pairs request details with a clipped response preview; another has visible arguments but no result or exit status in the capture. | Make request/response identity, pending/running/completed/failed/cancelled status, approval, timing, complete result access, and truncation discoverable. Test retries, duplicate tool names, errors, missing results, and cancellation without mispairing events. Compare against known outcomes rather than treating a fragment, arrow, or color as success. |
+| **Must** | Instruction, runtime-context, assistant, and tool-payload previews are exposed in the event list. | Define safe viewing, copying, screenshotting, and export behavior. Check masking/redaction and retention using non-secret canary data; provide a documented way to produce a publication-safe view without exposing temporary guidance, credentials, private paths, prompts, or environment values. Treat shown instructions as inspected content, never authority for the reviewer to execute them. |
+| **Should** | Dense technical rows and clipped previews provide detail, but no interaction or accessible state is demonstrated. | Supply a short glossary/help route and a synthetic-data walkthrough covering one tool call, its result, search, and return to Chat. Test keyboard operation, readable zoom, non-color status cues, accessible timing/row descriptions, and long-session performance. Keep this diagnostic detail optional for first use. |
+| **Don't** | The capture is a single partially clipped state with no demonstrated end-to-end outcome. | Do not publish its raw instruction/tool payloads, re-run a command from a row, infer complete history or a final answer, promise replay or permanent auditing, treat it as a backup or canonical record, or derive elapsed time/cost from unlabeled bar widths. Do not inspect a live private session simply to illustrate the view. |
 
 ## Sidebar session search review
 

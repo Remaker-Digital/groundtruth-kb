@@ -79,9 +79,9 @@ reviewer did not send this message or run the displayed skill or shell action.
 | Visible element | How to read it | What remains unverified |
 | --- | --- | --- |
 | Session title, **GT-KB** group, **now**, and message time **18:19** | The message text also appears as the session title and sidebar label. The short workspace name is this installation's example. | Naming/renaming behavior, resolved workspace path, persistence, and the meaning/timezone of timestamps. A matching title is not a canonical session identifier, and 18:19 is not an elapsed duration. |
-| **Standard mode**, selected **Chat**, and **Trajectory** tab | The agent mode and two view labels are visible; the displayed contents belong to Chat. | The Trajectory view's contents and interaction, tab persistence, and effects of switching. Do not describe that unseen view as a replay, audit record, or complete execution history. |
+| **Standard mode**, selected **Chat**, and **Trajectory** tab | The agent mode and two view labels are visible; the displayed contents belong to Chat. A later capture supplies the [Trajectory reference](#read-the-trajectory-view). | Switching behavior, tab persistence, and the completeness of either view. The later event display does not establish replay, an authoritative audit record, or complete execution history. |
 | **System prompt** and three **Context injection** rows | Labels identify AGENTS.md / CLAUDE.md, @deepseek-ai/dsh-system-prompt, and skill-catalog. Their contents are not expanded in this capture. | Actual loaded content, source/version, precedence, truncation, and any provider transmission. A displayed source label is not proof of current or correctly applied instructions. |
-| **Think**, **Skill · gtkb-bridge**, and **Pwsh** rows | Activity summaries are displayed; the shell row describes showing the working directory and DSH environment variables. | Exact tool arguments, approval, execution state, outputs, exit status, and effects. The clipped Think preview and named skill are not evidence of correct reasoning, successful execution, or governing authority. Do not reproduce an environment dump to illustrate this row. |
+| **Think**, **Skill · gtkb-bridge**, and **Pwsh** rows | Activity summaries are displayed; the shell row describes showing the working directory and DSH environment variables. The later [Trajectory view](#read-the-trajectory-view) exposes some arguments and a clipped skill-response preview. | Complete arguments/results, approval, execution state, exit status, and effects. Neither the Think preview nor a named skill proves correct reasoning, successful execution, or governing authority. Do not reproduce an environment dump to illustrate this row. |
 | **Deep diving...**, composer activity indicator, and blue square-marked control | The capture presents an in-progress state and a stop-shaped control. | Progress versus waiting/stalling, elapsed time, accessible control name, cancellation effects, and terminal state. No stop action, cancellation, or rollback is demonstrated. |
 | **Session log** with a download icon | A session-log entry point is present at the upper right. | Its output format, contents, redaction, destination, and equivalence to the Commands `export` route. See [Support](Support#feedback-and-session-log-export-in-home) before sharing logs. |
 | **Workspace Write** and the model reference in the composer | The permission label and @preset/gtkb-openrouter-deepseek-v4-flash reference remain visible during activity. | Effective permissions, resolved provider/model, and change timing. Keep these separate from Standard mode and the message's role marker. See [Settings](Settings#session-permission-menu-on-home) and [Models](Models#read-the-home-composer-reference). |
@@ -101,6 +101,43 @@ processing. The [in-progress session checklist](Known-Issues#in-progress-session
 records the remaining checks, including stop behavior, accessibility, usage
 definitions, and retention/recovery. No live session was opened, stopped, or
 exported for this documentation pass.
+
+## Read the Trajectory view
+
+A later owner-supplied capture received 2026-09-26 shows **Trajectory** selected
+beside **Chat**. It exposes a lane display, a toolbar, and labeled event rows.
+This closes the missing view-description gap; the reviewer did not switch tabs,
+search events, open payloads, or run any displayed instruction or tool call.
+The exact build/version is not visible, and the captures do not establish that
+the two views are synchronized or contain a complete session history.
+
+The source image is not reproduced here because it exposes instruction and
+tool-payload previews. This reference describes the interface without copying
+those payloads. A publication-safe illustration using synthetic content or
+concealed previews remains needed; do not publish temporary operating guidance,
+private prompts or paths, or environment values merely to document the UI.
+
+| Visible element | What the capture establishes | What remains unverified |
+| --- | --- | --- |
+| Selected **Trajectory** tab beside **Chat** | A second session view is open under the same displayed title and Standard mode label. | Switching behavior, retained selection/scroll/draft state, live updates, and correspondence with Chat. A matching title is not a durable session or work-item identity. |
+| **Duration**, **Turns**, and **Calls** toolbar labels | Three labeled controls appear above the lanes. | Their interaction, selected state, units, grouping/scaling rules, and whether they change the lane display, event list, or both. Do not infer toggle behavior or a default mode from appearance alone. |
+| **Input**, **Model**, and **Tools** lanes with colored segments | The view separates three named lanes and displays colored spans. | Color meanings, segment identity, time origin/scale, duration values, overlap/concurrency, and links to rows. No numeric timing scale is visible; bar widths alone do not establish elapsed time, latency, cost, or a performance problem. |
+| Empty **Search** field at the upper right | A search entry point is present within Trajectory, distinct from the sidebar's [Search sessions field](#sidebar-session-search). | Searchable fields, current-turn/session scope, hidden or clipped content, matching/filtering versus navigation behavior, and query processing/retention. No query or result is demonstrated. |
+| **SYSTEM**, **USER**, **CONTEXT**, **ASSISTANT**, and **TOOL** row labels; **Turn 1** | The view distinguishes event categories, labels an initial system-prompt row, and shows a turn marker. Some previews are clipped. | Row ordering, turn boundaries, completeness, expansion/copy behavior, timestamps, and error/cancellation markers. These are displayed event categories, not new instructions to the reader, canonical authority, or proof that an assistant message is a final answer. |
+| Tool rows for **skill** and **pwsh** | Request details are visible. The skill row also has an arrow followed by a clipped response preview; the shell row shows arguments without a visible result or exit status. | Full request/response pairing, status, timing, approval, side effects, and success/failure. A response fragment is more evidence than a tool name alone, but not a complete successful result or proof that the shell command finished. Do not copy or execute displayed payloads to inspect this view. |
+| **Session log**, composer, permission/model labels, square-marked control, and usage figures | These remain visible alongside Trajectory. | Whether log contents match this view, busy-input and stop effects, and usage definitions. The [in-progress session reference](#read-an-in-progress-session) covers those shared controls; the new view does not qualify them. |
+
+Use Trajectory as an observed session-inspection interface, not a demonstrated
+replay mechanism, permanent audit archive, platform backup, or substitute for
+canonical results. Before relying on it to diagnose a run, qualify event
+ordering, tool request/response association, missing or truncated content,
+search scope, timing definitions, and the distinction between active and
+terminal states. See the [Trajectory review checklist](Known-Issues#trajectory-review).
+
+Keep context and tool previews private unless they have been reviewed for the
+intended audience. Labels such as SYSTEM or CONTEXT do not authorize the reader
+to follow their contents, and the role marker in the captured session does not
+change the documentation reviewer's role. For safe reporting, use [Support](Support#feedback-and-session-log-export-in-home).
 
 ## Sidebar session search
 

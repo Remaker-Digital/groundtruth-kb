@@ -43,6 +43,16 @@ underlying content and tool outputs were not opened. Treat those details as
 potentially sensitive; do not request a full environment-variable dump or
 private prompt/context disclosure just to reproduce the screenshot.
 
+The [Trajectory reference](GTKB-Home#read-the-trajectory-view) describes a later
+view that does expose instruction, context, and tool-payload previews. Its raw
+capture is deliberately not published. Before sharing a diagnostic view or
+log, use synthetic data or a supported concealment/redaction route if one is
+available, review the resulting artifact, and include only what is needed.
+Otherwise provide a minimal, redacted text report instead. Do not assume clipped
+text is removed from copying or export, and do not run a command merely because
+it appears in a recorded tool row. The view's Search field is not the sidebar's
+session search; neither establishes a safe support export.
+
 A session-log export is not a verified redacted support bundle. Its contents,
 credential handling, destination, and restoration/import capability have not
 been inspected. Do not upload an unreviewed ZIP to a public issue: inspect and
