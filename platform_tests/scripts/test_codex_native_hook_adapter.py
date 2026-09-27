@@ -252,7 +252,8 @@ def test_native_registration_covers_bash_and_patch_once():
         )
     ]
     assert len(gates) == 1
-    assert set(gates[0]["matcher"].split("|")) == {"apply_patch", "Bash"}
+    # c117: the gate is also registered for reads, so it can refuse credential material on the read tools.
+    assert set(gates[0]["matcher"].split("|")) == {"apply_patch", "Bash", "Read", "Grep", "Glob"}
 
 
 def test_each_registered_hook_uses_the_native_adapter_without_batch_or_finalizer():

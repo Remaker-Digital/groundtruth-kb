@@ -447,3 +447,63 @@ def test_default_invocation_places_the_runtime_home_in_the_bound_contexts_scratc
     assert ".gtkb-state" not in (SDK_SOURCE / "harness.py").read_text(encoding="utf-8").replace(
         "such as `.gtkb-state`", ""
     )
+
+
+SDK_GUARD_HARNESS = r"""
+import { pathToFileURL } from 'node:url';
+const [modulePath] = process.argv.slice(2);
+const guard = await import(pathToFileURL(modulePath).href);
+let check;
+guard.apply({ tools: { guard: (fn) => { check = fn; } } });
+const view = (path) => ({ name: 'str_replace_editor', arguments: { command: 'view', path } });
+const results = {
+  credentialView: check(view('infrastructure/postgresql/credentials/pg_service.conf')) ?? null,
+  passwordFileView: check(view('E:/elsewhere/admin.pgpass')) ?? null,
+  envFileView: check(view('.env.local')) ?? null,
+  ordinaryView: check(view('README.md')) ?? null,
+  exampleView: check(view('.env.example')) ?? null,
+  envListing: check({ name: 'pwsh', arguments: { command: 'Get-ChildItem Env:PG*' } }) ?? null,
+};
+console.log(JSON.stringify(results));
+"""
+
+
+def test_editor_views_reach_the_real_gate_which_refuses_credential_material(tmp_path):
+    """c117: the SDK guard sends every editor view to the shared gate as a read; the gate refuses credential material
+    before any binding or authority check and allows every other read. Runs the guard module under plain Node with
+    the real gate script and this interpreter; no runtime, authority or network is involved."""
+    import shutil
+
+    node = shutil.which("node")
+    assert node, "the DeepSeek SDK guard requires Node.js on PATH"
+    harness = tmp_path / "sdk-guard-harness.mjs"
+    harness.write_text(SDK_GUARD_HARNESS, encoding="utf-8")
+    log = tmp_path / "guard-decisions.jsonl"
+    env = {
+        **os.environ,
+        "GTKB_GUARD_PYTHON": sys.executable,
+        "GTKB_GUARD_GATE": str(ROOT / "scripts" / "implementation_start_gate.py"),
+        "GT_PROJECT_ROOT": str(tmp_path),
+        "GTKB_GUARD_CWD": str(tmp_path),
+        "GTKB_NATIVE_CONTEXT_ID": "deepseek-sdk-guard-view-test",
+        "GTKB_GUARD_LOG": str(log),
+    }
+    done = subprocess.run(
+        [node, str(harness), str(SDK_SOURCE / "gtkb_guard.mjs")],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=240,
+        env=env,
+        cwd=tmp_path,
+        creationflags=FLAGS,
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    results = json.loads(done.stdout.strip().splitlines()[-1])
+    for key in ("credentialView", "passwordFileView", "envFileView"):
+        assert "credential material" in results[key], (key, results[key])
+    assert "environment listing" in results["envListing"]
+    assert results["ordinaryView"] is None and results["exampleView"] is None, "every other read passes"
+    decisions = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
+    assert [d["tool"] for d in decisions] == ["str_replace_editor"] * 5 + ["pwsh"], "every view reached the gate"
+    assert [d["allowed"] for d in decisions] == [False, False, False, True, True, False]

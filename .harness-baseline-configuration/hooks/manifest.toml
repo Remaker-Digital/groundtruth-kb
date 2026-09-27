@@ -46,9 +46,11 @@ timeout_seconds = 5
 # Session write isolation uses the shared native effect gate. The CLI resolves
 # the current binding, registered checkout, exact artifact claim and scratch
 # scope; missing identity or unavailable authority cannot imply permission.
+# Read events reach the gate too: it refuses agent reads of credential
+# material (c117, after the 2026-09-26 M13 incident) and allows other reads.
 [[hook]]
 event = "pre_tool_use"
-intents = ["file_write", "shell_exec"]
+intents = ["file_write", "shell_exec", "read_access"]
 script = "implementation_start_gate.py"
 script_root = "project_scripts"
 blocking = true

@@ -4,6 +4,8 @@
 // effect (editor create/replace/insert, PowerShell command) is checked by the
 // shared GT-KB effect gate, which resolves the current binding, registered
 // checkout, exact artifact claim and scratch scope through the native CLI.
+// Editor views go to the same gate as reads, which refuses credential material
+// (c117) and allows every other read.
 // The guard is monotonic: a later allowing pre-execution listener cannot
 // override a denial. Anything but a clean empty decision denies.
 import { spawnSync } from 'node:child_process';
@@ -31,9 +33,13 @@ export function apply(ctx) {
     let payload;
     if (input.name === 'str_replace_editor') {
       const command = input.arguments?.command;
-      if (command === 'view') return undefined;
-      if (!EDITOR_EFFECTS.has(command)) return 'GT-KB guard: unknown editor effect';
-      payload = { tool_name: 'Write', tool_input: { file_path: input.arguments?.path } };
+      if (command === 'view') {
+        payload = { tool_name: 'Read', tool_input: { file_path: input.arguments?.path } };
+      } else if (!EDITOR_EFFECTS.has(command)) {
+        return 'GT-KB guard: unknown editor effect';
+      } else {
+        payload = { tool_name: 'Write', tool_input: { file_path: input.arguments?.path } };
+      }
     } else if (input.name === 'pwsh') {
       payload = { tool_name: 'Bash', tool_input: { command: input.arguments?.command } };
     } else {

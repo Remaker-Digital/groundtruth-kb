@@ -1540,6 +1540,116 @@ def _direct_git_effect_from_payload(payload: dict[str, Any]) -> str | None:
     return None
 
 
+# Credential material (owner decision after the 2026-09-26 M13 host I incident: "Fix first: c117"). An agent context
+# never reads, searches, lists, prints or writes credential material: credential files and folders, .env files, the
+# environment's listing or a secret-named variable. Whatever an agent reads enters a conversation sent to its model
+# provider, so the refusal covers reads as well as effects and applies before binding and scope. The owner handles
+# credentials in their own terminal.
+CREDENTIAL_FILE_NAMES = frozenset({"pgpass", ".pgpass", "pgpass.conf", "pg_service.conf", ".pg_service.conf"})
+CREDENTIAL_ENV_FILE_SAFE_SUFFIXES = (".example", ".sample", ".template", ".dist")
+# Files the owner declares credential-bearing, relative to a project root (lower case).
+DECLARED_CREDENTIAL_PATHS = frozenset(
+    {
+        "memory/topics/reference_openai_api_key.md",
+        ".quality/release-candidate-tracked-secrets.json",
+        "groundtruth-kb/tests/fixtures/bridge_spike_minimized_governance_hooks/credential_scan.py",
+        "applications/agent_red/docs/owner-messages-all.json",
+    }
+)
+SECRET_VARIABLE_NAME = re.compile(r"KEY|PASSWORD|PASSWD|SECRET|TOKEN|CREDENTIAL|PGPASS", re.IGNORECASE)
+# Native read and search tools: every string argument (paths, globs, patterns) is inspected.
+CREDENTIAL_READ_TOOLS = frozenset(
+    {
+        "read",
+        "grep",
+        "glob",
+        "ls",
+        "view",
+        "notebookread",
+        "read_image",
+        "read_file",
+        "view_file",
+        "list_dir",
+        "find_by_name",
+        "grep_search",
+        "codebase_search",
+        # Goose's read-only tools, forwarded by its adapter under their namespaced names (developer__tree, ...).
+        "tree",
+        "list",
+        "search",
+    }
+)
+# Write, edit and unknown tools: only their target-path arguments are inspected, never the content they carry.
+CREDENTIAL_TARGET_KEYS = ("file_path", "notebook_path", "path", "target_file", "TargetFile", "AbsolutePath")
+_CREDENTIAL_TOKEN = re.compile(r"[^\s'\"`;|&(){}<>,=]+")
+_ENVIRONMENT_LISTINGS = (
+    # PowerShell's Env: drive, listed whole or by wildcard.
+    re.compile(r"(?i)\b(?:get-childitem|gci|dir|ls)\s+(?:-(?:literal)?path\s+)?['\"]?env:"),
+    re.compile(r"(?i)\benv:[\\/]?[^\s'\"`;|&()]*[*?]"),
+    re.compile(r"(?i)\[(?:system\.)?environment\]::getenvironmentvariables\s*\("),
+    # POSIX and cmd listings as whole commands.
+    re.compile(r"(?i)(?:^|[;&|(\n]\s*)(?:printenv|env|set|export\s+-p|declare\s+-x|compgen\s+-e)\s*(?=$|[;&|)\n])"),
+    # The whole mapping from Python or Node.
+    re.compile(r"(?i)\bos\.environ\b(?!\s*(?:\[|\.get\s*\())"),
+    re.compile(r"(?i)\bprocess\.env\b(?!\s*(?:\[|\.[A-Za-z_]))"),
+)
+_SECRET_VARIABLE_REFERENCES = (
+    re.compile(r"(?i)\benv:([A-Za-z_][A-Za-z0-9_]*)"),
+    re.compile(r"(?i)getenvironmentvariable\s*\(\s*['\"]([A-Za-z_][A-Za-z0-9_]*)"),
+    # POSIX variables are upper case by convention; a lower-case shell variable such as $key is not an environment read.
+    re.compile(r"\$\{?([A-Z_][A-Z0-9_]*)\}?"),
+    re.compile(r"%([A-Za-z_][A-Za-z0-9_]*)%"),
+    re.compile(r"(?i)\bos\.environ\s*(?:\[\s*|\.get\s*\(\s*)['\"]([A-Za-z_][A-Za-z0-9_]*)"),
+    re.compile(r"(?i)\bos\.getenv\s*\(\s*['\"]([A-Za-z_][A-Za-z0-9_]*)"),
+    re.compile(r"(?i)\bprocess\.env(?:\.|\[\s*['\"])([A-Za-z_][A-Za-z0-9_]*)"),
+)
+
+
+def _credential_path(token: str) -> bool:
+    """Return whether one path-like token names credential material."""
+    text = token.strip().replace("\\", "/")
+    segments = [segment for segment in text.lower().split("/") if segment not in ("", ".")]
+    if not segments:
+        return False
+    name = segments[-1]
+    if name in CREDENTIAL_FILE_NAMES or name.endswith(".pgpass"):
+        return True
+    if name == ".env" or (name.startswith(".env.") and not name.endswith(CREDENTIAL_ENV_FILE_SAFE_SUFFIXES)):
+        return True
+    # A credentials folder is named as a path segment; the bare word in prose is not a path.
+    if "credentials" in segments[:-1] or (name == "credentials" and "/" in text):
+        return True
+    joined = "/".join(segments)
+    return any(joined == declared or joined.endswith("/" + declared) for declared in DECLARED_CREDENTIAL_PATHS)
+
+
+def _credential_material_access(payload: dict[str, Any]) -> str | None:
+    """Name the credential material one tool call would read, search, list, print or write; None when it names none."""
+    tool = _tool_name(payload).lower()
+    data = _tool_input(payload)
+    command = _command_from_payload(payload, data, tool)
+    if command is not None:
+        for pattern in _ENVIRONMENT_LISTINGS:
+            if pattern.search(command):
+                return "an environment listing"
+        for pattern in _SECRET_VARIABLE_REFERENCES:
+            for match in pattern.finditer(command):
+                if SECRET_VARIABLE_NAME.search(match.group(1)):
+                    return f"the secret-named variable {match.group(1)}"
+        texts = [command]
+    elif _is_apply_patch_tool(tool) or any("*** Begin Patch" in value for value in _string_values(payload)):
+        texts = _paths_from_apply_patch(_project_root(payload), _apply_patch_text(payload, data))
+    elif Path(tool).name.rsplit("__", 1)[-1] in CREDENTIAL_READ_TOOLS:
+        texts = _string_values(data)
+    else:
+        texts = [str(data[key]) for key in CREDENTIAL_TARGET_KEYS if isinstance(data, dict) and data.get(key)]
+    for text in texts:
+        for token in _CREDENTIAL_TOKEN.findall(text):
+            if _credential_path(token):
+                return str(token)
+    return None
+
+
 def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     root = _project_root(payload)
     tool = _tool_name(payload).lower()
@@ -1604,6 +1714,14 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "owner_operation_only",
             f"{owner_operation} is an owner operation (D61): the owner performs it from the GT-KB Home's controls "
             "or their own terminal.",
+        )
+    credential = _credential_material_access(payload)
+    if credential is not None:
+        return blocked(
+            "credential_material_protected",
+            f"Agents do not read, search, list, print or write credential material ({credential}): credential files "
+            "and folders, .env files, environment listings and secret-named variables stay with the owner, who "
+            "handles credentials in their own terminal.",
         )
     root = _project_root(payload)
     cwd = Path(str(payload.get("cwd") or root)).absolute()

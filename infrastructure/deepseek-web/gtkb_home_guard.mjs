@@ -2,7 +2,8 @@
 //
 // Every effect-bearing tool call of every Home session is checked by GT-KB's shared effect gate
 // (scripts/implementation_start_gate.py) under that session's own native context identifier and workspace, read per call
-// from execution.agent.session.header. Reads pass without a gate call; network tools and unrecognized tools are denied.
+// from execution.agent.session.header. File reads and searches reach the same gate as reads: it refuses credential material
+// (c117) and allows the rest. Other non-effect tools pass without a gate call; network and unrecognized tools are denied.
 // The gate runs asynchronously in the tools/pre-execute stage, and its approval is bound to the exact arguments. The
 // monotonic ctx.tools.guard backstop denies any effect that reaches execution without that approval (a skipped or
 // reordered stage, or arguments changed after approval). Anything but a clean empty gate answer denies: exit status,
@@ -17,9 +18,11 @@ export const inject = ['tools'];
 
 const GATE_TIMEOUT_MS = 20000;
 const READ_ONLY = new Set([
-  'read', 'glob', 'grep', 'read_image', 'skill', 'todo_write', 'ask_user_question', 'get_goal', 'create_goal',
+  'skill', 'todo_write', 'ask_user_question', 'get_goal', 'create_goal',
   'update_goal', 'list_agents', 'job_list', 'job_output', 'job_kill', 'exit_plan_mode', 'send_message', 'interrupt_agent',
 ]);
+// File reads and searches: gated as reads with every argument, so a credential path or glob is refused (c117).
+const FILE_READS = { read: 'Read', read_image: 'Read', glob: 'Glob', grep: 'Grep' };
 // Their own calls meet this same host-level guard, so launching them is not itself an effect.
 const ORCHESTRATION = new Set(['subagent', 'subagent_fork', 'ralph']);
 const NETWORK = new Set(['web_fetch', 'web_search']);
@@ -50,16 +53,22 @@ export function classify(execution) {
   }
   let toolInput;
   let claudeTool;
-  if (tool === 'write') {
+  if (Object.hasOwn(FILE_READS, tool)) {
+    claudeTool = FILE_READS[tool];
+    toolInput = { ...args };
+  } else if (tool === 'write') {
     claudeTool = 'Write';
     toolInput = { file_path: absolute(cwd, args.file_path ?? args.path) };
   } else if (tool === 'edit') {
     claudeTool = 'Edit';
     toolInput = { file_path: absolute(cwd, args.file_path ?? args.path) };
   } else if (tool === 'str_replace_editor') {
-    if (args.command === 'view') return { kind: 'allow' };
-    if (!EDITOR_EFFECTS.has(args.command)) return { kind: 'deny', reason: 'GroundTruth KB: unknown editor effect' };
-    claudeTool = args.command === 'create' ? 'Write' : 'Edit';
+    if (args.command === 'view') {
+      claudeTool = 'Read';
+    } else {
+      if (!EDITOR_EFFECTS.has(args.command)) return { kind: 'deny', reason: 'GroundTruth KB: unknown editor effect' };
+      claudeTool = args.command === 'create' ? 'Write' : 'Edit';
+    }
     toolInput = { file_path: absolute(cwd, args.path) };
   } else if (tool === 'pwsh' || tool === 'bash') {
     claudeTool = 'Bash';
