@@ -102,10 +102,12 @@ request was sent for this review.
 | `@preset/gtkb-openrouter-deepseek-v4-flash` on the right | This is the literal label of a separate composer selector. Its naming suggests a model/provider configuration reference, but its resolved endpoint, model, account, and available choices are not shown. Do not confuse it with the Standard agent-mode preset or copy it as a required model identifier; see [Models and providers](Models#read-the-home-composer-reference). |
 | **New Session** in the sidebar | The captured view has a session entry under the workspace, but no submitted prompt or response. This does not establish a completed session, persisted history, application registration, or a canonical project/work item. |
 
-The open menu obscures part of the composer, including its left-hand controls.
-Do not infer the complete permission label or placeholder from the covered
-text. The visible send arrow does not prove that submission is enabled or that
-a provider request will succeed. Check workspace, mode, permissions, and the
+The open mode menu obscures part of the composer, including its left-hand
+controls. Do not infer the complete permission label or placeholder from that
+covered text; the later [Home permission capture](Settings#session-permission-menu-on-home)
+shows Workspace Write checked in a separate menu. The visible send arrow does
+not prove that submission is enabled or that a provider request will succeed.
+Check workspace, mode, permissions, and the
 resolved model/provider separately before using non-sensitive sample content.
 
 ### Understand the session mode and permissions
@@ -119,10 +121,17 @@ on active sessions still need testing. A preset does not assign a governed role.
 that a canonical project or work item has been created. Creating a custom preset
 is not a documented first-session prerequisite.
 
-The [Settings reference](Settings) shows the General pane, including the default
-permission mode for new sessions and conversation preferences. Review that
-distinction before treating any displayed permission value as a project
-authorization or a recommendation to change it.
+The [Home permission menu](Settings#session-permission-menu-on-home) is a separate
+control at the lower left of the composer. The supplied capture lists **Read
+Only**, **Workspace Write** (checked), and **Full access**. These are permission
+choices, not the Standard/PTC/Minimal/Creator agent modes or the model reference.
+
+The [General Settings reference](Settings#general-settings) describes a default
+permission mode for new sessions. Its relationship to the composer selection,
+and each choice's exact permitted operations, still need testing. Inspect the
+displayed permission before the first request; do not select Full access merely
+to resolve an unexplained refusal. Neither a permission label nor a mode
+selection authorizes project work.
 
 ### Check the model/provider setup for your intended session
 

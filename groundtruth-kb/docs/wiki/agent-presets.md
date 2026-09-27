@@ -95,9 +95,12 @@ recovery. No menu option was selected by the reviewer.
 
 [Models and providers](Models) concerns provider configuration and model-choice
 guidance. [Plugins](Plugins) concerns plugin configuration and inventory.
-[General Settings](Settings) shows a separately labeled session Permission
-control. A preset describes a composition of tools, prompt, and capabilities;
-none of its labels establishes the actual permission boundary by itself.
+[General Settings](Settings) describes a default Permission for new sessions.
+The separate [Home permission menu](Settings#session-permission-menu-on-home)
+now shows Read Only, Workspace Write (checked), and Full access. These are not
+the four agent modes. A preset describes a composition of tools, prompt, and
+capabilities; none of its labels establishes the actual permission boundary by
+itself, and Minimal is not equivalent to Read Only.
 
 Selecting a preset does not assign Prime Builder or Loyal Opposition, authorize
 a project, establish independent review, or grant durable ownership of a work

@@ -44,7 +44,10 @@ folder-shaped icon does. The [selected-workspace view](Get-Started#home-with-a-s
 also exposes a separate right-hand composer selector labeled with an
 `@preset/...` reference. Keep the workspace, agent mode, model/provider
 configuration, and session permissions distinct; a visible name or send arrow
-is not a completed first-response test.
+is not a completed first-response test. A further [Home permission capture](Settings#session-permission-menu-on-home)
+shows Read Only, Workspace Write (checked), and Full access at the lower left
+of the composer. This documents the menu, not the enforcement boundary or an
+instruction to broaden access.
 
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in

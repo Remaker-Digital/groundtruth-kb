@@ -28,8 +28,13 @@ them, not replace them.
    Explain Add provider versus Add a custom provider, the status indicator, and
    how the separate composer reference resolves to the provider/model, distinct
    from the agent-mode preset. Keep real keys off-camera, identify usage and
-   data-destination implications, and use non-sensitive sample content. Include
-   session permission scope and the verified busy-input behavior.
+   data-destination implications, and use non-sensitive sample content. The
+   [Home permission menu](Settings#session-permission-menu-on-home) now supplies
+   Read Only, Workspace Write, and Full access as visible choices. Demonstrate
+   the qualified permission scope and correct refusals using disposable sample
+   files, distinguish the General default from the composer selection, and
+   explain when changes take effect. Do not teach Full access as a routine
+   prerequisite or error-recovery shortcut. Include verified busy-input behavior.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent

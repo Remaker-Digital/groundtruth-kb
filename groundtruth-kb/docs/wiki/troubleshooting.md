@@ -125,6 +125,28 @@ error, and expected result for [Support](Support). Do not attach API keys,
 authorization headers, credential-bearing URLs, configuration files, or private
 prompts. The exact provider setup and error-recovery walkthrough remains open.
 
+## A permission label does not explain a refusal
+
+The [Home permission menu](Settings#session-permission-menu-on-home) shows
+Read Only, Workspace Write, and Full access. The screenshot establishes labels
+and a selected state, not the exact operations each permits. First distinguish
+the current composer permission from the General default for new sessions,
+the agent-mode preset, and the separate model/provider reference.
+
+Record the installed version, displayed permission, intended operation, whether
+the session is new or already running, and the exact redacted refusal. Check
+the intended workspace's resolved path through the supported interface and
+consult the release-specific permission contract. Do not infer an out-of-scope
+path or misconfiguration solely from the refusal, and do not retry a potentially
+destructive operation just to test the label.
+
+A correctly refused operation is not a defect. Do not switch to Full access,
+broaden the workspace, bypass a prompt, or manually edit generated configuration
+as a generic repair. If the expected behavior or permitted recovery route is
+unclear, use [Support](Support) with non-sensitive evidence; never include
+credentials or private file contents. Permission enforcement and change timing
+still require controlled qualification.
+
 ## A plugin section is visible but a tool is unavailable or refused
 
 The [Plugins overview](Plugins) distinguishes configuration sections from a

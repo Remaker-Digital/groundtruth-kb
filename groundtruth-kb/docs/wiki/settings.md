@@ -1,12 +1,13 @@
 # Settings
 
-**Status:** Illustrated General Settings reference and navigation; interaction checks pending
+**Status:** Illustrated General Settings and Home permission reference; interaction checks pending
 
 **Reviewed:** 2026-09-26
 
 Open **Settings** at the lower left of [GTKB Home](GTKB-Home), then select
-**General**. This page describes the supplied view of the integrated harness
-GUI; it does not change any settings or document unobserved dropdown options.
+**General**. This page describes the supplied General view and the separate
+permission menu on Home. It records visible choices, not tested enforcement,
+and does not change any settings.
 
 For the **GTKB** tab, see the separate illustrated [GTKB status guide](Status).
 For **GTKB services**, see the illustrated [service-management guide](Services).
@@ -25,12 +26,46 @@ they are not established factory defaults or recommendations for every user.
 
 | Setting | Value shown | Explanation supported by the visible UI |
 | --- | --- | --- |
-| **Permission** | **Workspace Write** | The helper text identifies this as the default permission mode for **new sessions**. The available alternatives and the precise operations this mode permits are not shown. |
+| **Permission** | **Workspace Write** | The helper text identifies this as the default permission mode for **new sessions**. This General dropdown is closed; the later Home capture below shows three composer-menu choices, not proof of identical options or synchronized state in both places. Precise allowed operations remain untested. |
 | **Language** | **English** | English is selected. The list of supported languages is not expanded. |
 | **Appearance** | **System** | System is highlighted; Light and Dark are also offered. Theme switching and system-theme tracking have not been tested in this review. |
 | **Font size** | **14 px** | The helper text says this affects conversation content only. It does not promise to resize the complete interface. |
 | **Conversation display** | **Compact** | The helper text says this controls process content in completed turns. The exact content collapsed or retained, and other display choices, are not shown. |
 | **Enter behavior while busy** | **Queue** | The setting applies while busy. The helper text says Cmd/Ctrl+Enter uses the other behavior, but does not name that behavior in this view. |
+
+## Session permission menu on Home
+
+On the supplied Home screen, the **Workspace Write** control is at the lower
+left of the composer, beside the plus-shaped control. Its open menu shows
+**Read Only**, **Workspace Write**, and **Full access**. Workspace Write has a
+checkmark and remains the label on the composer control.
+
+![GTKB Home with the composer permission menu open, showing Read Only, Workspace Write with a checkmark, and Full access. The composer control also reads Workspace Write; the sidebar shows GT-KB and New Session, and the right-hand model-reference selector remains visible. No prompt or response is shown.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-permissions.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. This captures a selected permission label, not a
+reviewer-executed permission change or enforcement test. The workspace name
+and model-reference label are examples from this installation. The reviewer did
+not change permissions or execute commands, access files, or send a model
+request through GTKB.
+
+| Visible choice | State in this capture | Boundary the documentation still needs to establish |
+| --- | --- | --- |
+| **Read Only** | Listed; no checkmark. | Which reads, tool calls, shell operations, network requests, and side effects are allowed or refused. The name alone is not proof that every tool is side-effect-free, that requests stay local, or that provider usage has no cost. |
+| **Workspace Write** | Checked; also displayed on the composer control. | The exact workspace boundary, supported writes and other operations, access outside that boundary, and approval/refusal behavior. A short workspace name does not establish the resolved filesystem scope. |
+| **Full access** | Listed; no checkmark. | Which restrictions change, what remains restricted, and any confirmation or approval behavior. The label does not establish unrestricted operating-system privileges or permission to perform every advertised action. |
+
+The menu identifies these three choices in this captured build. It does not
+demonstrate switching, dismissal without a change, saving, persistence, or
+behavior during an active turn. It also does not show an escalation warning;
+that does not prove no warning appears after selecting a broader option.
+
+Before the first request, inspect the displayed permission and consult the
+installed release's supported scope guidance. Do not choose **Full access**
+simply to get past an unexplained refusal or setup problem. If the required
+scope or effect of a change is unclear, use [Support](Support) rather than
+testing broader access against production files. See the
+[permission troubleshooting guidance](Troubleshooting#a-permission-label-does-not-explain-a-refusal).
 
 ## Session permissions and governed work
 
@@ -39,15 +74,19 @@ harness permission mode is not authorization to implement a project and does
 not replace the review requirements in [Core concepts](Core-Concepts).
 
 Do not infer the precise file boundary, permitted operations, or approval-prompt
-behavior from the name **Workspace Write** alone. Those details need a tested
-permission-mode reference. The **Standard mode** selector on Home is a
-differently labeled control. The [Agent presets capture](Agent-Presets) now
-describes a matching built-in preset's tools and capabilities; it does not
-establish the permission boundary or interaction with the Permission setting.
+behavior from any permission name alone. Those details need a tested
+permission-mode reference. The **Standard mode** selector on Home describes
+the agent's tool/prompt/capability preset, not its permission level. The separate
+right-hand `@preset/...` [composer reference](Models#read-the-home-composer-reference)
+is another control; it does not establish permission scope either.
 
-The Permission helper explicitly refers to new sessions. Do not assume a change
-will alter an already running session. The effect and persistence of changes
-must be checked against the installed release before relying on them.
+The General Permission helper explicitly refers to a default for new sessions.
+The Home menu is presented in the composer. Both supplied captures display
+Workspace Write, but matching labels do not establish inheritance, overrides,
+synchronization, or persistence. Test changing the default separately from
+changing the composer selection; document effects on pending, new, and already
+running sessions, including a busy turn and later tool calls. Do not assume a
+change retroactively alters a running operation or a prior permission grant.
 
 ## Other visible settings sections
 

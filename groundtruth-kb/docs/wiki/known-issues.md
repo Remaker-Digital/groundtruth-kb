@@ -34,8 +34,10 @@ This page records material adoption gaps, not every internal development item.
   [Windows directory picker](Get-Started#the-windows-directory-picker) and
   [Home with a selected workspace](Get-Started#home-with-a-selected-workspace),
   including the open mode menu and separate composer reference. The latter
-  capture reveals PTC's complete description. Resolved workspace path,
-  selection/cancellation and persistence behavior, mode-switching and permission
+  capture reveals PTC's complete description. The [Home permission menu](Settings#session-permission-menu-on-home)
+  now illustrates Read Only, Workspace Write (checked), and Full access.
+  Resolved workspace path, selection/cancellation and persistence behavior,
+  mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
   expanded plugin controls, plugin inventory, custom authoring, and a successful
   first session still need version-pinned coverage and interaction checks.
@@ -81,9 +83,10 @@ performed for this review. See [Get started](Get-Started#the-windows-directory-p
 
 ## Settings review
 
-These additional findings use the owner-supplied General Settings screenshot
-received 2026-09-26. The [Settings reference](Settings) records the visible values
-without treating them as shipped defaults or tested behavior. Separate captures
+These additional findings use the owner-supplied General Settings and Home
+permission-menu screenshots received 2026-09-26. The [Settings reference](Settings)
+records visible values and the three composer-menu choices without treating
+them as shipped defaults or tested behavior. Separate captures
 now illustrate **GTKB** in the [status guide](Status) and **GTKB services** in the
 [Services guide](Services), with **GTKB controls** in its own [reference](Controls).
 These observations do not change what was visible on the earlier Home empty
@@ -91,12 +94,14 @@ state, and service actions and configuration edits remain untested.
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
-| **Must** | Permission is **Workspace Write**, and the helper describes a default for new sessions. | Document every actual permission option, allowed operations, scope, and approval behavior. Test new versus existing sessions and distinguish session permissions from project authorization. |
+| **Must** | General labels Permission as a default for new sessions; the separate Home menu shows Read Only, Workspace Write (checked), and Full access. | Document the scope and relationship of both controls: inheritance/overrides, actual General dropdown choices, changes to pending/new/active sessions, and persistence. Matching Workspace Write labels do not prove synchronization. Distinguish permission from agent mode, model reference, and project authorization. |
+| **Must** | Permission names and a checkmark are visible, but no allowed/refused operation is shown. | Define and test each mode's actual filesystem boundary, tool/shell/network effects, approval behavior, and correct refusals in a separate test workspace with disposable files. Verify outside-workspace handling, useful diagnostics, no unintended partial mutation on refusal, and the effect of changes during a busy turn. Do not claim a tested sandbox or unrestricted OS privileges from labels alone. |
 | **Must** | No Save, Apply, or Reset control is visible in the General pane. | Make save/apply timing and recovery clear. Test persistence after closing/reopening settings and restarting Home, and state which changes require a new session. Do not assume automatic saving from the absence of a button. |
 | **Must** | **Enter behavior while busy** is **Queue**; the helper calls Cmd/Ctrl+Enter's action only the other behavior. | Name both actions and explain what happens to the active turn and subsequent input. Verify Enter and Ctrl+Enter on Windows in a safe test session. Do not invent the alternate action's name. |
 | **Should** | **Compact** controls process content, but its exact visible effect is not illustrated. | Provide a before/after example using non-sensitive sample content. Explain what becomes hidden and whether it can be revealed again. |
 | **Should** | **Open configuration file** does not name its target in the visible label. | Identify the target and settings scope, supported editing route, and recovery instructions before asking customers to use it. Do not direct manual edits to generated harness configuration. |
-| **Don't** | Selected values and six additional settings-section labels are visible. | Do not present these selected values as factory defaults, a permission label as proven enforcement, or a settings tab as evidence that its services or integrations are configured and healthy. |
+| **Should** | The Home permission menu offers three short names without explaining their precise effects in the captured view. | Provide concise, accessible scope guidance and clearly explain broader access before it takes effect. Verify keyboard selection/dismissal, focus, announced selected state, and any confirmation/recovery flow. The screenshot does not prove a later escalation warning is present or absent. |
+| **Don't** | Selected values, permission choices, and other settings-section labels are visible. | Do not present these values as factory defaults, a permission label as proven enforcement, or a settings tab as service health. Do not equate Minimal with Read Only, treat Read Only as offline or free of provider charges, or teach Full access as a prerequisite or generic workaround for a refusal. |
 
 ## Status pane review
 
