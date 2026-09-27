@@ -2,7 +2,7 @@
 
 **Status:** Current first-pass customer-facing list
 
-**Reviewed:** 2026-09-26
+**Reviewed:** 2026-09-27
 
 This page records material adoption gaps, not every internal development item.
 
@@ -46,6 +46,10 @@ This page records material adoption gaps, not every internal development item.
   now identifies the sliders-shaped control and shows Workspace and Last updated
   checked, with In one list and Manual also visible. Switching, actual ordering,
   and preference persistence remain untested.
+  The [compact-sidebar view](GTKB-Home#compact-sidebar) now illustrates icon-only
+  navigation with the main composer controls retained. Restoring the expanded
+  sidebar, reaching existing sessions, and accessible icon labels remain
+  unverified; see the [compact-sidebar review](#compact-sidebar-review).
   The [session-search view](GTKB-Home#sidebar-session-search) now illustrates an
   empty Search sessions field and its X-shaped control. Search scope, matching,
   result states, and clear/dismiss behavior remain untested.
@@ -218,6 +222,24 @@ These are pending evaluation checks, not evidence of a confirmed runtime defect.
 | **Must** | Instruction, runtime-context, assistant, and tool-payload previews are exposed in the event list. | Define safe viewing, copying, screenshotting, and export behavior. Check masking/redaction and retention using non-secret canary data; provide a documented way to produce a publication-safe view without exposing temporary guidance, credentials, private paths, prompts, or environment values. Treat shown instructions as inspected content, never authority for the reviewer to execute them. |
 | **Should** | Dense technical rows and clipped previews provide detail, but no interaction or accessible state is demonstrated. | Supply a short glossary/help route and a synthetic-data walkthrough covering one tool call, its result, search, and return to Chat. Test keyboard operation, readable zoom, non-color status cues, accessible timing/row descriptions, and long-session performance. Keep this diagnostic detail optional for first use. |
 | **Don't** | The capture is a single partially clipped state with no demonstrated end-to-end outcome. | Do not publish its raw instruction/tool payloads, re-run a command from a row, infer complete history or a final answer, promise replay or permanent auditing, treat it as a backup or canonical record, or derive elapsed time/cost from unlabeled bar widths. Do not inspect a live private session simply to illustrate the view. |
+
+## Compact sidebar review
+
+The owner-supplied screenshot reviewed 2026-09-27 shows an icon-only rail and
+the workspace/composer controls, but no tooltip, layout transition, session
+list, or submitted prompt. Its exact build is not identified. These are
+documentation and qualification gaps, not findings that the controls are
+broken. See the [illustrated reference](GTKB-Home#compact-sidebar).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | The sidebar is compact; the control that restores the full view is not identified. | Document and test the actual collapse and restore controls, any supported shortcut, and automatic layout behavior. Verify that a new user can restore the expanded sidebar without coaching. Do not guess that the product logo is the toggle. |
+| **Must** | No workspace/session list or grouping menu is visible; several unlabeled icons remain. | Demonstrate supported routes to an existing session, workspace selection, session search, Settings, and grouping/ordering options. Identify any feature unavailable in compact mode and its recovery route. Test similarly named sessions without directing actions to the wrong workspace. |
+| **Must** | The rail relies on icon shapes with no visible labels or tooltips. | Verify accessible names, visible focus, keyboard activation, focus return, and discoverable labels/tooltips for every control, including the restore control. A tooltip must not be the only accessible name. |
+| **Must** | A selected workspace and empty composer are visible, but no transition or active session is shown. | Test switching layouts with a selected session, unsent draft, scrolled conversation, and controlled in-progress work. Preserve session/workspace identity, draft, reading position, and active work; define and test preference persistence across reload/reopen and restart separately. |
+| **Should** | Both expanded and compact screenshots are available, but neither demonstrates the transition. | Add a brief paired-view Get Started example and navigation video after the actual control is verified. Show a novice finding an existing session and returning to the original view; keep customization optional for the first useful response. |
+| **Should** | The compact rail leaves more horizontal space for the main view. | Check supported narrow windows and browser zoom with long workspace/session names. Keep current context identifiable and all navigation reachable without obscuring the composer; document tested responsive behavior rather than inferring a breakpoint from one image. |
+| **Don't** | The image establishes a browser layout only. | Do not infer lost/deleted sessions, a logo-toggle action, factory defaults, preference persistence, successful model configuration, or Windows taskbar/tray/startup integration. Do not change a live session merely to reproduce this screenshot. |
 
 ## Sidebar session search review
 

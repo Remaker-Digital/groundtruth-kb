@@ -2,7 +2,7 @@
 
 **Status:** Training plan; videos not yet published
 
-**Reviewed:** 2026-09-26
+**Reviewed:** 2026-09-27
 
 Written, versioned instructions remain the primary source. Videos will supplement
 them, not replace them.
@@ -47,6 +47,12 @@ them, not replace them.
    ordering, and finding the same session again; distinguish view options from
    selecting the working directory or setting canonical work priority. Keep
    customization optional, and do not invent a drag gesture for Manual.
+   Pair the expanded view with the [compact sidebar](GTKB-Home#compact-sidebar)
+   once its collapse/restore control is verified. Show the actual control and
+   accessible keyboard route, locating an existing session, and returning
+   without losing the selected workspace or draft. Include readable zoom and
+   the icon labels; do not teach the product logo as a toggle from appearance
+   alone or make layout customization a prerequisite.
    Extend that tour with the [session-search view](GTKB-Home#sidebar-session-search)
    after its behavior is tested: demonstrate a known match, a no-match case,
    identifying the correct workspace/session, and returning to the unfiltered

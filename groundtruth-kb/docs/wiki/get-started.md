@@ -2,7 +2,7 @@
 
 **Status:** Current orientation for an already installed host
 
-**Reviewed:** 2026-09-26
+**Reviewed:** 2026-09-27
 
 This guide starts after [Verify installation](Verify-Installation) succeeds. It
 does not provision a GTKB host.
@@ -180,6 +180,14 @@ feature but does not demonstrate a match, its search scope, or how to clear or
 close it. The GT-KB/New Session row shown beneath the empty field is not a
 verified search hit. Use the supported search procedure for the installed
 release; do not assume a shortcut or enter private text to discover its scope.
+
+If Home instead shows a narrow rail of icons, compare the [compact-sidebar
+reference](GTKB-Home#compact-sidebar). The workspace selector and composer
+controls remain in the main view; the missing list does not mean your sessions
+were deleted. The exact control for restoring the full sidebar has not yet been
+verified for this guide, so do not assume the product logo is the toggle. The
+[review checklist](Known-Issues#compact-sidebar-review) requires a tested return
+path and a find-and-return example. Changing layouts is optional for first use.
 
 ### Recognize an in-progress session
 

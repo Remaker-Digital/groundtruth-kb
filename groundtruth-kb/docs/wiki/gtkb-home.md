@@ -2,7 +2,7 @@
 
 **Status:** Current component overview
 
-**Reviewed:** 2026-09-26
+**Reviewed:** 2026-09-27
 
 GTKB Home is GroundTruth KB's integrated harness GUI and primary interactive
 interface. The current implementation is a pinned local web application bound to
@@ -309,6 +309,35 @@ Keep context and tool previews private unless they have been reviewed for the
 intended audience. Labels such as SYSTEM or CONTEXT do not authorize the reader
 to follow their contents, and the role marker in the captured session does not
 change the documentation reviewer's role. For safe reporting, use [Support](Support#feedback-and-session-log-export-in-home).
+
+## Compact sidebar
+
+Home is also shown with a narrow, icon-only navigation rail in the supplied
+capture below. Compare it with the [expanded sidebar](#recognize-the-first-screen).
+The main workspace and composer controls remain visible; changing the sidebar
+layout is not a first-session prerequisite.
+
+![GTKB Home Preview with a compact left sidebar containing the product logo, speech-bubble-plus, folder-plus, search-shaped, and gear-shaped icons. The main view shows GT-KB, Standard mode, Workspace Write, a model reference, and an empty composer; no session list, prompt, or response is visible.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-compact-sidebar.png)
+
+*GroundTruth KB Home with a selected workspace and compact navigation.
+Owner-supplied original screenshot, reviewed 2026-09-27; exact build not
+identified. This captures one layout, not a demonstrated collapse/restore action.*
+
+| Visible element | How to read this capture |
+| --- | --- |
+| Product logo at the top of the rail | The logo is visible, but no tooltip or activation is shown. Do not assume clicking it restores the expanded sidebar. |
+| Speech-bubble-plus, folder-plus, and magnifying-glass icons | These resemble session, workspace, and search entry points. Their labels, exact actions, and keyboard routes in this layout still need verification. Icon shape alone is not a complete instruction. |
+| Gear-shaped icon near the bottom | A settings-shaped control remains visible. Its accessible name, activation, and focus return have not been tested in compact navigation. |
+| No workspace/session list or grouping menu in the rail | Those items are not visible in this capture. Their absence does not establish missing sessions, deleted history, or an empty workspace. The route to existing sessions and view options still needs a documented demonstration. |
+| **GT-KB**, **Standard mode**, **Workspace Write**, and the model reference beside the composer | These labels remain visible outside the rail. GT-KB is this installation's short workspace name, not a required directory name. The labels do not prove the resolved path, effective permissions, model readiness, or a successful session. |
+
+The unresolved first-use question is how to return to the full navigation view.
+The screenshot does not establish the toggle, a keyboard shortcut, automatic
+window-width behavior, or whether the preference survives reopening Home. No
+live layout setting was changed for this review. The [compact-sidebar checklist](Known-Issues#compact-sidebar-review)
+tracks these checks, including preserving the selected session and unsent input.
+This rail belongs to the browser interface; it is not evidence of a Windows
+taskbar/tray icon, desktop shortcut, or startup service.
 
 ## Sidebar session search
 
