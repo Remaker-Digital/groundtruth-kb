@@ -98,6 +98,14 @@ capabilities, while this reference is displayed under **Model** and its exact
 schema and resolution remain unverified. It does not change permission scope
 or authorize project work.
 
+A later [System prompt excerpt](GTKB-Home#read-the-expanded-system-prompt)
+also describes a model using a preset-style reference. That is displayed prompt
+prose, not independent confirmation of the effective provider/API model, request
+routing, or successful execution. Test its snapshot/refresh behavior against the
+actual selection when supported model changes or reloads occur. The model
+reference is also distinct from the composer's `@` file/session mentions; do
+not assume a shared resolution mechanism merely because both use `@` notation.
+
 Document dismissal/back navigation, keyboard use, focus, change timing,
 persistence, unavailable or unresolved references, and useful recovery before
 recommending model switches. The example label is not a provider/model

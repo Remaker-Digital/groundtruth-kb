@@ -109,24 +109,28 @@ In **Chat**, **System prompt** appears above the user message and grouped
 tool-call summary. A further owner-supplied capture received 2026-09-26 shows
 it expanded, with a downward chevron and a bounded monospaced text region.
 This adds an expanded-panel example; the exact build/version and the action
-that opened it are not shown. A follow-up capture shows a later excerpt and
-a lower position of the inner scrollbar, while the panel header and surrounding
-conversation appear in the same positions. Together they provide evidence of
-separate inner-panel scroll positions, not a demonstrated input gesture or a
+that opened it are not shown. Follow-up captures show later excerpts and
+lower positions of the inner scrollbar, while the panel header and surrounding
+conversation appear in the same positions. The latest excerpt describes a
+model reference, a working directory, and conventions for `@` path references.
+Together the three captures provide evidence of separate inner-panel scroll
+positions, not a demonstrated input gesture, verified runtime metadata, or a
 complete traversal of the prompt.
 
 Prompt inspection is an optional diagnostic view, not a first-session
 prerequisite. The raw captures are not published because they expose prompt
-text and session identifiers; the earlier view also exposes a machine-specific
-path in the prompt.
+text and session identifiers; some views also expose machine-specific paths
+in the prompt.
 No prompt payload or identifiers are transcribed here, and the reviewer did
 not open a live prompt, edit configuration, or execute the displayed text.
 
 | Visible element | How to read it | What still needs definition or testing |
 | --- | --- | --- |
 | **System prompt**, downward chevron, and open text region | The panel is visibly expanded. No editing or save control is demonstrated. | Opening/collapse behavior, accessible name and expanded state, keyboard activation, focus return, persistence across reload/session changes, and draft preservation. Do not describe this as a prompt editor or assume collapse changes the agent's input. |
-| Monospaced text and an inner vertical scrollbar at different positions in two captures | The follow-up reveals a later portion within the same bounded panel; the surrounding conversation appears stationary. Text is still clipped, so neither view supplies the whole prompt. | Scroll input method and edge behavior, completeness, and whether the text is an initial snapshot, current assembled prompt, or another representation. Define source/version, refresh timing, and relationship to Context injection, tools, messages, provider requests, and the context meter. Visible text alone does not prove what was transmitted, applied, or counted. |
-| Main conversation scrollbar and a separate circular down-chevron control above the composer | The pair illustrates distinct prompt and conversation scroll regions; it does not show the down-chevron being activated. That control is separate from the composer's upward arrow. | Exact accessible name and destination, mouse/touch/keyboard access, focus and scroll restoration, behavior at either end of the inner panel, and interaction with new messages. Do not label the down-chevron Jump to latest or assume it resumes generation, follows new output, or sends a message until tested. |
+| Monospaced text and an inner vertical scrollbar at different positions across three captures | The follow-ups reveal later portions within the same bounded panel; the surrounding conversation appears stationary. Text is still clipped, so no view supplies the whole prompt. | Scroll input method and edge behavior, completeness, and whether the text is an initial snapshot, current assembled prompt, or another representation. Define source/version, refresh timing, and relationship to Context injection, tools, messages, provider requests, and the context meter. Visible text alone does not prove what was transmitted, applied, or counted. |
+| Prompt prose describing a model reference and a working directory | The latest excerpt makes statements about the session's model and directory. A preset-style model reference also appears in the composer. | Verify the effective provider/model and working directory separately from prompt prose, short workspace labels, and the harness implementation checkout. Define whether this text is a creation-time snapshot or changes with supported model/workspace changes and reloads. A matching alias is not proof of a resolved API model, and a path in prose is not a current directory readback. See [Models](Models#read-the-home-composer-reference). |
+| Text describing `@` path references, directory notation, and quoting | The excerpt describes intended reference conventions; it does not show a mention picker, resolved path, directory listing, or file-read result. | Document and test file, directory, and session references separately from the composer's model `@preset/...` label. Verify relative-path resolution, trailing-directory notation, spaces/Unicode, missing or inaccessible targets, and useful failure feedback with synthetic content. A mention does not prove that contents were loaded or inspected, authorize broader access, or establish automatic recursive reading of a directory. |
+| Main conversation scrollbar and a separate circular down-chevron control above the composer | The captures illustrate distinct prompt and conversation scroll regions; they do not show the down-chevron being activated. That control is separate from the composer's upward arrow. | Exact accessible name and destination, mouse/touch/keyboard access, focus and scroll restoration, behavior at either end of the inner panel, and interaction with new messages. Do not label the down-chevron Jump to latest or assume it resumes generation, follows new output, or sends a message until tested. |
 
 The visible wording refers to the underlying harness and a local checkout.
 Explain how those terms relate to GroundTruth KB without treating the shown
@@ -137,6 +141,13 @@ The follow-up exposes maintainer-oriented web-development guidance. Its presence
 in a prompt is not a tested installation or update procedure. Publish supported
 user procedures separately, and keep maintainer-only build steps out of the
 beginner's required path.
+
+The composer advertises `@` files or sessions, while the latest prompt excerpt
+discusses paths. A user-facing mention guide should explain the supported
+selection and resolution behavior with safe examples rather than require users
+to read a system prompt. Keep model selection, workspace selection, referenced
+content, actual file reads, and permission scope distinct. No reference was
+entered or resolved, directory listed, or file read through Home for this review.
 
 For support, report the version, view state, and a synthetic reproduction rather
 than copying the full prompt. Collapsing a panel is not demonstrated redaction;
