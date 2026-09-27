@@ -52,6 +52,15 @@ them, not replace them.
    identifying the correct workspace/session, and returning to the unfiltered
    list without losing a draft. Explain supported search scope and actual
    clear/dismiss controls; the empty-field screenshot is not a search test.
+   Continue into the [in-progress session view](GTKB-Home#read-an-in-progress-session):
+   explain Chat versus the as-yet-unillustrated Trajectory view, context and
+   tool activity versus verified outcomes, busy input, Session log privacy,
+   and the scope of cache/token figures. The supplied image ends at **Deep
+   diving...**; it is not the completed-response demonstration. Use a bounded
+   non-sensitive example and show completion, a useful failure/refusal, and
+   controlled cancellation only after each route is tested. Do not teach the
+   captured role marker as a universal first prompt, infer success from usage
+   counts, or reveal private prompts, environment values, or unreviewed logs.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent

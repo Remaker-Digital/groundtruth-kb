@@ -35,6 +35,14 @@ review. The feedback destination, included data, submission confirmation, and
 failure/retry behavior still need qualification. Do not assume it files a
 GitHub issue or a canonical GTKB defect record.
 
+The later [in-progress Chat view](GTKB-Home#read-an-in-progress-session) also
+shows a **Session log** control with a download icon at the upper right. Its
+format and equivalence to Commands `export` have not been tested. Context
+injection and shell activity labels are visible in the conversation, but the
+underlying content and tool outputs were not opened. Treat those details as
+potentially sensitive; do not request a full environment-variable dump or
+private prompt/context disclosure just to reproduce the screenshot.
+
 A session-log export is not a verified redacted support bundle. Its contents,
 credential handling, destination, and restoration/import capability have not
 been inspected. Do not upload an unreviewed ZIP to a public issue: inspect and

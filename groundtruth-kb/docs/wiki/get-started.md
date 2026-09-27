@@ -181,6 +181,23 @@ close it. The GT-KB/New Session row shown beneath the empty field is not a
 verified search hit. Use the supported search procedure for the installed
 release; do not assume a shortcut or enter private text to discover its scope.
 
+### Recognize an in-progress session
+
+The [in-progress session reference](GTKB-Home#read-an-in-progress-session) now
+shows a submitted message, Chat selected beside Trajectory, context and tool
+activity, **Deep diving...**, a square-marked control, **Session log**, and
+cache/token figures. This closes the missing activity-view illustration gap,
+not the first-completed-response gap. Activity rows and output-token counts do
+not by themselves establish successful tool execution or a finished answer.
+
+The captured `::init gtkb pb` message is historical example content, not a
+generic first-use prompt to copy. Do not infer role initialization, authority,
+or the next action from its title. Use the procedure and assignment appropriate
+to the intended workflow. A qualified first-session example must still show
+completion or failure, explain waiting and cancellation, and preserve the
+distinction between UI activity and canonical results. Keep private prompt,
+context, tool output, and unreviewed session logs out of public reports.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator

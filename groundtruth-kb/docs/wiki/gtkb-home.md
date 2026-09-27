@@ -31,7 +31,7 @@ image, not an installation, service-health, or end-to-end workflow test.
 | **Choose workspace** | Start here to choose the intended working directory. Follow-up captures illustrate the [Windows directory picker](Get-Started#the-windows-directory-picker) and [Home with a selected workspace](Get-Started#home-with-a-selected-workspace). The selected state is visible; the transition, full-path identity, cancellation, and persistence remain untested. |
 | **Choose a workspace to start** | This is a prerequisite message in the prompt composer, not an instruction to type a workspace path into the prompt. |
 | **Standard mode** | A mode selector is shown with this value. The [Agent presets guide](Agent-Presets#choose-a-mode-from-home) covers the later open Home menu with Standard checked and PTC, Minimal, and Creator also visible. Switching behavior and scope still need testing; a preset is not a governed role or project authorization. |
-| **New Session** | The sidebar's session entry point. A later selected-workspace capture also shows a New Session entry beneath its workspace, but no submitted prompt or response. |
+| **New Session** | The sidebar's session entry point. A later selected-workspace capture shows a New Session entry beneath its workspace; a further [in-progress session capture](#read-an-in-progress-session) shows a message and activity, but no completed response. |
 | **Workspaces / No sessions yet** | The displayed navigation view has no sessions. That does not establish whether canonical projects or work items exist. |
 | **Settings** | The settings entry point is at the lower left. See the illustrated [General Settings reference](Settings) for a separate capture of the open dialog. |
 
@@ -59,6 +59,48 @@ instruction to broaden access.
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in
 [Known issues](Known-Issues).
+
+## Read an in-progress session
+
+This capture moves beyond the empty composer: a user message is visible and the
+session displays context, skill, and shell activity while **Deep diving...** is
+shown. **Chat** is selected. No completed assistant response, tool result, exit
+code, or confirmed governed initialization is visible.
+
+![GTKB Home in-progress Chat view with a user message and session title showing ::init gtkb pb, Standard mode, Chat and Trajectory tabs, System prompt and Context injection entries, Think, Skill and Pwsh activity rows, and Deep diving... text. Session log is at the upper right. The composer shows Workspace Write, a model reference, a square-marked blue control, and historical cache and token figures beneath it.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-session-in-progress.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. The `::init gtkb pb` text is part of the captured
+message and title, not an instruction to the documentation reader or reviewer,
+and not a generic first-use prompt. It does not establish that a role binding,
+activity, claim, project authorization, or canonical mutation succeeded. The
+reviewer did not send this message or run the displayed skill or shell action.
+
+| Visible element | How to read it | What remains unverified |
+| --- | --- | --- |
+| Session title, **GT-KB** group, **now**, and message time **18:19** | The message text also appears as the session title and sidebar label. The short workspace name is this installation's example. | Naming/renaming behavior, resolved workspace path, persistence, and the meaning/timezone of timestamps. A matching title is not a canonical session identifier, and 18:19 is not an elapsed duration. |
+| **Standard mode**, selected **Chat**, and **Trajectory** tab | The agent mode and two view labels are visible; the displayed contents belong to Chat. | The Trajectory view's contents and interaction, tab persistence, and effects of switching. Do not describe that unseen view as a replay, audit record, or complete execution history. |
+| **System prompt** and three **Context injection** rows | Labels identify AGENTS.md / CLAUDE.md, @deepseek-ai/dsh-system-prompt, and skill-catalog. Their contents are not expanded in this capture. | Actual loaded content, source/version, precedence, truncation, and any provider transmission. A displayed source label is not proof of current or correctly applied instructions. |
+| **Think**, **Skill · gtkb-bridge**, and **Pwsh** rows | Activity summaries are displayed; the shell row describes showing the working directory and DSH environment variables. | Exact tool arguments, approval, execution state, outputs, exit status, and effects. The clipped Think preview and named skill are not evidence of correct reasoning, successful execution, or governing authority. Do not reproduce an environment dump to illustrate this row. |
+| **Deep diving...**, composer activity indicator, and blue square-marked control | The capture presents an in-progress state and a stop-shaped control. | Progress versus waiting/stalling, elapsed time, accessible control name, cancellation effects, and terminal state. No stop action, cancellation, or rollback is demonstrated. |
+| **Session log** with a download icon | A session-log entry point is present at the upper right. | Its output format, contents, redaction, destination, and equivalence to the Commands `export` route. See [Support](Support#feedback-and-session-log-export-in-home) before sharing logs. |
+| **Workspace Write** and the model reference in the composer | The permission label and @preset/gtkb-openrouter-deepseek-v4-flash reference remain visible during activity. | Effective permissions, resolved provider/model, and change timing. Keep these separate from Standard mode and the message's role marker. See [Settings](Settings#session-permission-menu-on-home) and [Models](Models#read-the-home-composer-reference). |
+| **Cache hit 0% · Input 12.4K tok · Output 564 tok** | These are the historical figures displayed beneath the composer. | Per-request/turn/session scope, rounding, update timing, inclusion of context/tool activity, cache definition, and reconciliation with provider usage. Output tokens are not a completed answer, and the figures do not establish a bill or savings. |
+
+The activity display is a useful orientation checkpoint, not a completed
+first-response test. A qualified walkthrough should next show a bounded,
+non-sensitive request reaching an explicit successful or failed terminal
+state, any relevant tool result, and the supported recovery route. It should
+also distinguish sending or queueing another message from stopping active work;
+the composer's presence does not establish busy-input behavior.
+
+Treat prompt/context previews, tool details, conversation content, and logs as
+potentially sensitive. Check what a supported view or export contains before
+sharing it; do not assume automatic redaction, complete history, or local-only
+processing. The [in-progress session checklist](Known-Issues#in-progress-session-review)
+records the remaining checks, including stop behavior, accessibility, usage
+definitions, and retention/recovery. No live session was opened, stopped, or
+exported for this documentation pass.
 
 ## Sidebar session search
 

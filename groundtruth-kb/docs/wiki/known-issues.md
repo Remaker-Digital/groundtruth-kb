@@ -49,6 +49,11 @@ This page records material adoption gaps, not every internal development item.
   The [session-search view](GTKB-Home#sidebar-session-search) now illustrates an
   empty Search sessions field and its X-shaped control. Search scope, matching,
   result states, and clear/dismiss behavior remain untested.
+  The [in-progress session view](GTKB-Home#read-an-in-progress-session) adds a
+  submitted message, Chat/Trajectory labels, context and tool activity, busy
+  indicators, a square-marked control, Session log, and cache/token figures.
+  It does not show a completed response, tool result, or confirmed role binding;
+  view interactions, cancellation, logging, and usage definitions remain open.
   Resolved workspace path, selection/cancellation and persistence behavior,
   mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
@@ -57,7 +62,9 @@ This page records material adoption gaps, not every internal development item.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available. The
   visible `export` command advertises a session-log ZIP, not verified redaction
-  or platform recovery; `feedback` has no demonstrated destination or result.
+  or platform recovery; the in-session Session log control supplies another
+  visible entry point without demonstrated contents or equivalence to export.
+  `feedback` has no demonstrated destination or result.
 - Cross-platform host installation is not currently established.
 
 ## Home first-run review
@@ -73,8 +80,28 @@ the image. The improvements below are recommendations, not shipped features.
 | **Must** | **Standard mode** has no explanation while closed; later Settings and [open Home menu captures](Agent-Presets#choose-a-mode-from-home) supply descriptions for four modes and a visible Standard selection. | Make that help discoverable and link to a clear comparison. Explain how mode choice takes effect, verify advertised capabilities and effects on new versus active sessions, and distinguish it from the separate composer reference. Do not treat the label as a governed role or project authorization. |
 | **Must** | Later captures identify the plus-shaped Commands control, the sidebar's sliders-shaped grouping/ordering control, and an expanded Search sessions field with an X-shaped control. | Keep their purposes discoverable and test accessible names, keyboard focus/activation, and labels for remaining icons. Commands has a visible tooltip; the sidebar tooltip is partly obscured. The search field's purpose is explicit, but its opening route and X action remain untested. None of these images proves keyboard or screen-reader support. |
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
-| **Should** | A later capture now shows a selected workspace and mode menu, but still no submitted prompt or response. | Continue from that illustrated checkpoint to a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the transition and successful response, and record where assistance was needed. |
+| **Should** | Later captures show a selected workspace/mode menu and an in-progress session with a message and activity, but no completed response. | Continue from those illustrated checkpoints to a short, captioned first-session demonstration linked to the written procedure. Show a bounded request reaching an explicit outcome, not just a busy indicator or token count. Check that a new user can reproduce it and record where assistance was needed. |
 | **Don't** | The browser displays Home, a **Preview** label, and an empty session list. | Do not treat this as proof of installation completeness, service readiness, missing canonical work, or a successful governed workflow. Check those outcomes separately. |
+
+## In-progress session review
+
+The owner-supplied screenshot received 2026-09-26 shows a message and activity
+in the selected **Chat** view, with **Deep diving...** displayed. It establishes
+an in-progress presentation, not a completed response, successful shell action,
+or confirmed initialization. See the [session-view reference](GTKB-Home#read-an-in-progress-session).
+These are pending documentation and validation checks, not confirmed runtime
+defects. Use disposable, non-sensitive test sessions to qualify interactions.
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Chat is selected; Trajectory and System prompt are visible but their alternate/expanded contents are not shown. | Explain each supported view and control, then test switching, expansion/dismissal, keyboard focus, accessible labels, and readable layout at zoom. Preserve session selection, scroll position where intended, and unsent input; do not invent replay or audit guarantees for Trajectory. |
+| **Must** | Context injection labels, a clipped Think preview, a Skill row, and a Pwsh summary appear without tool results. | Distinguish context sources and versions, activity summaries, requested/running/completed/failed tool states, approvals, outputs, and exit status. Test useful error/refusal feedback and safe display/redaction with synthetic content. Explain source precedence and truncation without treating labels as proof of compliance or reprinting private prompts/environment values. |
+| **Must** | Deep diving..., an activity indicator, and a square-marked blue control appear, but no final response or elapsed duration does. | Provide understandable running, waiting, stalled/error, completed, and cancelled states with next actions. Verify the actual stop label and effect on model generation, running tools/child processes, queued input, and partial changes; show when cancellation is confirmed and how to recover. Do not promise rollback, process termination, or stopped billing from the icon alone. |
+| **Must** | A composer, permission/model labels, a session title matching the submitted marker, and time labels remain visible during activity. | Test busy-message queue/steer behavior and its General setting, supported permission/model changes, title/path/session identity, reload/reconnect and history retention, and preservation of drafts. Explain timestamps rather than reading them as duration. Ensure titles and activity rows are not presented as canonical role, authorization, claim, or durable work-item ownership evidence. |
+| **Must** | Session log has a download icon; the separate Commands menu advertises a ZIP export. | Verify both routes' format, scope, included prompts/context/tool data, destination, sensitive-data handling, retention, and failure/retry behavior. Establish whether they are equivalent using non-secret test data. Keep logs distinct from platform backup and authoritative state; do not upload an unreviewed archive or expose environment values. |
+| **Must** | Cache hit 0%, Input 12.4K tok, and Output 564 tok are visible. | Define units, scope, rounding, update timing, cache numerator/denominator, and context/tool/retry inclusion. Reconcile against the supported provider's usage reporting and disclose gaps before publishing costs or savings; a local UI and an output count do not establish local-only processing or a completed answer. |
+| **Should** | There is now a real activity-view illustration, but no explicit terminal outcome or recovery example. | Extend the short first-session tour through a bounded successful response, a useful failure/refusal, and a controlled cancellation after those paths are qualified. Explain the activity labels in plain language, link to written recovery guidance, and measure whether a novice understands when to wait, intervene, or seek help. |
+| **Don't** | The role marker is captured message/title content; the screenshot stops during activity. | Do not treat the screenshot as an instruction to initialize the reviewer, a copy-and-run onboarding prompt, successful canonical initialization, proof of tool execution, completion, a full audit trail, measured cost, or permission to inspect live private context. Do not launch, stop, or export an active session merely to document this view. |
 
 ## Sidebar session search review
 
