@@ -41,8 +41,10 @@ dialogs have not been inspected; this guide does not assign them unverified
 functions. The separate directory-picker capture is documented through the
 labeled **Choose workspace** route; it does not establish what the sidebar's
 folder-shaped icon does. The [selected-workspace view](Get-Started#home-with-a-selected-workspace)
-also exposes a separate right-hand composer selector labeled with an
-`@preset/...` reference. Keep the workspace, agent mode, model/provider
+also exposes a separate right-hand composer control labeled with an
+`@preset/...` reference. Its later [open popover](Models#read-the-home-composer-reference)
+explicitly shows **Model** and a right-facing chevron, but not the next view or
+alternative models. Keep the workspace, agent mode, model/provider
 configuration, and session permissions distinct; a visible name or send arrow
 is not a completed first-response test. A further [Home permission capture](Settings#session-permission-menu-on-home)
 shows Read Only, Workspace Write (checked), and Full access at the lower left

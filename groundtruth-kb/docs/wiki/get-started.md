@@ -99,7 +99,7 @@ request was sent for this review.
 | --- | --- |
 | **GT-KB** beside the folder icon | This is the displayed workspace, not a model or project. Verify the intended full working path through the supported workspace interface; this short name alone cannot distinguish similarly named checkouts. |
 | **Standard mode**, checked in the open menu | This is the agent-mode choice. The menu also shows PTC, Minimal, and Creator with descriptions; see [Agent presets](Agent-Presets#choose-a-mode-from-home). A selected label does not establish effective permissions or tested tools. |
-| `@preset/gtkb-openrouter-deepseek-v4-flash` on the right | This is the literal label of a separate composer selector. Its naming suggests a model/provider configuration reference, but its resolved endpoint, model, account, and available choices are not shown. Do not confuse it with the Standard agent-mode preset or copy it as a required model identifier; see [Models and providers](Models#read-the-home-composer-reference). |
+| `@preset/gtkb-openrouter-deepseek-v4-flash` on the right | This separate composer control is explicitly labeled **Model** in a later [open-popover capture](Models#read-the-home-composer-reference). The Model row repeats the reference and has a right-facing chevron; its destination, alternatives, and resolved provider/model are not shown. Do not confuse it with the Standard agent-mode preset or copy it as a required API model identifier. |
 | **New Session** in the sidebar | The captured view has a session entry under the workspace, but no submitted prompt or response. This does not establish a completed session, persisted history, application registration, or a canonical project/work item. |
 
 The open mode menu obscures part of the composer, including its left-hand
@@ -141,8 +141,10 @@ with a Custom badge and a green dot; it does not show a selected model or prove
 that credentials and requests work. Do not copy that provider name as a required
 configuration or assume that selecting a workspace also selects a working model.
 
-The selected-workspace capture adds a separate right-hand composer selector
-with an `@preset/...` reference, but not its open choices or resolved model.
+The later [Home Model popover](Models#read-the-home-composer-reference) identifies
+the separate right-hand composer control: open the reference-labeled control
+and locate **Model**. The capture shows that row and a right-facing chevron,
+not its destination, alternative models, or resolved provider/model.
 Confirm the provider/model route required by your intended workflow using the
 installed release's supported setup procedure. The exact Add/Edit dialogs,
 reference resolution and selection behavior, and first-response sequence still

@@ -36,6 +36,9 @@ This page records material adoption gaps, not every internal development item.
   including the open mode menu and separate composer reference. The latter
   capture reveals PTC's complete description. The [Home permission menu](Settings#session-permission-menu-on-home)
   now illustrates Read Only, Workspace Write (checked), and Full access.
+  The [Home Model popover](Models#read-the-home-composer-reference) now confirms
+  the right-hand control's purpose and shows its Model row and chevron, not the
+  next view or alternative models.
   Resolved workspace path, selection/cancellation and persistence behavior,
   mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
@@ -164,18 +167,21 @@ The owner-supplied **Settings → Models** screenshot received 2026-09-26 shows
 API-key guidance, a **GTKB OpenRouter** entry marked **Custom**, a green dot,
 **Edit**, **Add provider**, and **Add a custom provider**. Provider management
 is an existing interface; its complete setup path and status meaning remain
-unverified. No credentials were opened or entered, and no model request was
+unverified. A later Home capture explicitly labels the separate composer
+popover **Model**, repeats the displayed reference, and exposes a right-facing
+chevron. Its destination, alternatives, and reference resolution remain unseen.
+No credentials were opened or entered, no model was changed, and no request was
 made. See [Models and providers](Models).
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
 | **Must** | Add provider and Add a custom provider are separate buttons; neither dialog is open. | Explain when to use each route, document actual required fields and supported choices, and qualify a path from an unconfigured installation to a successful first response. Test save, cancel, persistence, duplicate handling, and recovery without exposing keys. |
 | **Must** | The provider entry has a green dot but no visible text status or check time. | Define the indicator and distinguish an entry being present from credentials being valid, a service being reachable, and a model request succeeding. Test missing/invalid credentials, unreachable endpoints, unavailable models, and usage-limit errors with useful next actions. |
-| **Must** | Settings lists a provider, while later Home shows a separate composer selector labeled `@preset/gtkb-openrouter-deepseek-v4-flash`; its choices and resolved values are not shown. | Document the actual selector choices and reference-to-provider/model mapping, how to verify the effective endpoint/model/account, scope, and the effect on new versus active sessions. Distinguish this reference from the agent-mode preset; do not treat a display name as an API model ID, working credential, or full support matrix. |
+| **Must** | Home's open popover explicitly labels `@preset/gtkb-openrouter-deepseek-v4-flash` as Model; a right-facing chevron is visible, but the next view and resolved values are not. | Document the Model row's actual destination, choices, and reference-to-provider/model mapping. Verify the effective endpoint/model/account, scope, persistence, and changes to new versus active sessions. Test unresolved references and unavailable models with useful recovery, not silent substitution. Distinguish the model reference from the agent-mode preset; do not treat its display name as an API model ID or working credential. |
 | **Must** | The helper asks for API keys; no secret-entry or storage details are shown. | Verify masking, save/replacement/removal behavior, storage protection, and redaction from logs, exports, screenshots, and support output. Explain provider-side revocation separately from removing a local entry. Use non-secret placeholders in training. |
 | **Must** | The view does not explain request charges or where model data goes. | Before the first-request step, identify the selected provider/account, endpoint, model, usage limits, and data destination. Link to the provider's current official guidance for the tested setup; do not imply included usage or local-only processing from a local GTKB interface. |
-| **Should** | The existing list is compact and exposes Edit and two Add routes. | Add concise in-context setup guidance and a captioned first-response demonstration tied to Get Started. Test keyboard navigation, accessible button names, and a non-color explanation for the status dot. |
-| **Don't** | One custom-named entry and a green dot are visible. | Do not publish a key, claim a successful API call, infer a default or required provider, invent endpoint/model values, or run a potentially billable request merely to confirm the screenshot. |
+| **Should** | The Settings list exposes Edit and two Add routes; Home reveals Model only after opening the reference-labeled control. | Add concise in-context guidance distinguishing provider setup, model selection, and agent mode, plus a captioned first-response demonstration. Test discoverability, keyboard navigation into/out of the Model row, dismissal, focus restoration, accessible names, and a non-color explanation for the provider dot. |
+| **Don't** | One custom-named provider entry and a green dot are visible in Settings; Home repeats one reference on its trigger and Model row without showing alternatives. | Do not count these as two models or a complete inventory, claim a successful API call, infer a default or required provider, invent endpoint/model/price values, publish a key, or run a potentially billable request merely to confirm the screenshot. |
 
 ## Plugins review
 

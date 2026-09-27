@@ -1,12 +1,13 @@
 # Models and providers
 
-**Status:** Illustrated provider-list reference; setup and model requests untested
+**Status:** Illustrated provider list and Home Model popover; setup and requests untested
 
 **Reviewed:** 2026-09-26
 
-In [GTKB Home](GTKB-Home), open **Settings → Models**. The supplied view shows
-provider-management entry points. It does not yet show the complete path from
-provider setup to selecting a model and receiving a first response.
+In [GTKB Home](GTKB-Home), open **Settings → Models** for provider-management
+entry points. Home also has a separate composer control whose open popover is
+labeled **Model**, illustrated below. The supplied views do not yet show the
+complete path from provider setup to choosing a model and receiving a response.
 
 Use this page with [Get started](Get-Started). A visible provider entry is not
 an installation-health check, a selected model, or proof that a request will
@@ -39,10 +40,10 @@ configuration file is the correct place to paste a secret.
 
 The visible entry is a provider configuration label, not a model identifier.
 This Settings capture has no model list, selected model, default-model control,
-capability list, or completed response. A later Home capture adds a separate
-composer selector with a configuration-looking reference, described below.
-Neither image establishes whether model choice is global, workspace-specific,
-or session-specific.
+capability list, or completed response. Later Home captures show a separate
+composer reference and explicitly label its popover **Model**, as described
+below. These images do not establish whether model choice is global,
+workspace-specific, or session-specific.
 
 The **GTKB OpenRouter** name is an example from this installation, not a
 recommendation, a requirement to use that provider, or a complete list of
@@ -56,25 +57,45 @@ concepts described in [Settings](Settings) and [Core concepts](Core-Concepts).
 
 ## Read the Home composer reference
 
-In the later [selected-workspace Home screenshot](Get-Started#home-with-a-selected-workspace),
-the right-hand composer selector displays the literal text
-`@preset/gtkb-openrouter-deepseek-v4-flash`. A dropdown chevron is visible, but
-this selector is not open. The open menu in that image belongs to **Standard
-mode**, the separate agent-mode choice.
+In the [selected-workspace Home screenshot](Get-Started#home-with-a-selected-workspace),
+the right-hand composer control displays
+`@preset/gtkb-openrouter-deepseek-v4-flash` while the separate **Standard mode**
+menu is open. The following capture opens the right-hand control itself. Its
+popover explicitly labels the displayed reference **Model**. This establishes
+the control's model-related purpose; that is no longer an inference from the
+reference's name.
 
-The right-hand label suggests a configured model/provider reference; it is not
-proof of a resolved API model identifier, endpoint, account, available balance,
-successful credential check, or request. Do not infer those values by splitting
-the label, assume it is a shipped default, or paste the full `@preset/...` text
-into a provider's model-ID field. The shared word *preset* needs explanation in
-the product: an agent-mode preset describes tools/prompt/capabilities, whereas
-this reference's exact schema and resolution still need a verified description.
+![GTKB Home with the right-hand composer control open. Its popover contains a Model row showing @preset/gtkb-openrouter-deepseek-v4-flash and a right-facing chevron; the same reference remains on the trigger below. Standard mode, Workspace Write, and the GT-KB workspace are visible. No model alternatives, prompt, or response are shown.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-model-popover.png)
 
-The next setup walkthrough should open the supported selector, explain its
-actual choices and reference mapping, and show the effective provider/model
-before the first request. Document scope, persistence, model availability, and
-failure/recovery behavior. No selector choice or model request was exercised in
-this review. The example name is not a recommendation of a provider or model.
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. The reference and workspace name are examples from
+this installation, not required defaults. The reviewer did not open a model
+submenu, select or change a model, inspect credentials, or send a request.
+
+| Visible element | What the capture establishes | What it does not establish |
+| --- | --- | --- |
+| Right-hand composer control | It displays `@preset/gtkb-openrouter-deepseek-v4-flash`, with its popover open. | The reference's definition, persistence, or effect on a running session. |
+| **Model** row with the same reference | The UI explicitly identifies this as a model-related setting, separate from Standard mode and Workspace Write. | A resolved API model identifier, provider endpoint/account, valid credential, available balance, or a successful request. The matching text is not two different model entries. |
+| Right-facing chevron on the Model row | A further navigation affordance is visible. | Its destination, alternative models, filtering/search, supported inventory, or selection behavior. One visible row is not proof that only one model is available. |
+
+To locate this setting, use the reference-labeled control at the lower right of
+the composer and identify its **Model** row. The capture stops there; it does
+not show the next view or a completed model change. The next walkthrough must
+inspect the row's destination, record actual choices and reference resolution,
+then verify the effective provider/model before the first request.
+
+Do not derive an endpoint, account, API model ID, or price by splitting the
+reference label, assume it is a shipped default, or paste the full `@preset/...`
+text into a provider's model-ID field. The shared word *preset* still needs a
+plain-language explanation: the agent-mode preset describes tools, prompt, and
+capabilities, while this reference is displayed under **Model** and its exact
+schema and resolution remain unverified. It does not change permission scope
+or authorize project work.
+
+Document dismissal/back navigation, keyboard use, focus, change timing,
+persistence, unavailable or unresolved references, and useful recovery before
+recommending model switches. The example label is not a provider/model
+recommendation or a successful-connection indicator.
 
 ## Credentials, usage, and data destination
 
@@ -103,9 +124,9 @@ The next illustrated procedure should establish, in a separate test installation
    official guidance and the product's supported interface, without exposing it.
 3. How changes are saved, what the status indicator means, and how errors are
    distinguished from an untested configuration.
-4. How the Home composer selector and any named references resolve to the
-   intended provider/model for a new session, including the actual choices,
-   scope, and effect of later changes.
+4. How the illustrated Home **Model** row leads to the actual choices, and how
+   named references resolve to the intended provider/model for a new session,
+   including scope and the effect of later changes.
 5. A bounded, non-sensitive first request and expected response, followed by
    recovery guidance for authentication, endpoint, model, and usage-limit errors.
 

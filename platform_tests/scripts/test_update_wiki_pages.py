@@ -120,6 +120,7 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
         "assets/gtkb-agent-presets.png",
         "assets/gtkb-controls.png",
         "assets/gtkb-home-empty-state.png",
+        "assets/gtkb-home-model-popover.png",
         "assets/gtkb-home-permissions.png",
         "assets/gtkb-home-session-modes.png",
         "assets/gtkb-models.png",
@@ -175,6 +176,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
         "assets/gtkb-workspace-picker.png": b"\x89PNG\r\n\x1a\n\x00\xf7workspace\r\n",
         "assets/gtkb-home-session-modes.png": b"\x89PNG\r\n\x1a\n\x00\xf6modes\r\n",
         "assets/gtkb-home-permissions.png": b"\x89PNG\r\n\x1a\n\x00\xf5permissions\r\n",
+        "assets/gtkb-home-model-popover.png": b"\x89PNG\r\n\x1a\n\x00\xf4model-popover\r\n",
     }
     for name, content in assets.items():
         (source_dir / name).write_bytes(content)
@@ -183,7 +185,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
 
     rows = module.update_pages(source_dir, wiki_dir)
 
-    assert len(rows) == 12
+    assert len(rows) == 13
     assert all(row["post_update_status"] == "current" for row in rows)
     for name, content in assets.items():
         assert (wiki_dir / name).read_bytes() == content
@@ -207,14 +209,15 @@ def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> N
     (source_dir / "assets" / "gtkb-workspace-picker.png").write_bytes(b"\x89PNG\r\n\xf7")
     (source_dir / "assets" / "gtkb-home-session-modes.png").write_bytes(b"\x89PNG\r\n\xf6")
     (source_dir / "assets" / "gtkb-home-permissions.png").write_bytes(b"\x89PNG\r\n\xf5")
+    (source_dir / "assets" / "gtkb-home-model-popover.png").write_bytes(b"\x89PNG\r\n\xf4")
     (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
 
     assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["dry_run"] is True
     assert result["summary"]["page_count"] == 1
-    assert result["summary"]["asset_count"] == 11
-    assert result["summary"]["drift_count"] == 12
+    assert result["summary"]["asset_count"] == 12
+    assert result["summary"]["drift_count"] == 13
     assert all(row["planned_action"] == "write" for row in result["pages"])
     assert not wiki_dir.exists()
 

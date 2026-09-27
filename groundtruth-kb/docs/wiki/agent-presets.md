@@ -81,8 +81,9 @@ capabilities.
 
 The separate right-hand composer selector displays
 `@preset/gtkb-openrouter-deepseek-v4-flash`. Despite the shared word *preset*,
-that reference is not one of the four agent-mode names. Its underlying
-model/provider mapping is not established by the text; see
+that reference is not one of the four agent-mode names. A later capture
+explicitly labels its popover **Model**, confirming the separate purpose but
+not the resolved model/provider or available alternatives; see
 [Models and providers](Models#read-the-home-composer-reference).
 
 Before documenting a switching procedure, test selecting each supported mode,

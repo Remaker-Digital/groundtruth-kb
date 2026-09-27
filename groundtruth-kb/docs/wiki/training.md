@@ -27,7 +27,11 @@ them, not replace them.
    level. Do not require custom-preset authoring for routine first use.
    Explain Add provider versus Add a custom provider, the status indicator, and
    how the separate composer reference resolves to the provider/model, distinct
-   from the agent-mode preset. Keep real keys off-camera, identify usage and
+   from the agent-mode preset. The [Home Model popover](Models#read-the-home-composer-reference)
+   now shows the labeled Model row and chevron; continue into its actual next
+   view only after that route and model-change behavior are tested. Show the
+   resolved selection and a bounded first response, not just matching labels.
+   Keep real keys off-camera, identify usage and
    data-destination implications, and use non-sensitive sample content. The
    [Home permission menu](Settings#session-permission-menu-on-home) now supplies
    Read Only, Workspace Write, and Full access as visible choices. Demonstrate
