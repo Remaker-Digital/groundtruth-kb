@@ -63,6 +63,10 @@ This page records material adoption gaps, not every internal development item.
   A further [rendered response reference](GTKB-Home#read-a-rendered-response-and-turn-statistics)
   now describes assistant prose, the grouped tool-call/message summary, the
   upward-arrow composer control, and turn/step/timing/cache/token statistics.
+  The lower-response capture adds a Conclusion, four unlabeled action icons,
+  response-row Usage and Ran for figures, and a timestamp. It supplies a visible
+  narrative ending, not independent outcome verification. Action semantics and
+  the distinction between activity selection and a work assignment need guidance.
   The raw image's identifiers and bridge details are withheld. Response-display
   coverage is no longer missing; independent outcome verification, counter
   definitions, complete metric values, safe sharing, and a reproducible first-use
@@ -118,21 +122,24 @@ defects. Use disposable, non-sensitive test sessions to qualify interactions.
 
 ## Response and turn statistics review
 
-The later owner-supplied Chat capture received 2026-09-26 shows a rendered
-assistant response, a grouped activity summary, an upward-arrow composer
-control, and an expanded statistics footer. Its session identifiers and bridge
-details are not republished. See the [written response reference](GTKB-Home#read-a-rendered-response-and-turn-statistics).
+The owner-supplied Chat captures received 2026-09-26 show the upper and lower
+portions of a rendered assistant response, a grouped activity summary, an
+upward-arrow composer control, and a statistics footer. The lower view adds the
+Conclusion and the response action/usage/duration row. Session identifiers and
+bridge details are not republished. See the [written response reference](GTKB-Home#read-a-rendered-response-and-turn-statistics).
 The checks below are pending evaluations, not confirmed runtime defects or
 independent acceptance of the assistant's state report.
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
 | **Must** | The assistant reports initialization/state and a readback; the composer shows an upward arrow. | Make running, waiting, completed, failed, and cancelled states unambiguous. Qualify a bounded request against known expected results and the supported authoritative readback, not merely the assistant's prose or an icon. Test follow-up submission, late tool completion, failures, reconnection, and draft preservation without assuming the whole session or workflow has ended. |
+| **Must** | The Conclusion describes waiting for an assignment, but its next-step example mixes activity selection with dispatch wording. | Explain role binding, activity selection, and a specific owner/dispatcher assignment separately. Test role-only, activity-only, and no-target cases against the intended workflow: request the missing input, do not invent a target or infer authorization, and do not teach an activity marker as sufficient dispatch. A valid waiting response is not a product failure or proof that no canonical work exists. |
+| **Must** | Four action icons appear without visible labels or demonstrated results. | Establish exact names, accessible labels, selected/disabled states, keyboard focus and activation, and cancellation/error feedback. With synthetic content, verify copy contents and formatting, rating destination/data/consent/confirmation, and the branching-line control's actual effect before documenting it. If it shares or creates a branch, explain recipients, retained context, identity, permissions, and side effects; do not assume those functions from its shape or silently equate ratings with the Commands feedback route. |
 | **Must** | The summary shows ten tool calls and one message, while the footer shows one turn and eight steps. | Define each count and its scope; explain how multiple calls, retries, failures, approvals, and message types relate to steps and turns. Test summary expansion/collapse and pairing with actual outcomes, including duplicate names and missing results. Verify accessible disclosure state and focus; do not require these counts to be equal without a defined contract. |
-| **Must** | The footer labels LLM time, tool-call time, average TTFT, and a token rate. | Document clock boundaries, units, accumulated versus wall-clock time, overlap, waits/retries, and the population/weighting used for averages and rates. Reconcile with controlled measured runs and provider reporting where applicable. Define a reproducible benchmark protocol before publishing latency/throughput claims; do not add unlike durations or diagnose slowness from this one capture. |
-| **Must** | Cache/input figures are visible, but Output is truncated. | Provide a discoverable accessible way to obtain full values and definitions. Test normal and narrow windows, zoom, long values, and keyboard/screen-reader access. Define cache and token accounting, rounding, updates, scope, and reconciliation gaps before estimating costs or savings. Do not guess hidden digits or derive per-request deltas from screenshots with unverified scope. |
+| **Must** | The response row shows Ran for 1m 48s and 18:21; the footer separately labels LLM time, tool-call time, average TTFT, and a token rate. Sidebar age also changes between captures. | Document clock boundaries, units, accumulated versus wall-clock time, overlap, waits/retries, average/rate populations, timestamp event/timezone, and age rounding. Reconcile response duration with controlled measured runs and the other displays; numerical similarity alone does not explain their relationship. Define a reproducible benchmark protocol before publishing latency/throughput claims; do not add unlike durations or treat an age/timestamp as elapsed execution. |
+| **Must** | The response row shows Usage 128K tok, while the footer has cache/input figures and truncated Output. | Define each accounting scope, included token categories, rounding, update timing, provider reconciliation, and whether the Usage control reveals details. Provide a discoverable accessible way to obtain full values and definitions; test normal/narrow windows, zoom, long values, and keyboard/screen-reader access. Disclose gaps before estimating costs or savings. Do not reconstruct Output by subtraction or derive request deltas from screenshots with unverified scope. |
 | **Must** | Rendered answer text itself includes session identifiers and bridge details. | Include answer text, identifiers, operational details, and copied/exported content in safe-sharing guidance, not just raw tool rows. Test supported concealment/redaction with non-secret canaries and inspect the resulting artifact. Publish a synthetic example; do not make ephemeral coordination content a durable documentation dependency. |
-| **Should** | A readable response checkpoint now exists, but no clean-machine reproduction or tested next action is demonstrated. | Finish the short Get Started tour with a synthetic bounded request, the expected response/result, a clear next step, and a useful failure/recovery example. Explain disclosure and metrics in a brief optional glossary. Test completion announcements, reading order, readable zoom, and novice recognition of when to wait or act. Keep advanced diagnostics out of first-use prerequisites. |
+| **Should** | A readable response and a stated waiting-for-assignment conclusion now exist, but no clean-machine reproduction or tested next action is demonstrated. | Finish the short Get Started tour with a synthetic bounded request, the expected response/result, a clear next step, and a useful failure/recovery example. Include the valid idle/waiting case and distinguish it from success, failure, and missing setup. Explain qualified response actions and metrics briefly; test completion announcements, reading order, readable zoom, and novice recognition of when to wait or act. Keep advanced diagnostics out of first-use prerequisites. |
 | **Don't** | This is a scrolled snapshot of generated prose and historical metrics, not the complete underlying execution. | Do not publish the raw identifiers/bridge details, adopt the captured role, select work from the reported queue, equate an initialization claim with verified state, infer durable work ownership, or treat a send arrow as an end-to-end success guarantee. Do not reconstruct truncated values or present these figures as a bill, benchmark, or current service-health report. |
 
 ## Trajectory review

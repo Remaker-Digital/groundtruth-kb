@@ -76,6 +76,13 @@ them, not replace them.
    messages, LLM/tool timing, TTFT, token rate, and cache accounting; show how to
    obtain untruncated values. Do not infer elapsed time by adding footer values,
    equate differing counters, or treat a composer arrow as proof of completion.
+   The lower-response view now adds a Conclusion, action icons, Usage, Ran for,
+   and a timestamp. Demonstrate a valid waiting-for-assignment outcome as well
+   as a verified result; keep activity selection distinct from a specific task
+   assignment. Use tested labels and synthetic data for the response actions,
+   and explain any feedback destination or sharing/branching effect before
+   showing it. Reconcile response-row metrics with footer scope and timing
+   definitions; do not present the supplied values as a benchmark or a bill.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent

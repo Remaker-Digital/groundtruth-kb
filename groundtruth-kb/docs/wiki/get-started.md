@@ -216,7 +216,18 @@ now describes a readable assistant answer, a **10 tool calls · 1 message**
 summary, an upward-arrow composer control, and turn/step/timing/cache/token
 figures. The response-display checkpoint is no longer missing. Read the answer,
 then check the expected result through the appropriate supported procedure;
-generated prose claiming initialization is not independent verification.
+generated prose claiming initialization is not independent verification. A
+lower-response capture now shows the **Conclusion** and the response action row,
+including **Usage 128K tok**, **Ran for 1m 48s**, and a timestamp. These are
+historical displayed values, not validated accounting or measured performance.
+
+The Conclusion describes waiting for an assignment. A valid waiting response
+need not be a failure: distinguish role binding, selecting an activity, and
+receiving the specific work to perform. An activity marker alone does not
+identify or dispatch a task. Follow the intended workflow rather than copying
+the screenshot's next-step example or choosing work from its state summary.
+The overlapping-sheets, thumbs-up/down, and branching-line icons still need
+documented names and tested effects; do not assume the last icon shares or forks.
 
 The raw capture is withheld because it contains session identifiers and bridge
 details. Its reported queue is not an instruction to select work, and its role

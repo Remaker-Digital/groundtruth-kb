@@ -61,12 +61,24 @@ through a supported safe route or use a synthetic reproduction. Distinguish
 what the assistant reported from the expected and independently observed result;
 do not publish a full private session merely to substantiate its summary.
 
+The lower-response view exposes overlapping-sheets, thumbs-up/down, and
+branching-line icons. No tooltip, accessible name, or action result was captured.
+Their exact functions and data handling have not been qualified; do not assume
+they copy only visible text, send private feedback, file an issue, share a link,
+or fork a session. Use the established support route until each intended action
+and its included data/destination are documented. The Commands `feedback` route
+and response ratings are not established as equivalent.
+
 For a statistics issue, report the version, relevant counter/metric, full value
 only if safely obtainable, reproduction steps, and whether the display is
 truncated. The visible ten-call summary and eight-step footer use different
-labels and are not by themselves proof of a discrepancy. Do not reconstruct
-the clipped Output value, sum LLM/tool times into wall-clock time, or provide
-private logs or provider credentials to explain a number.
+labels and are not by themselves proof of a discrepancy. Identify whether the
+issue concerns the response row (**Usage**, **Ran for**, or its timestamp),
+sidebar age, or the footer, since matching scope has not been established. Do
+not reconstruct clipped Output from Usage minus Input, sum LLM/tool times into
+wall-clock time, or provide private logs or provider credentials to explain a
+number. A reported wait for an assignment is not by itself a runtime failure;
+state the expected next step without publishing private dispatch content.
 
 A session-log export is not a verified redacted support bundle. Its contents,
 credential handling, destination, and restoration/import capability have not

@@ -112,21 +112,31 @@ and additional turn/timing figures appear below. This supplies the previously
 missing response-display checkpoint; it is not an independently tested
 initialization, installation, or completed governed workflow.
 
-The raw image is not reproduced because the response includes native/session
+A subsequent capture, also received 2026-09-26, shows the lower portion of the
+response: a **Conclusion** heading and an action/usage row beneath the answer.
+The conclusion describes waiting for an assignment, not a completed product
+change. This extends the same reference; it does not establish that the answer's
+state report is accurate or current.
+
+The raw images are not reproduced because the response includes native/session
 identifiers and bridge details. Those values and details are intentionally not
 transcribed here. Use synthetic content or supported concealment for a public
-illustration. Exact build/version is not visible, and the capture is scrolled;
-it does not show the complete conversation or all underlying tool results.
+illustration. Exact build/version is not visible, and both captures are scrolled;
+they do not show the complete conversation or all underlying tool results.
 
 | Visible element | How to read it | What remains unverified |
 | --- | --- | --- |
 | Selected **Chat**, a rendered response, and **Session bound** / **Bridge state** headings | Home displays the assistant's account of initialization and state, including a claimed readback. This is more than the earlier activity-only view. | Accuracy and freshness of those claims, the underlying results, and the final lifecycle state. Narrative assertions, identifiers, and headings are not independent verification, current canonical state, or instructions for this reviewer to initialize or take work. |
 | **10 tool calls · 1 message** with a right-facing chevron | A grouped activity summary and an apparent disclosure control are visible above the response. | Expansion/collapse behavior, scope of the counts, which message is counted, tool outcomes, ordering, retries, and missing/duplicate results. A count of calls is not a count of successful calls. |
+| **Conclusion** and text about waiting for an assignment | The lower capture shows an explicit narrative ending and a stated reason for not proceeding. It adds a next-step explanation, not proof of a completed work item or a verified empty queue. | The next-step wording needs to distinguish role binding, activity selection, and a specific work assignment. An activity marker selects an activity; it does not by itself identify or dispatch work. Do not copy the captured instruction example as a generic onboarding command or select a target from the reported state. |
+| Overlapping-sheets, thumbs-up, thumbs-down, and branching-line icons beneath the answer | Four icon-only controls are visible in the response action row. Their appearance suggests possible purposes, but no tooltip or accessible name is shown. | Exact names and effects, disabled/selected states, keyboard operation, copy scope, feedback destination and consent, and any sharing or branching behavior. Do not label the branching-line icon as Share or Fork, equate these controls with the Commands menu, or assume these actions keep all data local until qualified. |
+| **Usage 128K tok** beside a cylinder-shaped icon | A response-level usage label appears separately from the footer's Input/Output/cache figures. Its location is visible; its accounting scope is not. | Whether Usage is per-message, per-turn, or per-session; which tokens it includes; rounding; click/hover behavior; and reconciliation with the footer and provider reporting. Do not reconstruct the clipped Output value by subtraction or treat this label as a price or bill. |
+| Clock icon, **Ran for 1m 48s**, and **18:21** beneath the answer | A duration is now explicitly displayed in the response row, together with a clock-style timestamp. These are historical UI values, not an independently timed run. | What starts/stops the duration, inclusion of waits and tool/model overlap, timestamp event/timezone, accessible details, and relation to LLM/tool times or sidebar age. A numerically plausible sum does not establish metric semantics, and the row does not prove successful execution or a latency guarantee. |
 | Composer upward arrow, permission/model labels, and **Session log** | The upward arrow differs from the earlier square-marked control; the session composer and log entry point remain available on screen. | Whether the turn is terminal, input is enabled or queued, work remains active, and what follow-up or export does. Do not infer successful completion, cancellation, or stopped background work from an icon change alone. |
 | **1 turns · 8 steps** in the footer | The footer exposes turn and step counters alongside the separate ten-call summary. | Definitions, aggregation scope, update timing, and mapping between turns, steps, messages, and tool calls. The differing counts are a documentation question, not proof of a counting defect; one step need not equal one call. |
 | **LLM 37.4s · Tool call 1m11s · TTFT avg 3.1s · 193 tok/s** | These are the displayed historical timing/rate figures. TTFT commonly means time to first token; the release's actual measurement and averaging rules still need documentation. | Start/end boundaries, wall-clock versus accumulated time, overlap, waits/retries, averaging population, and the rate's token/time denominator. Do not sum LLM and tool time into an elapsed duration, infer concurrency, or use one capture as a performance benchmark. |
 | **Cache hit 86% · Input 125K tok · Output 2...** | The footer shows cache/input figures and a visibly truncated Output field. | Cache numerator/denominator, token scope, rounding, provider reconciliation, full Output value, and access to untruncated details. Do not reconstruct the missing digits, subtract figures from earlier captures as a per-request measurement, or infer price, savings, billing, or local-only processing. |
-| **1min** beside the selected sidebar session | A relative-looking time label is visible beside the session title. | Which event it measures, refresh/rounding rules, and its relation to the footer. It is not a measured end-to-end request duration or proof that the displayed state is current. |
+| Sidebar time changes from **1min** in the upper-response capture to **2min** in the lower-response capture | Relative-looking labels are visible beside the selected session title in the two images. | Which event they measure, refresh/rounding rules, and their relation to the response timestamp/duration and footer. They are not measured end-to-end request durations or proof that the displayed state is current. |
 
 For ordinary use, read the response and distinguish its proposed next action
 from a verified result before acting. For diagnostics, identify the installed
@@ -134,7 +144,10 @@ version and the exact metric/control being reported; use the [response and
 statistics checklist](Known-Issues#response-and-turn-statistics-review) rather
 than treating the footer as a performance or cost report. A qualified first-use
 walkthrough must still show a reproducible non-sensitive request, its expected
-outcome, and a useful next step. Keep detailed diagnostics optional in that tour.
+outcome, and a useful next step. An answer that appropriately waits for an
+assignment should say what input is missing; waiting is not by itself an error
+or evidence that the platform contains no work. Keep role, activity, assignment,
+and completed result distinct. Keep detailed diagnostics optional in that tour.
 See [Support](Support#feedback-and-session-log-export-in-home) before sharing
 response text, screenshots, or session logs.
 
