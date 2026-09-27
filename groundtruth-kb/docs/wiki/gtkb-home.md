@@ -64,7 +64,10 @@ fixed URL or secret.
 
 GTKB does not currently require a taskbar icon. A system-tray controller should
 be added only if measured user needs justify persistent health visibility or
-frequent service controls.
+frequent service controls. **Settings → GTKB services** already exposes a
+[service-management panel](Services); do not assume that these controls need
+to be built from scratch. Its presence does not replace a convenient launch
+entry or prove startup and recovery qualification.
 
 ## Privacy and network boundary
 

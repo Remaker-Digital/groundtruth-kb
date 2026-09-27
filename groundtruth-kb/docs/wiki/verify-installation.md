@@ -23,8 +23,10 @@ gt --config E:\GTKB\groundtruth.toml services status --json
 gt --config E:\GTKB\groundtruth.toml service status --json
 ```
 
-Treat missing, stopped, mismatched, or unreachable components as failures to
-diagnose. Do not infer health from a process identifier alone.
+Treat missing, stopped, mismatched, or unreachable **required** components as
+failures to diagnose. Establish which optional model/provider integrations the
+selected workflow needs before classifying an unused integration as a failure.
+Do not infer health from a process identifier alone.
 
 ## 3. Read canonical state
 
@@ -48,6 +50,11 @@ Confirm that the browser displays the expected GTKB branding, then open
 and explanation beside each row. A session **UNKNOWN** caused by missing context
 and a dashboard **PASS** marked **not contacted** do not replace the service and
 canonical-read checks above. Do not reuse a sign-in URL as a permanent shortcut.
+
+Then inspect **Settings → GTKB services** using the illustrated
+[Services guide](Services). Read each application state, task/service detail, and
+endpoint separately. Merely opening the panel is not a lifecycle test; do not
+press **Stop** as an installation check on an active host.
 
 ## 5. Run the applicable host doctor
 

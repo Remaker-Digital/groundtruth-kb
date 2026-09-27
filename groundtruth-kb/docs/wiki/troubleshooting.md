@@ -61,6 +61,30 @@ time. Do not assume that refreshing the status pane regenerates the dashboard,
 or that opening a dashboard makes its data current. Report the exact failing
 route, displayed times, and redacted error through [Support](Support).
 
+The [Services example](Services) shows **Dashboard stopped** at a health URL on
+port **8766**, while the separate [status example](Status) uses port **3000** for
+an uncontacted dashboard URL. Check the component and endpoint each view means;
+do not assume these separate captures are conflicting results from the same
+probe. This naming and endpoint mapping still needs a tested reference.
+
+## Home is running but its task says Ready
+
+In **Settings → GTKB services**, the application state and task state are
+separate fields. **task Ready** is not itself a Home-readiness result. Use the
+Home inspection commands above, inspect the selected task and installation, and
+read [Services](Services#application-state-and-task-state-are-different-fields)
+before treating the different labels as a fault. Do not create a duplicate task
+or restart a functioning Home instance merely to align the labels.
+
+## Ollama says stopped and task missing, with no Start button
+
+First confirm whether the selected model/provider workflow needs Ollama. The
+captured panel does not establish that it is required for every installation,
+or that no Ollama installation exists elsewhere on the machine. If it is needed,
+inspect the selected release's supported setup and registration route; do not
+substitute an invented button or automatic installation. If the route cannot be
+found, report that documentation or platform gap through [Support](Support).
+
 ## PostgreSQL does not start
 
 - Inspect the exact `gtkb-postgresql` Windows service configuration.

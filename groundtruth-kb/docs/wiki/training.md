@@ -24,7 +24,10 @@ them, not replace them.
    and uninstall. Include **Settings → GTKB** using the [status guide](Status),
    the difference between unknown session context and service failure, and the
    distinction between a configured dashboard link, reachability, and data
-   freshness.
+   freshness. Use **Settings → GTKB services** and the [Services guide](Services)
+   to explain required versus optional components and application versus task
+   state. Demonstrate safe service interruption and recovery only after that
+   workflow has been tested in a separate qualification installation.
 
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed

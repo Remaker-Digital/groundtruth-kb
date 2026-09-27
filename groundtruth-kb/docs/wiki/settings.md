@@ -9,6 +9,7 @@ Open **Settings** at the lower left of [GTKB Home](GTKB-Home), then select
 GUI; it does not change any settings or document unobserved dropdown options.
 
 For the **GTKB** tab, see the separate illustrated [GTKB status guide](Status).
+For **GTKB services**, see the illustrated [service-management guide](Services).
 
 ## General Settings
 
@@ -47,15 +48,16 @@ must be checked against the installed release before relying on them.
 
 The navigation also includes **GTKB**, **GTKB services**, **GTKB controls**,
 **Models**, **Plugins**, and **Agent presets**. Their contents are not visible in
-the General capture. A separate screenshot now documents the **GTKB**
-[status pane](Status); the remaining tabs still need content and interaction
-coverage. The presence of a tab does not establish which providers, plugins,
-presets, or controls are available or configured.
+the General capture. Separate screenshots now document the **GTKB**
+[status pane](Status) and **GTKB services** [panel](Services), including its
+visible Start/Stop controls. Those images establish the displayed interface,
+not current health or tested control behavior. **GTKB controls**, **Models**,
+**Plugins**, and **Agent presets** still need content and interaction coverage.
+The presence of a tab does not establish which providers, plugins, presets, or
+controls are available or configured.
 
-In particular, **GTKB services** is a visible navigation destination, not a
-service-health result. Use the documented checks in [Services](Services) and
-[Verify installation](Verify-Installation) until the settings-based procedure
-has been inspected and tested.
+Use the checks in [Services](Services) and
+[Verify installation](Verify-Installation) for the selected installation.
 
 ## Configuration-file access and saving
 

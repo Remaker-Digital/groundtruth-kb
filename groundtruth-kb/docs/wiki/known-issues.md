@@ -23,10 +23,11 @@ This page records material adoption gaps, not every internal development item.
 - The Home empty state is illustrated in [GTKB Home](GTKB-Home) and
   [Get started](Get-Started); the [General Settings reference](Settings) now
   illustrates the selected values and visible settings sections. The
-  [GTKB status guide](Status) now covers the **Settings → GTKB** pane. The workspace
-  picker, selected workspace, mode and permission choices, remaining settings
-  panes, and a successful first session still need version-pinned coverage and
-  interaction checks.
+  [GTKB status guide](Status) covers **Settings → GTKB**, and the [Services
+  guide](Services) illustrates **Settings → GTKB services** and its visible
+  controls. The workspace picker, selected workspace, mode and permission choices,
+  remaining settings panes, and a successful first session still need
+  version-pinned coverage and interaction checks.
 - Training videos and transcripts are not yet published.
 - A redacted automated support bundle is not yet documented as available.
 - Cross-platform host installation is not currently established.
@@ -51,11 +52,10 @@ the image. The improvements below are recommendations, not shipped features.
 
 These additional findings use the owner-supplied General Settings screenshot
 received 2026-09-26. The [Settings reference](Settings) records the visible values
-without treating them as shipped defaults or tested behavior. The newly visible
-**GTKB services** tab provides a navigation lead; its contents and health
-indicators have not been inspected. The separate **GTKB** tab is now illustrated
-in the [status guide](Status). Neither observation changes what was visible on
-the earlier Home empty state.
+without treating them as shipped defaults or tested behavior. Separate captures
+now illustrate **GTKB** in the [status guide](Status) and **GTKB services** in the
+[Services guide](Services). Neither observation changes what was visible on the
+earlier Home empty state, and service actions remain untested.
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
@@ -81,6 +81,25 @@ not establish a live outage or authorize a product change.
 | **Should** | The bridge summary exposes identifiers such as `active_status_mix` without the underlying status names. | Provide plain-language labels, metric definitions, and a supported detail view. Verify that users can distinguish applications, projects, declarations, attempts, and claims without interpreting raw field names. |
 | **Should** | **Open dashboard** and **Overview page** are both visible. | Explain their different destinations and failure/recovery paths, and check both links against the selected installation. Include a route to the status view in Get Started and operator training. |
 | **Don't** | PASS results, an UNKNOWN session, historical counts, and an explicitly uncontacted dashboard appear together. | Do not turn this screenshot into a current health report, a release qualification, evidence of authorized work, or a reason to restart services automatically. |
+
+## Service controls review
+
+The owner-supplied **Settings → GTKB services** screenshot received 2026-09-26
+establishes an existing service-management panel, not just a navigation label.
+It shows task/service integration and Start/Stop controls for some components.
+The following checks are still open; no service was started, stopped, or
+reconfigured for this review. See the illustrated [Services guide](Services).
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Authority and PostgreSQL show **Stop**; Dashboard shows **Start**. | Document action scope, dependency effects, active-work interruption, confirmation, progress, failure, and the supported recovery route. Test intentional stop and restart in an isolated qualification installation, not by interrupting the owner's active work. |
+| **Must** | Services shows Dashboard **stopped** at port 8766; the separate status capture shows dashboard **PASS**, **not contacted**, at port 3000. | Map each label to the actual component, endpoint, probe, and time. Test both views against controlled reachable/unreachable states. Do not call the separate captures a demonstrated contradiction or treat an uncontacted link as a health pass. |
+| **Must** | Home shows **running** with **task Ready**, while Authority shows **task Running**. | Explain application readiness versus scheduler state and test their combinations. Identify the source of each field; do not equate task registration or scheduler state with a healthy application. |
+| **Must** | Ollama shows **stopped**, **task missing**, and no action button. | Distinguish required components from optional provider integrations. Provide a supported setup/recovery route when needed and an understandable not-required state when not selected. Test missing registration separately from an installed but unreachable service. |
+| **Must** | Home displays **this page** rather than a Start/Stop control. | Document and test recovery when Home itself is unavailable, using a supported route outside this panel. Verify fresh-install registration, boot/logon startup, unexpected-stop recovery, and intentional-stop behavior separately. The screenshot does not prove those outcomes. |
+| **Should** | **Refresh** is visible but no last-checked time or probe definition is shown. | Display or make discoverable result age and what was actually checked. Test refresh, pending/error states, keyboard operation, accessible names, and non-color status cues. |
+| **Should** | Existing service controls are inside Settings; no launch shortcut is shown in this capture. | Prioritize a discoverable, supported launch entry and a short operator walkthrough. Evaluate a tray icon only for a demonstrated unmet need, not to duplicate controls already present. The capture cannot establish whether a shortcut exists elsewhere. |
+| **Don't** | Historical green/red states and local addresses appear in a settings screen. | Do not treat this as current health, universal port requirements, missing startup support, or permission to stop a service, install Ollama, expose a listener, or change generated configuration. |
 
 ## Documentation migration
 

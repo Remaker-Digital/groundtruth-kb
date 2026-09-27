@@ -33,7 +33,9 @@ including:
 | 8765 | Native GTKB authority service |
 | 3080 | GTKB Home |
 
-Dashboard and optional model services can require additional ports. Verify the
+Dashboard and optional model services can require additional ports. The
+illustrated [Services guide](Services) records additional endpoints from one
+installation; those are examples, not universal requirements. Verify the
 installation's actual configuration before reserving, exposing, or filtering a
 port. GTKB documentation does not authorize exposing a loopback-only service to
 the LAN or public Internet.

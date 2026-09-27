@@ -43,7 +43,12 @@ WIKI_SOURCE_ALLOWLIST = frozenset(
     }
 )
 WIKI_ASSET_ALLOWLIST = frozenset(
-    {"assets/gtkb-home-empty-state.png", "assets/gtkb-settings-general.png", "assets/gtkb-status.png"}
+    {
+        "assets/gtkb-home-empty-state.png",
+        "assets/gtkb-services.png",
+        "assets/gtkb-settings-general.png",
+        "assets/gtkb-status.png",
+    }
 )
 
 

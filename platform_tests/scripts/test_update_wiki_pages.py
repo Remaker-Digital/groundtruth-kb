@@ -103,7 +103,13 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
 
 @pytest.mark.parametrize("status", ["missing", "different", "current"])
 @pytest.mark.parametrize(
-    "asset_name", ["assets/gtkb-home-empty-state.png", "assets/gtkb-settings-general.png", "assets/gtkb-status.png"]
+    "asset_name",
+    [
+        "assets/gtkb-home-empty-state.png",
+        "assets/gtkb-services.png",
+        "assets/gtkb-settings-general.png",
+        "assets/gtkb-status.png",
+    ],
 )
 def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str, asset_name: str) -> None:
     module = _load_module()
@@ -142,6 +148,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
         "assets/gtkb-home-empty-state.png": b"\x89PNG\r\n\x1a\n\x00\xffhome\r\n",
         "assets/gtkb-settings-general.png": b"\x89PNG\r\n\x1a\n\x00\xfesettings\r\n",
         "assets/gtkb-status.png": b"\x89PNG\r\n\x1a\n\x00\xfdstatus\r\n",
+        "assets/gtkb-services.png": b"\x89PNG\r\n\x1a\n\x00\xfcservices\r\n",
     }
     for name, content in assets.items():
         (source_dir / name).write_bytes(content)
@@ -150,7 +157,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
 
     rows = module.update_pages(source_dir, wiki_dir)
 
-    assert len(rows) == 4
+    assert len(rows) == 5
     assert all(row["post_update_status"] == "current" for row in rows)
     for name, content in assets.items():
         assert (wiki_dir / name).read_bytes() == content
@@ -166,14 +173,15 @@ def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> N
     (source_dir / "assets" / "gtkb-home-empty-state.png").write_bytes(b"\x89PNG\r\n\xff")
     (source_dir / "assets" / "gtkb-settings-general.png").write_bytes(b"\x89PNG\r\n\xfe")
     (source_dir / "assets" / "gtkb-status.png").write_bytes(b"\x89PNG\r\n\xfd")
+    (source_dir / "assets" / "gtkb-services.png").write_bytes(b"\x89PNG\r\n\xfc")
     (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
 
     assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
     result = json.loads(capsys.readouterr().out)
     assert result["dry_run"] is True
     assert result["summary"]["page_count"] == 1
-    assert result["summary"]["asset_count"] == 3
-    assert result["summary"]["drift_count"] == 4
+    assert result["summary"]["asset_count"] == 4
+    assert result["summary"]["drift_count"] == 5
     assert all(row["planned_action"] == "write" for row in result["pages"])
     assert not wiki_dir.exists()
 

@@ -71,6 +71,13 @@ exercised in this documentation pass. In particular:
 - do not treat **Open dashboard** and **Overview page** as interchangeable
   without checking their destinations.
 
+The separate [GTKB services capture](Services#compare-services-with-the-status-pane)
+shows **Dashboard stopped** with a health URL on port **8766**, unlike this
+pane's uncontacted dashboard URL on port **3000**. The captures do not establish
+that these are the same component or simultaneous results. Their component and
+endpoint mapping needs clarification; do not infer an outage or prescribe a
+restart from the apparent difference alone.
+
 ## What to check next
 
 Use [Verify installation](Verify-Installation) for service and canonical-read
