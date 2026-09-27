@@ -25,3 +25,13 @@ customer procedure after the installer and backup registration are unified.
 Successful backup creation is not recovery evidence. Release or operational
 claims must cite a completed restore appropriate to the asserted failure
 scenario.
+
+## Session export is not a platform backup
+
+The [Home Commands menu](GTKB-Home#commands-menu) describes `export` as a ZIP
+download of the session log. This is a different purpose from protecting and
+recovering canonical PostgreSQL state. No export was generated or inspected in
+the documentation review, and no import or recovery path was demonstrated.
+Do not count a session archive as a verified database backup, whole-product
+recovery, or a redacted support bundle. See [Support](Support#feedback-and-session-log-export-in-home)
+before sharing diagnostic content.

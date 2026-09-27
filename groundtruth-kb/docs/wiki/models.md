@@ -42,8 +42,9 @@ The visible entry is a provider configuration label, not a model identifier.
 This Settings capture has no model list, selected model, default-model control,
 capability list, or completed response. Later Home captures show a separate
 composer reference and explicitly label its popover **Model**, as described
-below. These images do not establish whether model choice is global,
-workspace-specific, or session-specific.
+below. A further [Commands capture](GTKB-Home#commands-menu) labels `model` as
+selecting the model **for this conversation**. That establishes the scope stated
+by the UI, not tested inheritance, persistence, or effects on an active request.
 
 The **GTKB OpenRouter** name is an example from this installation, not a
 recommendation, a requirement to use that provider, or a complete list of
@@ -83,6 +84,11 @@ the composer and identify its **Model** row. The capture stops there; it does
 not show the next view or a completed model change. The next walkthrough must
 inspect the row's destination, record actual choices and reference resolution,
 then verify the effective provider/model before the first request.
+
+The Commands menu also advertises a `model` entry. Its destination and
+relationship to the Model popover have not been exercised. Verify that both
+routes expose the same effective conversation selection and explain any
+differences; do not infer identical dialogs from their related labels.
 
 Do not derive an endpoint, account, API model ID, or price by splitting the
 reference label, assume it is a shipped default, or paste the full `@preset/...`

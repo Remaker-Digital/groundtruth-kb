@@ -33,6 +33,11 @@ they are not established factory defaults or recommendations for every user.
 | **Conversation display** | **Compact** | The helper text says this controls process content in completed turns. The exact content collapsed or retained, and other display choices, are not shown. |
 | **Enter behavior while busy** | **Queue** | The setting applies while busy. The helper text says Cmd/Ctrl+Enter uses the other behavior, but does not name that behavior in this view. |
 
+The `compact` conversation command advertises compaction of older history; it
+is distinct from General's **Conversation display → Compact** setting. Do not
+treat a presentation choice as a history-compaction operation or assume the
+command is merely a display toggle. See the [Commands reference](GTKB-Home#commands-menu).
+
 ## Session permission menu on Home
 
 On the supplied Home screen, the **Workspace Write** control is at the lower
@@ -59,6 +64,13 @@ The menu identifies these three choices in this captured build. It does not
 demonstrate switching, dismissal without a change, saving, persistence, or
 behavior during an active turn. It also does not show an escalation warning;
 that does not prove no warning appears after selecting a broader option.
+
+The later [Commands menu](GTKB-Home#commands-menu) also advertises `permission`
+as switching the permission preset, described as **sandbox mode + approval
+policy**. This clarifies the UI's intended grouping but does not prove the
+enforced boundary, identify the exact policy behind each choice, or establish
+that this entry opens the same dialog. Qualify consistency between the command,
+composer menu, and General default separately.
 
 Before the first request, inspect the displayed permission and consult the
 installed release's supported scope guidance. Do not choose **Full access**

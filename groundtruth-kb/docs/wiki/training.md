@@ -39,6 +39,9 @@ them, not replace them.
    files, distinguish the General default from the composer selection, and
    explain when changes take effect. Do not teach Full access as a routine
    prerequisite or error-recovery shortcut. Include verified busy-input behavior.
+   Identify the plus-shaped **Commands** entry point using the [menu reference](GTKB-Home#commands-menu);
+   keep command discovery brief and do not make advanced conversation controls
+   prerequisites for the first response.
 3. **Install and first launch** — a clean Windows installation through a healthy
    GTKB Home.
 4. **First governed change** — requirement, linked test, proposal, independent
@@ -75,6 +78,15 @@ complete PTC description, including one TypeScript program; explain its tested
 tradeoffs, Minimal mode's Windows shell requirements, and actual icon actions
 in the built-in comparison before making recommendations. Keep secrets and
 private prompts out of recordings; a generated preset still needs validation.
+
+A **conversation commands** supplement should demonstrate only qualified flows
+using disposable, non-sensitive session content. Explain history compaction
+versus display Compact, session-log export versus platform backup, the actual
+feedback destination, goal lifetime/cancellation, and entering/leaving plan
+mode. Compare the command and composer routes for permission/model selection,
+including effects during active turns. Establish exported content and redaction
+before showing a support-upload example. The [Commands checklist](Known-Issues#commands-review)
+records the pending checks; the screenshot is not a completed demonstration.
 
 Every video must identify the GTKB version, include captions and a transcript,
 link to the corresponding Wiki procedure, show expected results, and be reviewed

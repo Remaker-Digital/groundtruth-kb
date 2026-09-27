@@ -26,6 +26,22 @@ and the consequence for the user. Documentation that teaches retired authority,
 status, path, or installation behavior is a correctness defect, not merely an
 editorial preference.
 
+## Feedback and session-log export in Home
+
+The [Home Commands menu](GTKB-Home#commands-menu) advertises `feedback` to record
+feedback about the session and `export` to download its log as a ZIP archive.
+These entry points exist in the supplied capture; neither was executed for this
+review. The feedback destination, included data, submission confirmation, and
+failure/retry behavior still need qualification. Do not assume it files a
+GitHub issue or a canonical GTKB defect record.
+
+A session-log export is not a verified redacted support bundle. Its contents,
+credential handling, destination, and restoration/import capability have not
+been inspected. Do not upload an unreviewed ZIP to a public issue: inspect and
+redact diagnostic material through a supported safe route, and provide only
+what the report requires. Follow [Backup and restore](Backup-And-Restore) for
+platform recovery; a conversation archive does not replace it.
+
 ## Security reports
 
 Use the repository's current security reporting route rather than a public issue

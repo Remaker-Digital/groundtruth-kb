@@ -36,9 +36,10 @@ image, not an installation, service-health, or end-to-end workflow test.
 | **Settings** | The settings entry point is at the lower left. See the illustrated [General Settings reference](Settings) for a separate capture of the open dialog. |
 
 The capture also contains icon-only controls beside **Workspaces** and inside the
-composer. Their tooltips, accessible names, keyboard behavior, and resulting
-dialogs have not been inspected; this guide does not assign them unverified
-functions. The separate directory-picker capture is documented through the
+composer. A later capture identifies the composer's plus-shaped control with a
+**Commands** tooltip and shows the [Commands menu](#commands-menu). The other
+icons' functions, accessible names, and keyboard behavior remain unverified.
+The separate directory-picker capture is documented through the
 labeled **Choose workspace** route; it does not establish what the sidebar's
 folder-shaped icon does. The [selected-workspace view](Get-Started#home-with-a-selected-workspace)
 also exposes a separate right-hand composer control labeled with an
@@ -54,6 +55,39 @@ instruction to broaden access.
 Continue with [Get started](Get-Started) for the next steps. The remaining
 first-run guidance and screenshot coverage are listed in
 [Known issues](Known-Issues).
+
+## Commands menu
+
+The plus-shaped control at the lower left of the composer is labeled
+**Commands** in this capture. Its open panel lists seven conversation commands
+and their helper text. The composer also advertises **/ commands, @ files or
+sessions**; exact typed syntax, arguments, and keyboard behavior have not been
+tested. These are Home conversation controls, not terminal CLI commands.
+
+![GTKB Home with the Commands panel open above the composer, listing compact, export, feedback, goal, permission, plan, and model with helper text. The plus-shaped control has a Commands tooltip; compact is highlighted, Workspace Write and the model reference remain visible, and no command result is shown.](https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/assets/gtkb-home-commands.png)
+
+Owner-supplied screenshot received 2026-09-26, reproduced unchanged; exact
+build/version not shown. The highlighted compact row is not proof that it ran.
+No command was invoked, history compacted, export downloaded, feedback sent,
+goal set, plan mode entered, permission changed, or model selected for this
+documentation pass.
+
+| Command | Purpose stated by the visible helper | Before relying on it |
+| --- | --- | --- |
+| `compact` | Compact older conversation history. | Establish what is summarized or removed, what remains available, persistence, and recovery. This is not the **Conversation display → Compact** presentation setting. |
+| `export` | Download this Session log as a ZIP archive. | Inspect contents and handling using non-sensitive test data. Redaction, destination, and import/recovery are unverified. A session-log ZIP is not a [platform backup](Backup-And-Restore#session-export-is-not-a-platform-backup). |
+| `feedback` | Record feedback about this session. | Establish destination, included data, confirmation/consent, and failure handling. Do not assume this creates a GitHub issue or canonical defect record; see [Support](Support#feedback-and-session-log-export-in-home). |
+| `goal` | Set or view the goal for a long-running task. | Document the actual set/view flow, scope, progress, cancellation, persistence, and any provider usage. The menu does not demonstrate unattended execution or a startup service. |
+| `permission` | Switch the permission preset (sandbox mode + approval policy). | The helper names the advertised combination, not tested enforcement. Compare the actual command flow with the [Home permission menu](Settings#session-permission-menu-on-home) before recommending a change. |
+| `plan` | Enter or leave plan mode. | Qualify both transitions and their effect on tool execution. Harness plan mode is not a GTKB governed activity or project authorization, nor proof that all actions are read-only. |
+| `model` | Select the model for this conversation. | This states the intended conversation scope. Available choices, reference resolution, change timing, and persistence still require testing; see [Models](Models#read-the-home-composer-reference). |
+
+These are the rows visible in this build, not a complete command inventory for
+every release or preset. The screenshot does not show command arguments,
+confirmations, results, or failure states. No conversation command is established
+as a first-session prerequisite. Follow the [Commands review checklist](Known-Issues#commands-review)
+when qualifying behavior in a separate test installation, and keep private
+conversation content and credentials out of public exports and recordings.
 
 ## Startup behavior
 

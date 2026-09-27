@@ -39,13 +39,18 @@ This page records material adoption gaps, not every internal development item.
   The [Home Model popover](Models#read-the-home-composer-reference) now confirms
   the right-hand control's purpose and shows its Model row and chevron, not the
   next view or alternative models.
+  The [Commands menu](GTKB-Home#commands-menu) identifies the plus-shaped entry
+  point and seven commands with helper text; their execution and results remain
+  untested.
   Resolved workspace path, selection/cancellation and persistence behavior,
   mode-switching and permission
   behavior, provider Add/Edit dialogs, model-reference resolution and selection,
   expanded plugin controls, plugin inventory, custom authoring, and a successful
   first session still need version-pinned coverage and interaction checks.
 - Training videos and transcripts are not yet published.
-- A redacted automated support bundle is not yet documented as available.
+- A redacted automated support bundle is not yet documented as available. The
+  visible `export` command advertises a session-log ZIP, not verified redaction
+  or platform recovery; `feedback` has no demonstrated destination or result.
 - Cross-platform host installation is not currently established.
 
 ## Home first-run review
@@ -59,10 +64,29 @@ the image. The improvements below are recommendations, not shipped features.
 | --- | --- | --- |
 | **Must** | Workspace selection is required, but no first-run guide or documentation link is visible. | Provide a short in-context path to Get Started. A first-time evaluator should identify the next action and select the intended workspace without source-code inspection or operator coaching. Record time and assistance needed. |
 | **Must** | **Standard mode** has no explanation while closed; later Settings and [open Home menu captures](Agent-Presets#choose-a-mode-from-home) supply descriptions for four modes and a visible Standard selection. | Make that help discoverable and link to a clear comparison. Explain how mode choice takes effect, verify advertised capabilities and effects on new versus active sessions, and distinguish it from the separate composer reference. Do not treat the label as a governed role or project authorization. |
-| **Must** | Several controls are represented only by icons. | Test accessible names, keyboard focus and activation, and discoverable labels/tooltips. The screenshot cannot establish a pass or failure for those behaviors. |
+| **Must** | Several controls are represented only by icons; a later capture supplies a Commands tooltip for the composer's plus-shaped control. | Retain that discoverable label and test accessible names, keyboard focus/activation, and labels for the remaining icons. A visible tooltip is not a screen-reader or keyboard test, but the composer's entry-point purpose is no longer unknown. |
 | **Should** | No readiness indicator or help/recovery link is visible on the empty Home view. A subsequent capture establishes a status pane under **Settings → GTKB**. | Make the existing status and troubleshooting route easy to find from Home. Test it both on a healthy host and when a required component is unavailable; do not assume a status view must be built from scratch. |
 | **Should** | A later capture now shows a selected workspace and mode menu, but still no submitted prompt or response. | Continue from that illustrated checkpoint to a short, captioned first-session demonstration linked to the written procedure. Check that a new user can reproduce the transition and successful response, and record where assistance was needed. |
 | **Don't** | The browser displays Home, a **Preview** label, and an empty session list. | Do not treat this as proof of installation completeness, service readiness, missing canonical work, or a successful governed workflow. Check those outcomes separately. |
+
+## Commands review
+
+The owner-supplied screenshot received 2026-09-26 identifies the plus-shaped
+**Commands** control and shows seven rows with helper text. See the illustrated
+[command reference](GTKB-Home#commands-menu). It documents advertised purposes,
+not command execution. These checks remain open; qualify them in a separate
+test installation with non-sensitive, disposable session content.
+
+| Priority | Evidence in the captured view | Improvement and evaluation check |
+| --- | --- | --- |
+| **Must** | Commands has a tooltip, seven named rows, and a highlighted compact row; the composer advertises / commands and @ files or sessions. | Document actual menu/typed invocation, required arguments, context-dependent availability, result/error feedback, and cancellation. Test keyboard navigation, accessible labels, selected/highlighted state, dismissal, and focus return. Keep conversation commands separate from terminal CLI syntax; a highlight is not execution. |
+| **Must** | compact advertises compaction of older conversation history; General separately offers Conversation display → Compact. | Explain the different purposes. Test what is summarized, removed, retained, or still retrievable; state persistence, recovery, and any provider usage. Do not claim lossless compaction, a reversible display-only action, or a backup substitute from the label. |
+| **Must** | export advertises a session-log ZIP download. | Document archive contents, scope, destination, sensitive-data handling/redaction, failures, and any supported import. Test with non-secret canary values and synthetic content before sharing a real archive. Separate session export from a redacted support bundle and independently qualified platform/database recovery. |
+| **Must** | feedback says it records feedback about the session, without showing a destination or submission result. | Show the actual destination, included content/metadata, consent/confirmation, and success/failure/retry behavior. Verify privacy and retention guidance; do not claim GitHub issue creation, canonical defect intake, or automatic redaction without evidence. |
+| **Must** | goal offers set/view for a long-running task; plan offers entering/leaving plan mode. | Test actual inputs, state visibility, both plan transitions, tool effects, goal progress/cancellation and lifetime across reopen/restart, and any provider charges. Distinguish these harness controls from governed activities and project authorization; do not infer unattended/background execution, persistence, or universally read-only behavior. |
+| **Must** | permission names sandbox mode + approval policy; model specifies this conversation. | Use the helper text to explain intended purpose and scope, then test consistency with the composer controls and General default. Document actual choices, effective state, cancellation, persistence, busy-turn change timing, and useful refusals. Reuse the [Settings checks](#settings-review) and [Models checks](#models-review); labels alone do not verify enforcement or a resolved model. |
+| **Should** | Short helper text explains seven otherwise terse command names. | Keep this help discoverable and add a concise, captioned command walkthrough after behavior is qualified. Keep advanced history/goal operations out of first-use prerequisites; measure whether novices can find the right control without guessing command syntax or broadening permissions. |
+| **Don't** | A single menu is shown, with no command arguments, confirmation, output, export, or response. | Do not claim a complete cross-release command inventory or tested behavior, upload an unreviewed log, create a goal/feedback submission, compact active history, or change model/permissions merely to document the screenshot. |
 
 ## Workspace picker review
 
@@ -97,11 +121,11 @@ state, and service actions and configuration edits remain untested.
 
 | Priority | Evidence in the captured view | Improvement and evaluation check |
 | --- | --- | --- |
-| **Must** | General labels Permission as a default for new sessions; the separate Home menu shows Read Only, Workspace Write (checked), and Full access. | Document the scope and relationship of both controls: inheritance/overrides, actual General dropdown choices, changes to pending/new/active sessions, and persistence. Matching Workspace Write labels do not prove synchronization. Distinguish permission from agent mode, model reference, and project authorization. |
+| **Must** | General labels Permission as a default for new sessions; the Home menu shows Read Only, Workspace Write (checked), and Full access; the later permission command helper describes sandbox mode + approval policy. | Document the scope and relationship of these routes: inheritance/overrides, actual General and command choices, changes to pending/new/active sessions, and persistence. Matching labels do not prove synchronization or enforcement. Distinguish permission from agent mode, model reference, and project authorization. |
 | **Must** | Permission names and a checkmark are visible, but no allowed/refused operation is shown. | Define and test each mode's actual filesystem boundary, tool/shell/network effects, approval behavior, and correct refusals in a separate test workspace with disposable files. Verify outside-workspace handling, useful diagnostics, no unintended partial mutation on refusal, and the effect of changes during a busy turn. Do not claim a tested sandbox or unrestricted OS privileges from labels alone. |
 | **Must** | No Save, Apply, or Reset control is visible in the General pane. | Make save/apply timing and recovery clear. Test persistence after closing/reopening settings and restarting Home, and state which changes require a new session. Do not assume automatic saving from the absence of a button. |
 | **Must** | **Enter behavior while busy** is **Queue**; the helper calls Cmd/Ctrl+Enter's action only the other behavior. | Name both actions and explain what happens to the active turn and subsequent input. Verify Enter and Ctrl+Enter on Windows in a safe test session. Do not invent the alternate action's name. |
-| **Should** | **Compact** controls process content, but its exact visible effect is not illustrated. | Provide a before/after example using non-sensitive sample content. Explain what becomes hidden and whether it can be revealed again. |
+| **Should** | **Compact** controls process content, but its exact visible effect is not illustrated; a separate compact command advertises history compaction. | Provide a before/after display example using non-sensitive sample content. Explain what becomes hidden and whether it can be revealed again; distinguish presentation from history compaction, whose data effects need the separate Commands checks. |
 | **Should** | **Open configuration file** does not name its target in the visible label. | Identify the target and settings scope, supported editing route, and recovery instructions before asking customers to use it. Do not direct manual edits to generated harness configuration. |
 | **Should** | The Home permission menu offers three short names without explaining their precise effects in the captured view. | Provide concise, accessible scope guidance and clearly explain broader access before it takes effect. Verify keyboard selection/dismissal, focus, announced selected state, and any confirmation/recovery flow. The screenshot does not prove a later escalation warning is present or absent. |
 | **Don't** | Selected values, permission choices, and other settings-section labels are visible. | Do not present these values as factory defaults, a permission label as proven enforcement, or a settings tab as service health. Do not equate Minimal with Read Only, treat Read Only as offline or free of provider charges, or teach Full access as a prerequisite or generic workaround for a refusal. |
@@ -170,6 +194,8 @@ is an existing interface; its complete setup path and status meaning remain
 unverified. A later Home capture explicitly labels the separate composer
 popover **Model**, repeats the displayed reference, and exposes a right-facing
 chevron. Its destination, alternatives, and reference resolution remain unseen.
+The later `model` command's helper specifies **this conversation**, adding an
+explicit scope description but not a tested selection or persistence result.
 No credentials were opened or entered, no model was changed, and no request was
 made. See [Models and providers](Models).
 
@@ -177,7 +203,7 @@ made. See [Models and providers](Models).
 | --- | --- | --- |
 | **Must** | Add provider and Add a custom provider are separate buttons; neither dialog is open. | Explain when to use each route, document actual required fields and supported choices, and qualify a path from an unconfigured installation to a successful first response. Test save, cancel, persistence, duplicate handling, and recovery without exposing keys. |
 | **Must** | The provider entry has a green dot but no visible text status or check time. | Define the indicator and distinguish an entry being present from credentials being valid, a service being reachable, and a model request succeeding. Test missing/invalid credentials, unreachable endpoints, unavailable models, and usage-limit errors with useful next actions. |
-| **Must** | Home's open popover explicitly labels `@preset/gtkb-openrouter-deepseek-v4-flash` as Model; a right-facing chevron is visible, but the next view and resolved values are not. | Document the Model row's actual destination, choices, and reference-to-provider/model mapping. Verify the effective endpoint/model/account, scope, persistence, and changes to new versus active sessions. Test unresolved references and unavailable models with useful recovery, not silent substitution. Distinguish the model reference from the agent-mode preset; do not treat its display name as an API model ID or working credential. |
+| **Must** | Home's popover labels the reference Model and shows a chevron without its destination; the model command helper specifies this conversation. | Document both routes' actual choices and reference-to-provider/model mapping. Verify the effective endpoint/model/account, advertised conversation scope, inheritance, persistence, and changes to new versus active sessions. Test unresolved references and unavailable models with useful recovery, not silent substitution. Distinguish the model reference from the agent-mode preset; do not treat its display name as an API model ID or working credential. |
 | **Must** | The helper asks for API keys; no secret-entry or storage details are shown. | Verify masking, save/replacement/removal behavior, storage protection, and redaction from logs, exports, screenshots, and support output. Explain provider-side revocation separately from removing a local entry. Use non-secret placeholders in training. |
 | **Must** | The view does not explain request charges or where model data goes. | Before the first-request step, identify the selected provider/account, endpoint, model, usage limits, and data destination. Link to the provider's current official guidance for the tested setup; do not imply included usage or local-only processing from a local GTKB interface. |
 | **Should** | The Settings list exposes Edit and two Add routes; Home reveals Model only after opening the reference-labeled control. | Add concise in-context guidance distinguishing provider setup, model selection, and agent mode, plus a captioned first-response demonstration. Test discoverability, keyboard navigation into/out of the Model row, dismissal, focus restoration, accessible names, and a non-color explanation for the provider dot. |

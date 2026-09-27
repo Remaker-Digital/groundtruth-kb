@@ -153,6 +153,17 @@ confirm any usage charges and data destination, and use non-sensitive sample
 content for the first request. If a setup step is missing, use [Support](Support) rather than
 guessing an endpoint or manually editing generated harness configuration.
 
+### Find conversation commands
+
+The composer's plus-shaped control has a **Commands** tooltip in the
+[illustrated Commands menu](GTKB-Home#commands-menu). It lists compact, export,
+feedback, goal, permission, plan, and model with short explanations. The `model`
+helper specifies **this conversation**; the `permission` helper describes a
+preset combining sandbox mode and approval policy. Their effects remain
+untested. The composer also advertises `/ commands, @ files or sessions`, not
+a verified syntax reference. You do not need to compact history, export a log,
+submit feedback, or set a goal just to begin a first-session walkthrough.
+
 ## 3. Understand the separation
 
 - The GTKB host supplies the canonical service, shared baseline, and operator
