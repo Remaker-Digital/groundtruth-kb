@@ -1845,6 +1845,117 @@ def _evaluated_command(stage: str) -> str | None:
     return text or None
 
 
+_INNER_COMMAND_DEPTH = 4
+
+
+def _stage_executable(stage: str) -> str | None:
+    """Return the executable basename a stage runs, past PowerShell's call operator and cmd's call."""
+    tokens = _shell_split(stage)
+    if not tokens:
+        return None
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    relevant = tokens[verb_index:]
+    while relevant and _clean_shell_token(relevant[0]).lower() in {"&", "call"}:
+        relevant = relevant[1:]
+    return _executable_name(relevant[0]) if relevant else None
+
+
+def _unquote_once(text: str) -> str:
+    """Remove one enclosing quote pair, keeping every quote inside the text."""
+    text = text.strip()
+    if len(text) >= 2 and text[0] == text[-1] and text[0] in "'\"":
+        return text[1:-1]
+    return text
+
+
+_HANDING_FLAGS = {
+    "cmd": frozenset({"/c", "/k"}),
+    "powershell": frozenset({"-c", "-command", "/c", "/command"}),
+    "posix": frozenset({"-c"}),
+}
+
+
+def _handed_command(stage: str) -> tuple[str | None, bool]:
+    """The command a nested-shell stage hands on, with its inner quotes kept (c119).
+
+    Recognizes the wrappers _nested_shell_command recognizes and returns the text after the handing flag (a POSIX shell
+    runs only the next argument) with one enclosing quote pair removed; _nested_shell_command strips every quote at both
+    ends, which can drop a quote that belongs to the inner command. Any other stage keeps that helper's answer.
+    """
+    nested, recognized = _nested_shell_command(stage)
+    if not recognized or not nested:
+        return nested, recognized
+    tokens = _shell_split(stage) or []
+    verb_index = _shell_verb_index(tokens)
+    relevant = tokens[verb_index:] if verb_index is not None else []
+    while relevant and _clean_shell_token(relevant[0]).lower() in {"&", "call"}:
+        relevant = relevant[1:]
+    if not relevant:
+        return nested, recognized
+    executable = _executable_name(relevant[0])
+    if executable in _CMD_SHELL_NAMES:
+        flags = _HANDING_FLAGS["cmd"]
+    elif executable in _POWERSHELL_NAMES:
+        flags = _HANDING_FLAGS["powershell"]
+    elif executable in _POSIX_SHELL_NAMES:
+        flags = _HANDING_FLAGS["posix"]
+    else:
+        return nested, recognized
+    for index, raw in enumerate(relevant[1:], start=1):
+        if _clean_shell_token(raw).lower() in flags:
+            rest = relevant[index + 1 :]
+            if executable in _POSIX_SHELL_NAMES:
+                rest = rest[:1]
+            text = _unquote_once(" ".join(rest))
+            return (text or None), True
+    return nested, recognized
+
+
+def _handed_evaluation(stage: str) -> str | None:
+    """The written-out text an Invoke-Expression (iex) stage runs, with its inner quotes kept (c119)."""
+    if _evaluated_command(stage) is None:
+        return None
+    tokens = _shell_split(stage) or []
+    verb_index = _shell_verb_index(tokens)
+    words = tokens[verb_index:] if verb_index is not None else []
+    while words and _clean_shell_token(words[0]).lower() in {"&", "call"}:
+        words = words[1:]
+    rest = [word for word in words[1:] if not (word.startswith("-") and "-command".startswith(word.lower()))]
+    return _unquote_once(" ".join(rest)) or None
+
+
+def _inner_commands(command: str, *, _depth: int = 0) -> list[str]:
+    """Every command a stage hands to a nested shell or to Invoke-Expression, recursively (c119).
+
+    A command string given to cmd /c or /k, powershell or pwsh -c/-Command, bash, sh or zsh -c, or Invoke-Expression
+    (iex) is one quoted token to the outer shell, so a redirect or a mutating command inside it never reaches the outer
+    write judgment. Each inner command is returned so the caller judges it as a command of its own. cmd does not treat
+    single quotes as quotes, so for a cmd wrapper they are judged as ordinary characters. A recognized wrapper whose
+    command is encoded, empty or unparsable, or nesting deeper than _INNER_COMMAND_DEPTH, yields
+    UNINSPECTABLE_SHELL_COMMAND.
+    """
+    inner: list[str] = []
+    for stage in _split_command_stages(command):
+        nested, recognized = _handed_command(stage)
+        found: list[str | None] = []
+        if recognized:
+            if nested and _stage_executable(stage) in _CMD_SHELL_NAMES:
+                nested = nested.replace("'", " ")
+            found.append(nested)
+        evaluated = _handed_evaluation(stage)
+        if evaluated is not None:
+            found.append(evaluated)
+        for text in found:
+            if not text or _depth >= _INNER_COMMAND_DEPTH or _shell_split(text) is None:
+                inner.append(UNINSPECTABLE_SHELL_COMMAND)
+                continue
+            inner.append(text)
+            inner.extend(_inner_commands(text, _depth=_depth + 1))
+    return inner
+
+
 def _git_reach_roots(args: list[str]) -> tuple[list[str], bool] | None:
     """Return (roots, True) for a read-only Git form that reads past the ignore rules; None for every other Git call.
 
@@ -2123,7 +2234,16 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
         if diagnostic_outputs is not None:
             return diagnostic_outputs, True
         paths = _paths_from_shell(root, command)
-        return paths, _is_mutating_command(command)
+        mutating = _is_mutating_command(command)
+        # c119: a command handed to a nested shell or to Invoke-Expression is judged as a command of its own (M13 host I,
+        # Q6 on c118: `cmd /c "gt --help > help.out 2>&1"` wrote a file under a read's judgment).
+        for inner in _inner_commands(command):
+            if inner == UNINSPECTABLE_SHELL_COMMAND:
+                mutating = True
+            elif not _is_safe_command(inner):
+                paths = sorted(set(paths) | set(_paths_from_shell(root, inner)))
+                mutating = mutating or _is_mutating_command(inner)
+        return paths, mutating
 
     return [], False
 

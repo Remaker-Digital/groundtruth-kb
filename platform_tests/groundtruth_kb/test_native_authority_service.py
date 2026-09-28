@@ -1145,6 +1145,9 @@ def native_cli_operational_controls(tmp_path):
     return target
 
 
+# c119 round 2 (owner, 2026-09-28): 72-100 s in complete runs and once past 120 s on the qualification host,
+# so this multi-process CLI workflow gets 180 s; the module keeps 120 s for every other test.
+@pytest.mark.timeout(180)
 def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_path, native_cli_operational_controls):
     service, client, _, service_name = native
     seed(client)
