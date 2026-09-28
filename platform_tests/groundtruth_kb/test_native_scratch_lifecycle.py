@@ -221,8 +221,9 @@ def test_teardown_reports_surviving_entries_as_partial_and_completes_on_rerun(br
     real_scandir = os.scandir
 
     def interrupted_scandir(path=".", *args, **kwargs):
-        # One directory listing fails mid-walk, as an interrupted or denied read would.
-        if Path(path) == own / "unreadable":
+        # One directory listing fails mid-walk, as an interrupted or denied read would. On Windows the walk lists the
+        # extended-length form of each directory (c118), so the directory is matched without that prefix.
+        if Path(str(path).removeprefix("\\\\?\\")) == own / "unreadable":
             raise OSError(5, "Listing interrupted")
         return real_scandir(path, *args, **kwargs)
 
@@ -268,3 +269,34 @@ def test_teardown_reports_surviving_entries_as_partial_and_completes_on_rerun(br
     }
     assert not own.exists()
     assert history_count(service) == history
+
+
+def _long(path: Path) -> str:
+    """The extended-length spelling of path on Windows, so the test can create entries beyond 260 characters."""
+    text = os.path.abspath(str(path))
+    return "\\\\?\\" + text if os.name == "nt" else text
+
+
+def test_teardown_removes_entries_nested_beyond_the_windows_path_limit(bridge):
+    """A runtime nesting inside the context's scratch (M13 host I, 2026-09-27: a session folder named after its working
+    directory, 277 characters deep) is removed completely, not reported as surviving (c118)."""
+    _service, client, contexts, work_root = bridge
+    root = work_root.parents[2]
+    own = root / "scratchpad" / contexts["pb1"]["session_context_id"]
+    deep = own / "deepseek-sdk" / "sessions"
+    while len(str(deep)) < 300:
+        deep = deep / ("d" * 40)
+    os.makedirs(_long(deep))
+    with open(_long(deep / "session.jsonl"), "w", encoding="utf-8") as handle:
+        handle.write("{}\n")
+    (own / "near.md").write_text("near", encoding="utf-8")
+    assert len(str(deep / "session.jsonl")) > 300
+
+    result = _teardown(client, "pb1")
+    assert result.status_code == 200, result.text
+    report = result.json()
+    assert report["status"] == "removed" and report["surviving"] == []
+    removed = {entry["path"]: entry["kind"] for entry in report["removed"]}
+    deep_file = (deep / "session.jsonl").relative_to(own).as_posix()
+    assert removed[deep_file] == "file" and removed["near.md"] == "file" and removed["."] == "directory"
+    assert not own.exists()

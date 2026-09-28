@@ -34,6 +34,11 @@ INVALID_HOOK_PAYLOAD_KEY = "__gtkb_invalid_hook_payload__"
 DIRECT_GIT_READ_ONLY_SUBCOMMANDS = frozenset(
     {
         "blame",
+        # c118: object and content reads; neither has a writing form, and `git cat-file` reads an object by id.
+        # This set judges whether Git can write. What a read-only form can reach is judged by _git_reach_roots: git
+        # grep and git ls-files forms that read Git-ignored files are refused there as traversal (round 2, B127).
+        "cat-file",
+        "grep",
         "check-attr",
         "check-ignore",
         "cherry",
@@ -673,9 +678,35 @@ def _direct_git_effect(stage: str, *, _depth: int = 0) -> str | None:
             return None
         return None
     subcommand = _direct_git_subcommand(stage)
-    if subcommand in DIRECT_GIT_READ_ONLY_SUBCOMMANDS:
+    if subcommand in DIRECT_GIT_READ_ONLY_SUBCOMMANDS or _git_informational_only(stage):
         return None
     return subcommand or "<unknown>"
+
+
+_GIT_INFORMATIONAL_OPTIONS = frozenset(
+    {"--version", "-v", "--help", "-h", "--exec-path", "--html-path", "--man-path", "--info-path"}
+)
+_REDIRECT_TOKEN = re.compile(r"\d*>{1,2}.*|\d*<.*")
+
+
+def _git_informational_only(stage: str) -> bool:
+    """Return whether a Git invocation runs no subcommand and only reports (`git --version`, `git --help`).
+
+    Redirections (`2>&1`) are not arguments. Any other non-option token is a subcommand or a value, so the
+    invocation is judged by the ordinary subcommand rule instead.
+    """
+    tokens = _shell_split(stage) or []
+    words = [_clean_shell_token(token) for token in tokens]
+    while words and words[0].lower() in {"&", "call"}:
+        words = words[1:]
+    if not words or _executable_name(words[0]) not in {"git", "git.exe"}:
+        return False
+    options = [word for word in words[1:] if not _REDIRECT_TOKEN.fullmatch(word)]
+    return (
+        bool(options)
+        and all(option.startswith("-") for option in options)
+        and any(option.split("=", 1)[0].lower() in _GIT_INFORMATIONAL_OPTIONS for option in options)
+    )
 
 
 def _has_direct_git_effect_signal(command: str) -> bool:
@@ -1650,6 +1681,416 @@ def _credential_material_access(payload: dict[str, Any]) -> str | None:
     return None
 
 
+# Context isolation (owner decision after the 2026-09-27 M13 host I finding: "Fix first: c118"). A review context
+# searched the whole scratchpad and listed seven other contexts' runtime homes, the implementer's included. A context
+# uses only its own scratch (scratchpad/<its session context>) and registered checkout (.worktrees/<its session
+# context>): another context's scratch or checkout is not read, searched, listed or changed. A shell recursion rooted at
+# or above the shared scratchpad or .worktrees roots, the project root included, is refused too, because it walks into
+# them and into Git-ignored credential files. Repository content is searched with git grep or rg, which skip
+# Git-ignored paths; shared state is read through the gt CLI.
+CONTEXT_PARENTS = ("scratchpad", ".worktrees")
+# A context's scratch and checkout are named by its session context; .worktrees/projects/<project> (the service's
+# project work checkouts) and loose entries belong to no context.
+_SESSION_CONTEXT_NAME = re.compile(r"SENV-[0-9a-f]{32}", re.IGNORECASE)
+# Native tools that list or search a tree; their path-like arguments are inspected.
+CONTEXT_SEARCH_TOOLS = frozenset(
+    {"grep", "glob", "ls", "tree", "list", "search", "list_dir", "find_by_name", "grep_search", "codebase_search"}
+)
+_PATH_LIKE_KEY = re.compile(r"path|dir|glob|include|exclude|target", re.IGNORECASE)
+_WILDCARD = re.compile(r"[*?\[]")
+_LISTING_VERBS = frozenset({"get-childitem", "gci", "dir", "ls"})
+# PowerShell accepts parameter prefixes, and Get-ChildItem binds -r and -re to -Recurse (both recurse in PowerShell 7 and
+# Windows PowerShell 5.1; round 2, B128). In PowerShell `ls` is Get-ChildItem; a POSIX `ls -r` only reverses the order,
+# and refusing it at the shared roots is fail-closed.
+_POWERSHELL_RECURSE = re.compile(r"-(?:r|re|rec|recu|recur|recurs|recurse|de|dep|dept|depth)(?::.*)?", re.IGNORECASE)
+_POSIX_LIST_RECURSE = re.compile(r"-[a-z]*R[a-z]*")
+_GREP_RECURSE = re.compile(r"-[a-zA-Z]*[rR][a-zA-Z]*|--recursive|--dereference-recursive")
+_GREP_PATTERN_OPTIONS = frozenset({"-e", "-f", "--regexp", "--file"})
+_RG_UNIGNORE = frozenset(
+    {"--no-ignore", "--no-ignore-vcs", "--no-ignore-parent", "--no-ignore-dot", "--unrestricted", "-u", "-uu", "-uuu"}
+)
+_POWERSHELL_VALUE_PARAMETERS = re.compile(
+    r"-(?:fi|fil|filt|filte|filter|in|inc|incl|inclu|includ|include|ex|exc|excl|exclu|exclud|exclude|de|dep|dept|"
+    r"depth|at|att|attr|attri|attrib|attribu|attribut|attribute|attributes)",
+    re.IGNORECASE,
+)
+
+
+def _context_root(root: Path) -> Path:
+    """Return the project that owns the shared scratchpad and .worktrees, also from inside a context's checkout."""
+    for candidate in (root, *root.parents):
+        if candidate.name.lower() in CONTEXT_PARENTS:
+            return candidate.parent
+    return root
+
+
+def _absolute(base: Path, token: str) -> Path | None:
+    """Resolve one path-like token against the call's working directory; None for flags and variables."""
+    text = _clean_shell_token(token).strip().strip("'\"")
+    if not text or text.startswith(("-", "$", "@", "%")) or "://" in text:
+        return None
+    candidate = Path(text)
+    return Path(os.path.normpath(str(candidate if candidate.is_absolute() else base / candidate)))
+
+
+def _wildcard_parent(token: str) -> str:
+    """Return the part of a path token before its first wildcard segment."""
+    text = _clean_shell_token(token).strip().strip("'\"").replace("\\", "/")
+    parts = text.split("/")
+    for index, part in enumerate(parts):
+        if _WILDCARD.search(part):
+            return "/".join(parts[:index]) or "."
+    return text
+
+
+def _is_within(path: Path, ancestor: Path) -> bool:
+    """Return whether path is ancestor or lies below it (case-insensitive on Windows)."""
+    here, there = os.path.normcase(str(path)), os.path.normcase(str(ancestor))
+    return here == there or here.startswith(there.rstrip("\\/") + os.sep)
+
+
+def _context_directory(project: Path, target: Path) -> tuple[str, str] | None:
+    """Return (parent, child) when target lies in a context's scratch or checkout; a wildcard child counts too.
+
+    A context's directory is named by its session context (SENV- and 32 hex digits). Any other entry directly under
+    the shared roots (a loose file, the service's .worktrees/projects) belongs to no context and is judged as usual.
+    """
+    for parent in CONTEXT_PARENTS:
+        base = project / parent
+        if not _is_within(target, base):
+            continue
+        relative = os.path.normcase(str(target))[len(os.path.normcase(str(base))) :].strip("\\/")
+        if not relative:
+            return None
+        child = str(target)[len(str(base)) :].strip("\\/").replace("\\", "/").split("/", 1)[0]
+        if _SESSION_CONTEXT_NAME.fullmatch(child) or _WILDCARD.search(child):
+            return parent, child
+        return None
+    return None
+
+
+def _path_like_values(tool: str, data: Any) -> list[str]:
+    """Path-like argument values of a native tool call: its paths and globs, never a content pattern or query."""
+    if not isinstance(data, dict):
+        return _string_values(data)
+    values: list[str] = []
+    for key, value in data.items():
+        if _PATH_LIKE_KEY.search(str(key)) or (tool in {"glob", "find_by_name"} and str(key).lower() == "pattern"):
+            values.extend(_string_values(value))
+    return values
+
+
+def _context_tokens(payload: dict[str, Any]) -> tuple[list[str], str | None]:
+    """Return the tokens that may name paths in this call, and its shell command if it is one."""
+    tool = _tool_name(payload).lower()
+    data = _tool_input(payload)
+    command = _command_from_payload(payload, data, tool)
+    if command is not None:
+        return _CREDENTIAL_TOKEN.findall(command), command
+    if _is_apply_patch_tool(tool) or any("*** Begin Patch" in value for value in _string_values(payload)):
+        return _paths_from_apply_patch(_project_root(payload), _apply_patch_text(payload, data)), None
+    name = Path(tool).name.rsplit("__", 1)[-1]
+    texts = _path_like_values(name, data)
+    return [token for text in texts for token in _CREDENTIAL_TOKEN.findall(text)], None
+
+
+def _named_context_directories(payload: dict[str, Any]) -> list[tuple[str, str]]:
+    """Return (child, token) for every context scratch or checkout directory this call names."""
+    root = _project_root(payload)
+    project = _context_root(root)
+    cwd = Path(str(payload.get("cwd") or root))
+    named: list[tuple[str, str]] = []
+    tokens, _command = _context_tokens(payload)
+    for token in tokens:
+        target = _absolute(cwd, token)
+        found = _context_directory(project, target) if target is not None else None
+        if found is not None:
+            named.append((found[1], str(token)))
+    return named
+
+
+def _embedded_commands(stage: str) -> list[str]:
+    """Commands nested in one stage: PowerShell (...), $(...), @(...) and { ... } groups, innermost first.
+
+    PowerShell runs a subexpression inside a double-quoted string as well, so quotes do not hide a group; a group that
+    is only text is judged like a command, which is fail-closed.
+    """
+    found: list[str] = []
+    opened: list[int] = []
+    for index, char in enumerate(stage):
+        if char in "({":
+            opened.append(index)
+        elif char in ")}" and opened:
+            found.append(stage[opened.pop() + 1 : index])
+    return found
+
+
+_EVALUATING_VERBS = frozenset({"invoke-expression", "iex"})
+
+
+def _evaluated_command(stage: str) -> str | None:
+    """Return the written-out command text a PowerShell Invoke-Expression (iex) stage runs; None for any other stage."""
+    tokens = _shell_split(stage)
+    if not tokens:
+        return None
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    words = [_clean_shell_token(token) for token in tokens[verb_index:]]
+    while words and words[0].lower() in {"&", "call"}:
+        words = words[1:]
+    if not words or _executable_name(words[0]) not in _EVALUATING_VERBS:
+        return None
+    text = " ".join(word for word in words[1:] if not (word.startswith("-") and "-command".startswith(word.lower())))
+    return text or None
+
+
+def _git_reach_roots(args: list[str]) -> tuple[list[str], bool] | None:
+    """Return (roots, True) for a read-only Git form that reads past the ignore rules; None for every other Git call.
+
+    DIRECT_GIT_READ_ONLY_SUBCOMMANDS judges whether Git can write. These forms are judged by what they read, and each
+    reads Git-ignored files, the shared context roots among them: git grep with --no-exclude-standard, or with
+    --no-index but without --exclude-standard; git ls-files with --others but without --exclude-standard, or with
+    --ignored; git status with --ignored (other than --ignored=no); and git diff --no-index, which compares any two
+    trees. Each walks from its paths (after -- for grep, ls-files and status), else from the working directory or the
+    -C directory.
+    """
+    base = ""
+    index = 0
+    while index < len(args):
+        token = args[index]
+        if token == "-C" and index + 1 < len(args):
+            base = args[index + 1]
+            index += 2
+        elif token in GIT_GLOBAL_OPTIONS_WITH_VALUES and index + 1 < len(args):
+            index += 2
+        elif token.startswith("-"):
+            index += 1
+        else:
+            break
+    if index >= len(args):
+        return None
+    subcommand, rest = args[index].lower(), args[index + 1 :]
+    options = [arg.lower() for arg in rest if arg.startswith("-") and arg != "--"]
+    short = "".join(option[1:] for option in options if not option.startswith("--"))
+    if subcommand == "grep":
+        reaches = "--no-exclude-standard" in options or (
+            "--no-index" in options and "--exclude-standard" not in options
+        )
+    elif subcommand == "ls-files":
+        ignored = "--ignored" in options or "i" in short
+        others = "--others" in options or "o" in short
+        reaches = ignored or (others and "--exclude-standard" not in options)
+    elif subcommand == "status":
+        reaches = any(
+            option == "--ignored" or (option.startswith("--ignored=") and option != "--ignored=no")
+            for option in options
+        )
+    elif subcommand == "diff":
+        reaches = "--no-index" in options
+    else:
+        return None
+    if not reaches:
+        return None
+    if subcommand == "diff":
+        paths = [arg for arg in rest if not arg.startswith("-")]
+    else:
+        paths = rest[rest.index("--") + 1 :] if "--" in rest else []
+    roots = [os.path.join(base, path) for path in paths] if base else paths
+    return (roots or [base or "."]), True
+
+
+def _recursive_roots(verb: str, args: list[str]) -> tuple[list[str], bool] | None:
+    """Return (roots, walks_ignored) for a recursive listing or search; None when the stage is not one.
+
+    walks_ignored is False only for rg without an ignore-disabling flag: rg skips Git-ignored paths, so only an explicit
+    root at or inside the shared roots reaches them.
+    """
+    if verb in {"git", "git.exe"}:
+        return _git_reach_roots(args)
+    lowered = [arg.lower() for arg in args]
+    if verb in _LISTING_VERBS:
+        recursive = any(
+            _POWERSHELL_RECURSE.fullmatch(arg) or _POSIX_LIST_RECURSE.fullmatch(arg) or low == "/s"
+            for arg, low in zip(args, lowered, strict=True)
+        )
+        if not recursive:
+            return None
+        roots: list[str] = []
+        skip = False
+        for arg in args:
+            if skip:
+                skip = False
+                continue
+            if _POWERSHELL_VALUE_PARAMETERS.fullmatch(arg):
+                skip = True
+                continue
+            if arg.startswith("-") or arg.startswith("/"):
+                continue
+            roots.append(arg)
+        return roots, True
+    if verb in {"tree", "tree.com", "du"}:
+        return [arg for arg in args if not arg.startswith(("-", "/"))], True
+    if verb == "find":
+        roots = []
+        for arg in args:
+            if arg.startswith(("-", "(", "!")):
+                break
+            roots.append(arg)
+        return roots, True
+    if verb in {"grep", "egrep", "fgrep", "rg", "rg.exe"}:
+        is_rg = verb.startswith("rg")
+        if not is_rg and not any(_GREP_RECURSE.fullmatch(arg) for arg in args):
+            return None
+        explicit_pattern = any(arg.split("=", 1)[0] in _GREP_PATTERN_OPTIONS for arg in args)
+        operands: list[str] = []
+        skip = False
+        for arg in args:
+            if skip:
+                skip = False
+                continue
+            if arg in _GREP_PATTERN_OPTIONS or arg in {"-g", "--glob", "-t", "--type", "-m", "--max-count"}:
+                skip = True  # the option's value (a pattern, glob, type or count) is not a root
+                continue
+            if arg.startswith("-"):
+                continue
+            operands.append(arg)
+        roots = operands if explicit_pattern else operands[1:]
+        walks_ignored = not is_rg or any(low in _RG_UNIGNORE for low in lowered)
+        return roots, walks_ignored
+    if verb in {"findstr", "findstr.exe"} and "/s" in lowered:
+        return [_wildcard_parent(arg) for arg in args if not arg.startswith("/")][1:], True
+    if verb in {"forfiles", "forfiles.exe"} and "/s" in lowered:
+        return [args[lowered.index("/p") + 1]] if "/p" in lowered and lowered.index("/p") + 1 < len(args) else [], True
+    if verb in {"where", "where.exe"} and "/r" in lowered:
+        return [args[lowered.index("/r") + 1]] if lowered.index("/r") + 1 < len(args) else [], True
+    if verb in {"robocopy", "robocopy.exe", "xcopy", "xcopy.exe"} and ({"/s", "/e"} & set(lowered)):
+        return [arg for arg in args if not arg.startswith("/")][:1], True
+    return None
+
+
+def _stage_traversal(stage: str, cwd: Path, shared: list[Path], *, _depth: int = 0) -> str | None:
+    """Name the recursive listing or search in one shell stage that walks into a shared context root."""
+    if _depth > 4:
+        return None
+    nested, recognized = _nested_shell_command(stage)
+    if recognized:
+        for inner in _split_command_stages(nested or "") or ([nested] if nested else []):
+            found = _stage_traversal(inner, cwd, shared, _depth=_depth + 1)
+            if found is not None:
+                return found
+        return None
+    evaluated = _evaluated_command(stage)
+    if evaluated:
+        for inner in _split_command_stages(evaluated) or [evaluated]:
+            found = _stage_traversal(inner, cwd, shared, _depth=_depth + 1)
+            if found is not None:
+                return found
+    found = _stage_recursion(stage, cwd, shared)
+    if found is not None:
+        return found
+    # A PowerShell subexpression, grouping or script block runs its own command; each one is judged like a stage.
+    for inner in _embedded_commands(stage):
+        for part in _split_command_stages(inner) or ([inner] if inner.strip() else []):
+            found = _stage_traversal(part, cwd, shared, _depth=_depth + 1)
+            if found is not None:
+                return found
+    return None
+
+
+def _stage_recursion(stage: str, cwd: Path, shared: list[Path]) -> str | None:
+    """Name the stage's own recursive listing or search (its leading verb) when it walks into a shared context root."""
+    tokens = _shell_split(stage)
+    if not tokens:
+        return None
+    verb_index = _shell_verb_index(tokens)
+    if verb_index is None:
+        return None
+    words = [_clean_shell_token(token) for token in tokens[verb_index:]]
+    while words and words[0].lower() in {"&", "call"}:
+        words = words[1:]
+    if not words:
+        return None
+    recursion = _recursive_roots(_executable_name(words[0]), words[1:])
+    if recursion is None:
+        return None
+    roots, walks_ignored = recursion
+    for token in roots or ["."]:
+        text = _clean_shell_token(token).strip().strip("'\"")
+        if text.startswith(("$", "@", "%", "(")):
+            # A variable or an expression can name any directory, the shared roots included (fail-closed).
+            return " ".join(words)[:240]
+        target = _absolute(cwd, _wildcard_parent(token))
+        if target is None:
+            continue
+        for base in shared:
+            reaches = _is_within(base, target) if walks_ignored else _is_within(target, base)
+            if reaches:
+                return " ".join(words)[:240]
+    return None
+
+
+def _context_traversal(payload: dict[str, Any]) -> str | None:
+    """Name a listing or search that walks into the shared scratchpad or .worktrees roots; None when none does."""
+    root = _project_root(payload)
+    project = _context_root(root)
+    cwd = Path(str(payload.get("cwd") or root))
+    shared = [project / parent for parent in CONTEXT_PARENTS]
+    tokens, command = _context_tokens(payload)
+    if command is not None:
+        for stage in _split_command_stages(command) or [command]:
+            found = _stage_traversal(stage, cwd, shared)
+            if found is not None:
+                return found
+        # A group that holds a pipe or a separator is split across the stages above; each group is judged whole too.
+        for inner in _embedded_commands(command):
+            for part in _split_command_stages(inner) or ([inner] if inner.strip() else []):
+                found = _stage_traversal(part, cwd, shared)
+                if found is not None:
+                    return found
+        return None
+    if Path(_tool_name(payload).lower()).name.rsplit("__", 1)[-1] not in CONTEXT_SEARCH_TOOLS:
+        return None
+    for token in tokens:
+        target = _absolute(cwd, _wildcard_parent(token))
+        if target is not None and any(os.path.normcase(str(target)) == os.path.normcase(str(base)) for base in shared):
+            return str(token)
+    return None
+
+
+def _bound_session_context(payload: dict[str, Any], project: Path) -> tuple[str | None, bool]:
+    """Return (session context, available) for this call's native context through the ordinary CLI.
+
+    An unbound context owns no scratch or checkout. The CLI runs against the project that owns the shared roots, so a
+    context inside its own checkout still reaches the configured authority.
+    """
+    native = str(os.environ.get("GTKB_NATIVE_CONTEXT_ID") or payload.get("session_id") or "").strip()
+    if not native:
+        return None, True
+    argv = [sys.executable, "-m", "groundtruth_kb", "session", "show", "--native-context-id", native, "--json"]
+    env = {**os.environ, "GT_PROJECT_ROOT": str(project), "PYTHONIOENCODING": "utf-8"}
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=project,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None, False
+    if result.returncode:
+        return None, "no_session_binding" in (result.stderr or "")
+    try:
+        context = json.loads(result.stdout).get("session_context_id")
+    except (ValueError, AttributeError):
+        return None, False
+    return (str(context) if context else None), True
+
+
 def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
     root = _project_root(payload)
     tool = _tool_name(payload).lower()
@@ -1723,6 +2164,31 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "and folders, .env files, environment listings and secret-named variables stay with the owner, who "
             "handles credentials in their own terminal.",
         )
+    traversal = _context_traversal(payload)
+    if traversal is not None:
+        return blocked(
+            "context_traversal",
+            f"A recursive listing or search from here walks into other contexts' scratch and checkouts ({traversal}). "
+            "Search tracked files with git grep or git ls-files in their ignore-honouring forms (not git grep "
+            "--no-exclude-standard or --no-index, and git ls-files --others only with --exclude-standard), use rg (it "
+            "skips Git-ignored paths), or name the directories to search; this context's own scratch is "
+            "scratchpad/<its session context>.",
+        )
+    named = _named_context_directories(payload)
+    if named:
+        own, available = _bound_session_context(payload, _context_root(_project_root(payload)))
+        if not available:
+            return blocked(
+                "context_isolation_unavailable",
+                "Restore the native CLI/authority connection before reading or changing scratch or checkout paths.",
+            )
+        foreign = [token for child, token in named if child.lower() != (own or "").lower()]
+        if foreign:
+            return blocked(
+                "foreign_context_material",
+                f"A context uses only its own scratch and checkout; {foreign[0]} belongs to another context. Read "
+                "shared state through the gt CLI and review work through your own checkout.",
+            )
     root = _project_root(payload)
     cwd = Path(str(payload.get("cwd") or root)).absolute()
     paths, mutating = changed_paths({**payload, "project_root": str(cwd)})

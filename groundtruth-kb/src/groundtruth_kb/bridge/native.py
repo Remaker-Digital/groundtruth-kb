@@ -189,6 +189,22 @@ def _scratch_entry(path: Path, root: Path) -> str:
     return path.relative_to(root).as_posix() or "."
 
 
+def _extended_length(path: Path) -> Path:
+    """Return the Windows extended-length form of an absolute path; other systems keep the path.
+
+    A runtime inside a context's scratch can nest beyond 260 characters (a session folder named after its working
+    directory, for example). Without the extended-length prefix such an entry cannot be listed or removed there.
+    """
+    if os.name != "nt":
+        return path
+    text = os.path.abspath(str(path))
+    if text.startswith("\\\\?\\"):
+        return Path(text)
+    if text.startswith("\\\\"):
+        return Path("\\\\?\\UNC\\" + text[2:])
+    return Path("\\\\?\\" + text)
+
+
 def _surviving(relative: str, kind: str, error: OSError) -> dict[str, Any]:
     return {
         "path": relative,
@@ -1072,9 +1088,10 @@ class NativeBridgeService:
             )
         removed: list[dict[str, str]] = []
         surviving: list[dict[str, Any]] = []
-        if self._remove_scratch_entries(own, own, removed, surviving):
+        walk_root = _extended_length(own)
+        if self._remove_scratch_entries(walk_root, walk_root, removed, surviving):
             try:
-                os.rmdir(own)
+                os.rmdir(walk_root)
                 removed.append({"path": ".", "kind": "directory"})
             except OSError as error:
                 surviving.append(_surviving(".", "directory", error))

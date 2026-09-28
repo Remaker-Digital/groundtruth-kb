@@ -315,12 +315,17 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
                 )
             )
             check(
-                command=ruff_command("check", "--no-fix", "--no-fix-only", checkout / "code.py"),
+                command=ruff_command("check", "--no-fix", "--no-fix-only", tmp_path / "code.py"),
                 # The native Antigravity envelope always requires its supplied
                 # conversation identity, even for a read-only tool call.
                 context="pb2" if harness in {"antigravity", "codex"} else "",
                 allowed=True,
             )
+            # Reading a context's checkout needs that context's identity (c118): an unidentified caller owns none,
+            # and the owning context reads its own checkout.
+            if harness not in {"antigravity", "codex"}:
+                check(command=ruff_command("check", "--no-fix", "--no-fix-only", checkout / "code.py"), context="")
+            check(command=ruff_command("check", "--no-fix", "--no-fix-only", checkout / "code.py"), allowed=True)
             code = checkout / "code.py"
             code.write_bytes(b"value=1\n")
             check(command=ruff_command("format", code), allowed=True)
