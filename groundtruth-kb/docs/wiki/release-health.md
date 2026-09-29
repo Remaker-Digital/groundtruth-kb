@@ -1,107 +1,43 @@
-# Release Health
+# Release health
 
-This page is the wiki-ready source for GT-KB release-health evidence. It is
-published from `groundtruth-kb/docs/wiki/release-health.md` into the
-`Remaker-Digital/groundtruth-kb` GitHub Wiki as `Release-Health.md`.
+**Status:** Current documentation of evidence classes, not a live release claim
+**Reviewed:** 2026-09-26
 
-The wiki copy is a publication target only. The in-root markdown file remains
-the GT-KB source artifact.
+Release readiness is not one green counter. A release decision must distinguish
+the exact product bytes, test results, independent review, Git state,
+installation, actual-host qualification, backup/recovery evidence, and remaining
+known limitations.
 
-## Release-Health Gates
+## Evidence classes
 
-GT-KB release readiness is not a single green counter. The dashboard release
-health view combines these evidence classes:
-
-| Evidence | Source | Release meaning |
-| --- | --- | --- |
-| Dirty worktree paths | `git status --short --branch` | Changed paths must be classified before release commit or push. |
-| Bridge actionability | TAFE/dispatcher state plus numbered `bridge/*.md` files | Latest `GO`, `NO-GO`, `NEW`, or `REVISED` work means the bridge is still active. |
-| Dispatcher daemon health | `gt bridge dispatch health/status/daemon status --json` | WARN or FAIL states block a clean release-health claim. |
-| CI and workflow runs | GitHub Actions for `Remaker-Digital/groundtruth-kb` on `main` | Recent failures, unavailable live state, and absent workflows are distinct states. |
-| README/wiki drift | `scripts/update_wiki_pages.py compare` | Published wiki pages must match in-root source docs before release signoff. |
-| Deferred work expiry | Dashboard model records with `status` / `state` / `outcome` = `deferred` | Every deferral needs an expiry, time limit, or resume trigger; indefinite deferral is WARN. |
-| Governed release gate | `scripts/release_candidate_gate.py` | A release candidate needs governed local evidence or an explicit owner-approved deferral. |
-
-Azure Container Apps reconciliation is not part of the default GT-KB release
-gate. It is an optional adopter diagnostic and only runs when
-`GTKB_DASHBOARD_AZURE_RECONCILE=1` is set for the dashboard refresh process.
-The application must also provide `GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP` and
-`GTKB_DASHBOARD_AZURE_RESOURCE_GROUP`; GT-KB does not ship deployment-provider
-resource names as platform defaults.
-
-Application deployment, security, throughput/latency, defects, and
-infrastructure summaries are provider-neutral dashboard display contracts. The
-default rows are mock data so tests can verify the dashboard surface; live
-values belong to the active application's connector.
-
-## Dashboard Semantics
-
-The dashboard must not report `release_blockers = 0` solely because a cached
-readiness note says no blockers. Live git, bridge, dispatcher, workflow, and
-wiki comparison findings are release-health blockers when they indicate
-unclassified or unresolved release-scope work.
-
-`current_metrics.release_blockers` therefore reflects the larger of:
-
-- the release-readiness model's explicit blocker count;
-- explicit blocker messages; and
-- live release-health findings gathered during dashboard refresh.
-
-## GitHub Workflow State
-
-GitHub workflow health is classified rather than collapsed into one unknown
-state:
-
-| State | Meaning |
+| Evidence | What it establishes |
 | --- | --- |
-| `passing` | A recent completed run for the relevant workflow and branch succeeded. |
-| `failing` | A recent completed run failed, timed out, was cancelled, or requires action. |
-| `running` | A run is in progress. |
-| `no_recent_run` | The workflow exists locally, but no recent run was returned. |
-| `not_wired` | The workflow or required local configuration is absent. |
-| `manual` | The gate is intentionally local/manual and no workflow run is expected. |
-| `live_state_unavailable` | `gh` is unavailable, unauthenticated, rate-limited, or otherwise unable to query. |
+| Git status and exact object identities | The candidate cohort and any unrelated or uncommitted paths |
+| Specification-derived test results | Behavior observed in the stated test environment |
+| Independent review | The final bytes and evidence inspected by a separate review context |
+| Project finalization | The complete verified project cohort and its Git result |
+| Installed-service readiness | The selected installed services answered their real readiness checks |
+| Restart qualification | The installation recovered after a real host restart |
+| Backup and restore drill | Recovery succeeded from the copy intended for the asserted loss scenario |
+| Documentation comparison | Published Wiki pages match reviewed source |
 
-The GT-KB release branch is `main` unless a future release proposal explicitly
-selects another branch.
+None of these substitutes for another. In particular:
 
-## README and Wiki Comparison
+- `VERIFIED` is review completion, not proof of a commit.
+- A commit is not proof that the product was installed or started successfully.
+- A readiness endpoint is not complete release qualification.
+- A generated dashboard is not authority for the underlying product state.
+- Backup creation is not proof of recovery.
 
-Use the in-root wiki comparison tool:
+## Documentation release gate
 
-```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/update_wiki_pages.py compare --wiki-dir .tmp/groundtruth-kb.wiki
-```
+Critical installation, Get Started, troubleshooting, upgrade, backup/restore,
+and uninstall pages must accurately describe the selected release. Published
+Wiki content must match `groundtruth-kb/docs/wiki/` before a public release.
 
-To refresh the local wiki checkout from in-root source pages:
+Use `scripts/update_wiki_pages.py compare` against a fresh Wiki clone to detect
+publication drift. A zero-drift comparison proves equality of the selected text;
+it does not prove that the text is behaviorally correct. Command and cold-read
+qualification remain separate gates.
 
-```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/update_wiki_pages.py update --wiki-dir .tmp/groundtruth-kb.wiki
-```
-
-The updater does not push. Any wiki publish step is a separate external Git
-operation and must use the in-root source pages as the content source.
-
-Live git, dispatcher, and GitHub workflow probes are opt-in during dashboard
-refresh:
-
-```powershell
-groundtruth-kb/.venv/Scripts/python.exe scripts/gtkb_dashboard/refresh_dashboard_db.py --db-path .tmp/gtkb-dashboard-health.sqlite --project-root E:\GT-KB --probe-live
-```
-
-Use live probes for release signoff only after confirming the host-local
-dispatcher and GitHub CLI probes are healthy.
-
-## Release Signoff Rule
-
-A clean release-health claim requires all of the following:
-
-- dashboard release-health findings are zero or explicitly dispositioned;
-- the worktree is clean except for intentionally staged release artifacts;
-- bridge state has no unresolved release-scope Prime or Loyal Opposition work;
-- dispatcher daemon/control-surface health is not WARN or FAIL;
-- deferred release-scope items have an expiry, time limit, or resume trigger;
-- required `main` workflow evidence is passing or explicitly deferred; and
-- README and wiki source comparisons are current.
-
-(c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
+Current customer-impacting gaps are listed in [Known issues](Known-Issues).

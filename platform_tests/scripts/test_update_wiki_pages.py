@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import hashlib
 import importlib.util
+import json
+import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 import pytest
 
@@ -21,8 +26,16 @@ def test_wiki_page_name_maps_in_root_source_slug_to_github_wiki_name() -> None:
     module = _load_module()
 
     assert module.wiki_page_name(Path("release-health.md")) == "Release-Health.md"
+    assert module.wiki_page_name(Path("settings.md")) == "Settings.md"
+    assert module.wiki_page_name(Path("status.md")) == "Status.md"
+    assert module.wiki_page_name(Path("controls.md")) == "Controls.md"
+    assert module.wiki_page_name(Path("models.md")) == "Models.md"
+    assert module.wiki_page_name(Path("plugins.md")) == "Plugins.md"
+    assert module.wiki_page_name(Path("agent-presets.md")) == "Agent-Presets.md"
     assert module.wiki_page_name(Path("azure-enterprise-readiness.md")) == "Azure-Enterprise-Readiness.md"
     assert module.wiki_page_name(Path("Home.md")) == "Home.md"
+    assert module.wiki_page_name(Path("_Sidebar.md")) == "_Sidebar.md"
+    assert module.wiki_page_name(Path("_Footer.md")) == "_Footer.md"
 
 
 def test_compare_pages_distinguishes_current_missing_and_different(tmp_path: Path) -> None:
@@ -41,7 +54,7 @@ def test_compare_pages_distinguishes_current_missing_and_different(tmp_path: Pat
 
     assert rows["Release-Health.md"]["status"] == "current"
     assert rows["Home.md"]["status"] == "missing"
-    assert "Azure-Enterprise-Readiness.md" not in rows
+    assert rows["Azure-Enterprise-Readiness.md"]["status"] == "different"
 
 
 def test_update_pages_copies_from_source_without_pushing(tmp_path: Path) -> None:
@@ -73,24 +86,252 @@ def test_script_no_longer_targets_agent_red_temp_wiki() -> None:
     assert "groundtruth-kb.wiki" in text
 
 
-def test_source_pages_only_includes_intentional_release_wiki_sources(tmp_path: Path) -> None:
+def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: Path) -> None:
     module = _load_module()
     source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
     source_dir.mkdir(parents=True)
     (source_dir / "release-health.md").write_text("# Release Health\n", encoding="utf-8")
     (source_dir / "azure-enterprise-readiness.md").write_text("# Azure draft\n", encoding="utf-8")
+    (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
+    (source_dir / "_Sidebar.md").write_text("# Sidebar\n", encoding="utf-8")
+    (source_dir / "settings.md").write_text("# Settings\n", encoding="utf-8")
+    (source_dir / "status.md").write_text("# GTKB status\n", encoding="utf-8")
+    (source_dir / "controls.md").write_text("# GTKB controls\n", encoding="utf-8")
+    (source_dir / "models.md").write_text("# Models and providers\n", encoding="utf-8")
+    (source_dir / "plugins.md").write_text("# Plugins\n", encoding="utf-8")
+    (source_dir / "agent-presets.md").write_text("# Agent presets\n", encoding="utf-8")
     (source_dir / "scratch.md").write_text("# Scratch\n", encoding="utf-8")
 
-    assert [path.name for path in module.source_pages(source_dir)] == ["release-health.md"]
+    assert {path.name for path in module.source_pages(source_dir)} == {
+        "_Sidebar.md",
+        "agent-presets.md",
+        "azure-enterprise-readiness.md",
+        "controls.md",
+        "Home.md",
+        "models.md",
+        "plugins.md",
+        "release-health.md",
+        "settings.md",
+        "status.md",
+    }
 
 
-def test_readmes_reference_main_branch_and_release_health_source() -> None:
+@pytest.mark.parametrize("status", ["missing", "different", "current"])
+@pytest.mark.parametrize(
+    "asset_name",
+    [
+        "assets/gtkb-agent-presets.png",
+        "assets/gtkb-controls.png",
+        "assets/gtkb-home-commands.png",
+        "assets/gtkb-home-compact-sidebar.png",
+        "assets/gtkb-home-empty-state.png",
+        "assets/gtkb-home-model-popover.png",
+        "assets/gtkb-home-orientation.svg",
+        "assets/gtkb-home-permissions.png",
+        "assets/gtkb-home-session-in-progress.png",
+        "assets/gtkb-home-session-modes.png",
+        "assets/gtkb-home-session-search.png",
+        "assets/gtkb-home-sidebar-options.png",
+        "assets/gtkb-models.png",
+        "assets/gtkb-plugins.png",
+        "assets/gtkb-services.png",
+        "assets/gtkb-settings-general.png",
+        "assets/gtkb-status.png",
+        "assets/gtkb-workspace-picker.png",
+    ],
+)
+def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str, asset_name: str) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "source"
+    wiki_dir = tmp_path / "wiki"
+    source_asset = source_dir / asset_name
+    source_asset.parent.mkdir(parents=True)
+    content = (
+        b'<svg xmlns="http://www.w3.org/2000/svg"><text>Fixture</text></svg>\r\n'
+        if asset_name.endswith(".svg")
+        else b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
+    )
+    source_asset.write_bytes(content)
+    if status != "missing":
+        target = wiki_dir / asset_name
+        target.parent.mkdir(parents=True)
+        target.write_bytes(content if status == "current" else b"stale image")
+
+    rows = module.compare_pages(source_dir, wiki_dir)
+
+    assert len(rows) == 1
+    assert rows[0]["kind"] == "asset"
+    assert rows[0]["wiki_page"] == asset_name
+    assert rows[0]["status"] == status
+    assert rows[0]["source_sha256"] == hashlib.sha256(content).hexdigest()
+    if status == "current":
+        assert rows[0]["wiki_sha256"] == rows[0]["source_sha256"]
+    elif status == "missing":
+        assert rows[0]["wiki_sha256"] == ""
+    else:
+        assert rows[0]["wiki_sha256"] == hashlib.sha256(b"stale image").hexdigest()
+
+
+def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "source"
+    wiki_dir = tmp_path / "wiki"
+    (source_dir / "assets").mkdir(parents=True)
+    assets = {
+        "assets/gtkb-home-empty-state.png": b"\x89PNG\r\n\x1a\n\x00\xffhome\r\n",
+        "assets/gtkb-settings-general.png": b"\x89PNG\r\n\x1a\n\x00\xfesettings\r\n",
+        "assets/gtkb-status.png": b"\x89PNG\r\n\x1a\n\x00\xfdstatus\r\n",
+        "assets/gtkb-services.png": b"\x89PNG\r\n\x1a\n\x00\xfcservices\r\n",
+        "assets/gtkb-controls.png": b"\x89PNG\r\n\x1a\n\x00\xfbcontrols\r\n",
+        "assets/gtkb-models.png": b"\x89PNG\r\n\x1a\n\x00\xfamodels\r\n",
+        "assets/gtkb-plugins.png": b"\x89PNG\r\n\x1a\n\x00\xf9plugins\r\n",
+        "assets/gtkb-agent-presets.png": b"\x89PNG\r\n\x1a\n\x00\xf8presets\r\n",
+        "assets/gtkb-workspace-picker.png": b"\x89PNG\r\n\x1a\n\x00\xf7workspace\r\n",
+        "assets/gtkb-home-session-modes.png": b"\x89PNG\r\n\x1a\n\x00\xf6modes\r\n",
+        "assets/gtkb-home-permissions.png": b"\x89PNG\r\n\x1a\n\x00\xf5permissions\r\n",
+        "assets/gtkb-home-model-popover.png": b"\x89PNG\r\n\x1a\n\x00\xf4model-popover\r\n",
+        "assets/gtkb-home-commands.png": b"\x89PNG\r\n\x1a\n\x00\xf3commands\r\n",
+        "assets/gtkb-home-sidebar-options.png": b"\x89PNG\r\n\x1a\n\x00\xf2sidebar-options\r\n",
+        "assets/gtkb-home-session-search.png": b"\x89PNG\r\n\x1a\n\x00\xf1session-search\r\n",
+        "assets/gtkb-home-session-in-progress.png": b"\x89PNG\r\n\x1a\n\x00\xf0session-in-progress\r\n",
+        "assets/gtkb-home-compact-sidebar.png": b"\x89PNG\r\n\x1a\n\x00\xefcompact-sidebar\r\n",
+        "assets/gtkb-home-orientation.svg": b'<svg xmlns="http://www.w3.org/2000/svg"><text>Orientation</text></svg>\r\n',
+    }
+    for name, content in assets.items():
+        (source_dir / name).write_bytes(content)
+    (source_dir / "assets" / "private-capture.png").write_bytes(b"do not publish")
+    (source_dir / "settings.md").write_text("# Settings\n", encoding="utf-8")
+
+    rows = module.update_pages(source_dir, wiki_dir)
+
+    assert len(rows) == 19
+    assert all(row["post_update_status"] == "current" for row in rows)
+    for name, content in assets.items():
+        assert (wiki_dir / name).read_bytes() == content
+    assert not (wiki_dir / "assets" / "private-capture.png").exists()
+    assert (wiki_dir / "Settings.md").read_text(encoding="utf-8") == "# Settings\n"
+
+
+def test_cli_dry_run_does_not_create_asset_checkout(tmp_path: Path, capsys) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
+    wiki_dir = tmp_path / ".tmp" / "groundtruth-kb.wiki"
+    (source_dir / "assets").mkdir(parents=True)
+    (source_dir / "assets" / "gtkb-home-empty-state.png").write_bytes(b"\x89PNG\r\n\xff")
+    (source_dir / "assets" / "gtkb-settings-general.png").write_bytes(b"\x89PNG\r\n\xfe")
+    (source_dir / "assets" / "gtkb-status.png").write_bytes(b"\x89PNG\r\n\xfd")
+    (source_dir / "assets" / "gtkb-services.png").write_bytes(b"\x89PNG\r\n\xfc")
+    (source_dir / "assets" / "gtkb-controls.png").write_bytes(b"\x89PNG\r\n\xfb")
+    (source_dir / "assets" / "gtkb-models.png").write_bytes(b"\x89PNG\r\n\xfa")
+    (source_dir / "assets" / "gtkb-plugins.png").write_bytes(b"\x89PNG\r\n\xf9")
+    (source_dir / "assets" / "gtkb-agent-presets.png").write_bytes(b"\x89PNG\r\n\xf8")
+    (source_dir / "assets" / "gtkb-workspace-picker.png").write_bytes(b"\x89PNG\r\n\xf7")
+    (source_dir / "assets" / "gtkb-home-session-modes.png").write_bytes(b"\x89PNG\r\n\xf6")
+    (source_dir / "assets" / "gtkb-home-permissions.png").write_bytes(b"\x89PNG\r\n\xf5")
+    (source_dir / "assets" / "gtkb-home-model-popover.png").write_bytes(b"\x89PNG\r\n\xf4")
+    (source_dir / "assets" / "gtkb-home-commands.png").write_bytes(b"\x89PNG\r\n\xf3")
+    (source_dir / "assets" / "gtkb-home-sidebar-options.png").write_bytes(b"\x89PNG\r\n\xf2")
+    (source_dir / "assets" / "gtkb-home-session-search.png").write_bytes(b"\x89PNG\r\n\xf1")
+    (source_dir / "assets" / "gtkb-home-session-in-progress.png").write_bytes(b"\x89PNG\r\n\xf0")
+    (source_dir / "assets" / "gtkb-home-compact-sidebar.png").write_bytes(b"\x89PNG\r\n\xef")
+    (source_dir / "Home.md").write_text("# Home\n", encoding="utf-8")
+
+    assert module.main(["update", "--project-root", str(tmp_path), "--dry-run", "--json"]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["dry_run"] is True
+    assert result["summary"]["page_count"] == 1
+    assert result["summary"]["asset_count"] == 17
+    assert result["summary"]["drift_count"] == 18
+    assert all(row["planned_action"] == "write" for row in result["pages"])
+    assert not wiki_dir.exists()
+
+
+def test_cli_compare_fails_on_asset_drift_and_passes_after_update(tmp_path: Path, capsys) -> None:
+    module = _load_module()
+    source_dir = tmp_path / "groundtruth-kb" / "docs" / "wiki"
+    asset_name = "assets/gtkb-home-empty-state.png"
+    (source_dir / "assets").mkdir(parents=True)
+    (source_dir / asset_name).write_bytes(b"\x89PNG\r\n\xff")
+    args = ["--project-root", str(tmp_path), "--json"]
+
+    assert module.main(["compare", *args]) == 1
+    assert module.main(["update", *args]) == 0
+    capsys.readouterr()
+    assert module.main(["compare", *args]) == 0
+    result = json.loads(capsys.readouterr().out)
+    assert result["summary"]["page_count"] == 0
+    assert result["summary"]["asset_count"] == 1
+    assert result["summary"]["drift_count"] == 0
+
+
+def test_readmes_route_customers_to_the_wiki_and_reviewed_source() -> None:
     root_readme = (REPO_ROOT / "README.md").read_text(encoding="utf-8")
     package_readme = (REPO_ROOT / "groundtruth-kb" / "README.md").read_text(encoding="utf-8")
 
-    assert "branch=develop" not in root_readme
-    assert "branch=main" in root_readme
-    assert "groundtruth-kb/docs/wiki/release-health.md" in root_readme
+    assert "github.com/Remaker-Digital/groundtruth-kb/wiki" in root_readme
+    assert "groundtruth-kb/docs/wiki/" in root_readme
     assert "docs/wiki/release-health.md" in package_readme
     assert "scripts/update_wiki_pages.py compare" in package_readme
     assert "Agent Red" not in package_readme
+
+
+def _heading_ids(markdown: str) -> set[str]:
+    counts: dict[str, int] = {}
+    result = set()
+    for heading in re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", markdown, re.MULTILINE):
+        slug = re.sub(r"[^\w\s-]", "", heading.lower()).replace(" ", "-")
+        occurrence = counts.get(slug, 0)
+        counts[slug] = occurrence + 1
+        result.add(f"{slug}-{occurrence}" if occurrence else slug)
+    return result
+
+
+def test_pilot_links_and_existing_incoming_anchors_resolve() -> None:
+    module = _load_module()
+    source_dir = REPO_ROOT / "groundtruth-kb" / "docs" / "wiki"
+    # GitHub Wiki resolves page names without regard to case; fragments remain exact.
+    pages = {
+        module.wiki_page_name(p)[:-3].casefold(): p.read_text(encoding="utf-8") for p in module.source_pages(source_dir)
+    }
+    pilot = {"home", "get-started", "troubleshooting"}
+    for current_page, markdown in pages.items():
+        for href in re.findall(r"!?\[[^\]]*\]\(([^\s)]+)\)", markdown):
+            parsed = urlsplit(href)
+            if parsed.scheme or parsed.netloc:
+                continue
+            target = unquote(parsed.path).removesuffix(".md").casefold() or current_page
+            if current_page not in pilot and target not in pilot:
+                continue
+            assert target in pages, f"{current_page}: missing page {href}"
+            if parsed.fragment:
+                assert unquote(parsed.fragment) in _heading_ids(pages[target]), f"{current_page}: missing anchor {href}"
+
+
+@pytest.mark.parametrize("page_name", ["Home.md", "get-started.md", "troubleshooting.md"])
+def test_pilot_prose_uses_no_em_dashes(page_name: str) -> None:
+    markdown = (REPO_ROOT / "groundtruth-kb" / "docs" / "wiki" / page_name).read_text(encoding="utf-8")
+    assert "\u2014" not in markdown
+
+
+def test_orientation_asset_is_accessible_native_svg_without_embedded_content() -> None:
+    module = _load_module()
+    source_dir = REPO_ROOT / "groundtruth-kb" / "docs" / "wiki"
+    asset_name = "assets/gtkb-home-orientation.svg"
+    assert asset_name in module.WIKI_ASSET_ALLOWLIST
+    svg = (source_dir / asset_name).read_text(encoding="utf-8")
+    root = ET.fromstring(svg)
+    namespace = "{http://www.w3.org/2000/svg}"
+    assert root.tag == f"{namespace}svg"
+    assert root.attrib["viewBox"] == "0 0 1120 736"
+    assert root.attrib["role"] == "img"
+    assert root.find(f"{namespace}title").text
+    assert "not a screenshot" in root.find(f"{namespace}desc").text.lower()
+    assert root.findall(f".//{namespace}text"), "Keep editable native SVG text, not a bitmap wrapper"
+    assert "\u2014" not in svg
+    for node in root.iter():
+        assert node.tag not in {f"{namespace}{tag}" for tag in ("image", "script", "foreignObject")}
+        assert not any(key.rsplit("}", 1)[-1].lower().startswith("on") for key in node.attrib)
+        assert not any(key.rsplit("}", 1)[-1] == "href" for key in node.attrib)
+    markdown = (source_dir / "get-started.md").read_text(encoding="utf-8")
+    assert f"https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/{asset_name}" in markdown
+    assert "Illustration, not a screenshot" in markdown

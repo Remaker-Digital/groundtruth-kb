@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1120" height="736" viewBox="0 0 1120 736" role="img" aria-labelledby="title desc">
+  <title id="title">GTKB Home: five controls to check before a request</title>
+  <desc id="desc">Simplified interface illustration, not a screenshot. One marks workspace, two agent mode, three permission, four model, and five Settings. Example values are not required defaults. The guide provides equivalent text descriptions.</desc>
+  <rect width="1120" height="736" rx="20" fill="#f4f6fa"/>
+  <g font-family="Inter, Arial, sans-serif">
+    <text x="32" y="42" font-size="14" font-weight="700" letter-spacing="2" fill="#b72d1b">GTKB / QUICK ORIENTATION</text>
+    <text x="32" y="88" font-size="32" font-weight="700" fill="#152239">Know what each control changes</text>
+    <text x="32" y="120" font-size="18" fill="#45556d">Five checks before your first request.</text>
+    <g id="simplified-home">
+      <rect x="32" y="148" width="1056" height="328" rx="14" fill="#15171c"/>
+      <path d="M46 148H212V476H46Q32 476 32 462V162Q32 148 46 148Z" fill="#22252d"/>
+      <path d="M212 148V476" stroke="#424853"/>
+      <rect x="52" y="170" width="28" height="28" rx="6" fill="#ff3b26"/>
+      <text x="66" y="189" text-anchor="middle" font-size="17" font-weight="700" fill="#ffffff">{r}</text>
+      <text x="90" y="190" font-size="20" font-weight="700" fill="#f4f6fa">GTKB</text>
+      <rect x="52" y="214" width="140" height="36" rx="9" fill="#414650"/>
+      <text x="122" y="238" text-anchor="middle" font-size="15" font-weight="600" fill="#ffffff">New Session</text>
+      <text x="52" y="284" font-size="14" fill="#c4ccd9">Workspaces</text>
+      <text x="52" y="319" font-size="15" fill="#ffffff">Example workspace</text>
+      <text x="451" y="219" font-size="26" font-weight="600" fill="#f4f6fa">GroundTruth KB</text>
+      <rect x="676" y="197" width="77" height="25" rx="8" fill="#36465f"/>
+      <text x="714" y="214" text-anchor="middle" font-size="12" font-weight="600" fill="#ffffff">Preview</text>
+      <g id="workspace-control">
+        <rect x="256" y="258" width="259" height="44" rx="10" fill="#2b303a"/>
+        <circle cx="278" cy="280" r="14" fill="#9cc5ff"/>
+        <text x="278" y="285" text-anchor="middle" font-size="15" font-weight="700" fill="#142b4a">1</text>
+        <text x="304" y="286" font-size="16" font-weight="600" fill="#ffffff">Example workspace</text>
+        <path d="m490 277 5 5 5-5" fill="none" stroke="#c4ccd9" stroke-width="2"/>
+      </g>
+      <g id="mode-control">
+        <rect x="531" y="258" width="220" height="44" rx="10" fill="#2b303a"/>
+        <circle cx="553" cy="280" r="14" fill="#9cc5ff"/>
+        <text x="553" y="285" text-anchor="middle" font-size="15" font-weight="700" fill="#142b4a">2</text>
+        <text x="579" y="286" font-size="16" font-weight="600" fill="#ffffff">Standard mode</text>
+        <path d="m724 277 5 5 5-5" fill="none" stroke="#c4ccd9" stroke-width="2"/>
+      </g>
+      <rect x="256" y="322" width="800" height="127" rx="16" fill="#2b2e36"/>
+      <text x="279" y="357" font-size="16" fill="#c4ccd9">Describe the task you intend to request...</text>
+      <g id="permission-control">
+        <circle cx="278" cy="412" r="14" fill="#9cc5ff"/>
+        <text x="278" y="417" text-anchor="middle" font-size="15" font-weight="700" fill="#142b4a">3</text>
+        <text x="304" y="418" font-size="16" font-weight="600" fill="#ffffff">Workspace Write</text>
+        <path d="m457 409 5 5 5-5" fill="none" stroke="#c4ccd9" stroke-width="2"/>
+      </g>
+      <g id="model-control">
+        <circle cx="728" cy="412" r="14" fill="#9cc5ff"/>
+        <text x="728" y="417" text-anchor="middle" font-size="15" font-weight="700" fill="#142b4a">4</text>
+        <text x="754" y="418" font-size="16" font-weight="600" fill="#ffffff">Model reference</text>
+        <path d="m912 409 5 5 5-5" fill="none" stroke="#c4ccd9" stroke-width="2"/>
+      </g>
+      <circle cx="1024" cy="412" r="18" fill="#40577b"/>
+      <path d="M1024 421v-17m-6 6 6-6 6 6" fill="none" stroke="#d1d9e6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <g id="settings-control">
+        <circle cx="66" cy="439" r="14" fill="#9cc5ff"/>
+        <text x="66" y="444" text-anchor="middle" font-size="15" font-weight="700" fill="#142b4a">5</text>
+        <text x="92" y="445" font-size="16" font-weight="600" fill="#ffffff">Settings</text>
+      </g>
+    </g>
+    <g id="control-key" fill="#152239">
+      <text x="32" y="515" font-size="17" font-weight="700">1  Workspace</text>
+      <text x="32" y="542" font-size="16" fill="#45556d">Check the intended full working path.</text>
+      <text x="400" y="515" font-size="17" font-weight="700">2  Agent mode</text>
+      <text x="400" y="542" font-size="16" fill="#45556d">Choose tools and behavior for the task.</text>
+      <text x="768" y="515" font-size="17" font-weight="700">3  Permission</text>
+      <text x="768" y="542" font-size="16" fill="#45556d">Check the permitted operation.</text>
+      <text x="32" y="591" font-size="17" font-weight="700">4  Model</text>
+      <text x="32" y="618" font-size="16" fill="#45556d">Check the provider and model separately.</text>
+      <text x="400" y="591" font-size="17" font-weight="700">5  Settings</text>
+      <text x="400" y="618" font-size="16" fill="#45556d">Inspect status, services, and setup.</text>
+    </g>
+    <path d="M32 654H1088" stroke="#ccd5e2"/>
+    <text x="32" y="686" font-size="14" font-weight="600" fill="#45556d">ILLUSTRATION, NOT A SCREENSHOT</text>
+    <text x="32" y="711" font-size="14" fill="#45556d">Simplified labels. Example selections are not required defaults or evidence of successful setup.</text>
+  </g>
+</svg>
