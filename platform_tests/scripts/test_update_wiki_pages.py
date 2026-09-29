@@ -3,7 +3,10 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
+import re
+import xml.etree.ElementTree as ET
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 import pytest
 
@@ -123,6 +126,7 @@ def test_source_pages_only_includes_intentional_product_wiki_sources(tmp_path: P
         "assets/gtkb-home-compact-sidebar.png",
         "assets/gtkb-home-empty-state.png",
         "assets/gtkb-home-model-popover.png",
+        "assets/gtkb-home-orientation.svg",
         "assets/gtkb-home-permissions.png",
         "assets/gtkb-home-session-in-progress.png",
         "assets/gtkb-home-session-modes.png",
@@ -142,7 +146,11 @@ def test_compare_pages_checks_asset_bytes_and_hashes(tmp_path: Path, status: str
     wiki_dir = tmp_path / "wiki"
     source_asset = source_dir / asset_name
     source_asset.parent.mkdir(parents=True)
-    content = b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
+    content = (
+        b'<svg xmlns="http://www.w3.org/2000/svg"><text>Fixture</text></svg>\r\n'
+        if asset_name.endswith(".svg")
+        else b"\x89PNG\r\n\x1a\n\x00\xfffixture\r\n"
+    )
     source_asset.write_bytes(content)
     if status != "missing":
         target = wiki_dir / asset_name
@@ -187,6 +195,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
         "assets/gtkb-home-session-search.png": b"\x89PNG\r\n\x1a\n\x00\xf1session-search\r\n",
         "assets/gtkb-home-session-in-progress.png": b"\x89PNG\r\n\x1a\n\x00\xf0session-in-progress\r\n",
         "assets/gtkb-home-compact-sidebar.png": b"\x89PNG\r\n\x1a\n\x00\xefcompact-sidebar\r\n",
+        "assets/gtkb-home-orientation.svg": b'<svg xmlns="http://www.w3.org/2000/svg"><text>Orientation</text></svg>\r\n',
     }
     for name, content in assets.items():
         (source_dir / name).write_bytes(content)
@@ -195,7 +204,7 @@ def test_update_pages_preserves_allowlisted_asset_bytes_only(tmp_path: Path) -> 
 
     rows = module.update_pages(source_dir, wiki_dir)
 
-    assert len(rows) == 18
+    assert len(rows) == 19
     assert all(row["post_update_status"] == "current" for row in rows)
     for name, content in assets.items():
         assert (wiki_dir / name).read_bytes() == content
@@ -264,3 +273,65 @@ def test_readmes_route_customers_to_the_wiki_and_reviewed_source() -> None:
     assert "docs/wiki/release-health.md" in package_readme
     assert "scripts/update_wiki_pages.py compare" in package_readme
     assert "Agent Red" not in package_readme
+
+
+def _heading_ids(markdown: str) -> set[str]:
+    counts: dict[str, int] = {}
+    result = set()
+    for heading in re.findall(r"^#{1,6}\s+(.+?)\s*#*\s*$", markdown, re.MULTILINE):
+        slug = re.sub(r"[^\w\s-]", "", heading.lower()).replace(" ", "-")
+        occurrence = counts.get(slug, 0)
+        counts[slug] = occurrence + 1
+        result.add(f"{slug}-{occurrence}" if occurrence else slug)
+    return result
+
+
+def test_pilot_links_and_existing_incoming_anchors_resolve() -> None:
+    module = _load_module()
+    source_dir = REPO_ROOT / "groundtruth-kb" / "docs" / "wiki"
+    # GitHub Wiki resolves page names without regard to case; fragments remain exact.
+    pages = {
+        module.wiki_page_name(p)[:-3].casefold(): p.read_text(encoding="utf-8") for p in module.source_pages(source_dir)
+    }
+    pilot = {"home", "get-started", "troubleshooting"}
+    for current_page, markdown in pages.items():
+        for href in re.findall(r"!?\[[^\]]*\]\(([^\s)]+)\)", markdown):
+            parsed = urlsplit(href)
+            if parsed.scheme or parsed.netloc:
+                continue
+            target = unquote(parsed.path).removesuffix(".md").casefold() or current_page
+            if current_page not in pilot and target not in pilot:
+                continue
+            assert target in pages, f"{current_page}: missing page {href}"
+            if parsed.fragment:
+                assert unquote(parsed.fragment) in _heading_ids(pages[target]), f"{current_page}: missing anchor {href}"
+
+
+@pytest.mark.parametrize("page_name", ["Home.md", "get-started.md", "troubleshooting.md"])
+def test_pilot_prose_uses_no_em_dashes(page_name: str) -> None:
+    markdown = (REPO_ROOT / "groundtruth-kb" / "docs" / "wiki" / page_name).read_text(encoding="utf-8")
+    assert "\u2014" not in markdown
+
+
+def test_orientation_asset_is_accessible_native_svg_without_embedded_content() -> None:
+    module = _load_module()
+    source_dir = REPO_ROOT / "groundtruth-kb" / "docs" / "wiki"
+    asset_name = "assets/gtkb-home-orientation.svg"
+    assert asset_name in module.WIKI_ASSET_ALLOWLIST
+    svg = (source_dir / asset_name).read_text(encoding="utf-8")
+    root = ET.fromstring(svg)
+    namespace = "{http://www.w3.org/2000/svg}"
+    assert root.tag == f"{namespace}svg"
+    assert root.attrib["viewBox"] == "0 0 1120 736"
+    assert root.attrib["role"] == "img"
+    assert root.find(f"{namespace}title").text
+    assert "not a screenshot" in root.find(f"{namespace}desc").text.lower()
+    assert root.findall(f".//{namespace}text"), "Keep editable native SVG text, not a bitmap wrapper"
+    assert "\u2014" not in svg
+    for node in root.iter():
+        assert node.tag not in {f"{namespace}{tag}" for tag in ("image", "script", "foreignObject")}
+        assert not any(key.rsplit("}", 1)[-1].lower().startswith("on") for key in node.attrib)
+        assert not any(key.rsplit("}", 1)[-1] == "href" for key in node.attrib)
+    markdown = (source_dir / "get-started.md").read_text(encoding="utf-8")
+    assert f"https://raw.githubusercontent.com/wiki/Remaker-Digital/groundtruth-kb/{asset_name}" in markdown
+    assert "Illustration, not a screenshot" in markdown

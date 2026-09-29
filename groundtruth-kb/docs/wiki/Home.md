@@ -1,61 +1,65 @@
 # GroundTruth KB documentation
 
-**Status:** Current documentation home
+GroundTruth KB (GTKB) is a local-first development platform for software work
+with AI coding agents. It connects requirements, executable tests, projects,
+work items, independent review, and the Git result that activates completed
+work. GTKB Home is the interactive interface; `gt` is the command-line client.
 
-**Audience:** Evaluators, installers, developers, and operators
-**Reviewed:** 2026-09-26
+**New to GTKB? Start with the path that matches your situation.**
 
-GroundTruth KB (GTKB) is a local-first development platform for coordinating
-specification-linked software work performed with AI coding agents. It connects
-current requirements, executable tests, projects, work items, independent
-review, and the Git result that activates completed work.
+## Explore the product
 
-GTKB is under active development. The current production installation is a
-Windows-hosted system whose canonical records are served by a native PostgreSQL
-domain service. The `gt` command is the supported client surface. GTKB Home is
-the primary interactive interface.
+Read the [Product overview](Product-Overview) to understand what GTKB does,
+then check [System requirements](System-Requirements) and
+[Known issues](Known-Issues) before deciding whether it fits your environment.
 
-## Choose your path
+GTKB is under active development. The documented installation is Windows-hosted
+and uses a native PostgreSQL domain service. Installing the Python package alone
+does **not** create a complete host: PostgreSQL, the GTKB service, configuration,
+and GTKB Home also need setup. The current
+[Windows installation procedure](Install-on-Windows) is for operators, not a
+qualified one-click customer installer.
 
-| I want to... | Start here |
+## Use an installed host
+
+1. [Verify installation](Verify-Installation): check the selected host and its
+   required components.
+2. [Get started](Get-Started): open Home, choose the right workspace, and check
+   the controls before a request.
+3. [Core concepts](Core-Concepts): understand projects, work items, and review
+   before attempting your [first governed change](First-Governed-Change).
+
+Get Started is an orientation guide. A version-pinned, end-to-end first-session
+tutorial is still a [documented gap](Known-Issues), not a completed qualification.
+
+## Resolve a problem
+
+Use [Troubleshooting](Troubleshooting) to find a symptom and its first safe
+check. If that does not resolve it, [Support](Support) explains what to collect
+and how to report a problem without exposing credentials or private content.
+
+## Find a reference
+
+| You need to understand... | Read... |
 | --- | --- |
-| Understand the product | [Product overview](Product-Overview) |
-| Evaluate prerequisites and current limitations | [System requirements](System-Requirements) and [Known issues](Known-Issues) |
-| Install GTKB on Windows | [Install on Windows](Install-on-Windows) |
-| Check an existing installation | [Verify installation](Verify-Installation) |
-| Start using the product | [Get started](Get-Started) |
-| Open the primary interface | [GTKB Home](GTKB-Home) |
-| Understand the visible interface settings | [Settings](Settings) |
-| Understand provider setup and model-selection gaps | [Models and providers](Models) |
-| Understand the plugin configuration entry points | [Plugins](Plugins) |
-| Compare the visible built-in agent modes | [Agent presets](Agent-Presets) |
-| Interpret the status pane and its limitations | [GTKB status](Status) |
-| Understand the advanced operational tuning fields | [GTKB controls](Controls) |
-| Understand the operating model | [Core concepts](Core-Concepts) |
-| Diagnose a problem | [Troubleshooting](Troubleshooting) |
-| Operate the background components | [Services](Services) |
-| Upgrade or remove GTKB | [Upgrade](Upgrade) or [Uninstall](Uninstall) |
-| Ask for help or report a defect | [Support](Support) |
+| The interface and everyday controls | [GTKB Home](GTKB-Home), [Settings](Settings) |
+| Models, tools, and agent modes | [Models](Models), [Plugins](Plugins), [Agent presets](Agent-Presets) |
+| Health indicators and background components | [Status](Status), [Services](Services) |
+| Advanced operational tuning | [Controls](Controls) |
+| Maintaining an installation | [Upgrade](Upgrade), [Backup and restore](Backup-and-Restore), [Uninstall](Uninstall) |
+| Available learning material and planned walkthroughs | [Training](Training) |
+| Current release evidence and limitations | [Release health](Release-Health), [Known issues](Known-Issues) |
 
-## Important installation notice
+## About these docs
 
-Installing the `groundtruth-kb` Python package installs the Python distribution
-and the `gt` command. It does **not**, by itself, provision a complete GTKB host.
-A working host also requires the native PostgreSQL installation, the GTKB domain
-service, configuration, and GTKB Home. The present installation procedure is an
-operator procedure while a unified installer is developed.
-
-Do not use retired SQLite, Deliberation Archive, TAFE, PAUTH,
-`.gtkb-state`, `harness-state`, or durable file-bridge instructions as a current
-installation or authority model.
-
-## Documentation policy
-
-This Wiki is the customer-facing product documentation. Reviewed source lives in
-`groundtruth-kb/docs/wiki/` in the main repository and is published here through
-the Wiki publisher. Component READMEs remain useful maintainer references, but a
-customer should not need to browse the source tree to discover the next ordinary
-installation, launch, learning, or recovery step.
-
-The product source and issue tracker are in the
+This GitHub Wiki is the customer-facing documentation. Reviewed source lives in
+`groundtruth-kb/docs/wiki/` in the
 [GTKB repository](https://github.com/Remaker-Digital/groundtruth-kb).
+Component READMEs are maintainer references, not prerequisites for finding an
+ordinary installation, launch, or recovery step.
+
+Page review dates describe documentation review, not product qualification.
+Screenshots show captured states; illustrations explain concepts and are labeled
+as such. Check the page's stated limitations against your installed version.
+
+**Reviewed:** 2026-09-28
