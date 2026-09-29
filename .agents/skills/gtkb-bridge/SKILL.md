@@ -155,9 +155,10 @@ claim successful tests that were not run, or commit per message.
 Loyal Opposition loads current requirements and work through the CLI and its
 own claimed checkout, performs the applicable review and tests, and obtains
 `gt bridge artifacts <document> --json`. This reports each path's Git mode and normalized object ID;
-it does not perform the review. VERIFIED includes `verified_artifacts` containing
-the exact reviewed JSON map, for example
-`{"code.py":{"mode":"100755","object_id":"<Git object ID>"}}`; deletion is
+it does not perform the review. VERIFIED carries the exact reviewed JSON map as one
+header line among the `key: value` lines that follow the status line, for example
+`verified_artifacts: {"code.py":{"mode":"100755","object_id":"<Git object ID>"}}`;
+the service reads the map nowhere else. Deletion is
 represented by `null`. An executable-bit-only change invalidates the review. Changed or forbidden scope must be
 reconciled before further effects; no old claim or snapshot grants an exception.
 

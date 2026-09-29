@@ -61,7 +61,9 @@ Do not copy a prior reviewer's verdict or artifact map as your own evidence.
 ## Author and deliver the result
 
 Author VERIFIED only when the entire required result is established. Include
-`verified_artifacts` as the exact reviewed JSON path-to-mode/object map. VERIFIED is
+`verified_artifacts` as the exact reviewed JSON path-to-mode/object map on one header
+line, `verified_artifacts: {...}`, among the `key: value` lines that follow the status
+line; the service reads the map nowhere else. VERIFIED is
 non-dispatchable: omit both init/open envelope lines and `recipient_role`.
 
 Otherwise author NOT-READY. It addresses Prime Builder with

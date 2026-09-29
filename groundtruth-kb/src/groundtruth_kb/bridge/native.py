@@ -223,6 +223,24 @@ def _unlink_link(path: Path) -> None:
         os.rmdir(path)
 
 
+# c120 (M13 host I, Q6 on c119): a verifier's correct map below the header was refused 12 times without being told
+# where the map belongs. A line or heading naming verified_artifacts outside the header is now reported.
+VERIFIED_MAP_BELOW_HEADER = re.compile(r"(?im)^[\s#>*`-]*verified_artifacts\b")
+
+
+def _reviewed_artifacts_message(metadata: dict[str, str], content: str) -> str:
+    """Say where VERIFIED's reviewed map belongs and, when the message shows it, what was wrong with it."""
+    message = (
+        "VERIFIED must identify the exact reviewed Git mode/object map as one header line, "
+        "verified_artifacts: <JSON map>, among the key: value lines that follow the status line"
+    )
+    if "verified_artifacts" in metadata:
+        return message + "; the header's verified_artifacts value is not valid JSON"
+    if VERIFIED_MAP_BELOW_HEADER.search(content):
+        return message + "; a verified_artifacts line below the header is not read"
+    return message
+
+
 def parse_authored_message(content: str) -> dict[str, Any]:
     """Validate the author's complete header, preserving the submitted text."""
     lines = [line.strip() for line in content.splitlines()]
@@ -1361,7 +1379,17 @@ class NativeBridgeService:
             binding, attempt, claim = self._fenced(tx, document, request)
             if message["version"] != claim["next_version"] or status != claim["intended_status"]:
                 _error("claim_does_not_match_artifact", "The complete artifact must match its exact claimed successor")
-            _required(tx, "harnesses", metadata["author_harness_id"])
+            if tx.get("harnesses", {"id": metadata["author_harness_id"]}) is None:
+                # c120 (M13 host I, PB1 on c119): a native context id given as the harness was refused without naming
+                # the field. The code and details keep the canonical not_found's (docs/reference/cli.md).
+                _error(
+                    "not_found",
+                    "author_harness_id must name a registered harness: use this host's id from gt harness list, "
+                    "not a native context id",
+                    domain="harnesses",
+                    id=metadata["author_harness_id"],
+                    field="author_harness_id",
+                )
             if status == "ADVISORY":
                 self._publish(
                     tx,
@@ -1476,9 +1504,7 @@ class NativeBridgeService:
                 try:
                     reviewed = parse_json_bytes(metadata.get("verified_artifacts", "").encode("utf-8"))
                 except PostgresKernelError:
-                    _error(
-                        "reviewed_artifacts_required", "VERIFIED must identify the exact reviewed Git mode/object map"
-                    )
+                    _error("reviewed_artifacts_required", _reviewed_artifacts_message(metadata, request.content))
                 actual = self._snapshot(
                     sorted(set(attempt["proposal_paths"] + attempt["test_targets"])),
                     root=self.work_root(attempt["project_id"], tx=tx),
