@@ -295,7 +295,7 @@ def test_dependency_writer_cannot_cross_a_publication_effect(bridge, monkeypatch
                     updated.result(timeout=0.2)
             finally:
                 release.set()
-            result = published.result(timeout=15)
+            result = published.result(timeout=20)
             assert result.status_code == 200, result.text
             assert updated.result(timeout=15)["id"] == "DEP-LATE"
     assert (root / "code.py").read_text() == "result = 42\n"

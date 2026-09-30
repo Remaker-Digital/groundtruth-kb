@@ -7,6 +7,7 @@ in the domain service; this module creates no approval or publication record.
 from __future__ import annotations
 
 import json
+import math
 import os
 import re
 import subprocess
@@ -23,6 +24,29 @@ from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientErro
 
 class ProjectCommitError(RuntimeError):
     pass
+
+
+# The reference-transaction callback's deadline in seconds. It was measured on a loaded and a saturated workstation
+# (owner decision 2026-09-29): one check-commit starts up to five Git processes on the authority, and one process start
+# took up to 8.97 s under saturation. An operator or a test may set another positive number in the variable below.
+COMMIT_CALLBACK_TIMEOUT_SECONDS = 50.0
+COMMIT_CALLBACK_TIMEOUT_VARIABLE = "GT_PROJECT_COMMIT_CALLBACK_TIMEOUT_SECONDS"
+
+
+def commit_callback_timeout() -> float:
+    """Return the callback deadline: the variable's finite positive number, else the measured default."""
+    raw = os.environ.get(COMMIT_CALLBACK_TIMEOUT_VARIABLE)
+    if raw is None or not raw.strip():
+        return COMMIT_CALLBACK_TIMEOUT_SECONDS
+    try:
+        value = float(raw)
+    except ValueError:
+        value = math.nan
+    if not math.isfinite(value) or value <= 0:
+        raise ProjectCommitError(
+            f"invalid_callback_timeout: {COMMIT_CALLBACK_TIMEOUT_VARIABLE} must be a finite positive number of seconds"
+        )
+    return value
 
 
 def _git(
@@ -256,7 +280,7 @@ def check_reference_transaction(state: str) -> None:
     old, new = identities.pop()
     if old != values["PARENT"]:
         raise ProjectCommitError("checkout_base_changed: The prepared parent changed")
-    result = AuthorityClient(values["AUTHORITY"], timeout=5).request(
+    result = AuthorityClient(values["AUTHORITY"], timeout=commit_callback_timeout()).request(
         "POST",
         f"/v1/projects/{quote(values['PROJECT'], safe='')}/check-commit",
         body={

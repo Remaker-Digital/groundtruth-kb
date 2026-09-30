@@ -1,5 +1,6 @@
 """Predecessor results through native readiness, effects and real Git workspaces."""
 
+import dataclasses
 import json
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -242,8 +243,9 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
 
     def pause(*args, **kwargs):
         entered.set()
-        # Held until the concurrent amendment has been refused by the kernel's bounded lock wait (5 s) - the
-        # bound covers that wait plus client round trips on a slow host; it is not a kernel timeout.
+        # Held until the concurrent amendment has been refused by the kernel's bounded lock wait, which this
+        # test sets to 5 s below - the bound covers that wait plus client round trips on a slow host; it is not a
+        # kernel timeout.
         assert release.wait(timeout=30)
         return original(*args, **kwargs)
 
@@ -264,6 +266,9 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
 
     with monkeypatch.context() as patch:
         patch.setattr(native_bridge, "publish_context_work", pause)
+        # The product's lock limit is measured for writers that wait out a publication (20 s); this test checks the
+        # refusal itself, so its own transactions keep a 5 s limit.
+        patch.setattr(service.kernel, "settings", dataclasses.replace(service.kernel.settings, lock_timeout_ms=5000))
         with ThreadPoolExecutor(max_workers=2) as pool:
             effect = pool.submit(client.post, "/v1/bridge/chain-2/publish-work", json=body)
             assert entered.wait(timeout=10)
@@ -278,7 +283,7 @@ def test_predecessor_formal_change_cannot_cross_a_publication_effect(bridge, mon
                 assert client.get("/v1/specifications/SPEC-PREDECESSOR").json()["version"] == 1
             finally:
                 release.set()
-            result = effect.result(timeout=15)
+            result = effect.result(timeout=20)
             assert result.status_code == 200, result.text
     # Synchronized on the effect's completion: the same amendment now acquires the row and completes.
     assert amend_predecessor()["version"] == 2

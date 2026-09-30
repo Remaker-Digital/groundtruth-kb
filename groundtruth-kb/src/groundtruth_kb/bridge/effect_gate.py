@@ -10,6 +10,7 @@ import re
 import shlex
 import subprocess
 import sys
+from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -120,6 +121,9 @@ NET_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue"})
 # refusal depends on the other running first.
 UNINSPECTABLE_SHELL_COMMAND = "<uninspectable-shell-command>"
 
+# c121: every write cmdlet, alias and cmd built-in is also matched by _NAMED_WRITE_RE, which is built from the same
+# verb tables that read their targets, so the write signal and the target reading cannot list different verbs again
+# (M13 GTKB Home, Q1 on c120: add-content, clear-content and rename-item were in the tables and not here).
 MUTATING_COMMAND_RE = re.compile(
     r"\b("
     r"set-content|out-file|new-item|remove-item|move-item|copy-item|"
@@ -383,6 +387,18 @@ _POWERSHELL_PATH_ARG_VERBS = frozenset(
         "remove-item",
         "add-content",
         "clear-content",
+        # c121 (M13 GTKB Home, Q1 on c120): the other cmdlets that write the file or item they name.
+        "export-csv",
+        "export-clixml",
+        "tee-object",
+        "start-transcript",
+        "set-acl",
+        "unblock-file",
+        "set-itemproperty",
+        "new-itemproperty",
+        "remove-itemproperty",
+        "rename-itemproperty",
+        "clear-itemproperty",
     }
 )
 
@@ -391,8 +407,154 @@ _POWERSHELL_BOTH_PATHS_VERBS = frozenset(
         "move-item",
         "copy-item",
         "rename-item",
+        "copy-itemproperty",
+        "move-itemproperty",
     }
 )
+
+# c121: cmdlets whose written path is a destination parameter, and web requests, which write a file only with -OutFile.
+_POWERSHELL_DESTINATION_VERBS = frozenset({"expand-archive", "compress-archive"})
+_POWERSHELL_OUTFILE_VERBS = frozenset({"invoke-webrequest", "invoke-restmethod"})
+
+# c121: PowerShell aliases that run a write cmdlet, read as that cmdlet.
+_POWERSHELL_WRITE_ALIASES = {
+    "ac": "add-content",
+    "clc": "clear-content",
+    "ni": "new-item",
+    "ri": "remove-item",
+    "rni": "rename-item",
+    "mi": "move-item",
+    "ci": "copy-item",
+    "cpi": "copy-item",
+    "epcsv": "export-csv",
+    "sp": "set-itemproperty",
+    "rp": "remove-itemproperty",
+    "rnp": "rename-itemproperty",
+    "clp": "clear-itemproperty",
+    "iwr": "invoke-webrequest",
+    "irm": "invoke-restmethod",
+}
+
+# c121: names that are a PowerShell alias of a write cmdlet and also a cmd built-in or, for mkdir and rmdir, a POSIX
+# command. Each takes cmd switches (/s, /q, /y) or POSIX flags (-p) as well as PowerShell parameters, so every operand
+# is read as a target (_extract_dual_syntax_paths).
+_DUAL_SYNTAX_WRITE_VERBS = frozenset({"copy", "move", "ren", "del", "erase", "rd", "rmdir", "md", "mkdir"})
+
+_CMD_SWITCH_RE = re.compile(r"/-?[a-z?](?::\S*)?", re.IGNORECASE)
+_POWERSHELL_PATH_PARAMETERS = frozenset({"-path", "-literalpath", "-filepath", "-destination", "-destinationpath"})
+
+
+def _extract_dual_syntax_paths(tokens: list[str]) -> list[str]:
+    """Every operand of copy, move, ren, del, erase, rd, rmdir, md or mkdir (c121).
+
+    In PowerShell these run the write cmdlets, in cmd the built-ins, and mkdir and rmdir are POSIX commands too. A
+    PowerShell path parameter's value and every other token that is neither a flag (-p, -Force) nor a cmd switch (/s,
+    /q, /y) is a target. Like _extract_posix_paths this over-collects rather than under-collects.
+    """
+    paths: list[str] = []
+    i = 1
+    while i < len(tokens):
+        token = tokens[i]
+        if token.lower() in _POWERSHELL_PATH_PARAMETERS:
+            paths.extend(tokens[i + 1 : i + 2])
+            i += 2
+            continue
+        if not token.startswith("-") and not _CMD_SWITCH_RE.fullmatch(token):
+            paths.append(token)
+        i += 1
+    return paths
+
+
+def _extract_destination_path(tokens: list[str]) -> list[str]:
+    """The path Expand-Archive or Compress-Archive writes (c121).
+
+    -DestinationPath when named; otherwise the operand that binds to it (the second, or the first when the source is
+    named). Expand-Archive without a destination writes into the current directory, which is then the target.
+    """
+    positional: list[str] = []
+    named_source = False
+    i = 1
+    while i < len(tokens):
+        lowered = tokens[i].lower()
+        if lowered in ("-destinationpath", "-destination"):
+            return tokens[i + 1 : i + 2]
+        if lowered in ("-path", "-literalpath", "-compressionlevel"):
+            named_source = named_source or lowered != "-compressionlevel"
+            i += 2
+            continue
+        if not tokens[i].startswith("-"):
+            positional.append(tokens[i])
+        i += 1
+    index = 0 if named_source else 1
+    if len(positional) > index:
+        return [positional[index]]
+    return ["."] if tokens[0].lower() == "expand-archive" else []
+
+
+def _extract_outfile(tokens: list[str]) -> list[str]:
+    """The file an Invoke-WebRequest or Invoke-RestMethod call writes, its -OutFile value (c121); none without it."""
+    for index, token in enumerate(tokens[1:], start=1):
+        lowered = token.lower()
+        if lowered.startswith("-outf"):
+            if ":" in token:
+                return [token.split(":", 1)[1]]
+            return tokens[index + 1 : index + 2]
+    return []
+
+
+def _word_alternation(words: frozenset[str] | set[str]) -> str:
+    return "|".join(re.escape(word) for word in sorted(words, key=len, reverse=True))
+
+
+# c121: every named write command, for the write signal and for checking that each one's target was read. A cmdlet
+# name matches wherever it appears outside quotes, as set-content always has. An alias, a cmd built-in or a POSIX write
+# verb matches only at command position (the start, after a separator, or at the start of a script block or group),
+# so prose and argument text do not match. A web request is a write only with -OutFile. `sed -i` and `awk -i inplace`
+# are the POSIX in-place edits of MUTATING_COMMAND_RE.
+_COMMAND_POSITION = r"(?:^|[|;&\n{(])\s*"
+_CMDLET_WRITE_WORDS = _word_alternation(
+    _POWERSHELL_PATH_ARG_VERBS | _POWERSHELL_BOTH_PATHS_VERBS | _POWERSHELL_DESTINATION_VERBS
+)
+_ALIAS_WRITE_WORDS = _word_alternation(
+    (frozenset(_POWERSHELL_WRITE_ALIASES) - {"iwr", "irm"}) | _DUAL_SYNTAX_WRITE_VERBS
+)
+_NAMED_WRITE_RE = re.compile(
+    rf"\b(?P<cmdlet>{_CMDLET_WRITE_WORDS})\b"
+    rf"|{_COMMAND_POSITION}(?P<alias>{_ALIAS_WRITE_WORDS})(?:\.exe)?\b(?![-.])"
+    rf"|{_COMMAND_POSITION}(?P<posix>tee|touch|truncate|shred|install|patch|dd|cp|mv|rm|ln)(?:\.exe)?\b(?![-.])"
+    r"|\b(?P<sed>sed)\s+(?:[^|;&]*\s)?-i\b|\b(?P<awk>awk)\s+[^|;&]*-i\s+inplace\b"
+    rf"|(?:\b(?P<web>invoke-webrequest|invoke-restmethod)\b|{_COMMAND_POSITION}(?P<webalias>iwr|irm)\b)[^|;&\n]*?\s-outf",
+    re.IGNORECASE,
+)
+
+# c121: .NET calls that write a file or directory. Their targets are not read (a call's argument may be any
+# expression), so a command that carries one is refused whole: unknown_effect_targets.
+_DOTNET_WRITE_RE = re.compile(
+    r"\[(?:(?:system\.)?io\.)?(?:file|directory)\]::\s*"
+    r"(?:write\w*|append\w*|create\w*|delete|move|copy|replace|open(?!read|text)\w*|set(?!currentdirectory)\w*"
+    r"|encrypt|decrypt)\s*\("
+    r"|\[(?:system\.)?io\.(?:streamwriter|filestream|binarywriter)\]::\s*new\s*\("
+    r"|\[(?:system\.)?io\.compression\.zipfile\]::\s*(?:createfromdirectory|extracttodirectory|open)\s*\("
+    r"|\bnew-object\s+(?:-typename\s+)?(?:system\.)?io\.(?:streamwriter|filestream|binarywriter)\b"
+    r"|\.(?:delete|create|createtext|appendtext|openwrite|moveto|copyto|createsubdirectory|encrypt|decrypt"
+    r"|extracttofile|downloadfile|save|setaccesscontrol)\s*\("
+    r"|\.(?:isreadonly|attributes|(?:creation|lastwrite|lastaccess)time(?:utc)?)\s*[+-]?=(?!=)",
+    re.IGNORECASE,
+)
+
+
+def _canonical_write_verb(word: str) -> str:
+    lowered = word.lower().removesuffix(".exe")
+    return _POWERSHELL_WRITE_ALIASES.get(lowered, lowered)
+
+
+def _named_writes(shell_view: str) -> Counter[str]:
+    """How many times each named write command occurs in a quote-masked command, by canonical verb (c121)."""
+    found: Counter[str] = Counter()
+    for match in _NAMED_WRITE_RE.finditer(shell_view):
+        word = next(value for value in match.groupdict().values() if value)
+        found[_canonical_write_verb(word)] += 1
+    return found
 
 
 MUTATING_VERB_TABLE = {
@@ -400,6 +562,10 @@ MUTATING_VERB_TABLE = {
     "git_non_mutating": tuple(_GIT_NON_MUTATING_SUBCOMMANDS),
     "powershell_path_arg": tuple(_POWERSHELL_PATH_ARG_VERBS),
     "powershell_both_paths": tuple(_POWERSHELL_BOTH_PATHS_VERBS),
+    "powershell_destination": tuple(_POWERSHELL_DESTINATION_VERBS),
+    "powershell_outfile": tuple(_POWERSHELL_OUTFILE_VERBS),
+    "powershell_aliases": tuple(_POWERSHELL_WRITE_ALIASES),
+    "dual_syntax": tuple(_DUAL_SYNTAX_WRITE_VERBS),
     "posix_path_arg": tuple(_POSIX_PATH_ARG_VERBS),
     "posix_both_paths": tuple(_POSIX_BOTH_PATHS_VERBS),
 }
@@ -429,10 +595,18 @@ def _classify_command_verb(tokens: list[str]) -> tuple[Callable[[list[str]], lis
             return _extract_none, relevant
         return None
 
+    # c121: an alias reads as its cmdlet, and a trailing .exe (Git Bash's mkdir.exe) does not hide the verb.
+    verb = _canonical_write_verb(verb)
     if verb in _POWERSHELL_PATH_ARG_VERBS:
         return _extract_powershell_path_arg, relevant
     if verb in _POWERSHELL_BOTH_PATHS_VERBS:
         return _extract_powershell_both_paths, relevant
+    if verb in _DUAL_SYNTAX_WRITE_VERBS:
+        return _extract_dual_syntax_paths, relevant
+    if verb in _POWERSHELL_DESTINATION_VERBS:
+        return _extract_destination_path, relevant
+    if verb in _POWERSHELL_OUTFILE_VERBS:
+        return _extract_outfile, relevant
     if verb in _POSIX_PATH_ARG_VERBS or verb in _POSIX_BOTH_PATHS_VERBS:
         return _extract_posix_paths, relevant
 
@@ -1298,28 +1472,155 @@ def _open_call_uses_write_mode(node: ast.Call) -> bool:
     return mode is not None and "w" in mode
 
 
-def _has_python_mutating_signal(command: str) -> bool:
-    source = _python_c_source(command)
-    if source is None:
-        return False
-    try:
-        tree = ast.parse(source)
-    except SyntaxError:
-        return False
+# c121 (M13 GTKB Home, Q1 on c120; owner "All forms found"): the Python calls that write a file or directory. Before
+# c121 only write_text, open(..., "w...") and the insert_/update_/delete_ calls were writes, so append mode, write_bytes
+# and the os, shutil and pathlib file operations passed as reads.
+_PYTHON_PATH_WRITE_METHODS = frozenset(
+    {
+        "write_text",
+        "write_bytes",
+        "touch",
+        "mkdir",
+        "rmdir",
+        "unlink",
+        "symlink_to",
+        "hardlink_to",
+        "chmod",
+        "lchmod",
+        "extractall",
+        "urlretrieve",
+    }
+)
+_PYTHON_MODULE_WRITES = {
+    "os": frozenset(
+        {
+            "remove",
+            "unlink",
+            "rename",
+            "renames",
+            "replace",
+            "rmdir",
+            "removedirs",
+            "mkdir",
+            "makedirs",
+            "link",
+            "symlink",
+            "chmod",
+            "chown",
+            "lchown",
+            "truncate",
+            "utime",
+            "mkfifo",
+            "mknod",
+        }
+    ),
+    "shutil": frozenset(
+        {
+            "copy",
+            "copy2",
+            "copyfile",
+            "copytree",
+            "copymode",
+            "copystat",
+            "move",
+            "rmtree",
+            "make_archive",
+            "unpack_archive",
+            "chown",
+        }
+    ),
+}
+# Module-level open functions take the path first and the mode second; a path object's open() takes the mode first.
+_PYTHON_OPEN_MODULES = frozenset({"io", "codecs", "gzip", "bz2", "lzma", "builtins", "tarfile"})
+_PYTHON_OS_OPEN_WRITE_FLAGS = frozenset({"O_WRONLY", "O_RDWR", "O_CREAT", "O_APPEND", "O_TRUNC"})
+# A file mode ("a", "wb", "r+", tarfile's "w:gz"); any other string (a URL, a file name) is not one.
+_PYTHON_FILE_MODE_RE = re.compile(r"[rwxabtU+]{1,4}(?::\w*)?")
 
-    sqlite_classification = _classify_python_sqlite_read_ast(command)
-    if sqlite_classification is False:
+
+def _python_write_mode(node: ast.AST | None) -> bool:
+    mode = _constant_string(node) if node is not None else None
+    return (
+        mode is not None and _PYTHON_FILE_MODE_RE.fullmatch(mode) is not None and any(flag in mode for flag in "wax+")
+    )
+
+
+def _python_call_writes(node: ast.Call) -> bool:
+    """Whether one Python call writes a file or directory (c121)."""
+    func = node.func
+    name = _python_call_name(func)
+    if name is None:
+        return False
+    receiver = func.value.id if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) else None
+    if name == "open" and receiver == "os":
+        return any(
+            (child.attr if isinstance(child, ast.Attribute) else child.id) in _PYTHON_OS_OPEN_WRITE_FLAGS
+            for argument in node.args[1:]
+            for child in ast.walk(argument)
+            if isinstance(child, ast.Attribute | ast.Name)
+        )
+    if name in ("open", "ZipFile"):
+        for keyword in node.keywords:
+            if keyword.arg == "mode":
+                return _python_write_mode(keyword.value)
+        method_open = name == "open" and isinstance(func, ast.Attribute) and receiver not in _PYTHON_OPEN_MODULES
+        index = 0 if method_open else 1
+        return len(node.args) > index and _python_write_mode(node.args[index])
+    if name.startswith(("insert_", "update_", "delete_")):
         return True
+    if receiver in _PYTHON_MODULE_WRITES:
+        return name in _PYTHON_MODULE_WRITES[receiver]
+    if name in _PYTHON_PATH_WRITE_METHODS:
+        return True
+    # A path's rename(target) or replace(target) takes one argument; str.replace takes two.
+    return (
+        isinstance(func, ast.Attribute) and name in ("rename", "replace") and len(node.args) == 1 and not node.keywords
+    )
 
-    for node in ast.walk(tree):
-        if not isinstance(node, ast.Call):
+
+def _python_c_sources(command: str) -> list[str]:
+    """Every source the command hands to python -c, wherever the call sits in the line (c121).
+
+    _python_c_source reads only a command that starts with the interpreter, split as a POSIX shell splits it, so a
+    python -c after Set-Location, a separator or a Windows path to the interpreter was not read. The line is split both
+    ways here (a POSIX split drops a Windows path's backslashes; a Windows split keeps a source's quotes, removed once).
+    """
+    sources: list[str] = []
+    first = _python_c_source(command)
+    if first is not None:
+        sources.append(first)
+    for posix in (False, True):
+        try:
+            tokens = shlex.split(command, posix=posix)
+        except ValueError:
             continue
-        call_name = _python_call_name(node.func)
-        if call_name == "write_text":
-            return True
-        if call_name == "open" and _open_call_uses_write_mode(node):
-            return True
-        if call_name and call_name.startswith(("insert_", "update_", "delete_")):
+        for index, token in enumerate(tokens):
+            name = _executable_name(token).removesuffix(".exe")
+            if not (name.startswith("python") or name == "py"):
+                continue
+            offset = index + 1
+            while offset < len(tokens) and offset <= index + 6:
+                option = _clean_shell_token(tokens[offset])
+                if option == "-c":
+                    if offset + 1 < len(tokens):
+                        source = tokens[offset + 1] if posix else _unquote_once(tokens[offset + 1])
+                        if source not in sources:
+                            sources.append(source)
+                    break
+                if not option.startswith("-"):
+                    break
+                offset += 2 if option in ("-X", "-W") else 1
+    return sources
+
+
+def _has_python_mutating_signal(command: str) -> bool:
+    if _classify_python_sqlite_read_ast(command) is False:
+        return True
+    for source in _python_c_sources(command):
+        try:
+            tree = ast.parse(source)
+        except SyntaxError:
+            continue
+        if any(_python_call_writes(node) for node in ast.walk(tree) if isinstance(node, ast.Call)):
             return True
     return False
 
@@ -1331,6 +1632,9 @@ def _has_mutating_signal(command: str) -> bool:
     shell_view = _mask_quoted_spans(command, mask_double=True)
     return (
         MUTATING_COMMAND_RE.search(shell_view) is not None
+        # c121: every named write command of the verb tables, and the .NET write calls.
+        or _NAMED_WRITE_RE.search(shell_view) is not None
+        or _DOTNET_WRITE_RE.search(shell_view) is not None
         or _has_direct_git_effect_signal(command)
         or _has_python_mutating_signal(command)
         or _shell_redirect_present(command)
@@ -1956,6 +2260,85 @@ def _inner_commands(command: str, *, _depth: int = 0) -> list[str]:
     return inner
 
 
+def _string_subexpressions(command: str) -> list[str]:
+    """The text of each $(...) subexpression inside a double-quoted string of the command (c121).
+
+    PowerShell and POSIX shells run a $(...) inside double quotes, so `Write-Output "$(Set-Content x y)"` writes while
+    the quote-masked write judgment saw only a string. Single-quoted text is literal in both shells, and a character
+    after PowerShell's escape (a backtick) is literal. A subexpression without its closing parenthesis is not returned.
+    """
+    found: list[str] = []
+    quote: str | None = None
+    i = 0
+    while i < len(command):
+        char = command[i]
+        if quote == "'":
+            quote = None if char == "'" else quote
+        elif quote == '"':
+            if char == '"':
+                quote = None
+            elif char == "`":
+                i += 1
+            elif command.startswith("$(", i):
+                depth, j = 1, i + 2
+                while j < len(command) and depth:
+                    depth += {"(": 1, ")": -1}.get(command[j], 0)
+                    j += 1
+                if depth == 0:
+                    found.append(command[i + 2 : j - 1])
+                    i = j
+                    continue
+        elif char in "'\"":
+            quote = char
+        i += 1
+    return found
+
+
+def _string_subexpression_commands(command: str, *, _depth: int = 0) -> list[str]:
+    """Each $(...) inside a double-quoted string, and every command inside it, recursively (c121)."""
+    found: list[str] = []
+    for text in _string_subexpressions(command):
+        if _depth >= _INNER_COMMAND_DEPTH:
+            found.append(UNINSPECTABLE_SHELL_COMMAND)
+            continue
+        found.append(text)
+        found.extend(_inner_commands(text))
+        found.extend(_string_subexpression_commands(text, _depth=_depth + 1))
+    return found
+
+
+def _has_unread_write(command: str) -> bool:
+    """Whether the command carries a write whose target the gate does not read (c121).
+
+    A redirect to a file (its target is not read yet: B149), a .NET write call, a Python write, or a named write command
+    that does not begin a stage the gate parses (inside a script block, a group or a subexpression, or after a call
+    operator) names no target the gate can check. Owner decision 2026-09-29 07:56 ("All forms found"): such a command is
+    refused whole (unknown_effect_targets), so a claim check never covers one write while another goes unchecked.
+    """
+    shell_view = _mask_quoted_spans(command, mask_double=True)
+    if _DOTNET_WRITE_RE.search(shell_view) is not None or _has_python_mutating_signal(command):
+        return True
+    if _shell_redirect_present(NULL_SINK_REDIRECT_STRIP_RE.sub("", command)):
+        return True
+    named = _named_writes(shell_view)
+    if not named:
+        return False
+    read: Counter[str] = Counter()
+    for stage in _split_pipeline_stages(command):
+        try:
+            tokens = shlex.split(stage, posix=False)
+        except ValueError:
+            continue
+        classification = _classify_command_verb(tokens)
+        if classification is None:
+            continue
+        extractor, relevant = classification
+        verb = _canonical_write_verb(relevant[0])
+        if _named_writes(_mask_quoted_spans(stage, mask_double=True))[verb] and extractor(relevant):
+            read[verb] += 1
+    return any(count > read[verb] for verb, count in named.items())
+
+
 def _git_reach_roots(args: list[str]) -> tuple[list[str], bool] | None:
     """Return (roots, True) for a read-only Git form that reads past the ignore rules; None for every other Git call.
 
@@ -2235,14 +2618,30 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
             return diagnostic_outputs, True
         paths = _paths_from_shell(root, command)
         mutating = _is_mutating_command(command)
+        unread = mutating and _has_unread_write(command)
         # c119: a command handed to a nested shell or to Invoke-Expression is judged as a command of its own (M13 host I,
-        # Q6 on c118: `cmd /c "gt --help > help.out 2>&1"` wrote a file under a read's judgment).
-        for inner in _inner_commands(command):
+        # Q6 on c118: `cmd /c "gt --help > help.out 2>&1"` wrote a file under a read's judgment). c121: so is a $(...)
+        # subexpression inside a double-quoted string, which PowerShell and POSIX shells run.
+        judged = _inner_commands(command)
+        judged += [
+            text
+            for source in (command, *judged)
+            if source != UNINSPECTABLE_SHELL_COMMAND
+            for text in _string_subexpression_commands(source)
+        ]
+        for inner in judged:
             if inner == UNINSPECTABLE_SHELL_COMMAND:
                 mutating = True
+                unread = True
             elif not _is_safe_command(inner):
                 paths = sorted(set(paths) | set(_paths_from_shell(root, inner)))
-                mutating = mutating or _is_mutating_command(inner)
+                inner_mutating = _is_mutating_command(inner)
+                mutating = mutating or inner_mutating
+                unread = unread or (inner_mutating and _has_unread_write(inner))
+        # c121 (M13 GTKB Home, Q1 on c120; owner 2026-09-29 07:56): the claim check must cover every write, so a command
+        # carrying a write whose target the gate cannot read is refused whole (unknown_effect_targets).
+        if unread:
+            return [], True
         return paths, mutating
 
     return [], False

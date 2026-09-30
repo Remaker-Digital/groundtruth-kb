@@ -63,7 +63,9 @@ class PostgreSQLConfig:
 
     service: str = "gtkb"
     connect_timeout_seconds: int = 10
-    lock_timeout_ms: int = 5000
+    # Measured (2026-09-30): a writer waiting out a publication on the same project waited up to 6.7 s on a
+    # saturated workstation; the measurement rule of 2026-09-29 gives 20 s.
+    lock_timeout_ms: int = 20000
     statement_timeout_ms: int = 30000
 
 

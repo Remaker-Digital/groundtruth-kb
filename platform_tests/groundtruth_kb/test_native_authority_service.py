@@ -36,7 +36,10 @@ from psycopg import sql
 from platform_tests.groundtruth_kb.native_fixtures import history_count, link_project_formal, put, seed, work_fields
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+# Per-test limit from measurement (owner decision 2026-09-29): the separate-processes CLI workflow, the slowest test,
+# took 101.0 s on the host as it is and at least 365.9 s under saturation (3.6 times; its helper's former 30 s limit
+# ended it there); the limit is 365.9 s x 3.6, rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(1330)]
 
 
 @pytest.mark.parametrize("column", ["formal_roots", "terminal_author_session_context_id"])
@@ -1145,9 +1148,6 @@ def native_cli_operational_controls(tmp_path):
     return target
 
 
-# c119 round 2 (owner, 2026-09-28): 72-100 s in complete runs and once past 120 s on the qualification host,
-# so this multi-process CLI workflow gets 180 s; the module keeps 120 s for every other test.
-@pytest.mark.timeout(180)
 def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_path, native_cli_operational_controls):
     service, client, _, service_name = native
     seed(client)
@@ -1232,6 +1232,8 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
     assert package_probe.returncode == 0, package_probe.stderr
     assert Path(package_probe.stdout.strip()).resolve() == package_file
 
+    # One CLI command's limit from measurement (owner decision 2026-09-29): the commit command's request took 26.1 s on
+    # the host as it is and 57.8 s under saturation (2.2 times); the limit is 57.8 s x 2.2, rounded up to 10 s.
     def cli(*arguments):
         return subprocess.run(
             [sys.executable, "-m", "groundtruth_kb", "--config", str(client_config), *arguments],
@@ -1240,7 +1242,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
             capture_output=True,
             text=True,
             encoding="utf-8",
-            timeout=30,
+            timeout=130,
             creationflags=flags,
         )
 

@@ -531,7 +531,7 @@ def test_native_config_report_resolves_selected_settings_without_probes(tmp_path
         "postgresql": {
             "service": "gtkb",
             "connect_timeout_seconds": 10,
-            "lock_timeout_ms": 5000,
+            "lock_timeout_ms": 20000,
             "statement_timeout_ms": 30000,
         },
         "legacy_paths": {"db_path": str(db_path.resolve()), "chroma_path": None},

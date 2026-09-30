@@ -17,7 +17,9 @@ from platform_tests.groundtruth_kb.finalization_fixtures import commit_environme
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put
 
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(150)]
+# Per-test limit from measurement (owner decision 2026-09-29): the slowest test took 58.7 s on the host as it is and
+# 128.0 s under saturation (2.18 times); the limit is 128.0 s x 2.18, rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(280)]
 
 
 def kill_child_tree(process):

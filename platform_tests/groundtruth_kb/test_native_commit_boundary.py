@@ -13,14 +13,20 @@ from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integ
 from platform_tests.groundtruth_kb.finalization_fixtures import commit_environment as commit_environment
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+# Per-test limit from measurement (owner decisions 2026-09-29 14:31): the slowest test took 42.0 s on the host as it is
+# and 89.8 s under saturation (2.1 times), and the stalled-callback test up to 110.1 s under saturation (R 183 s); the
+# limit is the larger rule value, rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(200)]
 
-# The arrival oracle (N-28): the reference callback must reach the stalled authority within this window. Owner decision
-# D60 (2026-09-25) widened it from 10 s to 20 s. The callback follows about 56 sequential Git launches, and this host's
-# process creation intermittently slows about fourfold, which put two installed runs' arrivals past 10 s. The product's
-# five-second callback deadline and every assertion are unchanged. B86 records the observed wait against the window on
-# every execution, so a pass also measures its margin.
-ARRIVAL_WINDOW_SECONDS = 20
+# The arrival oracle (N-28): the reference callback must reach the stalled authority within this window. D60 (2026-09-25)
+# widened it from 10 s to 20 s; the owner's decisions of 2026-09-29 14:31 set it to 90 s from measurement (a commit's
+# callback arrived up to 33.1 s after its request under saturation). B86 records the observed wait against the window on
+# every execution, so a pass also measures its margin. Both stalled-callback tests set the commit callback deadline to
+# CALLBACK_DEADLINE_SECONDS through GT_PROJECT_COMMIT_CALLBACK_TIMEOUT_SECONDS, so they exercise the deadline itself
+# without waiting for the product's measured 50 s default; their other waits were measured with that setting at both
+# loads and stand (the timer measurements' D60 levels).
+ARRIVAL_WINDOW_SECONDS = 90
+CALLBACK_DEADLINE_SECONDS = "5"
 
 
 def pending_invocation_report(pending, submitted_at, wait_seconds=15):
@@ -139,11 +145,14 @@ def test_redirected_hooks_cannot_skip_required_normal_hooks(commit_environment):
     assert real_index(checkout).read_bytes() == index
 
 
-def test_stalled_commit_callback_releases_reference_lock_without_advancing_head(commit_environment, record_property):
+def test_stalled_commit_callback_releases_reference_lock_without_advancing_head(
+    commit_environment, record_property, monkeypatch
+):
     import json
     from concurrent.futures import ThreadPoolExecutor
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+    monkeypatch.setenv("GT_PROJECT_COMMIT_CALLBACK_TIMEOUT_SECONDS", CALLBACK_DEADLINE_SECONDS)
     client, root, parent, checkout, hooks, config, message = commit_environment
     foreign = checkout / "foreign_tracked.txt"
     foreign.write_text("foreign staged work\n", encoding="utf-8")
@@ -237,6 +246,7 @@ def test_timed_out_real_callback_finishes_before_recovery(commit_environment, mo
     from groundtruth_kb.postgres_kernel import PostgresKernelError
     from groundtruth_kb.project.native_finalization import NativeProjectFinalization
 
+    monkeypatch.setenv("GT_PROJECT_COMMIT_CALLBACK_TIMEOUT_SECONDS", CALLBACK_DEADLINE_SECONDS)
     client, root, parent, checkout, _hooks, config, message = commit_environment
     foreign = checkout / "foreign_tracked.txt"
     foreign.write_text("foreign staged work\n", encoding="utf-8")

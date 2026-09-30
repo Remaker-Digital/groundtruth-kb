@@ -23,7 +23,10 @@ from platform_tests.groundtruth_kb.finalization_fixtures import (
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
 
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+# Per-test limit from measurement (owner decision 2026-09-29): the integration-overlap test took 38.4 s on the host as
+# it is and ran past 120 s in both modes of c121's first qualification (3.1 times at least); the limit is 120 s x 3.1,
+# rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(380)]
 
 
 @pytest.mark.parametrize("initial,changed", [("100644", "100755"), ("100755", "100644")])

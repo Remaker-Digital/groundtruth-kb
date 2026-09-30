@@ -34,7 +34,9 @@ from platform_tests.scripts.provider_fixtures import (
 )
 from scripts import ollama_harness as ollama
 
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+# Per-test limit from measurement (owner decision 2026-09-29): the workflow's openrouter case took 84.0 s on the host as
+# it is and 186.0 s under saturation (2.2 times); the limit is 186.0 s x 2.2, rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(420)]
 
 
 @pytest.mark.parametrize("provider", PROVIDERS)
@@ -218,9 +220,6 @@ def test_explicit_init_cli_reports_missing_invalid_and_conflicting_markers(bridg
             process.wait(timeout=10)
 
 
-# c119 round 2 (owner, 2026-09-28): 44-110 s per provider in complete runs and once past 120 s on the
-# qualification host, so this workflow gets 180 s; the module keeps 120 s for every other test.
-@pytest.mark.timeout(180)
 @pytest.mark.parametrize("provider", PROVIDERS)
 def test_provider_binds_claims_authors_and_delivers_through_separate_cli(provider, bridge, tmp_path, monkeypatch):
     service, client, contexts, _work_root = bridge

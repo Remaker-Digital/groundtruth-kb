@@ -16,7 +16,9 @@ from platform_tests.groundtruth_kb.finalization_fixtures import commit_environme
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put
 
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+# Per-test limit from measurement (owner decision 2026-09-29): the test took 79.8 s on the host as it is and 102.3 s
+# under saturation (1.28 times); the limit is 102.3 s x 1.28, rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(140)]
 
 
 def test_current_formal_roots_cannot_change_between_reference_check_and_project_commit(commit_environment):
