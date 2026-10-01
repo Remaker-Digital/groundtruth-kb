@@ -7,6 +7,9 @@ cmd /c or /k, powershell or pwsh -c/-Command, bash, sh or zsh -c, and Invoke-Exp
 typed directly: a redirect or a writing command there is a write, and a read there stays a read. cmd does not treat
 single quotes as quotes, so a redirect between them is a write under cmd. No authority is contacted: a write whose target
 the gate cannot name is refused unknown_effect_targets before the native check, and a read passes before it.
+
+c122 (owner decision 2026-09-30 20:52, "Fix first: c122"): a command run through a program named by a variable, as
+Q6's `$gt`, is refused first by the Git rule's fail-closed branch (direct_git_effect_requires_lifecycle).
 """
 
 from __future__ import annotations
@@ -117,8 +120,12 @@ def test_an_unparsable_or_too_deep_inner_command_counts_as_a_write(tmp_path, mon
 
 
 def test_the_gate_refuses_the_q6_write_and_passes_a_nested_read(tmp_path):
+    # c122: Q6[2] and its direct form run the program $gt names, which the gate cannot read, so the Git rule refuses
+    # both before the write rule does (until c121: unknown_effect_targets). The two forms still get the same answer.
     refused = effect_gate.gate_decision(_payload(tmp_path, Q6[2]))
-    assert refused.get("decision") == "block" and refused["reason_code"] == "unknown_effect_targets", refused
+    assert refused.get("decision") == "block" and refused["reason_code"] == "direct_git_effect_requires_lifecycle", (
+        refused
+    )
     direct = effect_gate.gate_decision(_payload(tmp_path, r"$gt --help > help.out 2>&1"))
     assert direct.get("decision") == "block" and direct["reason_code"] == refused["reason_code"], direct
     assert effect_gate.gate_decision(_payload(tmp_path, 'cmd /c "git status"')) == {}
