@@ -96,8 +96,6 @@ GT-KB is at **`0.7.0-rc1`** (release candidate). The version source of truth is 
 
 Dashboard application-deployment panels use mock, provider-neutral rows by default. Live container, topology, security, throughput/latency, defect, and infrastructure health data is supplied by the active application for its chosen deployment environment.
 
-Deferred release-scope work must have an expiry, time limit, or resume trigger. Indefinite deferral is treated as a release-health warning, not a quiet parking lot.
-
 Local dashboard refresh:
 
 ```powershell

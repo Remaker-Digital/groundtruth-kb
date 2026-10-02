@@ -36,13 +36,14 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 #: path -> (LF-normalized byte size, sha256 of the LF-normalized content) as reviewed. Do not recompute these from disk.
 COHORT: dict[str, tuple[int, str]] = {
+    # Re-pinned under c123 (batch design WP5 G17): the bridge status CHECKs and the chained transition, under review.
     "groundtruth-kb/src/groundtruth_kb/postgres_kernel.py": (
-        140341,
-        "f6dca15ab51b5f44a7b690ee5790e463f0394172924dba980758f3c1cf36437d",
+        145523,
+        "1c5c08e3e75cf0cd90d53101c9fcf61be0d88f6be4af75eab212941e9ae1aa1e",
     ),
     "groundtruth-kb/src/groundtruth_kb/postgresql_v1.sql": (
-        17823,
-        "4b5f8275cec878ade811adf5692436835ef06c147d79a24686a29dad327980fb",
+        18472,
+        "55e4eb33ebb058d35fc354a67e5596518bc06e62320b59fe20229ecd57792989",
     ),
     "groundtruth-kb/tests/test_postgres_kernel.py": (
         78379,
@@ -52,9 +53,11 @@ COHORT: dict[str, tuple[int, str]] = {
     # which changes its blob. A reviewed-preimage pin is re-pinned under review
     # when the file legitimately changes; that is what the pin is for.
     # Re-pinned under c102 (Q-3, D23): shared fixtures moved to postgres_fixtures.py, imports rewired; tests unchanged.
+    # Re-pinned under c123 (WP5 G17): the predecessor rebuild moved to postgres_fixtures.py; the 2f25 cases also
+    # assert the bridge status step.
     "platform_tests/groundtruth_kb/test_postgres_kernel_integration.py": (
-        62537,
-        "4e5e7674dfca4eae904d4bcab25e838b33d3a811f4d362fce8f062e45a554c7f",
+        62969,
+        "4f3f38433e39b0c3995b3c9baa299743b6344109f450d437474ceb16a0d98b6f",
     ),
 }
 

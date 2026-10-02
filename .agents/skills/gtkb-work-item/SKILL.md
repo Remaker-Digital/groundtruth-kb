@@ -3,8 +3,6 @@ name: gtkb-work-item
 description: Create a work item with an executable linked test and current test-plan phase, using native governed writers.
 argument-hint: "[title] [--spec SPEC-ID] [--origin regression|defect|new|hygiene]"
 allowed-tools: Bash, Read, Grep
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: knowledge-management
@@ -12,15 +10,16 @@ metadata:
   references:
     - references/taxonomy.md
   license: "Proprietary - (c) 2026 Remaker Digital"
-  activity-envelope: build, ops, project, deliberation, spec
 ---
 # Create a work item with executable evidence
 
 Use the current explicitly opened activity and immutable session attribution.
 This skill grants no role, project authorization or implementation approval.
-The work item belongs to the selected execution project; no agent owns the
-whole work item. Ask for a missing owner selection instead of choosing work
-from a queue.
+Any bound context files work items from findings it can evidence. Filing neither
+dispatches nor authorizes work. File into the intake and name any related
+project in the description. The intake is `PROJECT-GTKB-NEW-WORK-INTAKE`. Only
+the owner moves an item into an authorized project. No agent owns the whole
+work item.
 
 ## Read the selected scope
 
@@ -91,7 +90,7 @@ and read back both before creating work or claiming coverage; do not claim an
 atomic combined transaction. On conflict, re-read and preserve intervening
 members. An unphased test cannot satisfy the current work-evidence rule.
 
-## Create the work item in the selected project
+## Create the work item in the intake
 
 Prepare the authored fields in `wi.json`:
 
@@ -100,7 +99,7 @@ Prepare the authored fields in `wi.json`:
   "title": "Implement the specified behavior",
   "origin": "new",
   "component": "maintenance_tool",
-  "description": "The bounded implementation and its expected effects.",
+  "description": "The bounded implementation, its expected effects and any related project.",
   "source_spec_id": "SPEC-SELECTED",
   "source_test_id": "TEST-SELECTED",
   "priority": "P2"
@@ -108,7 +107,7 @@ Prepare the authored fields in `wi.json`:
 ```
 
 ```text
-gt backlog record --id WI-SELECTED --project-id PROJECT-SELECTED --fields-file wi.json --expected-version 0 --actor "<current-context>" --change-reason "<specific owner-selected intake purpose>" --json
+gt backlog record --id WI-SELECTED --project-id PROJECT-GTKB-NEW-WORK-INTAKE --fields-file wi.json --expected-version 0 --actor "<current-context>" --change-reason "<the finding this item files>" --json
 gt backlog show WI-SELECTED --json
 ```
 

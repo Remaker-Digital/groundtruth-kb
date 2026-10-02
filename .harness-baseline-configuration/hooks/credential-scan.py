@@ -27,6 +27,22 @@ Session S281. Loyal Opposition GO: bridge/credential-scan-narrowing-012.md.
 import json
 import re
 import sys
+from pathlib import Path
+
+HOOKS = Path(__file__).resolve().parent
+if str(HOOKS) not in sys.path:
+    sys.path.insert(0, str(HOOKS))
+try:
+    # c123 (batch design WP2, G38): the payload readers that accept every key a route has used.
+    from _hook_context import edit_new_text, patch_text, tool_path, write_content
+except ImportError:
+    # The hook also runs alone, with no sidecar file (GO-008 Condition 1: its fallback is inline). It then reads the
+    # canonical keys only, as before c123: each reader yields nothing and the callers read the canonical key.
+
+    def _canonical_keys_only(_value: object) -> str:
+        return ""
+
+    edit_new_text = patch_text = tool_path = write_content = _canonical_keys_only
 
 # ---------------------------------------------------------------------------
 # Patterns that indicate hardcoded environment-specific values
@@ -299,15 +315,17 @@ def main():
         print(json.dumps(_deny("credential_catalog_unavailable: Restore the installed GT-KB package before retrying")))
         return
     try:
-        path = tool_input.get("file_path", tool_input.get("path", ""))
-        if not isinstance(path, str):
+        raw_path = tool_input.get("file_path", tool_input.get("path", ""))
+        if not isinstance(raw_path, str):
             raise ValueError("invalid file path")
+        path = tool_path(tool_input) or raw_path
         if tool in {"Bash", "PowerShell"}:
             values = [tool_input.get("command", "")]
         elif tool == "Write":
-            values = [tool_input.get("content", "")]
+            # c123 (G38): a route's own name for the text is read too; a canonical value that is not text still refuses.
+            values = [write_content(tool_input) or tool_input.get("content", "")]
         elif tool == "Edit":
-            values = [tool_input.get("new_string", tool_input.get("new_text", ""))]
+            values = [edit_new_text(tool_input) or tool_input.get("new_string", tool_input.get("new_text", ""))]
         elif tool == "MultiEdit":
             edits = tool_input.get("edits")
             if not isinstance(edits, list) or not all(isinstance(edit, dict) for edit in edits):
@@ -316,7 +334,8 @@ def main():
         elif tool == "NotebookEdit":
             values = [tool_input.get("new_source", "")]
         else:
-            values = [tool_input.get("patch", tool_input.get("input", ""))]
+            # c123 (G38): Codex puts the apply_patch text in the tool's command, which was never scanned.
+            values = [patch_text(data) or tool_input.get("patch", tool_input.get("input", ""))]
         if not all(isinstance(value, str) for value in values):
             raise ValueError("invalid effect content")
         findings = []

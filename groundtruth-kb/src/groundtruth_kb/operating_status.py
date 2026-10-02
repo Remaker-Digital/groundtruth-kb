@@ -176,11 +176,26 @@ def _formal(client: AuthorityClient) -> tuple[str, str, str, dict[str, Any]]:
     counts = {name: len(payload[name]) for name in FORMAL_FINDING_LISTS}
     healthy = payload["status"] == "pass" and not any(counts.values())
     findings = ", ".join(f"{count} {name.replace('_', ' ')}" for name, count in counts.items() if count)
+    # c123 (batch design WP3 3.4): without findings, the authority's own term counts state the cause when it has them.
+    terms = [payload.get(key) for key in ("active_records", "inactive_records", "records")]
+    if healthy:
+        detail = "pass: no ambiguities, source issues or validation issues"
+    elif findings:
+        detail = f"{payload['status']}: {findings}"
+    elif all(type(term) is int for term in terms) and terms[0] == 0:
+        active, inactive, records = terms
+        detail = (
+            f"{payload['status']}: no active canonical terms ({active} active, {inactive} inactive of {records} "
+            "records); no term resolves until one is active"
+        )
+    else:
+        detail = (
+            f"{payload['status']}: the authority reports fail with no findings and no term counts, so the cause is "
+            "not stated here; read gt authority status"
+        )
     return (
         "PASS" if healthy else "FAIL",
-        "pass: no ambiguities, source issues or validation issues"
-        if healthy
-        else f"{payload['status']}: " + (findings or "the service reports fail without listed findings"),
+        detail,
         route,
         {key: payload[key] for key in payload if key != "records"},
     )

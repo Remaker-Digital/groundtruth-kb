@@ -118,24 +118,6 @@ _GITHUB_WORKFLOW_BRANCH = "main"
 _TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 _AZURE_CONTAINER_APP_MAP_ENV = "GTKB_DASHBOARD_AZURE_CONTAINER_APP_MAP"
 _AZURE_RESOURCE_GROUP_ENV = "GTKB_DASHBOARD_AZURE_RESOURCE_GROUP"
-_DEFERRAL_STATUS_KEYS = ("status", "state", "outcome", "resolution_status", "lifecycle_state")
-_DEFERRAL_BOUNDARY_KEYS = (
-    "expires_at",
-    "expiry",
-    "expiry_at",
-    "expiration",
-    "expiration_at",
-    "defer_until",
-    "deferred_until",
-    "review_after",
-    "review_at",
-    "resume_at",
-    "resume_trigger",
-    "resume_condition",
-    "expiry_condition",
-    "time_limit",
-    "trigger",
-)
 
 
 class IncidentIngestError(RuntimeError):
@@ -1806,60 +1788,6 @@ def _explicit_release_health_findings(intelligence: dict[str, Any]) -> list[dict
     return [_normalize_release_finding(item) for item in raw_findings]
 
 
-def _has_deferral_boundary(record: dict[str, Any]) -> bool:
-    for key in _DEFERRAL_BOUNDARY_KEYS:
-        if str(record.get(key) or "").strip():
-            return True
-    nested = record.get("deferral")
-    if isinstance(nested, dict):
-        return _has_deferral_boundary(nested)
-    return False
-
-
-def _is_deferred_record(record: dict[str, Any]) -> bool:
-    return any(str(record.get(key) or "").strip().lower() == "deferred" for key in _DEFERRAL_STATUS_KEYS)
-
-
-def _deferred_records_missing_expiry(value: Any, *, path: str = "$", out: list[str] | None = None) -> list[str]:
-    missing = [] if out is None else out
-    if isinstance(value, dict):
-        if _is_deferred_record(value) and not _has_deferral_boundary(value):
-            identifier = (
-                value.get("id")
-                or value.get("work_item_id")
-                or value.get("spec_id")
-                or value.get("document")
-                or value.get("title")
-                or path
-            )
-            missing.append(str(identifier))
-        for key, nested in value.items():
-            if key == "raw_model_json":
-                continue
-            _deferred_records_missing_expiry(nested, path=f"{path}.{key}", out=missing)
-    elif isinstance(value, list):
-        for idx, nested in enumerate(value):
-            _deferred_records_missing_expiry(nested, path=f"{path}[{idx}]", out=missing)
-    return missing
-
-
-def _deferral_expiry_findings(model: dict[str, Any] | None) -> list[dict[str, str]]:
-    if not model:
-        return []
-    missing = _deferred_records_missing_expiry(model)
-    if not missing:
-        return []
-    examples = ", ".join(missing[:5])
-    suffix = f": {examples}" if examples else ""
-    return [
-        {
-            "source": "deferral-expiry",
-            "message": (f"{len(missing)} deferred record(s) lack an expiry, time limit, or resume trigger{suffix}"),
-            "severity": "yellow",
-        }
-    ]
-
-
 def _run_release_probe(
     project_root: Path, args: list[str], *, timeout: int = 20
 ) -> subprocess.CompletedProcess[str] | None:
@@ -2148,7 +2076,6 @@ def _release_health_findings(
     config: GTConfig | None = None,
 ) -> list[dict[str, Any]]:
     findings = _explicit_release_health_findings(intelligence)
-    findings.extend(_deferral_expiry_findings(model))
     if probe_live:
         findings.extend(_live_release_health_findings(project_root, config))
     deduped: list[dict[str, str]] = []

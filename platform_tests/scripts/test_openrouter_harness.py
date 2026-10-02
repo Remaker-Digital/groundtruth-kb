@@ -62,19 +62,33 @@ omit_payload_model = true
 
 [routing.openrouter]
 default_model = "openrouter-cloud-default"
-
-[routing.openrouter.skills]
-implementation = "openrouter-cloud-default"
 """.strip()
         + "\n",
         encoding="utf-8",
     )
 
-    selected = orh.resolve_model(orh.load_routing_config(root), None, skill="implementation")
+    # c123 (batch design WP2 2.1): no skill table and no skill argument; the default route is the one selected.
+    selected = orh.resolve_model(orh.load_routing_config(root), None)
 
     assert selected.key == "openrouter-cloud-default"
     assert selected.model_id == "moonshotai/kimi-k2.7-code"
     assert selected.omit_payload_model is True
+
+
+def test_openrouter_routing_refuses_a_retired_skill_table(tmp_path: Path):
+    """c123 (batch design WP2 2.1): a role skill no longer selects F's model; a registration names --model."""
+    root = make_root(tmp_path)
+    path = root / orh.ROUTING_CONFIG_PATH
+    path.write_text(
+        path.read_text(encoding="utf-8") + '\n[routing.openrouter.skills]\nimplementation = "fixture-full"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        orh.OpenRouterHarnessError,
+        match=r"routing\.openrouter\.skills: routing skill tables are retired; registrations name --model",
+    ):
+        orh.load_routing_config(root)
 
 
 def test_glob_skips_root_escaping_resolved_matches(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
@@ -149,8 +163,11 @@ def test_main_loads_env_local_key_before_live_dispatch(
         assert api_key == "env-file-fixture-key"
         assert project_root == root.resolve()
         assert max_turns == 600
-        assert kwargs["skill"] == "bridge-review"
-        assert kwargs["system_prompt"].startswith("Shared root instructions.\n")
+        # c123 (batch design WP2 2.1): no skill reaches the loop; without --init the run is unbound, and the prompt is
+        # AGENTS.md alone although the root holds the bridge skills.
+        assert "skill" not in kwargs
+        assert kwargs["binding"] is None
+        assert kwargs["system_prompt"] == "Shared root instructions.\n"
         assert kwargs["timeout"] == 900
         assert kwargs["session_timeout"] == 3600
         return "done"
@@ -159,7 +176,7 @@ def test_main_loads_env_local_key_before_live_dispatch(
     monkeypatch.setattr(orh, "load_routing_config", lambda _project_root: config)
     monkeypatch.setattr(orh, "run_tool_loop", fake_run_tool_loop)
 
-    assert orh.main(["-p", "hello", "--skill", "bridge-review"]) == 0
+    assert orh.main(["-p", "hello"]) == 0
     assert capsys.readouterr().out.strip() == "done"
 
 
@@ -190,10 +207,12 @@ def test_openrouter_bridge_review_inherits_shared_completion_contract(
 
     def fake_base_loop(_prompt, _route, _endpoint, _api_key, _max_turns, _root, profile, **kwargs):
         captured["profile"] = profile
-        captured["skill"] = kwargs["skill"]
+        captured["kwargs"] = kwargs
         return "done"
 
     monkeypatch.setattr(orh.base, "run_tool_loop", fake_base_loop)
+    # c123 (batch design WP2 2.1): bridge work is the assigned target and the launcher's binding, not a role skill.
+    binding = {"session_context_id": "bound-context", "role": "loyal-opposition", "native_context_id": "native-1"}
 
     assert (
         orh.run_tool_loop(
@@ -203,12 +222,19 @@ def test_openrouter_bridge_review_inherits_shared_completion_contract(
             "key",
             1,
             root,
-            skill="bridge-review",
+            bridge_document="assigned",
+            bridge_version=2,
+            native_context_id="native-1",
+            binding=binding,
         )
         == "done"
     )
     assert captured["profile"] is orh._OPENROUTER_PROFILE
-    assert captured["skill"] == "bridge-review"
+    forwarded = captured["kwargs"]
+    assert (forwarded["bridge_document"], forwarded["bridge_version"]) == ("assigned", 2)
+    assert forwarded["native_context_id"] == "native-1"
+    assert forwarded["binding"] is binding
+    assert "skill" not in forwarded
 
 
 def test_bridge_write_invokes_required_guard_sequence(tmp_path: Path):

@@ -26,7 +26,8 @@ SAFE_COMMAND_PREFIXES = (
     "get-content",
     "select-string",
     "get-childitem",
-    "python -m pytest",
+    # c123 (owner decision A1): python -m pytest left this list. A test run is a program run, which needs a live claim
+    # of the bound context (_program_run).
     "python -m groundtruth_kb deliberations search",
 )
 
@@ -83,14 +84,30 @@ GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
 # terminal. They are neither file nor Git effects, so the gate passed them for any agent shell. It now refuses them in
 # every harness context, bound or not, whatever the target. Read-only forms stay allowed (gt services status, gt
 # controls show, Get-ScheduledTask, Get-Service, schtasks /query).
+# c123 (batch design WP1, G27): gt service serve starts the authority API itself, and gt dashboard install downloads
+# and installs the dashboard's server; both are service operations of the same kind.
+# c123 (owner decision A2): gt home open starts the Home when it is down, so it is a Home operation as well; gt db
+# postgres init and import-current administer the authority database directly (three command words). Ending a process
+# and controlling the PostgreSQL cluster are owner operations too (_process_or_cluster_control).
 GT_OWNER_OPERATIONS = {
     "services": frozenset({"start", "stop"}),
-    "home": frozenset({"start", "stop"}),
-    "dashboard": frozenset({"start", "stop", "serve"}),
+    "service": frozenset({"serve"}),
+    "home": frozenset({"start", "stop", "open"}),
+    "dashboard": frozenset({"start", "stop", "serve", "install"}),
     "controls": frozenset({"set"}),
 }
+GT_OWNER_SUBCOMMAND_OPERATIONS: dict[tuple[str, str], frozenset[str]] = {
+    ("db", "postgres"): frozenset({"init", "import-current"}),
+}
+# c123 (owner decision E1): the owner's levers over project authorization (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001)
+# are refused to every agent context, bound or not, like the owner operations above: gt projects set-authorization, gt
+# projects move-item (a move can carry intake work into an authorized project), and gt projects record when it creates
+# an execution project, which starts authorized (_creates_execution_project). Amendments of existing records, program
+# creation and the nested projects dependencies and formal-links records are not levers.
+GT_OWNER_LEVERS = {"projects": frozenset({"set-authorization", "move-item", "record"})}
 GT_GLOBAL_OPTIONS_WITH_VALUES = frozenset({"--config"})
 GT_MODULES = frozenset({"groundtruth_kb", "groundtruth_kb.cli"})
+_PYTHON_VALUE_OPTIONS = frozenset({"-X", "-W", "--check-hash-based-pycs"})
 # GT-KB's scheduled tasks and Windows service share this prefix (GTKB-DomainService, GTKB-Home, GTKB-Ollama-Serve,
 # GTKB-BaseBackup, gtkb-postgresql); a wildcard such as 'GTKB*' names them too.
 GTKB_TASK_OR_SERVICE_NAME_RE = re.compile(r"gtkb(?:-[a-z0-9-]+|-?\*[a-z0-9*-]*)", re.IGNORECASE)
@@ -116,6 +133,43 @@ SERVICE_CONTROL_CMDLETS = frozenset(
 SCHTASKS_CHANGING_SWITCHES = frozenset({"/run", "/end", "/change", "/delete", "/create"})
 SC_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue", "config", "delete", "create", "failure"})
 NET_CHANGING_VERBS = frozenset({"start", "stop", "pause", "continue"})
+# c123 (owner decision A2; batch design WP1 item 4, change 3): ending a process, controlling the PostgreSQL cluster and
+# reaching the authority database with the PostgreSQL programs are owner operations whatever the target: a process name
+# or number does not say whose process it is, and the authority database is read and changed through the gt CLI. A
+# context still ends its own shell's jobs (Stop-Job, Remove-Job, kill %1) and reads process and cluster state
+# (Get-Process, tasklist, pg_ctl status, pg_isready, a program's --version or --help).
+PROCESS_TERMINATORS = frozenset({"stop-process", "spps", "taskkill", "tskill", "pkill", "killall"})
+_PROCESS_TERMINATING_CALL_RE = re.compile(r"\.(?:kill|terminate)\s*\(", re.IGNORECASE)
+PG_CTL_CHANGING_ACTIONS = frozenset(
+    {"start", "stop", "restart", "kill", "promote", "reload", "init", "initdb", "register", "unregister", "logrotate"}
+)
+POSTGRESQL_PROGRAMS = frozenset(
+    {
+        "postgres",
+        "initdb",
+        "pg_resetwal",
+        "psql",
+        "pg_dump",
+        "pg_dumpall",
+        "pg_restore",
+        "createdb",
+        "dropdb",
+        "createuser",
+        "dropuser",
+        "vacuumdb",
+        "reindexdb",
+        "clusterdb",
+        "pg_basebackup",
+        "pg_receivewal",
+        "pg_recvlogical",
+        "pg_rewind",
+        "pg_upgrade",
+        "pg_amcheck",
+        "pg_checksums",
+    }
+)
+# The options with which those programs only print their version or usage.
+_POSTGRESQL_INFORMATIONAL_OPTIONS = frozenset({"-V", "--version", "-?", "--help"})
 # A command the gate cannot inspect: nested past the inspection cap, or a recognized shell wrapper whose command is
 # encoded or empty. The Git rule and the owner-operation rule each fail closed on it (observer B102), so neither rule's
 # refusal depends on the other running first. c122 adds a program named by a variable or an expression, text that
@@ -140,7 +194,8 @@ MUTATING_COMMAND_RE = re.compile(
     # while read-only inspection was refused. Quoted spans are masked by
     # _has_mutating_signal before this regex runs, so verbs appearing inside
     # quoted prose do not false-positive.
-    r"sed\s+(?:[^|;&]*\s)?-i\b|awk\s+[^|;&]*-i\s+inplace\b|"
+    # c123 (owner decision A5, row 18): sed's -i also counts inside a flag bundle (-ni, -Ei) and as --in-place.
+    r"sed\s+(?:[^|;&]*\s)?(?:-[nrEsuzb]*i|--in-place)\b|awk\s+[^|;&]*-i\s+inplace\b|"
     r"python\s+.*(?:write_text|open\(.+,\s*['\"]w|sqlite3|insert_|update_|delete_)"
     r")\b"
     # Change 7 (WI-6821): bare POSIX write verbs are matched only at COMMAND
@@ -163,7 +218,7 @@ MUTATING_COMMAND_RE = re.compile(
     re.IGNORECASE,
 )
 
-REDIRECT_OPERATOR_TOKEN_RE = re.compile(r"&?>{1,2}")
+REDIRECT_OPERATOR_TOKEN_RE = re.compile(r"&?>{1,2}|>\|")
 
 NULL_SINK_REDIRECT_STRIP_RE = re.compile(
     r"\s*(?:\d+|&)?>{1,2}(?!&)\s*(?:/dev/null|\$null|NUL)\b",
@@ -369,6 +424,206 @@ def _extract_posix_paths(tokens: list[str]) -> list[str]:
     return paths
 
 
+# c123 (owner decision A5; batch design WP1 section 6, row 18): two over-collections failed a claimed edit's claim check
+# (the native check refused `sed -i 's/a/b/' f.txt` because the script "s/a/b/" lies outside the claim). sed's and
+# awk's script operand is not a file: without a script option (sed's -e, -f, --expression and --file; awk's -f, -e, -E,
+# --file, --source and --exec) the first operand is the script, and the values of their options are not files either.
+# A copy's sources are read, not written, so only its destination is a target.
+_SED_VALUE_OPTIONS = frozenset({"-e", "-f", "-l", "--expression", "--file", "--line-length"})
+_SED_SCRIPT_OPTIONS = frozenset({"-e", "-f", "--expression", "--file"})
+_AWK_VALUE_OPTIONS = frozenset(
+    {
+        "-f",
+        "-v",
+        "-F",
+        "-i",
+        "-e",
+        "-E",
+        "-l",
+        "-W",
+        "--file",
+        "--assign",
+        "--field-separator",
+        "--include",
+        "--source",
+        "--exec",
+        "--load",
+    }
+)
+_AWK_SCRIPT_OPTIONS = frozenset({"-f", "-e", "-E", "--file", "--source", "--exec"})
+_AWK_ASSIGNMENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*", re.DOTALL)
+
+
+def _extract_sed_awk_paths(tokens: list[str]) -> list[str]:
+    """The files sed or awk reads, and with -i writes: its operands after the script, option values excluded (c123).
+
+    awk's var=value operands are assignments, not files. sed's -i takes its backup suffix attached (-i.bak).
+    """
+    awk = _executable_name(tokens[0]).removesuffix(".exe") == "awk"
+    values, scripts = (_AWK_VALUE_OPTIONS, _AWK_SCRIPT_OPTIONS) if awk else (_SED_VALUE_OPTIONS, _SED_SCRIPT_OPTIONS)
+    operands: list[str] = []
+    scripted = False
+    index = 1
+    while index < len(tokens):
+        word = _clean_shell_token(tokens[index])
+        if word == "--":
+            operands.extend(tokens[index + 1 :])
+            break
+        if word.startswith("--"):
+            name = word.split("=", 1)[0]
+            scripted = scripted or name in scripts
+            index += 2 if name in values and "=" not in word else 1
+            continue
+        if word.startswith("-") and len(word) > 1:
+            letters = word[1:]
+            for position, letter in enumerate(letters):
+                if not awk and letter == "i":
+                    break  # the rest of the bundle is sed's backup suffix
+                scripted = scripted or f"-{letter}" in scripts
+                if f"-{letter}" in values:
+                    # The rest of the bundle is the option's value, or the next word when the option ends it.
+                    index += 1 if position == len(letters) - 1 else 0
+                    break
+            index += 1
+            continue
+        if not (awk and _AWK_ASSIGNMENT.fullmatch(word)):
+            operands.append(tokens[index])
+        index += 1
+    return operands if scripted else operands[1:]
+
+
+_COPY_VERBS = frozenset({"copy-item", "copy", "cp", "copy-itemproperty"})
+_COPY_SOURCE_PARAMETERS = frozenset({"-path", "-literalpath", "-lp", "-pspath"})
+# Copy-Item's and Copy-ItemProperty's valued parameters and PowerShell's valued common parameters, and cp's --suffix.
+_COPY_VALUE_PARAMETERS = frozenset(
+    {
+        "-filter",
+        "-include",
+        "-exclude",
+        "-credential",
+        "-tosession",
+        "-fromsession",
+        "-name",
+        "-erroraction",
+        "-ea",
+        "-warningaction",
+        "-wa",
+        "-informationaction",
+        "-infa",
+        "-progressaction",
+        "-proga",
+        "-errorvariable",
+        "-ev",
+        "-warningvariable",
+        "-wv",
+        "-informationvariable",
+        "-iv",
+        "-outvariable",
+        "-ov",
+        "-outbuffer",
+        "-ob",
+        "-pipelinevariable",
+        "-pv",
+        "--suffix",
+    }
+)
+_COPY_SWITCHES = frozenset(
+    {
+        "-recurse",
+        "-force",
+        "-container",
+        "-passthru",
+        "-whatif",
+        "-wi",
+        "-confirm",
+        "-cf",
+        "-verbose",
+        "-vb",
+        "-debug",
+        "-db",
+        "-usetransaction",
+        "--archive",
+        "--attributes-only",
+        "--backup",
+        "--copy-contents",
+        "--debug",
+        "--dereference",
+        "--force",
+        "--interactive",
+        "--keep-directory-symlink",
+        "--link",
+        "--no-clobber",
+        "--no-dereference",
+        "--no-preserve",
+        "--no-target-directory",
+        "--one-file-system",
+        "--parents",
+        "--preserve",
+        "--recursive",
+        "--reflink",
+        "--remove-destination",
+        "--sparse",
+        "--strip-trailing-slashes",
+        "--symbolic-link",
+        "--update",
+        "--verbose",
+    }
+)
+# POSIX cp's short flags, which take no value; a bundle of them (-rf, -av) is a flag word.
+_CP_SHORT_FLAGS = frozenset("abdfHilLnPpRrsTuvxZ")
+
+
+def _extract_copy_destination(tokens: list[str]) -> list[str]:
+    """The destination a copy writes: Copy-Item (cpi, and copy or cp in PowerShell), cmd's copy, POSIX cp (c123).
+
+    -Destination, or cp's -t and --target-directory, when named; otherwise the last operand, which is cmd's and cp's
+    destination and binds to Copy-Item's -Destination. Copy-ItemProperty's destination is its second operand, or its
+    first when -Path names the source. A copy that names no destination writes into the current directory, which is
+    then the target. Its sources (-Path, -LiteralPath, the other operands) are read. An option the gate does not know
+    could take the destination's place, so every operand is then a target, as before c123.
+    """
+    property_copy = _canonical_write_verb(tokens[0]) == "copy-itemproperty"
+    destination: list[str] = []
+    operands: list[str] = []
+    named_source = False
+    known = True
+    index = 1
+    while index < len(tokens):
+        word = _clean_shell_token(tokens[index])
+        if word.startswith("-") and len(word) > 1:
+            head, separator, attached = word.partition("=" if word.startswith("--") else ":")
+            name = head.lower()
+            step = 1 if separator else 2
+            if name in ("-destination", "--target-directory") or head == "-t":
+                destination.extend([attached] if separator else tokens[index + 1 : index + 2])
+                index += step
+                continue
+            if name in _COPY_SOURCE_PARAMETERS:
+                named_source = True
+                index += step
+                continue
+            if name in _COPY_VALUE_PARAMETERS or head == "-S":
+                index += step
+                continue
+            if name not in _COPY_SWITCHES and not (not word.startswith("--") and set(word[1:]) <= _CP_SHORT_FLAGS):
+                known = False
+            index += 1
+            continue
+        if word != "+" and not _CMD_SWITCH_RE.fullmatch(word):
+            operands.append(tokens[index])
+        index += 1
+    if destination:
+        return destination
+    if not known:
+        return operands or ["."]
+    if property_copy:
+        position = 0 if named_source else 1
+        return operands[position : position + 1] or ["."]
+    if named_source:
+        return operands[:1] or ["."]
+    return operands[-1:] if len(operands) > 1 else ["."]
+
+
 _GIT_NON_MUTATING_SUBCOMMANDS = DIRECT_GIT_READ_ONLY_SUBCOMMANDS
 
 _GIT_MUTATING_EXTRACTORS = {
@@ -400,6 +655,11 @@ _POWERSHELL_PATH_ARG_VERBS = frozenset(
         "remove-itemproperty",
         "rename-itemproperty",
         "clear-itemproperty",
+        # c123 (batch design WP1, residual row 6): Set-Item and Clear-Item write the item they name. On the session-state
+        # drives (Env:, Variable:, Function:, Alias:) they hold no file and are not writes (_ITEM_WRITE_RE); on the
+        # machine-configuration drives they are owner operations (_machine_configuration_write).
+        "set-item",
+        "clear-item",
     }
 )
 
@@ -434,7 +694,65 @@ _POWERSHELL_WRITE_ALIASES = {
     "clp": "clear-itemproperty",
     "iwr": "invoke-webrequest",
     "irm": "invoke-restmethod",
+    # c123 (residual rows 5 and 6): si and cli; sc is Set-Content in Windows PowerShell, and sc.exe when its first
+    # operand is one of sc.exe's verbs or a \\server name (_sc_runs_sc_exe).
+    "si": "set-item",
+    "cli": "clear-item",
+    "sc": "set-content",
 }
+# The aliases matched by their own patterns in _NAMED_WRITE_RE, each with a condition on what follows.
+_CONDITIONAL_WRITE_ALIASES = frozenset({"si", "cli", "sc"})
+_ITEM_WRITE_VERBS = frozenset({"set-item", "clear-item"})
+_SC_EXE_VERBS = frozenset(
+    {
+        "query",
+        "queryex",
+        "start",
+        "pause",
+        "interrogate",
+        "continue",
+        "stop",
+        "config",
+        "description",
+        "failure",
+        "failureflag",
+        "sidtype",
+        "privs",
+        "managedaccount",
+        "qc",
+        "qdescription",
+        "qfailure",
+        "qfailureflag",
+        "qsidtype",
+        "qprivs",
+        "qtriggerinfo",
+        "qpreferrednode",
+        "qmanagedaccount",
+        "qprotection",
+        "quserservice",
+        "delete",
+        "create",
+        "control",
+        "sdshow",
+        "sdset",
+        "showsid",
+        "triggerinfo",
+        "preferrednode",
+        "getdisplayname",
+        "getkeyname",
+        "enumdepend",
+        "boot",
+        "lock",
+        "querylock",
+    }
+)
+
+
+def _sc_runs_sc_exe(relevant: list[str]) -> bool:
+    """Whether a command led by sc runs sc.exe: no operand, one of its verbs, or a \\\\server name (c123, row 5)."""
+    operand = _clean_shell_token(relevant[1]).strip("'\"").lower() if len(relevant) > 1 else ""
+    return not operand or operand in _SC_EXE_VERBS or operand.startswith("\\\\")
+
 
 # c121: names that are a PowerShell alias of a write cmdlet and also a cmd built-in or, for mkdir and rmdir, a POSIX
 # command. Each takes cmd switches (/s, /q, /y) or POSIX flags (-p) as well as PowerShell parameters, so every operand
@@ -514,16 +832,25 @@ def _word_alternation(words: frozenset[str] | set[str]) -> str:
 # are the POSIX in-place edits of MUTATING_COMMAND_RE.
 _COMMAND_POSITION = r"(?:^|[|;&\n{(])\s*"
 _CMDLET_WRITE_WORDS = _word_alternation(
-    _POWERSHELL_PATH_ARG_VERBS | _POWERSHELL_BOTH_PATHS_VERBS | _POWERSHELL_DESTINATION_VERBS
+    (_POWERSHELL_PATH_ARG_VERBS - _ITEM_WRITE_VERBS) | _POWERSHELL_BOTH_PATHS_VERBS | _POWERSHELL_DESTINATION_VERBS
 )
 _ALIAS_WRITE_WORDS = _word_alternation(
-    (frozenset(_POWERSHELL_WRITE_ALIASES) - {"iwr", "irm"}) | _DUAL_SYNTAX_WRITE_VERBS
+    (frozenset(_POWERSHELL_WRITE_ALIASES) - {"iwr", "irm"} - _CONDITIONAL_WRITE_ALIASES) | _DUAL_SYNTAX_WRITE_VERBS
 )
+# c123 (batch design WP1, residual row 6): an item write whose target is on a session-state drive is not a file write.
+# A quoted target is masked in the view these patterns read, so a quoted session-state path still counts (refused).
+_NOT_SESSION_STATE = r"(?!\s+(?:-(?:literal)?path[\s:]+)?(?:env|variable|function|alias):)"
+_SESSION_STATE_DRIVES = ("env:", "variable:", "function:", "alias:")
+# c123 (row 5): sc is Set-Content unless one of sc.exe's verbs or a \\server name follows it.
+_SC_EXE_WORDS = _word_alternation(_SC_EXE_VERBS)
 _NAMED_WRITE_RE = re.compile(
     rf"\b(?P<cmdlet>{_CMDLET_WRITE_WORDS})\b"
+    rf"|\b(?P<item>set-item|clear-item)\b(?![-.]){_NOT_SESSION_STATE}"
+    rf"|{_COMMAND_POSITION}(?P<itemalias>si|cli)\b(?![-.]){_NOT_SESSION_STATE}"
+    rf"|{_COMMAND_POSITION}(?P<scalias>sc)\b(?![-.])(?=[ \t]+(?!(?:{_SC_EXE_WORDS})\b)(?!\\\\)[^\s|;&])"
     rf"|{_COMMAND_POSITION}(?P<alias>{_ALIAS_WRITE_WORDS})(?:\.exe)?\b(?![-.])"
     rf"|{_COMMAND_POSITION}(?P<posix>tee|touch|truncate|shred|install|patch|dd|cp|mv|rm|ln)(?:\.exe)?\b(?![-.])"
-    r"|\b(?P<sed>sed)\s+(?:[^|;&]*\s)?-i\b|\b(?P<awk>awk)\s+[^|;&]*-i\s+inplace\b"
+    r"|\b(?P<sed>sed)\s+(?:[^|;&]*\s)?(?:-[nrEsuzb]*i|--in-place)\b|\b(?P<awk>awk)\s+[^|;&]*-i\s+inplace\b"
     rf"|(?:\b(?P<web>invoke-webrequest|invoke-restmethod)\b|{_COMMAND_POSITION}(?P<webalias>iwr|irm)\b)[^|;&\n]*?\s-outf",
     re.IGNORECASE,
 )
@@ -544,6 +871,11 @@ _DOTNET_WRITE_RE = re.compile(
 )
 
 
+# c123 (batch design WP1, residual row 10, accepted and stated): New-TemporaryFile and [IO.Path]::GetTempFileName()
+# create a file only in the user's temporary directory, outside every governed tree, so they are not writes here; a
+# later write to that file goes through a variable and is refused by the unresolved-value rule.
+
+
 def _canonical_write_verb(word: str) -> str:
     lowered = word.lower().removesuffix(".exe")
     return _POWERSHELL_WRITE_ALIASES.get(lowered, lowered)
@@ -556,6 +888,480 @@ def _named_writes(shell_view: str) -> Counter[str]:
         word = next(value for value in match.groupdict().values() if value)
         found[_canonical_write_verb(word)] += 1
     return found
+
+
+# c123 (batch design WP1, residual row 16): a write cmdlet's name given to a help or lookup command (Get-Help
+# Export-Csv, Get-Command Remove-Item) is that command's argument, not a write. Those arguments are blanked, to the end
+# of the statement, in the view the write patterns read; every other argument position stays as it was.
+_HELP_ARGUMENTS_RE = re.compile(
+    rf"{_COMMAND_POSITION}(?:get-help|help|man|get-command|gcm|get-alias)\b(?![-.])(?P<arguments>[^|;&\n{{}}()]*)",
+    re.IGNORECASE,
+)
+
+
+def _mask_help_arguments(view: str) -> str:
+    """The view with each help or lookup command's arguments blanked; every position is kept (c123, row 16)."""
+    return _HELP_ARGUMENTS_RE.sub(
+        lambda match: view[match.start() : match.start("arguments")] + " " * len(match.group("arguments")), view
+    )
+
+
+def _write_view(command: str) -> str:
+    """The view the write patterns read: quoted interiors and help arguments blanked, positions kept (c123)."""
+    return _mask_help_arguments(_mask_quoted_spans(command, mask_double=True))
+
+
+# c123 (batch design WP1, residual rows 2, 7 and 9): commands that write through an option rather than by their name.
+# find writes the file -fprint, -fprint0, -fprintf and -fls name, and -delete removes what it matches (not read). curl
+# writes the files -o (--output), -c (--cookie-jar) and -D (--dump-header) name, and with -O (--remote-name,
+# --remote-name-all) one named from the URL (not read). wget writes the files -O (--output-document), -o
+# (--output-file) and -a (--append-output) name, and without -O one named from the URL (not read; --spider writes
+# none). Start-Process writes the files -RedirectStandardOutput and -RedirectStandardError name. "-" is standard
+# output. In Windows PowerShell 5.1 curl and wget are Invoke-WebRequest aliases, whose -OutFile the web-request
+# pattern reads.
+_FIND_FILE_OPTIONS = frozenset({"-fprint", "-fprint0", "-fprintf", "-fls"})
+_CURL_FILE_OPTIONS = frozenset({"-o", "--output", "-c", "--cookie-jar", "-D", "--dump-header"})
+_CURL_REMOTE_NAME = frozenset({"-O", "--remote-name", "--remote-name-all"})
+_CURL_SHORT_VALUES = frozenset("AbcCdDeEFHKmoPQrtTuUwxXyYz")
+_WGET_FILE_OPTIONS = frozenset({"-O", "--output-document", "-o", "--output-file", "-a", "--append-output"})
+_WGET_SHORT_VALUES = frozenset("oaeiBtOTwQPUlARDIX")
+
+
+def _short_option_values(word: str, values: frozenset[str]) -> list[tuple[str, str | None]]:
+    """The options of one short-option bundle (-sSLo out.txt, -qO-), each with its attached value or None (c123)."""
+    found: list[tuple[str, str | None]] = []
+    letters = word[1:]
+    for index, letter in enumerate(letters):
+        if letter in values:
+            found.append(("-" + letter, letters[index + 1 :] or None))
+            break
+        found.append(("-" + letter, None))
+    return found
+
+
+def _download_writes(name: str, args: list[str]) -> tuple[list[str], bool] | None:
+    """The files curl or wget names to write, and whether it also writes one it does not name (c123, row 7)."""
+    files = _CURL_FILE_OPTIONS if name == "curl" else _WGET_FILE_OPTIONS
+    shorts = _CURL_SHORT_VALUES if name == "curl" else _WGET_SHORT_VALUES
+    named: list[str] = []
+    remote_name = False
+    document = spider = False
+    operands = 0
+    index = 0
+    while index < len(args):
+        word = _clean_shell_token(args[index])
+        following = args[index + 1] if index + 1 < len(args) else None
+        if word.startswith("--"):
+            option, equals, attached = word.partition("=")
+            options = [(option, attached if equals else None)]
+            takes_value = option in files
+        elif word.startswith("-") and len(word) > 1:
+            options = _short_option_values(word, shorts)
+            takes_value = options[-1][0][1] in shorts
+        else:
+            operands += 1
+            index += 1
+            continue
+        consumed = 1
+        for option, value in options:
+            if name == "curl" and option in _CURL_REMOTE_NAME:
+                remote_name = True
+            if name == "wget" and option in ("-O", "--output-document"):
+                document = True
+            if name == "wget" and option == "--spider":
+                spider = True
+            if option in files:
+                if value is None and following is not None:
+                    value = following
+                    consumed = 2
+                if value is not None and _clean_shell_token(value).strip("'\"") != "-":
+                    named.append(value)
+        if takes_value and consumed == 1 and options[-1][1] is None and following is not None:
+            consumed = 2  # a value option's value is the next word
+        index += consumed
+    unnamed = remote_name if name == "curl" else (not document and not spider and operands > 0)
+    return (named, unnamed) if named or unnamed else None
+
+
+def _start_process_redirects(args: list[str]) -> list[str]:
+    """The files Start-Process's -RedirectStandardOutput and -RedirectStandardError name (c123, row 9)."""
+    found: list[str] = []
+    for index, word in enumerate(args):
+        if not (word.startswith("-") and len(word) > 1 and not word[1].isdigit()):
+            continue
+        head, colon, tail = word.partition(":")
+        if _start_process_parameter(head) in ("redirectstandardoutput", "redirectstandarderror"):
+            if colon and tail:
+                found.append(tail)
+            elif index + 1 < len(args):
+                found.append(args[index + 1])
+    return found
+
+
+# c123 (owner decision A5; batch design WP1 section 6, row 17): Windows and archive tools that write what their operands
+# or switches name. robocopy and xcopy write their destination; robocopy's /MOV and /MOVE also remove the sources,
+# /MIR and /PURGE remove files under the destination, and /LOG: and /UNILOG: write log files. tar writes its archive
+# when it creates, appends, updates, catenates or deletes, and its -C directory (or the current one) when it extracts;
+# 7z writes its archive with a, d, u or rn and its -o directory (or the current one) with e or x; expand writes its
+# destination; certutil writes the output file of -decode, -decodehex, -encode and -encodehex and the download file of
+# -urlcache; mklink writes the link; icacls, attrib and takeown change the files they name (icacls /save writes its
+# file); fsutil writes the file its file, hardlink, sparse, objectid and reparsepoint verbs name; cipher /e and /d
+# change the files they name, and cipher /w overwrites free space under the directory it names. A form that writes
+# without naming its file (an archive on the default device, tar extracting absolute names, a download named from its
+# address, an expand without a destination, robocopy /SAVE, fsutil's volume and machine settings, cipher's key
+# operations) names nothing the gate can check, so its command is refused whole.
+_ROBOCOPY_LOG_SWITCHES = ("/log:", "/log+:", "/unilog:", "/unilog+:")
+
+
+def _switches_and_operands(args: list[str]) -> tuple[list[str], list[str]]:
+    """A Windows tool's switches (/x, /x:value), lower case, and its other words as written (c123, row 17)."""
+    switches = [_clean_shell_token(arg).lower() for arg in args if _clean_shell_token(arg).startswith("/")]
+    operands = [arg for arg in args if not _clean_shell_token(arg).startswith("/")]
+    return switches, operands
+
+
+def _robocopy_writes(args: list[str]) -> tuple[list[str], bool] | None:
+    """robocopy's destination, with /MOV or /MOVE its source, and its log files; /SAVE's job file is not read."""
+    switches, operands = _switches_and_operands(args)
+    if "/l" in switches or "/?" in switches or len(operands) < 2:
+        return None  # a listing, the usage text, or no destination: robocopy copies nothing
+    named = [operands[1]]
+    if {"/mov", "/move"} & set(switches):
+        named.append(operands[0])
+    for arg in args:
+        word = _clean_shell_token(arg)
+        if word.lower().startswith(_ROBOCOPY_LOG_SWITCHES) and word.split(":", 1)[1]:
+            named.append(word.split(":", 1)[1])
+    return named, any(switch.startswith("/save:") for switch in switches)
+
+
+def _xcopy_writes(args: list[str]) -> tuple[list[str], bool] | None:
+    """xcopy's destination, or the current directory when it names none."""
+    switches, operands = _switches_and_operands(args)
+    if "/l" in switches or "/?" in switches or not operands:
+        return None
+    return (operands[1:2] or ["."]), False
+
+
+_TAR_LONG_MODES = {
+    "--create": "c",
+    "--append": "r",
+    "--update": "u",
+    "--catenate": "A",
+    "--concatenate": "A",
+    "--delete": "D",
+    "--extract": "x",
+    "--get": "x",
+    "--list": "t",
+    "--diff": "d",
+    "--compare": "d",
+}
+
+
+def _tar_writes(args: list[str]) -> tuple[list[str], bool] | None:
+    """The archive tar creates, appends to, updates or deletes from, or the directory it extracts into."""
+    mode = ""
+    archive: str | None = None
+    directory: str | None = None
+    to_stdout = absolute = False
+    pending: list[str] = []  # the bundle's f and C, each waiting for the next word as its value
+    for index, arg in enumerate(args):
+        word = _clean_shell_token(arg)
+        if pending:
+            if pending.pop(0) == "f":
+                archive = arg
+            else:
+                directory = arg
+            continue
+        if word.startswith("--"):
+            name, separator, value = word.partition("=")
+            if name in _TAR_LONG_MODES:
+                mode = _TAR_LONG_MODES[name]
+            elif name in ("--file", "--directory"):
+                if separator:
+                    archive, directory = (value, directory) if name == "--file" else (archive, value)
+                else:
+                    pending.append("f" if name == "--file" else "C")
+            elif name == "--to-stdout":
+                to_stdout = True
+            elif name == "--absolute-names":
+                absolute = True
+            elif name in ("--help", "--usage", "--version"):
+                return None
+            continue
+        old_style = index == 0 and word.isalpha()
+        if not (word.startswith("-") or old_style):
+            continue  # a member name
+        letters = word.lstrip("-")
+        for position, letter in enumerate(letters):
+            if letter in "crutxAd":
+                mode = letter
+            elif letter in "fC":
+                rest = letters[position + 1 :]
+                if rest and not old_style:
+                    archive, directory = (rest, directory) if letter == "f" else (archive, rest)
+                    break  # the rest of a dashed bundle is the option's value
+                pending.append(letter)
+            elif letter == "O":
+                to_stdout = True
+            elif letter == "P":
+                absolute = True
+    if mode in ("c", "r", "u", "A", "D"):
+        if archive is None:
+            return [], True  # the default archive device
+        return None if _clean_shell_token(archive) == "-" else ([archive], False)
+    if mode == "x" and not to_stdout:
+        return ([], True) if absolute else ([directory or "."], False)
+    return None
+
+
+_SEVEN_ZIP_NAMES = frozenset({"7z", "7za", "7zr", "7zz", "7zg"})
+
+
+def _seven_zip_writes(args: list[str]) -> tuple[list[str], bool] | None:
+    """The archive 7z adds to, deletes from, updates or renames in, or the directory it extracts into."""
+    words = [_clean_shell_token(arg) for arg in args]
+    operands = [arg for arg, word in zip(args, words, strict=True) if not word.startswith("-")]
+    command = _clean_shell_token(operands[0]).lower() if operands else ""
+    if command in ("a", "d", "u", "rn"):
+        return (operands[1:2], False) if len(operands) > 1 else ([], True)
+    if command in ("e", "x") and not any(word.lower() == "-so" for word in words):
+        output = next((word[2:].strip("'\"") for word in words if word.lower().startswith("-o") and len(word) > 2), "")
+        return [output or "."], False
+    return None
+
+
+def _expand_writes(args: list[str]) -> tuple[list[str], bool] | None:
+    """The destination Windows expand writes; POSIX expand (tab stops) writes standard output."""
+    words = [_clean_shell_token(arg).lower() for arg in args]
+    if any(word in ("--tabs", "--initial") or word.startswith(("-t", "--tabs=")) for word in words):
+        return None
+    if {"-d", "/d", "-?", "/?"} & set(words):
+        return None  # a listing or the usage text
+    operands = [arg for arg, word in zip(args, words, strict=True) if not word.startswith(("-", "/"))]
+    if len(operands) > 1:
+        return operands[-1:], False
+    return ([], True) if operands else None
+
+
+def _certutil_writes(args: list[str]) -> tuple[list[str], bool] | None:
+    """The file certutil decodes or encodes into, or downloads to with -urlcache."""
+    words = [_clean_shell_token(arg) for arg in args]
+    verbs = {word.lower().lstrip("-/") for word in words if word.startswith(("-", "/"))}
+    operands = [arg for arg, word in zip(args, words, strict=True) if not word.startswith(("-", "/"))]
+    if verbs & {"decode", "decodehex", "encode", "encodehex"}:
+        return (operands[1:2], False) if len(operands) > 1 else ([], True)
+    if "urlcache" in verbs:
+        position = next((index for index, word in enumerate(operands) if "://" in word), None)
+        if position is None:
+            return None  # a cache listing or deletion, in the user's cache outside every governed tree
+        return (operands[position + 1 : position + 2], False) if position + 1 < len(operands) else ([], True)
+    return None
+
+
+_ICACLS_CHANGES = frozenset(
+    {
+        "/grant",
+        "/deny",
+        "/remove",
+        "/setowner",
+        "/setintegritylevel",
+        "/inheritance",
+        "/reset",
+        "/restore",
+        "/substitute",
+    }
+)
+_ATTRIB_FLAG = re.compile(r"[+-][rahsiolpuxvb]", re.IGNORECASE)
+_FSUTIL_FILE_WRITES = frozenset(
+    {
+        ("file", "createnew"),
+        ("file", "setzerodata"),
+        ("file", "seteof"),
+        ("file", "setshortname"),
+        ("file", "setvaliddata"),
+        ("file", "setcasesensitiveinfo"),
+        ("file", "setstrictlysequential"),
+        ("hardlink", "create"),
+        ("sparse", "setflag"),
+        ("sparse", "setrange"),
+        ("objectid", "set"),
+        ("objectid", "delete"),
+        ("objectid", "create"),
+        ("reparsepoint", "delete"),
+    }
+)
+
+
+def _permission_tool_writes(name: str, args: list[str]) -> tuple[list[str], bool] | None:
+    """What mklink, icacls, attrib, takeown, fsutil or cipher writes (c123, row 17); None for another program."""
+    words = [_clean_shell_token(arg) for arg in args]
+    lowered = [word.lower() for word in words]
+    if name == "mklink":
+        operands = [arg for arg, word in zip(args, words, strict=True) if not word.startswith("/")]
+        return (operands[:1], False) if operands else None
+    if name == "icacls":
+        if "/save" in lowered:
+            position = lowered.index("/save")
+            return (args[position + 1 : position + 2], False) if position + 1 < len(args) else ([], True)
+        changes = any(word.split(":", 1)[0] in _ICACLS_CHANGES for word in lowered)
+        return (args[:1], False) if changes and args else None
+    if name == "attrib":
+        if not any(_ATTRIB_FLAG.fullmatch(word) for word in words):
+            return None  # a display of attributes
+        operands = [
+            arg for arg, word in zip(args, words, strict=True) if not _ATTRIB_FLAG.fullmatch(word) and word[:1] != "/"
+        ]
+        return (operands or ["."]), False
+    if name == "takeown":
+        if "/f" not in lowered:
+            return None
+        position = lowered.index("/f")
+        return (args[position + 1 : position + 2], False) if position + 1 < len(args) else ([], True)
+    if name == "fsutil":
+        if len(lowered) < 2 or lowered[0] == "fsinfo":
+            return None
+        group, verb = lowered[0], lowered[1]
+        if verb.startswith("query") or verb in ("list", "diskfree", "info", "help", "/?"):
+            return None
+        if (group, verb) in _FSUTIL_FILE_WRITES:
+            return (args[2:3], False) if len(args) > 2 else ([], True)
+        return [], True  # a volume or machine setting, which names no file the gate checks
+    if name == "cipher":
+        for word, low in zip(words, lowered, strict=True):
+            if low.startswith("/w"):
+                directory = word.split(":", 1)[1] if ":" in word else ""
+                return ([directory], False) if directory else ([], True)
+        keys = ("/u", "/k", "/x", "/rekey", "/flushcache")
+        if any(low in keys or low.startswith(("/r:", "/x:", "/adduser", "/removeuser")) for low in lowered):
+            return [], True
+        if "/e" in lowered or "/d" in lowered:
+            operands = [arg for arg, word in zip(args, words, strict=True) if not word.startswith("/")]
+            scopes = [word.split(":", 1)[1] for word, low in zip(words, lowered, strict=True) if low.startswith("/s:")]
+            return (operands + scopes) or ["."], False
+        return None
+    return None
+
+
+_PERMISSION_TOOLS = frozenset({"mklink", "icacls", "attrib", "takeown", "fsutil", "cipher"})
+
+
+def _option_writes(tokens: list[str]) -> tuple[list[str], bool] | None:
+    """The files one command writes through its options or, for row 17's tools, its operands, and whether it writes
+    one it does not name; None if none."""
+    words, _called = _statement_program(tokens)
+    if not words:
+        return None
+    name = _executable_name(words[0]).removesuffix(".exe")
+    args = words[1:]
+    # c123 (owner decision A5, row 17): the system write tools.
+    if name == "robocopy":
+        return _robocopy_writes(args)
+    if name == "xcopy":
+        return _xcopy_writes(args)
+    if name in ("tar", "bsdtar"):
+        return _tar_writes(args)
+    if name in _SEVEN_ZIP_NAMES:
+        return _seven_zip_writes(args)
+    if name == "expand":
+        return _expand_writes(args)
+    if name == "certutil":
+        return _certutil_writes(args)
+    if name in _PERMISSION_TOOLS:
+        return _permission_tool_writes(name, args)
+    if name == "find":
+        named = [
+            args[index + 1]
+            for index, word in enumerate(args[:-1])
+            if _clean_shell_token(word).lower() in _FIND_FILE_OPTIONS
+        ]
+        deletes = any(_clean_shell_token(word).lower() == "-delete" for word in args)
+        return (named, deletes) if named or deletes else None
+    if name in ("curl", "wget"):
+        return _download_writes(name, args)
+    if name in ("start-process", "saps"):
+        named = _start_process_redirects(args)
+        return (named, False) if named else None
+    return None
+
+
+def _stage_option_writes(command: str) -> list[tuple[list[str], bool]]:
+    """_option_writes for each stage of a command the gate parses (c123)."""
+    found: list[tuple[list[str], bool]] = []
+    for stage in _split_pipeline_stages(command):
+        tokens = _shell_split(stage)
+        written = _option_writes(tokens) if tokens else None
+        if written is not None:
+            found.append(written)
+    return found
+
+
+# c123 (batch design WP1, residual row 4): a change of directory moves every relative target after it. A single
+# leading cd, chdir, Set-Location, sl, pushd or Push-Location to a literal directory is read: the command's relative
+# targets are judged from that directory. Any other change (a later one, a second one, popd, cd -, cd with no operand,
+# one inside a group or a launched command, or one to a directory the shell supplies) leaves the relative targets
+# unread, so a write among them is refused whole.
+_DIRECTORY_CHANGE_VERBS = frozenset(
+    {"cd", "chdir", "set-location", "sl", "pushd", "push-location", "popd", "pop-location"}
+)
+
+
+def _directory_change_operand(words: list[str]) -> str | None:
+    """The literal directory a change of directory names; None when it names none the gate can read (c123)."""
+    verb = _executable_name(words[0]).removesuffix(".exe")
+    if verb in ("popd", "pop-location"):
+        return None
+    operands: list[str] = []
+    index = 1
+    while index < len(words):
+        word = words[index]
+        lowered = _clean_shell_token(word).lower()
+        if lowered in ("-path", "-literalpath"):
+            if index + 1 < len(words):
+                operands.append(words[index + 1])
+            index += 2
+            continue
+        if lowered.startswith("-") and lowered not in ("-",) and verb not in ("cd", "chdir", "pushd"):
+            return None  # a Set-Location or Push-Location parameter the gate does not read
+        if lowered.startswith("-") and verb in ("cd", "chdir", "pushd") and lowered in ("-l", "-p", "-e", "-@"):
+            index += 1  # bash's cd -L, -P, -e and -@
+            continue
+        operands.append(word)
+        index += 1
+    if len(operands) != 1:
+        return None
+    operand = operands[0]
+    literal = _clean_shell_token(operand).strip()
+    if not literal or literal in ("-", "~") or _unresolved_value(operand):
+        return None
+    if literal[:1] in ("'", '"') and literal[-1:] == literal[:1]:
+        literal = literal[1:-1]
+    return literal
+
+
+def _leading_directory(command: str) -> str | None:
+    """The directory a command's relative targets are judged from: "" when it changes none, the literal directory of a
+    single leading change, or None when a change leaves the targets unread (c123, row 4)."""
+    changes = [
+        line
+        for line, _text in _walked_commands(command)
+        if line != UNINSPECTABLE_SHELL_COMMAND
+        and (words := _shell_split(line))
+        and _executable_name(words[0]).removesuffix(".exe") in _DIRECTORY_CHANGE_VERBS
+    ]
+    if not changes:
+        return ""
+    flat, _groups = _flatten_groups(command)
+    statements = _split_statements(flat)
+    if len(changes) != 1 or not statements:
+        return None
+    first = _shell_split(statements[0])
+    if not first:
+        return None
+    words, called = _statement_program(first)
+    if called or not words or " ".join(words) != changes[0]:
+        return None
+    return _directory_change_operand(words)
 
 
 MUTATING_VERB_TABLE = {
@@ -596,8 +1402,16 @@ def _classify_command_verb(tokens: list[str]) -> tuple[Callable[[list[str]], lis
             return _extract_none, relevant
         return None
 
+    # c123 (batch design WP1, residual row 5): sc.exe controls services (the owner rule judges it); sc is Set-Content.
+    if verb.removesuffix(".exe") == "sc" and (verb.endswith(".exe") or _sc_runs_sc_exe(relevant)):
+        return None
     # c121: an alias reads as its cmdlet, and a trailing .exe (Git Bash's mkdir.exe) does not hide the verb.
     verb = _canonical_write_verb(verb)
+    # c123 (owner decision A5, row 18): sed's and awk's script and a copy's sources are not targets.
+    if verb in ("sed", "awk"):
+        return _extract_sed_awk_paths, relevant
+    if verb in _COPY_VERBS:
+        return _extract_copy_destination, relevant
     if verb in _POWERSHELL_PATH_ARG_VERBS:
         return _extract_powershell_path_arg, relevant
     if verb in _POWERSHELL_BOTH_PATHS_VERBS:
@@ -785,18 +1599,18 @@ def _python_script_invocation(tokens: list[str]) -> tuple[str, list[str]] | None
     return script_name, relevant[2:]
 
 
-def _direct_git_subcommand(stage: str) -> str | None:
-    """Return a direct Git subcommand, accounting for executable/global options."""
+def _direct_git_subcommand_and_args(stage: str) -> tuple[str | None, list[str]]:
+    """Return a direct Git subcommand and the words after it, accounting for executable/global options (c123)."""
     tokens = _shell_split(stage)
     if not tokens:
-        return None
+        return None, []
     verb_index = _shell_verb_index(tokens)
     if verb_index is None:
-        return None
+        return None, []
     relevant = [_clean_shell_token(token) for token in tokens[verb_index:]]
     executable = Path(relevant[0]).name.lower()
     if executable not in {"git", "git.exe"}:
-        return None
+        return None, []
 
     index = 1
     while index < len(relevant):
@@ -806,7 +1620,7 @@ def _direct_git_subcommand(stage: str) -> str | None:
             break
         if token in GIT_GLOBAL_OPTIONS_WITH_VALUES:
             if index + 1 >= len(relevant):
-                return None
+                return None, []
             index += 2
             continue
         if any(token.startswith(option + "=") for option in GIT_GLOBAL_OPTIONS_WITH_VALUES):
@@ -821,10 +1635,208 @@ def _direct_git_subcommand(stage: str) -> str | None:
         if token.startswith("-"):
             index += 1
             continue
-        return token.lower()
+        return token.lower(), relevant[index + 1 :]
     if index < len(relevant):
-        return relevant[index].lower()
-    return None
+        return relevant[index].lower(), relevant[index + 1 :]
+    return None, []
+
+
+def _direct_git_subcommand(stage: str) -> str | None:
+    """Return a direct Git subcommand, accounting for executable/global options."""
+    return _direct_git_subcommand_and_args(stage)[0]
+
+
+# c123 (batch design WP1, item 3): hash-object, worktree and config read or write by their arguments, so their names
+# alone cannot judge them. Each is a read only in its read forms, and an option the gate does not know fails closed.
+_GIT_CONFIG_READ_ACTIONS = frozenset({"--get", "--get-all", "--get-regexp", "--get-urlmatch", "-l", "--list"})
+_GIT_CONFIG_WRITE_ACTIONS = frozenset(
+    {"--add", "--replace-all", "--unset", "--unset-all", "--rename-section", "--remove-section", "-e", "--edit"}
+)
+_GIT_CONFIG_VALUE_OPTIONS = frozenset(
+    {"--file", "-f", "--blob", "--type", "--default", "--value", "--url", "--comment"}
+)
+_GIT_CONFIG_FLAGS = frozenset(
+    {
+        "--global",
+        "--system",
+        "--local",
+        "--worktree",
+        "--includes",
+        "--no-includes",
+        "--show-origin",
+        "--show-scope",
+        "--null",
+        "-z",
+        "--name-only",
+        "--bool",
+        "--int",
+        "--bool-or-int",
+        "--path",
+        "--expiry-date",
+        "--no-type",
+        "--fixed-value",
+        "--all",
+        "--regexp",
+    }
+)
+_GIT_CONFIG_READ_VERBS = frozenset({"get", "list"})
+_GIT_CONFIG_WRITE_VERBS = frozenset({"set", "unset", "rename-section", "remove-section", "edit"})
+
+
+def _git_config_read_only(args: list[str]) -> bool:
+    """Whether git config reads: a read action, no write action, no legacy set form, no unknown option (c123)."""
+    read = False
+    operands: list[str] = []
+    index = 0
+    while index < len(args):
+        word = args[index]
+        if word == "--":
+            operands.extend(args[index + 1 :])
+            break
+        if word.startswith("-") and word != "-":
+            name = word.split("=", 1)[0]
+            if name in _GIT_CONFIG_WRITE_ACTIONS:
+                return False
+            if name in _GIT_CONFIG_READ_ACTIONS:
+                read = True
+            elif name in _GIT_CONFIG_VALUE_OPTIONS:
+                index += 0 if "=" in word else 1
+            elif name not in _GIT_CONFIG_FLAGS:
+                return False
+        else:
+            operands.append(word)
+        index += 1
+    if operands and operands[0].lower() in _GIT_CONFIG_WRITE_VERBS:
+        return False
+    if operands and operands[0].lower() in _GIT_CONFIG_READ_VERBS:
+        read = True
+    return read
+
+
+def _git_read_only(subcommand: str | None, args: list[str]) -> bool:
+    """Whether git hash-object, worktree or config runs in one of its read forms (c123; batch design WP1, item 3), or
+    branch, stash, remote, reflog or symbolic-ref in one of its list forms (c123, owner decision A3)."""
+    if subcommand == "hash-object":
+        options = args[: args.index("--")] if "--" in args else args
+        # -w writes the object, alone or inside a short-option bundle (-wt blob).
+        return not any(word.startswith("-") and not word.startswith("--") and "w" in word[1:] for word in options)
+    if subcommand == "worktree":
+        operands = [word for word in args if not word.startswith("-")]
+        return bool(operands) and operands[0].lower() == "list"
+    if subcommand == "config":
+        return _git_config_read_only(args)
+    words = _without_redirects(args)
+    if subcommand == "branch":
+        return _git_branch_lists(words)
+    if subcommand == "stash":
+        return bool(words) and words[0].lower() in ("list", "show") and not _names_git_output(words)
+    if subcommand == "remote":
+        rest = [word for word in words if word not in ("-v", "--verbose")]
+        return not rest or rest[0].lower() in ("get-url", "show")
+    if subcommand == "reflog":
+        if _names_git_output(words):
+            return False
+        return not words or words[0].lower() in ("show", "exists", "list") or words[0].startswith("-")
+    if subcommand == "symbolic-ref":
+        operands = [word for word in words if not word.startswith("-")]
+        flags = [word for word in words if word.startswith("-")]
+        return len(operands) == 1 and all(flag in _GIT_SYMBOLIC_REF_READ_FLAGS for flag in flags)
+    return False
+
+
+# c123 (owner decision A3; batch design WP1 item 3, the optional list forms): branch, stash, remote, reflog and
+# symbolic-ref list or show in some forms and write in others, so their names alone cannot judge them either. Each is a
+# read only in its list forms; an option the gate does not know fails closed.
+# - branch: no operand, or a listing option (--list, -a, -r, -v, --show-current, --contains, --merged and their
+#   negations, --points-at), with no option that creates, deletes, renames, copies or sets an upstream;
+# - stash list and stash show; remote with no operand, -v, get-url or show; reflog show (also reflog with no
+#   subcommand or with log options only, which is show, and reflog exists and list);
+# - symbolic-ref with one operand (reading a ref; a second operand or -d writes).
+# stash, reflog and the log options they pass on write a file with --output.
+_GIT_BRANCH_LIST_OPTIONS = frozenset(
+    {
+        "--list",
+        "--all",
+        "--remotes",
+        "--verbose",
+        "--show-current",
+        "--contains",
+        "--no-contains",
+        "--merged",
+        "--no-merged",
+        "--points-at",
+    }
+)
+_GIT_BRANCH_NEUTRAL_OPTIONS = frozenset(
+    {
+        "--color",
+        "--no-color",
+        "--column",
+        "--no-column",
+        "--sort",
+        "--format",
+        "--abbrev",
+        "--no-abbrev",
+        "--ignore-case",
+        "--omit-empty",
+        "--quiet",
+    }
+)
+# The branch options whose value may be the next word; their value is no new branch name.
+_GIT_BRANCH_VALUE_OPTIONS = frozenset({"--sort", "--format", "--points-at"})
+_GIT_SYMBOLIC_REF_READ_FLAGS = frozenset({"-q", "--quiet", "--short", "--no-short", "--recurse", "--no-recurse"})
+_REDIRECT_OPERATOR_WORD = re.compile(r"(?:\d+|\*|&)?(?:>{1,2}|<)")
+_REDIRECT_WORD = re.compile(r"(?:\d+|\*|&)?(?:>{1,2}|<).*", re.DOTALL)
+
+
+def _without_redirects(args: list[str]) -> list[str]:
+    """A Git call's words without its redirections (2>&1, > out.txt): those are the shell's, not Git's (c123)."""
+    words: list[str] = []
+    skip = False
+    for word in args:
+        if skip:
+            skip = False
+        elif _REDIRECT_OPERATOR_WORD.fullmatch(word):
+            skip = True  # the operator stands alone; its target is the next word
+        elif not _REDIRECT_WORD.fullmatch(word):
+            words.append(word)
+    return words
+
+
+def _names_git_output(words: list[str]) -> bool:
+    """Whether a Git call passes --output, which writes the file it names (c123)."""
+    return any(word.split("=", 1)[0] == "--output" for word in words)
+
+
+def _git_branch_lists(words: list[str]) -> bool:
+    """Whether git branch lists branches: a listing option or no operand, and no option that writes (c123, A3)."""
+    listing = False
+    operands: list[str] = []
+    index = 0
+    while index < len(words):
+        word = words[index]
+        if word == "--":
+            operands.extend(words[index + 1 :])
+            break
+        if word.startswith("--"):
+            name = word.split("=", 1)[0]
+            if name in _GIT_BRANCH_LIST_OPTIONS:
+                listing = True
+            elif name not in _GIT_BRANCH_NEUTRAL_OPTIONS:
+                return False  # an option that writes (--delete, --move, --copy, --set-upstream-to) or is unknown
+            index += 2 if name in _GIT_BRANCH_VALUE_OPTIONS and "=" not in word else 1
+            continue
+        if word.startswith("-") and len(word) > 1:
+            for letter in word[1:]:
+                if letter in "lavr":
+                    listing = True
+                elif letter not in "iq":
+                    return False  # -d, -D, -m, -M, -c, -C, -u, -f, -t or an unknown option
+            index += 1
+            continue
+        operands.append(word)
+        index += 1
+    return listing or not operands
 
 
 def _is_direct_git_invocation(stage: str) -> bool:
@@ -1003,7 +2015,8 @@ def _split_statements(text: str) -> list[str]:
         if char in "\r\n;":
             width = 1
         elif char == "|":
-            width = 2 if following == "|" else 1
+            # c123: >| (noclobber's override) is a redirection, not a pipe.
+            width = 0 if text[index - 1 : index] == ">" else 2 if following == "|" else 1
         elif char == "&":
             preceding = text[index - 1 : index]
             if following == "&":
@@ -1618,6 +2631,7 @@ def _walked_commands(
     strict: bool = False,
     values: bool = False,
     powershell: bool = False,
+    same_process: bool = False,
     _depth: int = 0,
     _nesting: int = 0,
 ) -> list[tuple[str, str]]:
@@ -1633,7 +2647,9 @@ def _walked_commands(
     text the outer shell expands first, a launched command): a variable there names a program even standing alone.
     values marks a POSIX array's list, whose words are values: only the groups inside it run. powershell marks text
     known to be PowerShell (an assignment's value, text handed to PowerShell or Invoke-Expression), where a statement
-    led by a quoted string is an expression, not a program.
+    led by a quoted string is an expression, not a program. c123 (owner decision A6): same_process walks only what runs
+    in the shell's own process: the statements, groups, string subexpressions and Invoke-Expression text, not the
+    command a nested shell is handed or a launcher runs, which runs in another process.
     """
     if _depth > _INNER_COMMAND_DEPTH or _nesting > _GROUP_DEPTH:
         return [(UNINSPECTABLE_SHELL_COMMAND, command)]
@@ -1643,29 +2659,61 @@ def _walked_commands(
         for statement in _split_statements(flat):
             found.extend(
                 _statement_commands(
-                    statement, text=command, strict=strict, powershell=powershell, _depth=_depth, _nesting=_nesting
+                    statement,
+                    text=command,
+                    strict=strict,
+                    powershell=powershell,
+                    same_process=same_process,
+                    _depth=_depth,
+                    _nesting=_nesting,
                 )
             )
     for only_values, body in groups:
         found.extend(
             _walked_commands(
-                body, strict=strict, values=only_values, powershell=powershell, _depth=_depth, _nesting=_nesting + 1
+                body,
+                strict=strict,
+                values=only_values,
+                powershell=powershell,
+                same_process=same_process,
+                _depth=_depth,
+                _nesting=_nesting + 1,
             )
         )
     for body in _string_subexpressions(flat):
-        found.extend(_walked_commands(body, strict=strict, powershell=powershell, _depth=_depth, _nesting=_nesting + 1))
+        found.extend(
+            _walked_commands(
+                body,
+                strict=strict,
+                powershell=powershell,
+                same_process=same_process,
+                _depth=_depth,
+                _nesting=_nesting + 1,
+            )
+        )
     return found
 
 
 def _statement_commands(
-    statement: str, *, text: str, strict: bool, powershell: bool, _depth: int, _nesting: int
+    statement: str,
+    *,
+    text: str,
+    strict: bool,
+    powershell: bool,
+    _depth: int,
+    _nesting: int,
+    same_process: bool = False,
 ) -> list[tuple[str, str]]:
     """The command lines one flattened statement of text runs: its own line and what it hands on (c122)."""
     found: list[tuple[str, str]] = []
     cut = _mask_quoted_spans(statement, mask_double=True).rfind(")")
     if cut >= 0 and statement[cut + 1 :].strip():
         # A POSIX case pattern ends at a parenthesis the statement never opened (case $x in a) ...); its command runs.
-        found.extend(_walked_commands(statement[cut + 1 :], strict=strict, _depth=_depth, _nesting=_nesting + 1))
+        found.extend(
+            _walked_commands(
+                statement[cut + 1 :], strict=strict, same_process=same_process, _depth=_depth, _nesting=_nesting + 1
+            )
+        )
     tokens = _shell_split(statement)
     if tokens is None:
         # Handed text that does not parse cannot be inspected; a typed line no shell parses does not run.
@@ -1702,12 +2750,19 @@ def _statement_commands(
                     break
         if rest:
             found.extend(
-                _walked_commands(" ".join(rest), strict=strict, powershell=True, _depth=_depth, _nesting=_nesting + 1)
+                _walked_commands(
+                    " ".join(rest),
+                    strict=strict,
+                    powershell=True,
+                    same_process=same_process,
+                    _depth=_depth,
+                    _nesting=_nesting + 1,
+                )
             )
         return found
     line = " ".join(words)
     found.append((line, text))
-    handed, recognized = _handed_command(line)
+    handed, recognized = _handed_command(line) if not same_process else (None, False)
     if recognized:
         if not handed:
             found.append((UNINSPECTABLE_SHELL_COMMAND, text))
@@ -1730,9 +2785,16 @@ def _statement_commands(
         else:
             literal = _evaluated_argument(words).startswith("'")
             found.extend(
-                _walked_commands(evaluated, strict=not literal, powershell=True, _depth=_depth + 1, _nesting=_nesting)
+                _walked_commands(
+                    evaluated,
+                    strict=not literal,
+                    powershell=True,
+                    same_process=same_process,
+                    _depth=_depth + 1,
+                    _nesting=_nesting,
+                )
             )
-    for launched in _launched_commands(words) or []:
+    for launched in (_launched_commands(words) or []) if not same_process else []:
         if launched == UNINSPECTABLE_SHELL_COMMAND:
             found.append((UNINSPECTABLE_SHELL_COMMAND, text))
         else:
@@ -1751,8 +2813,12 @@ def _direct_git_effect(stage: str, *, _depth: int = 0) -> str | None:
             return UNINSPECTABLE_SHELL_COMMAND
         if not _is_direct_git_invocation(line):
             continue
-        subcommand = _direct_git_subcommand(line)
-        if subcommand not in DIRECT_GIT_READ_ONLY_SUBCOMMANDS and not _git_informational_only(line):
+        subcommand, args = _direct_git_subcommand_and_args(line)
+        if (
+            subcommand not in DIRECT_GIT_READ_ONLY_SUBCOMMANDS
+            and not _git_read_only(subcommand, args)
+            and not _git_informational_only(line)
+        ):
             return subcommand or "<unknown>"
     return None
 
@@ -1788,38 +2854,159 @@ def _has_direct_git_effect_signal(command: str) -> bool:
     return _direct_git_effect(command) is not None
 
 
-def _gt_owner_operation(tokens: list[str]) -> str | None:
-    """Name the GT-KB owner operation these tokens run through gt or python -m groundtruth_kb, if any.
+def _gt_arguments(tokens: list[str]) -> list[str] | None:
+    """The words a gt invocation passes to gt, as written; None when the tokens run another program.
 
-    c122: a module, group or action word whose value the shell supplies (a variable, an expression) may name an owner
-    operation, so it gives UNINSPECTABLE_SHELL_COMMAND.
+    gt, gt.exe or a path to either, or python (py) -m groundtruth_kb. c123 (owner decision E1): the owner-operation,
+    owner-lever and program rules read gt commands through this one parser. A module the shell supplies (python -m
+    $module) may be groundtruth_kb, so it gives [UNINSPECTABLE_SHELL_COMMAND].
     """
     words = [_clean_shell_token(token) for token in tokens]
-    executable = _executable_name(words[0])
-    index = 1
-    if executable in _PYTHON_EXECUTABLE_NAMES or executable.startswith("python"):
-        while index < len(words) and words[index].startswith("-") and words[index] != "-m":
-            index += 1
-        if index + 1 < len(words) and words[index] == "-m" and _unresolved_value(tokens[index + 1]):
-            return UNINSPECTABLE_SHELL_COMMAND
-        if index + 1 >= len(words) or words[index] != "-m" or words[index + 1] not in GT_MODULES:
-            return None
-        index += 2
-    elif executable not in {"gt", "gt.exe"}:
+    executable = _executable_name(words[0]).removesuffix(".exe")
+    if executable == "gt":
+        return tokens[1:]
+    if executable != "py" and not executable.startswith("python"):
         return None
-    group_and_action: list[str] = []
-    while index < len(words) and len(group_and_action) < 2:
-        word = words[index]
+    index = 1
+    # c123 (batch design WP1, G27): python's -X and -W take a value (python -X utf8 -m groundtruth_kb ...).
+    while index < len(words) and words[index].startswith("-") and words[index] != "-m":
+        index += 2 if words[index] in _PYTHON_VALUE_OPTIONS else 1
+    if index + 1 < len(words) and words[index] == "-m" and _unresolved_value(tokens[index + 1]):
+        return [UNINSPECTABLE_SHELL_COMMAND]
+    if index + 1 >= len(words) or words[index] != "-m" or words[index + 1] not in GT_MODULES:
+        return None
+    return tokens[index + 2 :]
+
+
+def _gt_command_words(arguments: list[str], count: int) -> list[str] | None:
+    """gt's first `count` command words (group, action, ...), lower case, past its options; None when one of them is a
+    value the shell supplies (a variable, an expression), which may name any command (c122; shared since c123)."""
+    found: list[str] = []
+    index = 0
+    while index < len(arguments) and len(found) < count:
+        word = _clean_shell_token(arguments[index])
         if word in GT_GLOBAL_OPTIONS_WITH_VALUES:
             index += 2
             continue
         index += 1
         if not word.startswith("-"):
-            if _unresolved_value(tokens[index - 1]):
-                return UNINSPECTABLE_SHELL_COMMAND
-            group_and_action.append(word.lower())
-    if len(group_and_action) == 2 and group_and_action[1] in GT_OWNER_OPERATIONS.get(group_and_action[0], ()):
-        return "gt " + " ".join(group_and_action)
+            if _unresolved_value(arguments[index - 1]):
+                return None
+            found.append(word.lower())
+    return found
+
+
+def _gt_owner_operation(tokens: list[str]) -> str | None:
+    """Name the GT-KB owner operation these tokens run through gt or python -m groundtruth_kb, if any.
+
+    c122: a module, group or action word whose value the shell supplies (a variable, an expression) may name an owner
+    operation, so it gives UNINSPECTABLE_SHELL_COMMAND. c123 (owner decision A2): gt db postgres init and
+    import-current name their operation with a third word.
+    """
+    arguments = _gt_arguments(tokens)
+    if arguments is None:
+        return None
+    words = None if arguments == [UNINSPECTABLE_SHELL_COMMAND] else _gt_command_words(arguments, 2)
+    if words is None:
+        return UNINSPECTABLE_SHELL_COMMAND
+    if len(words) == 2 and words[1] in GT_OWNER_OPERATIONS.get(words[0], ()):
+        return "gt " + " ".join(words)
+    actions = GT_OWNER_SUBCOMMAND_OPERATIONS.get((words[0], words[1])) if len(words) == 2 else None
+    if actions is not None:
+        full = _gt_command_words(arguments, 3)
+        if full is None:
+            return UNINSPECTABLE_SHELL_COMMAND
+        if len(full) == 3 and full[2] in actions:
+            return "gt " + " ".join(full)
+    return None
+
+
+def _creates_execution_project(arguments: list[str]) -> bool:
+    """Whether gt projects record creates an execution project (c123, owner decision E1).
+
+    Read with _arg_value: --expected-version 0, missing or unreadable (fail closed), and --kind other than program. A
+    repeated option is unreadable as well, because click keeps its last value.
+    """
+    words = [_clean_shell_token(word) for word in arguments]
+    names = [word.split("=", 1)[0] for word in words]
+    if names.count("--expected-version") > 1 or names.count("--kind") > 1:
+        return True
+    version = _arg_value(words, "--expected-version")
+    kind = _arg_value(words, "--kind")
+    creates = version is None or not version.isdigit() or int(version) == 0
+    return creates and (kind or "").lower() != "program"
+
+
+def _owner_lever(command: str, *, _depth: int = 0) -> str | None:
+    """Name the owner lever over project authorization a shell command uses, in any command the line runs (c123).
+
+    Owner decision E1 (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001): gt projects set-authorization, move-item, and
+    record when it creates an execution project. Like the owner-operation rule it follows nested shells, chains,
+    launchers and argument lists through _walked_commands, and it fails closed on its own: a command the walk cannot
+    read, or a gt command whose module, group or action the shell supplies, returns UNINSPECTABLE_SHELL_COMMAND.
+    """
+    for line, _text in _walked_commands(command, _depth=_depth):
+        if line == UNINSPECTABLE_SHELL_COMMAND:
+            return UNINSPECTABLE_SHELL_COMMAND
+        tokens = _shell_split(line)
+        arguments = _gt_arguments(tokens) if tokens else None
+        if arguments is None:
+            continue
+        words = None if arguments == [UNINSPECTABLE_SHELL_COMMAND] else _gt_command_words(arguments, 2)
+        if words is None:
+            return UNINSPECTABLE_SHELL_COMMAND
+        if len(words) == 2 and words[1] in GT_OWNER_LEVERS.get(words[0], ()):
+            if words[1] != "record" or _creates_execution_project(arguments):
+                return "gt " + " ".join(words)
+    return None
+
+
+def _owner_lever_from_payload(payload: dict[str, Any]) -> str | None:
+    command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
+    return _owner_lever(command) if command else None
+
+
+def _kills_only_jobs(args: list[str]) -> bool:
+    """Whether a kill names only the shell's own jobs (%1, %+, %name), or lists signals (kill -l) (c123, A2)."""
+    operands: list[str] = []
+    index = 0
+    while index < len(args):
+        word = args[index]
+        if word in ("-l", "-L", "--list", "--table"):
+            return True
+        if word in ("-s", "-n", "--signal"):
+            index += 2
+            continue
+        if not (word.startswith("-") and len(word) > 1):
+            operands.append(word)
+        index += 1
+    return all(word.startswith("%") for word in operands)
+
+
+def _process_or_cluster_control(tokens: list[str]) -> str | None:
+    """Name the process termination or PostgreSQL cluster or database access these tokens run, if any (c123, A2)."""
+    words, _called = _statement_program(tokens)
+    if not words:
+        return None
+    shown = _clean_shell_token(words[0]).replace("\\", "/").rsplit("/", 1)[-1]
+    name = _executable_name(words[0]).removesuffix(".exe")
+    args = [_clean_shell_token(word) for word in words[1:]]
+    lowered = [arg.lower() for arg in args]
+    ending = "process termination; a context ends only its own shell's jobs, with Stop-Job, Remove-Job or kill %<job>"
+    if name in PROCESS_TERMINATORS or (name == "kill" and not _kills_only_jobs(args)):
+        return f"{shown} ({ending})"
+    if name == "wmic" and "process" in lowered and {"delete", "terminate"} & set(lowered):
+        return f"{shown} process ({ending})"
+    if name in ("invoke-cimmethod", "invoke-wmimethod") and "terminate" in lowered:
+        return f"{shown} Terminate ({ending})"
+    informational = bool(args) and all(arg in _POSTGRESQL_INFORMATIONAL_OPTIONS for arg in args)
+    if name == "pg_ctl":
+        action = next((arg for arg in lowered if arg in PG_CTL_CHANGING_ACTIONS), None)
+        if action is None and ("status" in lowered or informational):
+            return None
+        return f"{shown}{' ' + action if action else ''} (PostgreSQL cluster control)"
+    if name in POSTGRESQL_PROGRAMS and not informational:
+        return f"{shown} (direct PostgreSQL access; the authority database is read and changed through the gt CLI)"
     return None
 
 
@@ -1838,6 +3025,44 @@ def _service_control_verb(tokens: list[str]) -> str | None:
     return None
 
 
+# c123 (batch design WP1, residual row 6): the registry, certificate and WSMan drives hold machine configuration, so an
+# item or item-property write that names one is an owner operation, whatever the harness context.
+_MACHINE_CONFIGURATION_DRIVE_RE = re.compile(r"(?:hk[a-z]{1,3}:|registry::|cert:|wsman:)", re.IGNORECASE)
+_MACHINE_CONFIGURATION_WRITERS = frozenset(
+    {
+        "set-item",
+        "clear-item",
+        "new-item",
+        "remove-item",
+        "rename-item",
+        "move-item",
+        "copy-item",
+        "set-itemproperty",
+        "new-itemproperty",
+        "remove-itemproperty",
+        "rename-itemproperty",
+        "clear-itemproperty",
+        "copy-itemproperty",
+        "move-itemproperty",
+    }
+)
+
+
+def _machine_configuration_write(tokens: list[str]) -> str | None:
+    """Name an item write that targets a machine-configuration drive (HKLM:, HKCU:, Registry::, Cert:, WSMan:)."""
+    words, _called = _statement_program(tokens)
+    if not words:
+        return None
+    verb = _clean_shell_token(words[0])
+    if _canonical_write_verb(verb) not in _MACHINE_CONFIGURATION_WRITERS:
+        return None
+    for word in words[1:]:
+        text = _clean_shell_token(word).strip("'\"")
+        if _MACHINE_CONFIGURATION_DRIVE_RE.match(text):
+            return f"{verb} on {text} (machine configuration)"
+    return None
+
+
 def _names_gtkb_task_or_service(command: str) -> bool:
     """True when any argument of the command is a GT-KB task or service name (also as -Name:value or -Name=value)."""
     for token in _shell_split(command, punctuation=True) or []:
@@ -1852,7 +3077,9 @@ def _owner_operation(command: str, *, _depth: int = 0) -> str | None:
 
     Like the Git rule, it fails closed on its own (observer B102): a command the walk cannot read returns
     UNINSPECTABLE_SHELL_COMMAND, so this rule's refusal does not depend on the Git rule running first. A service or task
-    change counts when the command, or the text the walk found the change in, names a GT-KB task or service.
+    change counts when the command, or the text the walk found the change in, names a GT-KB task or service. c123
+    (owner decision A2): ending a process and controlling or reaching the PostgreSQL cluster count whatever the target,
+    a .Kill() or .Terminate() call included, wherever the line or a command it hands on or evaluates makes it.
     """
     names_gtkb = _names_gtkb_task_or_service(command)
     for line, text in _walked_commands(command, _depth=_depth):
@@ -1861,12 +3088,26 @@ def _owner_operation(command: str, *, _depth: int = 0) -> str | None:
         tokens = _shell_split(line)
         if not tokens:
             continue
-        found = _gt_owner_operation(tokens)
+        found = (
+            _gt_owner_operation(tokens) or _machine_configuration_write(tokens) or _process_or_cluster_control(tokens)
+        )
         if found is not None:
             return found
         verb = _service_control_verb(tokens)
         if verb is not None and (names_gtkb or _names_gtkb_task_or_service(text)):
             return f"{verb} on a GT-KB task or service"
+    for text in (command, *_judged_commands(command)):
+        call = (
+            None
+            if text == UNINSPECTABLE_SHELL_COMMAND
+            else _PROCESS_TERMINATING_CALL_RE.search(_mask_quoted_spans(text, mask_double=True))
+        )
+        if call is not None:
+            method = call.group(0).rstrip("( \t")
+            return (
+                f"a {method}() call (process termination; a context ends only its own shell's jobs, with Stop-Job, "
+                "Remove-Job or kill %<job>)"
+            )
     return None
 
 
@@ -1952,7 +3193,7 @@ def _diagnostic_output_paths_from_shell(root: Path, command: str) -> list[str] |
     return sorted(set(outputs))
 
 
-def _paths_from_shell(root: Path, command: str) -> list[str]:
+def _paths_from_shell(root: Path, command: str, *, redirects: bool = True) -> list[str]:
     """Verb-aware path extraction per DCL-IMPL-START-GATE-VERB-AWARE-PATH-EXTRACTION-001.
 
     Tokenize via shlex.split(posix=False), identify the verb (first non-env-prefix
@@ -1963,6 +3204,15 @@ def _paths_from_shell(root: Path, command: str) -> list[str]:
     fallback when appropriate.
     """
     paths: list[str] = []
+    # c123 (batch design WP1, B149): each output redirection writes the word after its operator, read here like a direct
+    # write's target; a word the shell supplies when it runs is left to the unresolved-value rule, which refuses it.
+    # A walked line rebuilt from its words is read with redirects=False where a whole-command scan reads them (r12).
+    for raw in (_redirect_writes(command or "") or []) if redirects else []:
+        if raw is None or _unresolved_value(raw):
+            continue
+        rel = _normalize(root, _shell_word_literal(raw))
+        if rel:
+            paths.append(rel)
     for stage in _split_pipeline_stages(command or ""):
         try:
             tokens = shlex.split(stage, posix=False)
@@ -1973,11 +3223,22 @@ def _paths_from_shell(root: Path, command: str) -> list[str]:
             rel = _normalize(root, raw, shell_quoted=True)
             if rel:
                 paths.append(rel)
+        # c123 (batch design WP1, residual rows 2, 7 and 9): the files a command writes through its options.
+        written = _option_writes(tokens)
+        for raw in written[0] if written else []:
+            if _unresolved_value(raw):
+                continue  # refused whole by the unresolved-value rule
+            rel = _normalize(root, raw, shell_quoted=True)
+            if rel:
+                paths.append(rel)
         classification = _classify_command_verb(tokens)
         if classification is None:
             continue
         extractor, relevant = classification
+        item_write = _canonical_write_verb(relevant[0]) in _ITEM_WRITE_VERBS
         for raw in extractor(relevant):
+            if item_write and _clean_shell_token(raw).strip("'\"").lower().startswith(_SESSION_STATE_DRIVES):
+                continue  # c123 (row 6): Env:, Variable:, Function: and Alias: hold no files
             rel = _normalize(root, raw, shell_quoted=True)
             if rel:
                 paths.append(rel)
@@ -2400,18 +3661,109 @@ def _shell_redirect_present(command: str) -> bool:
     argument or an embedded Python expression -- a comparison, a `->` return
     arrow, a `:>` format spec, or a `>>` shift -- is not misread as a redirect:
     a quoted span tokenizes as a single token and never exposes a bare operator
-    token. A parse failure (unbalanced quotes) falls back conservatively to
-    non-redirect; the named-command alternatives in MUTATING_COMMAND_RE remain
-    the other mutating signal in that case.
+    token. A parse failure (unbalanced quotes) counts a `>` outside the closed
+    quotes as a redirect (c123, batch design WP1, B149 change 5): cmd.exe takes
+    a quote character literally and runs such a line, writing the file.
     """
     if not command:
         return False
     lexer = shlex.shlex(command, posix=False, punctuation_chars=True)
     lexer.whitespace_split = True
     try:
-        return any(REDIRECT_OPERATOR_TOKEN_RE.fullmatch(token) for token in lexer)
+        tokens = list(lexer)
     except ValueError:
-        return False
+        return ">" in _mask_quoted_spans(command, mask_double=True)
+    for index, token in enumerate(tokens):
+        if REDIRECT_OPERATOR_TOKEN_RE.fullmatch(token):
+            return True
+        # c123 (batch design WP1, B149): `>& file` writes the file in POSIX shells; `>&2` and `>&-` duplicate or close.
+        if token == ">&" and index + 1 < len(tokens) and not re.fullmatch(r"\d+|-", tokens[index + 1]):
+            return True
+    return False
+
+
+_REDIRECT_DEVICES = frozenset({"$null", "nul", "nul:", "/dev/null", "/dev/stdout", "/dev/stderr"})
+_REDIRECT_WORD_ENDS = frozenset(" \t\r\n|;&<>()")
+
+
+def _redirect_writes(command: str) -> list[str | None] | None:
+    """The words a command's output redirections write, as written (c123; batch design WP1, B149); None if unreadable.
+
+    Each `>`, `>>`, `>|`, `&>`, `&>>` or `>&` outside quotes writes the word after it; a descriptor before the operator
+    (`1>`, `2>>`, `*>`) does not change that. A duplication or a close (`2>&1`, `>&2`, `*>&1`, `>&-`) and a null or
+    standard device ($null, NUL, /dev/null, /dev/stdout, /dev/stderr) write no file and are left out. A redirection with
+    no word after it is listed as None. A word keeps its quotes, so the unresolved-value rule judges it as written. The
+    whole command is scanned at once (stage splitting does not respect double quotes), and a command whose quotes do not
+    close cannot be read. A backtick escapes the next character, as in PowerShell.
+    """
+    writes: list[str | None] = []
+    index, length = 0, len(command)
+    quote = ""
+    while index < length:
+        char = command[index]
+        if quote:
+            if char == quote:
+                quote = ""
+            index += 1
+            continue
+        if char in "'\"":
+            quote = char
+            index += 1
+            continue
+        if char == "`":
+            index += 2
+            continue
+        if char == "&" and command[index + 1 : index + 2] == ">":
+            end = index + 2 + (command[index + 2 : index + 3] == ">")
+            duplicates = False
+        elif char == ">":
+            follower = command[index + 1 : index + 2]
+            end = index + 1 + (follower in (">", "|", "&"))
+            duplicates = follower == "&"
+        else:
+            index += 1
+            continue
+        start = end
+        while start < length and command[start] in " \t":
+            start += 1
+        word_end, word_quote = start, ""
+        while word_end < length:
+            char = command[word_end]
+            if word_quote:
+                if char == word_quote:
+                    word_quote = ""
+            elif char in "'\"":
+                word_quote = char
+            elif char in _REDIRECT_WORD_ENDS:
+                break
+            word_end += 1
+        if word_quote:
+            return None
+        word = command[start:word_end]
+        index = max(word_end, end)
+        if not word:
+            writes.append(None)
+        elif duplicates and re.fullmatch(r"\d+|-", word):
+            continue
+        elif _shell_word_literal(word).lower() not in _REDIRECT_DEVICES:
+            writes.append(word)
+    return None if quote else writes
+
+
+def _shell_word_literal(word: str) -> str:
+    """A shell word's text with its quotes removed (`'a b'.txt` is `a b.txt`); for words without unresolved values."""
+    text, quote = [], ""
+    for char in word:
+        if quote:
+            if char == quote:
+                quote = ""
+            else:
+                text.append(char)
+        elif char in "'\"":
+            quote = char
+        else:
+            text.append(char)
+    return "".join(text)
 
 
 def _python_call_name(node: ast.AST) -> str | None:
@@ -2511,27 +3863,78 @@ def _python_write_mode(node: ast.AST | None) -> bool:
     )
 
 
-def _python_call_writes(node: ast.Call) -> bool:
-    """Whether one Python call writes a file or directory (c121)."""
+# c123 (batch design WP1, residual row 14): os.open reads only with these flags; any other name, a computed flag or
+# a nonzero number may write.
+_PYTHON_OS_OPEN_READ_NAMES = frozenset(
+    {
+        "os",
+        "O_RDONLY",
+        "O_BINARY",
+        "O_TEXT",
+        "O_NOINHERIT",
+        "O_CLOEXEC",
+        "O_NOFOLLOW",
+        "O_DIRECTORY",
+        "O_NONBLOCK",
+        "O_SEQUENTIAL",
+        "O_RANDOM",
+    }
+)
+
+
+def _python_import_aliases(tree: ast.AST) -> dict[str, tuple[str, str | None]]:
+    """What each imported name refers to: (module, None) for a module, (module, name) for an imported name (c123).
+
+    Batch design WP1, residual row 13: `from shutil import copy; copy(a, b)` and `import shutil as sh` hid a write.
+    """
+    aliases: dict[str, tuple[str, str | None]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                top = alias.name.split(".")[0]
+                aliases[alias.asname or top] = (alias.name if alias.asname else top, None)
+        elif isinstance(node, ast.ImportFrom) and node.module:
+            for alias in node.names:
+                aliases[alias.asname or alias.name] = (node.module.split(".")[0], alias.name)
+    return aliases
+
+
+def _python_call_writes(node: ast.Call, aliases: dict[str, tuple[str, str | None]] | None = None) -> bool:
+    """Whether one Python call writes a file or directory (c121; c123 reads imported names and computed modes)."""
+    aliases = aliases or {}
     func = node.func
     name = _python_call_name(func)
     if name is None:
         return False
     receiver = func.value.id if isinstance(func, ast.Attribute) and isinstance(func.value, ast.Name) else None
+    if receiver in aliases and aliases[receiver][1] is None:
+        receiver = aliases[receiver][0].split(".")[0]  # import shutil as sh: sh.copy is shutil.copy
+    elif isinstance(func, ast.Name) and func.id in aliases:
+        module, imported = aliases[func.id]
+        if imported is not None:
+            receiver, name = module, imported  # from shutil import copy as c: c is shutil.copy
     if name == "open" and receiver == "os":
-        return any(
-            (child.attr if isinstance(child, ast.Attribute) else child.id) in _PYTHON_OS_OPEN_WRITE_FLAGS
-            for argument in node.args[1:]
-            for child in ast.walk(argument)
-            if isinstance(child, ast.Attribute | ast.Name)
-        )
+        if len(node.args) < 2:
+            return True  # flags passed some other way are not read
+        for child in ast.walk(node.args[1]):
+            if isinstance(child, ast.Attribute | ast.Name):
+                word = child.attr if isinstance(child, ast.Attribute) else child.id
+                if word in _PYTHON_OS_OPEN_WRITE_FLAGS or word not in _PYTHON_OS_OPEN_READ_NAMES:
+                    return True
+            elif isinstance(child, ast.Constant) and child.value != 0:
+                return True
+        return False
     if name in ("open", "ZipFile"):
-        for keyword in node.keywords:
-            if keyword.arg == "mode":
-                return _python_write_mode(keyword.value)
         method_open = name == "open" and isinstance(func, ast.Attribute) and receiver not in _PYTHON_OPEN_MODULES
         index = 0 if method_open else 1
-        return len(node.args) > index and _python_write_mode(node.args[index])
+        mode = next((keyword.value for keyword in node.keywords if keyword.arg == "mode"), None)
+        if mode is None and len(node.args) > index:
+            mode = node.args[index]
+        if mode is None:
+            return False
+        if _constant_string(mode) is None and not method_open:
+            return True  # c123 (row 14): a mode the command computes may write
+        return _python_write_mode(mode)
     if name.startswith(("insert_", "update_", "delete_")):
         return True
     if receiver in _PYTHON_MODULE_WRITES:
@@ -2587,7 +3990,8 @@ def _has_python_mutating_signal(command: str) -> bool:
             tree = ast.parse(source)
         except SyntaxError:
             continue
-        if any(_python_call_writes(node) for node in ast.walk(tree) if isinstance(node, ast.Call)):
+        aliases = _python_import_aliases(tree)
+        if any(_python_call_writes(node, aliases) for node in ast.walk(tree) if isinstance(node, ast.Call)):
             return True
     return False
 
@@ -2596,7 +4000,8 @@ def _has_mutating_signal(command: str) -> bool:
     """True when the command carries a mutating signal: a named mutating
     command (MUTATING_COMMAND_RE) or a standalone shell redirect operator
     token (_shell_redirect_present)."""
-    shell_view = _mask_quoted_spans(command, mask_double=True)
+    # c123 (batch design WP1, residual row 16): the write view blanks help and lookup arguments too.
+    shell_view = _write_view(command)
     return (
         MUTATING_COMMAND_RE.search(shell_view) is not None
         # c121: every named write command of the verb tables, and the .NET write calls.
@@ -2607,6 +4012,8 @@ def _has_mutating_signal(command: str) -> bool:
         or _has_direct_git_effect_signal(command)
         or _has_python_mutating_signal(command)
         or _shell_redirect_present(command)
+        # c123 (residual rows 2, 7 and 9): a command that writes through an option.
+        or bool(_stage_option_writes(command))
     )
 
 
@@ -3270,21 +4677,32 @@ def _string_subexpression_commands(command: str, *, _depth: int = 0) -> list[str
     return found
 
 
-def _has_unread_write(command: str) -> bool:
+def _has_unread_write(command: str, *, redirects: bool = True) -> bool:
     """Whether the command carries a write whose target the gate does not read (c121).
 
-    A redirect to a file (its target is not read yet: B149), a .NET write call, a Python write, or a named write command
-    that does not begin a stage the gate parses (inside a script block, a group or a subexpression, or after a call
-    operator) names no target the gate can check. Owner decision 2026-09-29 07:56 ("All forms found"): such a command is
+    A redirect with no word after it (since c123, B149, a redirect's word is read like a direct write's target), a .NET
+    write call, a Python write, or a named write command that does not begin a stage the gate parses (inside a script
+    block, a group or a subexpression, or after a call operator) names no target the gate can check. Owner decision 2026-09-29 07:56 ("All forms found"): such a command is
     refused whole (unknown_effect_targets), so a claim check never covers one write while another goes unchecked.
     """
-    shell_view = _mask_quoted_spans(command, mask_double=True)
+    shell_view = _write_view(command)
     if _DOTNET_WRITE_RE.search(shell_view) is not None or _has_python_mutating_signal(command):
         return True
-    if _shell_redirect_present(NULL_SINK_REDIRECT_STRIP_RE.sub("", command)):
+    # c123 (batch design WP1, residual rows 2 and 7): find -delete, curl -O and wget without -O write files they do not
+    # name.
+    if any(unnamed for _files, unnamed in _stage_option_writes(command)):
+        return True
+    # c123 (batch design WP1, B149): a redirect names its target, which is read like a direct write's. It stays unread
+    # only with no word after its operator, or in a command whose quotes do not close while a > stands in it; a word the
+    # shell supplies is caught by the unresolved-value rule below.
+    writes = _redirect_writes(command) if redirects else []
+    if writes is None:
+        if ">" in command:
+            return True
+    elif None in writes:
         return True
     # c122 (batch design WP1, W and item 8): a target whose value the shell supplies when it runs is not read.
-    if _unresolved_target(command) is not None:
+    if _unresolved_target(command, redirects=redirects) is not None:
         return True
     named = _named_writes(shell_view)
     # c122: git's --output is a named write too; it is read where a stage the gate parses gives its file.
@@ -3307,12 +4725,12 @@ def _has_unread_write(command: str) -> bool:
             continue
         extractor, relevant = classification
         verb = _canonical_write_verb(relevant[0])
-        if _named_writes(_mask_quoted_spans(stage, mask_double=True))[verb] and extractor(relevant):
+        if _named_writes(_write_view(stage))[verb] and extractor(relevant):
             read[verb] += 1
     return any(count > read[verb] for verb, count in named.items())
 
 
-def _unresolved_target(command: str) -> str | None:
+def _unresolved_target(command: str, *, redirects: bool = True) -> str | None:
     """The first write target the command names whose value the shell supplies when it runs (c122); None if none.
 
     Owner decision 2026-09-30 20:52 ("Fix first: c122"; batch design WP1, W and item 8): a write to
@@ -3320,13 +4738,26 @@ def _unresolved_target(command: str) -> str | None:
     own scratch whatever $x held. A target holding a variable, an expression, an environment variable or a home or
     splat prefix is not read, so its write is refused whole before the native check. The targets judged are the ones
     the verb tables read for a named write command at the start of a stage (a copy's source among them) and git's
-    --output file; a parameter's value, such as Set-Content's -Value, is not one.
+    --output file; a parameter's value, such as Set-Content's -Value, is not one. Since c123 (B149) a redirection's word
+    is one too.
     """
+    redirected = next(
+        (raw for raw in (_redirect_writes(command) or []) if redirects and raw is not None and _unresolved_value(raw)),
+        None,
+    )
+    if redirected is not None:
+        return redirected
     for stage in _split_pipeline_stages(command):
         try:
             tokens = shlex.split(stage, posix=False)
         except ValueError:
             continue
+        written = _option_writes(tokens)
+        if written is not None:
+            # c123 (residual rows 2, 7 and 9): a file a command writes through an option.
+            unresolved = next((target for target in written[0] if _unresolved_value(target)), None)
+            if unresolved is not None:
+                return unresolved
         outputs = _git_output_targets(tokens)
         if outputs is not None:
             targets = outputs
@@ -3335,7 +4766,7 @@ def _unresolved_target(command: str) -> str | None:
             if classification is None:
                 continue
             extractor, relevant = classification
-            if not _named_writes(_mask_quoted_spans(stage, mask_double=True))[_canonical_write_verb(relevant[0])]:
+            if not _named_writes(_write_view(stage))[_canonical_write_verb(relevant[0])]:
                 continue
             targets = extractor(relevant)
         unresolved = next((target for target in targets if _unresolved_value(target)), None)
@@ -3393,10 +4824,72 @@ def _git_reach_roots(args: list[str]) -> tuple[list[str], bool] | None:
         return None
     if subcommand == "diff":
         paths = [arg for arg in rest if not arg.startswith("-")]
+    elif "--" in rest:
+        paths = rest[rest.index("--") + 1 :]
     else:
-        paths = rest[rest.index("--") + 1 :] if "--" in rest else []
+        # c123 (batch design WP1, item 3): without --, Git reads the operands as pathspecs too (c119's LO GO step was
+        # refused because `git status --short --ignored m13-sentinel` was judged from the working directory).
+        paths = _git_pathspecs(subcommand, rest)
+    if any(path.startswith(":") or _WILDCARD.search(path) for path in paths):
+        # Pathspec magic (":/" names the top of the tree) or a wildcard reaches the top of the Git tree.
+        return [os.path.join(base, _GIT_TOPLEVEL) if base else _GIT_TOPLEVEL], True
     roots = [os.path.join(base, path) for path in paths] if base else paths
     return (roots or [base or "."]), True
+
+
+_GIT_TOPLEVEL = "__gtkb_git_toplevel__"
+_GIT_LS_FILES_VALUE_OPTIONS = frozenset(
+    {"-x", "-X", "--exclude", "--exclude-from", "--exclude-per-directory", "--with-tree", "--format"}
+)
+_GIT_GREP_VALUE_OPTIONS = frozenset(
+    {
+        "-e",
+        "-f",
+        "-A",
+        "-B",
+        "-C",
+        "-m",
+        "--max-count",
+        "--max-depth",
+        "--threads",
+        "--after-context",
+        "--before-context",
+        "--context",
+    }
+)
+
+
+def _git_pathspecs(subcommand: str, rest: list[str]) -> list[str]:
+    """The pathspecs of git status, ls-files or grep written without -- (c123; batch design WP1, item 3).
+
+    status: every operand. ls-files: every operand, the values of -x, -X, --exclude*, --with-tree and --format skipped.
+    grep: the operands after the pattern, or every operand when -e or -f supplies the pattern; the values of -e, -f,
+    -A, -B, -C, -m, --max-count, --max-depth and --threads skipped.
+    """
+    values = {"ls-files": _GIT_LS_FILES_VALUE_OPTIONS, "grep": _GIT_GREP_VALUE_OPTIONS}.get(subcommand, frozenset())
+    operands: list[str] = []
+    pattern_option = False
+    index = 0
+    while index < len(rest):
+        word = rest[index]
+        if word.startswith("-") and word != "-":
+            if subcommand == "grep" and not word.startswith("--") and word[:2] in ("-e", "-f"):
+                pattern_option = True
+            index += 2 if word in values else 1
+            continue
+        operands.append(word)
+        index += 1
+    if subcommand == "grep" and not pattern_option:
+        operands = operands[1:]  # the first operand is the pattern
+    return operands
+
+
+def _git_toplevel(start: Path) -> Path:
+    """The top of the Git tree that holds start: the nearest directory with a .git entry, else start (c123)."""
+    for candidate in (start, *start.parents):
+        if (candidate / ".git").exists():
+            return candidate
+    return start
 
 
 def _recursive_roots(verb: str, args: list[str]) -> tuple[list[str], bool] | None:
@@ -3497,6 +4990,17 @@ def _stage_traversal(stage: str, cwd: Path, shared: list[Path], *, _depth: int =
     return None
 
 
+class _Traversal(str):
+    """A traversal's command text; `unresolved_root` says the walk starts at a directory the shell supplies (c123, item 9)."""
+
+    unresolved_root: bool
+
+    def __new__(cls, text: str, *, unresolved_root: bool = False) -> _Traversal:
+        found = super().__new__(cls, text)
+        found.unresolved_root = unresolved_root
+        return found
+
+
 def _stage_recursion(stage: str, cwd: Path, shared: list[Path]) -> str | None:
     """Name the stage's own recursive listing or search (its leading verb) when it walks into a shared context root."""
     tokens = _shell_split(stage)
@@ -3518,8 +5022,13 @@ def _stage_recursion(stage: str, cwd: Path, shared: list[Path]) -> str | None:
         text = _clean_shell_token(token).strip().strip("'\"")
         if text.startswith(("$", "@", "%", "(")):
             # A variable or an expression can name any directory, the shared roots included (fail-closed).
-            return " ".join(words)[:240]
-        target = _absolute(cwd, _wildcard_parent(token))
+            return _Traversal(" ".join(words)[:240], unresolved_root=True)
+        if os.path.basename(text.replace("\\", "/")) == _GIT_TOPLEVEL:
+            # c123 (item 3): a Git pathspec with magic or a wildcard walks from the top of the tree.
+            start = _absolute(cwd, os.path.dirname(text) or ".")
+            target = _git_toplevel(start) if start is not None else None
+        else:
+            target = _absolute(cwd, _wildcard_parent(token))
         if target is None:
             continue
         for base in shared:
@@ -3557,11 +5066,23 @@ def _context_traversal(payload: dict[str, Any]) -> str | None:
     return None
 
 
-def _bound_session_context(payload: dict[str, Any], project: Path) -> tuple[str | None, bool]:
+class _LookupUnavailable:
+    """A falsy `available` answer that carries the cause the binding lookup observed (c123; batch design WP1, item 9)."""
+
+    def __init__(self, cause: str) -> None:
+        self.cause = cause
+
+    def __bool__(self) -> bool:
+        return False
+
+
+def _bound_session_context(payload: dict[str, Any], project: Path) -> tuple[str | None, bool | _LookupUnavailable]:
     """Return (session context, available) for this call's native context through the ordinary CLI.
 
     An unbound context owns no scratch or checkout. The CLI runs against the project that owns the shared roots, so a
-    context inside its own checkout still reaches the configured authority.
+    context inside its own checkout still reaches the configured authority. When the lookup fails, `available` is a
+    falsy answer naming the observed cause (c123): a timeout, a start failure, an exit code with the first stderr line,
+    or output that is not a JSON object.
     """
     native = str(os.environ.get("GTKB_NATIVE_CONTEXT_ID") or payload.get("session_id") or "").strip()
     if not native:
@@ -3579,14 +5100,19 @@ def _bound_session_context(payload: dict[str, Any], project: Path) -> tuple[str 
             timeout=10,
             creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return None, False
+    except subprocess.TimeoutExpired:
+        return None, _LookupUnavailable("gt session show did not answer within 10 seconds")
+    except OSError as error:
+        return None, _LookupUnavailable(f"gt session show could not start ({error.__class__.__name__})")
     if result.returncode:
-        return None, "no_session_binding" in (result.stderr or "")
+        if "no_session_binding" in (result.stderr or ""):
+            return None, True
+        first = next((line.strip() for line in (result.stderr or "").splitlines() if line.strip()), "no message")
+        return None, _LookupUnavailable(f"gt session show exited {result.returncode}: {first[:200]}")
     try:
         context = json.loads(result.stdout).get("session_context_id")
     except (ValueError, AttributeError):
-        return None, False
+        return None, _LookupUnavailable("gt session show printed output that is not a JSON object")
     return (str(context) if context else None), True
 
 
@@ -3598,12 +5124,45 @@ def _judged_commands(command: str) -> list[str]:
     subexpression inside a double-quoted string, which PowerShell and POSIX shells run.
     """
     judged = _inner_commands(command)
-    return judged + [
+    judged += [
         text
         for source in (command, *judged)
         if source != UNINSPECTABLE_SHELL_COMMAND
         for text in _string_subexpression_commands(source)
     ]
+    return judged
+
+
+def _group_bodies(command: str, _nesting: int = 0) -> set[str]:
+    """The text of every group in a command, nested ones included: text the whole-command scans read (c123)."""
+    if _nesting > _GROUP_DEPTH:
+        return set()
+    _flat, groups = _flatten_groups(command)
+    bodies: set[str] = set()
+    for _only_values, body in groups:
+        bodies.add(body)
+        bodies |= _group_bodies(body, _nesting + 1)
+    return bodies
+
+
+def _walked_write_lines(command: str) -> list[tuple[str, bool]]:
+    """The command lines the walk finds that the stage judgment does not read, each with whether its redirects are read
+    from it (c123; batch design WP1, W and residual rows 1 to 3).
+
+    The write rule judged each stage by its first word, so a write after a POSIX keyword (for f in *; do rm "$f"; done)
+    or an assignment prefix (FOO=1 rm x), and the command a launcher runs (env rm x, find -exec rm {} \\;, ls | xargs rm,
+    whose unresolved operand refuses it whole), were never judged. Each such line is judged now; this only adds checks,
+    and c121's refuse-whole for a write inside a block stands. A line is rebuilt from its words, so its redirects are
+    read here only when no whole-command scan reads them: in a command a launcher runs or a shell is handed.
+    """
+    stages = {" ".join(tokens) for stage in _split_pipeline_stages(command) if (tokens := _shell_split(stage))}
+    original = {command, *_group_bodies(command)}
+    lines: dict[str, bool] = {}
+    for line, text in _walked_commands(command):
+        if line == command or line in stages:
+            continue
+        lines[line] = lines.get(line, False) or text not in original
+    return list(lines.items())
 
 
 def _unresolved_write_target(command: str) -> str | None:
@@ -3611,7 +5170,25 @@ def _unresolved_write_target(command: str) -> str | None:
     for text in (command, *_judged_commands(command)):
         if text != UNINSPECTABLE_SHELL_COMMAND and (target := _unresolved_target(text)) is not None:
             return target
+    for line, redirects in _walked_write_lines(command):
+        if (
+            line != UNINSPECTABLE_SHELL_COMMAND
+            and (target := _unresolved_target(line, redirects=redirects)) is not None
+        ):
+            return target
     return None
+
+
+def _rebased(path: str, base: Path, root: Path) -> str:
+    """A target read relative to base, made relative to root as the native check reads it (c123, row 4)."""
+    candidate = Path(path)
+    if candidate.is_absolute():
+        return path
+    joined = os.path.normpath(base / candidate)
+    try:
+        return Path(os.path.relpath(joined, root)).as_posix()
+    except ValueError:
+        return Path(joined).as_posix()  # another drive: the absolute path
 
 
 def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
@@ -3645,7 +5222,11 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
         diagnostic_outputs = _diagnostic_output_paths_from_shell(root, command)
         if diagnostic_outputs is not None:
             return diagnostic_outputs, True
-        paths = _paths_from_shell(root, command)
+        # c123 (batch design WP1, residual row 4): a single leading change of directory moves every relative target,
+        # in the line and in every command it runs; any other change leaves the relative targets unread.
+        directory = _leading_directory(command)
+        base = Path(os.path.normpath(root / directory)) if directory else root
+        paths = _paths_from_shell(base, command)
         mutating = _is_mutating_command(command)
         unread = mutating and _has_unread_write(command)
         for inner in _judged_commands(command):
@@ -3653,28 +5234,724 @@ def changed_paths(payload: dict[str, Any]) -> tuple[list[str], bool]:
                 mutating = True
                 unread = True
             elif not _is_safe_command(inner):
-                paths = sorted(set(paths) | set(_paths_from_shell(root, inner)))
+                paths = sorted(set(paths) | set(_paths_from_shell(base, inner)))
                 inner_mutating = _is_mutating_command(inner)
                 mutating = mutating or inner_mutating
                 unread = unread or (inner_mutating and _has_unread_write(inner))
+        # c123 (batch design WP1, W and residual rows 1 to 3): every line the walk finds that no stage reads.
+        for line, redirects in _walked_write_lines(command):
+            if line == UNINSPECTABLE_SHELL_COMMAND:
+                mutating = True
+                unread = True
+            elif not _is_safe_command(line):
+                paths = sorted(set(paths) | set(_paths_from_shell(base, line, redirects=redirects)))
+                line_mutating = _is_mutating_command(line)
+                mutating = mutating or line_mutating
+                unread = unread or (line_mutating and _has_unread_write(line, redirects=redirects))
+        if directory is None and any(not Path(path).is_absolute() for path in paths):
+            unread = True
         # c121 (M13 GTKB Home, Q1 on c120; owner 2026-09-29 07:56): the claim check must cover every write, so a command
         # carrying a write whose target the gate cannot read is refused whole (unknown_effect_targets).
         if unread:
             return [], True
+        if base != root:
+            paths = sorted({_rebased(path, base, root) for path in paths})
         return paths, mutating
 
     return [], False
 
 
+def _unknown_target_cause(payload: dict[str, Any]) -> str:
+    """What made a mutating call name no target the gate can check (c123; batch design WP1, item 9, entry 6).
+
+    The refusal used to name no cause although several observations lead to it; this mirrors changed_paths' branches.
+    """
+    tool = _tool_name(payload).lower()
+    data = _tool_input(payload)
+    if tool in {"write", "edit", "strreplace", "multiedit", "notebookedit", "delete"}:
+        return "the write tool named no path"
+    if tool in {"move", "copy"}:
+        return f"the {tool} tool's payload does not name both of its paths"
+    if _is_apply_patch_tool(tool) or any("*** Begin Patch" in value for value in _string_values(payload)):
+        return "the patch names no file"
+    command = _command_from_payload(payload, data, tool)
+    if command is None:
+        return "the tool named no target"
+    if _ruff_effects(_project_root(payload), command) is not None:
+        return "a ruff command whose targets the gate cannot read"
+    walked = _walked_write_lines(command)
+    texts = [command, *_judged_commands(command), *(line for line, redirects in walked if redirects)]
+    if UNINSPECTABLE_SHELL_COMMAND in texts or any(line == UNINSPECTABLE_SHELL_COMMAND for line, _r in walked):
+        return "an inner command the gate cannot inspect (encoded, empty or nested too deeply)"
+    for line, redirects in walked:
+        if not redirects and _has_unread_write(line, redirects=False):
+            return "a write after a keyword, a prefix or a launcher whose target the gate cannot read"
+    if _leading_directory(command) is None:
+        return (
+            "a change of directory the gate cannot follow (only a single leading cd or Set-Location to a literal "
+            "directory is read)"
+        )
+    for text in texts:
+        if any(unnamed for _files, unnamed in _stage_option_writes(text)):
+            # c123 (owner decision A5, row 17): the system write tools join the examples.
+            return (
+                "a command that writes files it does not name (find -delete, curl -O, wget without -O, or a system "
+                "tool such as tar, certutil or fsutil writing a file it does not name)"
+            )
+        view = _mask_quoted_spans(text, mask_double=True)
+        dotnet = _DOTNET_WRITE_RE.search(view)
+        if dotnet is not None:
+            return f"a .NET write call ({dotnet.group(0).strip().rstrip('(')})"
+        if _has_python_mutating_signal(text):
+            return "a Python file write"
+        writes = _redirect_writes(text)
+        if (writes is None and ">" in text) or (writes is not None and None in writes):
+            return "a redirect with no target the gate can read"
+        if _GIT_OUTPUT_RE.search(view) and _has_unread_write(text):
+            return "git --output with no file the gate can read, or inside a block"
+        if _has_unread_write(text):
+            return "a write inside a script block, a group or a subexpression, or after a call operator"
+    return "a write whose target the gate cannot read"
+
+
+# c123 (owner decision A1; batch design WP1 item 5, option A): a program the shell runs can write what the command text
+# does not show, so the write rule cannot judge it (M13 on c121: an unbound, unclaimed context's script wrote its file).
+# A program run therefore needs a live claim of the bound context, of any intended status (a verifier's verdict claim
+# counts), which the native `gt bridge check-program` confirms; an unbound context is refused. A claim ties the run to a
+# delivery but does not bound the program: inside the claim it can still write outside the claim's targets. A program
+# run is:
+# - an interpreter given code: python (py, pythonw) with a script, -, or code from standard input, or with -m other than
+#   the read-only modules below; python -c whose source starts a process or loads code (subprocess, os.system and the
+#   os exec, spawn and popen calls, runpy, exec, eval, compile, __import__, importlib, ctypes) or imports a module from
+#   outside the standard library (code from the working directory, the project or a package); node, deno, bun, perl,
+#   ruby, php, lua, Rscript, cscript, wscript and java unless they only report their version or usage; pwsh or
+#   powershell with -File, a script operand or code from standard input; bash, sh or zsh with a script or standard
+#   input; cmd reading standard input;
+# - a script file run as the program (.ps1, .bat, .cmd, .sh, .py, .js, .vbs, ...), and an executable named by a path
+#   inside the project, a checkout or scratch (.\tools\x.exe);
+# - pytest, npx, pnpx, bunx, uvx and make; npm, pnpm, yarn, uv, pip, pipx, cargo, dotnet and go beyond their
+#   read-only commands (npm run, test, start and exec, uv run and uv tool run among them);
+# - the PowerShell code loaders: Import-Module with a path, Add-Type, New-Object -ComObject;
+# - the gt commands that write local files (_GT_LOCAL_WRITERS) and rg --pre;
+# - a command the gate cannot inspect (a program named by a variable or an expression).
+# Not program runs: python -c without those calls, python --version, python -m json.tool, every other gt command (gt.exe
+# --help among them), rg, Get-Content, git (its own rule), node --version, and ruff, whose writes _ruff_effects reads.
+_PYTHON_READ_ONLY_MODULES = frozenset({"json.tool", "site", "sysconfig", "platform", "tokenize", "ast"})
+_PYTHON_INFORMATIONAL_OPTIONS = frozenset(
+    {"-V", "-VV", "--version", "-h", "-?", "--help", "--help-env", "--help-xoptions", "--help-all"}
+)
+_PY_LAUNCHER_SELECTOR = re.compile(r"-\d+(?:\.\d+)*(?:-(?:32|64|arm64))?|-V:\S+")
+_PYTHON_CODE_MODULES = frozenset({"runpy", "importlib", "ctypes", "pty"})
+_PYTHON_SUBPROCESS_CALLS = frozenset(
+    {"run", "call", "check_call", "check_output", "Popen", "getoutput", "getstatusoutput"}
+)
+_PYTHON_OS_PROCESS_CALLS = frozenset({"system", "popen", "startfile", "posix_spawn", "posix_spawnp"})
+_PYTHON_CODE_BUILTINS = frozenset({"exec", "eval", "compile", "__import__"})
+_SCRIPT_EXTENSIONS = frozenset(
+    {
+        ".ps1",
+        ".psm1",
+        ".bat",
+        ".cmd",
+        ".sh",
+        ".bash",
+        ".zsh",
+        ".py",
+        ".pyw",
+        ".js",
+        ".mjs",
+        ".cjs",
+        ".ts",
+        ".mts",
+        ".cts",
+        ".vbs",
+        ".vbe",
+        ".wsf",
+        ".wsh",
+        ".jse",
+        ".rb",
+        ".pl",
+        ".php",
+        ".lua",
+        ".jar",
+        ".msi",
+    }
+)
+_COMMON_INFORMATIONAL = frozenset({"--version", "-V", "--help", "-h", "-?", "/?"})
+# Interpreters and runners that run code whenever they do more than report their version or usage.
+_RUNS_UNLESS_INFORMATIONAL: dict[str, frozenset[str]] = {
+    "node": frozenset({"--version", "-v", "--help", "-h", "--v8-options"}),
+    "deno": frozenset({"--version", "-V", "--help", "-h", "help"}),
+    "bun": frozenset({"--version", "-v", "--help", "-h", "--revision"}),
+    "perl": frozenset({"-v", "-V", "--version", "--help", "-h"}),
+    "ruby": frozenset({"-v", "--version", "--help", "-h"}),
+    "php": frozenset({"-v", "--version", "--help", "-h"}),
+    "lua": frozenset({"-v"}),
+    "rscript": frozenset({"--version", "--help"}),
+    "cscript": frozenset({"//?", "/?"}),
+    "wscript": frozenset({"//?", "/?"}),
+    "java": frozenset({"-version", "--version", "-help", "--help", "-h", "-?"}),
+    "pytest": _COMMON_INFORMATIONAL,
+    "py.test": _COMMON_INFORMATIONAL,
+    "npx": _COMMON_INFORMATIONAL,
+    "pnpx": _COMMON_INFORMATIONAL,
+    "bunx": _COMMON_INFORMATIONAL,
+    "uvx": _COMMON_INFORMATIONAL,
+    "make": _COMMON_INFORMATIONAL,
+    "gmake": _COMMON_INFORMATIONAL,
+    "nmake": _COMMON_INFORMATIONAL,
+    "mingw32-make": _COMMON_INFORMATIONAL,
+}
+_NODE_PACKAGE_READS = frozenset(
+    {
+        "--version",
+        "-v",
+        "-V",
+        "--help",
+        "-h",
+        "help",
+        "ls",
+        "list",
+        "ll",
+        "la",
+        "view",
+        "info",
+        "show",
+        "v",
+        "outdated",
+        "why",
+        "explain",
+        "search",
+        "root",
+        "prefix",
+        "bin",
+        "ping",
+        "whoami",
+    }
+)
+# Package and build runners, with the first words with which they only read (install, run, build and test run code).
+_RUNNER_READ_COMMANDS: dict[str, frozenset[str]] = {
+    "npm": _NODE_PACKAGE_READS,
+    "pnpm": _NODE_PACKAGE_READS,
+    "yarn": _NODE_PACKAGE_READS,
+    "pip": frozenset(
+        {"list", "show", "freeze", "check", "help", "inspect", "debug", "--version", "-V", "--help", "-h"}
+    ),
+    "pipx": frozenset({"list", "environment", "help", "--version", "--help", "-h"}),
+    "cargo": frozenset(
+        {
+            "--version",
+            "-V",
+            "version",
+            "help",
+            "--help",
+            "-h",
+            "--list",
+            "metadata",
+            "tree",
+            "search",
+            "locate-project",
+            "pkgid",
+            "read-manifest",
+            "verify-project",
+        }
+    ),
+    "dotnet": frozenset({"--version", "--info", "--list-sdks", "--list-runtimes", "help", "--help", "-h", "-?", "/?"}),
+    "go": frozenset({"version", "help", "list", "doc", "env"}),
+}
+_UV_READS: frozenset[tuple[str, ...]] = frozenset(
+    {
+        ("--version",),
+        ("-V",),
+        ("version",),
+        ("help",),
+        ("--help",),
+        ("-h",),
+        ("tree",),
+        ("pip", "list"),
+        ("pip", "show"),
+        ("pip", "freeze"),
+        ("pip", "tree"),
+        ("pip", "check"),
+        ("tool", "list"),
+        ("tool", "dir"),
+        ("python", "list"),
+        ("python", "find"),
+        ("python", "dir"),
+        ("cache", "dir"),
+        ("self", "version"),
+    }
+)
+_POWERSHELL_INFORMATIONAL = frozenset({"-version", "-v", "-help", "-h", "-?", "/?"})
+_POWERSHELL_FILE_PARAMETERS = frozenset({"-file", "-f"})
+_MODULE_FILE_SUFFIXES = (".psm1", ".psd1", ".ps1", ".dll", ".cdxml", ".xaml")
+# The gt commands that write local files, read from cli.py and cli_authority.py, each with the options that make it
+# write (none: it always writes). Every other gt command reads, or changes canonical state through the authority, which
+# judges that change there. harness project runs the project's projector; commit preflight runs the project's checks.
+_GT_LOCAL_WRITERS: dict[tuple[str, ...], frozenset[str]] = {
+    ("harness", "project"): frozenset(),
+    ("scaffold", "iac"): frozenset({"--apply"}),
+    ("scaffold", "cicd"): frozenset({"--apply"}),
+    ("controls", "propose"): frozenset(),
+    ("dashboard", "init"): frozenset(),
+    ("dashboard", "refresh"): frozenset(),
+    ("db", "postgres", "export-current"): frozenset(),
+    ("db", "postgres", "readback-current"): frozenset(),
+    ("validate", "spec-coherence"): frozenset(),
+    ("project", "init"): frozenset(),
+    ("project", "chroma", "regenerate"): frozenset(),
+    ("project", "classify-tree"): frozenset({"--output"}),
+    ("project", "upgrade"): frozenset({"--apply", "--recover"}),
+    ("application", "register"): frozenset(),
+    ("env", "migrate"): frozenset({"--apply"}),
+    ("registry", "reconcile"): frozenset({"--batch-output"}),
+    ("registry", "register"): frozenset(),
+    ("registry", "amend"): frozenset(),
+    ("registry", "transition"): frozenset(),
+    ("secrets", "scan"): frozenset({"--report-json"}),
+    ("commit", "preflight"): frozenset(),
+    ("push", "preflight"): frozenset({"--evidence-out", "--evidence-file"}),
+    ("push", "readiness"): frozenset({"--evidence-out", "--evidence-file"}),
+}
+_GT_WRITER_PREFIXES = frozenset(key[:2] for key in _GT_LOCAL_WRITERS if len(key) == 3)
+_KNOWN_PROGRAMS = frozenset(
+    {
+        "py",
+        "gt",
+        "git",
+        "ruff",
+        "rg",
+        "uv",
+        "pwsh",
+        "powershell",
+        "bash",
+        "sh",
+        "zsh",
+        "cmd",
+        *_RUNS_UNLESS_INFORMATIONAL,
+        *_RUNNER_READ_COMMANDS,
+    }
+)
+
+
+def _program_name(token: str) -> str:
+    """A program's name for the program rule: its basename, lower case, without .exe, and without .cmd, .bat or .ps1
+    when that names a known program (npm.cmd is npm) (c123)."""
+    name = _executable_name(token).removesuffix(".exe")
+    for suffix in (".cmd", ".bat", ".ps1", ".com"):
+        stem = name.removesuffix(suffix)
+        if stem != name and (stem in _KNOWN_PROGRAMS or stem.startswith("python") or stem.startswith("pip")):
+            return stem
+    return name
+
+
+def _gt_writes_local_files(arguments: list[str]) -> bool:
+    """Whether a gt command writes local files: one of _GT_LOCAL_WRITERS, with an option that makes it write (c123)."""
+    words = _gt_command_words(arguments, 2)
+    if words is not None and tuple(words) in _GT_WRITER_PREFIXES:
+        words = _gt_command_words(arguments, 3)
+    if words is None:
+        return True  # a command word the shell supplies may name a writer
+    options = _GT_LOCAL_WRITERS.get(tuple(words))
+    if options is None:
+        return False
+    given = {_clean_shell_token(word).split("=", 1)[0] for word in arguments}
+    return not options or bool(options & given)
+
+
+def _python_call_runs_code(node: ast.Call, aliases: dict[str, tuple[str, str | None]]) -> bool:
+    """Whether one Python call starts a process or loads code (c123, owner decision A1)."""
+    func = node.func
+    name = _python_call_name(func)
+    if name is None:
+        return False
+    module = ""
+    if isinstance(func, ast.Name):
+        target = aliases.get(func.id)
+        imported = target[1] if target is not None else None
+        if target is not None and imported is not None:
+            module, name = target[0], imported  # from os import system: system is os.system
+        elif func.id in _PYTHON_CODE_BUILTINS:
+            return True
+    else:
+        root: ast.expr = func
+        while isinstance(root, ast.Attribute):
+            root = root.value
+        if isinstance(root, ast.Name):
+            module = aliases[root.id][0] if root.id in aliases else root.id
+    top = module.split(".")[0]
+    if top in _PYTHON_CODE_MODULES:
+        return True
+    if top == "subprocess":
+        return name in _PYTHON_SUBPROCESS_CALLS
+    if top == "os":
+        return name in _PYTHON_OS_PROCESS_CALLS or name.startswith(("exec", "spawn"))
+    if top == "asyncio":
+        return name.startswith("create_subprocess")
+    return top == "builtins" and name in _PYTHON_CODE_BUILTINS
+
+
+def _python_tree_runs_code(tree: ast.AST) -> bool:
+    """Whether a python -c source starts a process, loads code, or imports a module from outside the standard library,
+    whose code runs on import (python -c "import probe" runs probe.py from the working directory) (c123, A1)."""
+    aliases = _python_import_aliases(tree)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            if any(alias.name.split(".")[0] not in sys.stdlib_module_names for alias in node.names):
+                return True
+        elif isinstance(node, ast.ImportFrom):
+            if node.level or (node.module or "").split(".")[0] not in sys.stdlib_module_names:
+                return True
+        elif isinstance(node, ast.Call) and _python_call_runs_code(node, aliases):
+            return True
+    return False
+
+
+def _python_source_runs_code(words: list[str], position: int, attached: str) -> bool:
+    """Whether python -c's source runs code; a source the shell supplies or the gate cannot parse does (c123, A1).
+
+    The source is read as the Windows split keeps it (one quote pair removed) and as a POSIX shell splits the line, so a
+    backslash-escaped quote does not make a readable source unreadable.
+    """
+    raw = attached or (words[position] if position < len(words) else "")
+    if not raw:
+        return False  # python -c without a source exits with an error
+    if _unresolved_value(raw):
+        return True
+    sources = [_unquote_once(raw)]
+    if not attached:
+        try:
+            posix = shlex.split(" ".join(words), posix=True)
+        except ValueError:
+            posix = []
+        sources += [posix[index + 1] for index, word in enumerate(posix[:-1]) if word == "-c"][:1]
+    trees: list[ast.AST] = []
+    for source in sources:
+        try:
+            trees.append(ast.parse(source))
+        except (SyntaxError, ValueError):
+            continue
+    return not trees or any(_python_tree_runs_code(tree) for tree in trees)
+
+
+def _python_module_runs_code(module: str, rest: list[str]) -> bool:
+    """Whether python -m <module> runs code: every module but the read-only ones, ruff (its writes are read by
+    _ruff_effects) and gt, whose commands are judged one by one (c123, A1)."""
+    if not module or _unresolved_value(module):
+        return bool(module)
+    name = _clean_shell_token(module)
+    if name in GT_MODULES:
+        return _gt_writes_local_files(rest)
+    if name == "ruff" or name in _PYTHON_READ_ONLY_MODULES:
+        return False
+    if name == "pip":
+        first = _clean_shell_token(rest[0]) if rest else ""
+        return first not in _RUNNER_READ_COMMANDS["pip"]
+    return True
+
+
+def _python_runs_code(words: list[str]) -> bool:
+    """Whether a python (py) command line runs code: a script, -, code from standard input, -m, or a -c source that
+    starts a process or loads code (c123, owner decision A1)."""
+    launcher = _program_name(words[0]) == "py"
+    index = 1
+    while index < len(words):
+        word = _clean_shell_token(words[index])
+        if launcher and _PY_LAUNCHER_SELECTOR.fullmatch(word):
+            index += 1  # the py launcher's version selector
+            continue
+        if launcher and word in ("--list", "-0", "--list-paths", "-0p"):
+            return False
+        if word in _PYTHON_INFORMATIONAL_OPTIONS:
+            return False
+        if word == "-" or word == "--" or not word.startswith("-"):
+            return True  # a script, or the source on standard input
+        if word.startswith("--"):
+            index += 2 if word in _PYTHON_VALUE_OPTIONS else 1
+            continue
+        letters = word[1:]
+        for position, letter in enumerate(letters):
+            rest = letters[position + 1 :]
+            if letter == "c":
+                return _python_source_runs_code(words, index + 1, rest)
+            if letter == "m":
+                if rest:
+                    return _python_module_runs_code(rest, words[index + 1 :])
+                return _python_module_runs_code(words[index + 1] if index + 1 < len(words) else "", words[index + 2 :])
+            if letter in "XW":
+                index += 0 if rest else 1  # the option's value is the rest of the bundle or the next word
+                break
+            if letter in "Vh?":
+                return False
+        index += 1
+    return True  # no script, -c or -m: python reads its code from standard input
+
+
+def _powershell_runs_code(args: list[str]) -> bool:
+    """Whether pwsh or powershell runs a script or code from standard input itself, rather than handing a command the
+    walk follows (-Command, -c) or reporting its version or usage (c123, A1)."""
+    words = [_clean_shell_token(arg).lower() for arg in args]
+    for index, word in enumerate(words):
+        if word in _HANDING_FLAGS["powershell"]:
+            return index + 1 >= len(words) or words[index + 1] == "-"
+        if word in _POWERSHELL_FILE_PARAMETERS:
+            return True
+    if any(word in _POWERSHELL_ENCODED_COMMAND_FLAGS for word in words):
+        return False  # the walk refuses an encoded command
+    return not (words and all(word in _POWERSHELL_INFORMATIONAL for word in words))
+
+
+def _posix_shell_runs_code(args: list[str]) -> bool:
+    """Whether bash, sh or zsh runs a script or code from standard input itself, rather than handing -c's command to
+    the walk or reporting its version or usage (c123, A1); a bundled -c (bash -lc) is not followed, so it runs code."""
+    words = [_clean_shell_token(arg) for arg in args]
+    if "-c" in words:
+        return False
+    return not (words and all(word in ("--version", "--help") for word in words))
+
+
+def _cmd_runs_code(args: list[str]) -> bool:
+    """Whether cmd reads commands from standard input: neither /c nor /k hands it one, and it is not /? (c123, A1)."""
+    words = [_clean_shell_token(arg).lower() for arg in args]
+    return not any(word in _HANDING_FLAGS["cmd"] for word in words) and words != ["/?"]
+
+
+def _local_program(token: str, project: Path, cwd: Path) -> bool:
+    """Whether a program a line names is a script file, or an executable named by a path inside the project, a checkout
+    or scratch (c123, A1). A program found on PATH by its name alone is judged by that name, not here."""
+    text = _clean_shell_token(token)
+    if not text:
+        return False
+    if Path(text.replace("\\", "/")).suffix.lower() in _SCRIPT_EXTENSIONS:
+        return True
+    if not any(separator in text for separator in "/\\") and not text.startswith("."):
+        return False
+    target = _absolute(cwd, text)
+    return target is not None and _is_within(target, project)
+
+
+def _runs_program(words: list[str], project: Path, cwd: Path) -> bool:
+    """Whether one command line the shell runs is a program run (c123, owner decision A1)."""
+    name = _program_name(words[0])
+    args = [_clean_shell_token(word) for word in words[1:]]
+    if name == "py" or name.startswith("python"):
+        return _python_runs_code(words)
+    if name in _RUNS_UNLESS_INFORMATIONAL:
+        if name == "node" and args[:1] in (["--check"], ["-c"]):
+            return False  # a syntax check runs nothing
+        return not args or not all(arg in _RUNS_UNLESS_INFORMATIONAL[name] for arg in args)
+    reads = _RUNNER_READ_COMMANDS.get("pip" if re.fullmatch(r"pip\d*(?:\.\d+)?", name) else name)
+    if reads is not None:
+        if not args or (args[0] not in reads and args[0].lower() not in reads):
+            return True
+        return name == "go" and args[0] == "env" and bool({"-w", "-u"} & set(args))
+    if name == "uv":
+        lowered = [arg.lower() for arg in args]
+        return tuple(lowered[:1]) not in _UV_READS and tuple(lowered[:2]) not in _UV_READS
+    if name in ("pwsh", "powershell"):
+        return _powershell_runs_code(words[1:])
+    if name in ("bash", "sh", "zsh"):
+        return _posix_shell_runs_code(words[1:])
+    if name == "cmd":
+        return _cmd_runs_code(words[1:])
+    if name == "gt":
+        return _gt_writes_local_files(words[1:])
+    if name == "rg":
+        return any(arg.split("=", 1)[0] == "--pre" for arg in args)
+    if name in ("import-module", "ipmo"):
+        return any(
+            _unresolved_value(arg)
+            or any(separator in arg for separator in "/\\")
+            or arg.startswith(".")
+            or arg.lower().endswith(_MODULE_FILE_SUFFIXES)
+            for arg in args
+            if not arg.startswith("-")
+        )
+    if name == "add-type":
+        return True
+    if name == "new-object":
+        return any(
+            len(arg) > 1 and "-comobject".startswith(arg.lower().split(":", 1)[0])
+            for arg in args
+            if arg.startswith("-")
+        )
+    if name in ("git", "ruff"):
+        return False
+    return _local_program(words[0], project, cwd)
+
+
+def _program_run(payload: dict[str, Any]) -> str | None:
+    """The first program run the call's shell command makes, as its command line; None when it makes none (c123, A1).
+
+    Every command the line runs is judged (_walked_commands): the stages, the commands nested shells, Invoke-Expression
+    and launchers run, groups and subexpressions.
+    """
+    command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
+    if not command:
+        return None
+    root = _project_root(payload)
+    project = _context_root(root)
+    cwd = Path(str(payload.get("cwd") or root))
+    for line, _text in _walked_commands(command):
+        if line == UNINSPECTABLE_SHELL_COMMAND:
+            return "a command the gate cannot inspect"
+        words = _shell_split(line)
+        if words and _runs_program(words, project, cwd):
+            return line if len(line) <= 200 else line[:197] + "..."
+    return None
+
+
+_PROGRAM_RESIDUAL = (
+    " A claim ties the run to a delivery; it does not bound the program, which can still write outside the claim's "
+    "targets."
+)
+
+
+def _native_program_check(native: str, root: Path, env: dict[str, str], program: str) -> dict[str, Any]:
+    """Confirm through the native CLI that this context holds a live claim before a program runs (c123, A1).
+
+    `gt bridge check-program` answers {"status": "current", "scope": "program", "claims": <n>} when the bound context
+    holds a live claim of any intended status; otherwise it exits nonzero with click's `Error: program_claim_required:
+    <message>`, or the binding errors the effect check raises for an unbound context. It is called as check-effects is:
+    the same root, environment and 10-second limit, and the same handling of every failure.
+    """
+
+    def blocked(code: str, reason: str) -> dict[str, Any]:
+        return {"decision": "block", "reason_code": code, "reason": reason}
+
+    argv = [sys.executable, "-m", "groundtruth_kb", "bridge", "check-program", "--native-context-id", native, "--json"]
+    try:
+        result = subprocess.run(
+            argv,
+            cwd=root,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=10,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if result.returncode:
+            refusal = _native_refusal(result.stderr, [], check="program")
+            refusal["reason"] = f"{refusal['reason']}\nProgram run: {program}.{_PROGRAM_RESIDUAL}"[:2000]
+            return refusal
+        current = json.loads(result.stdout)
+        if not isinstance(current, dict) or current.get("status") != "current" or current.get("scope") != "program":
+            return blocked("invalid_effect_response", "The native CLI did not return a current program check.")
+    except subprocess.TimeoutExpired:
+        return blocked(
+            "effect_check_unavailable",
+            "The native program check did not answer within 10 seconds. Restore the native CLI/authority connection "
+            "before running this program.",
+        )
+    except OSError as error:
+        return blocked(
+            "effect_check_unavailable",
+            f"The native program check could not start ({error.__class__.__name__}). Restore the native CLI/authority "
+            "connection before running this program.",
+        )
+    except ValueError:
+        return blocked(
+            "effect_check_unavailable",
+            "The native program check exited 0 but printed output that is not JSON, so its answer cannot be read.",
+        )
+    return {}
+
+
+# c123 (owner decision A6; batch design WP1 section 6, row 4's persistence across calls): a hook payload marked
+# "persistent_shell": true comes from a shell that keeps its working directory across calls (the persistent pwsh tool
+# of the DeepSeek SDK host and of the GT-KB Home), while the gate judges every call from the payload's cwd. A change of
+# directory there moves every later call's relative paths away from the directory the gate judges, so such a payload
+# may not change the directory its session keeps: a cd, chdir, Set-Location, sl, pushd, Push-Location, popd or
+# Pop-Location anywhere the shell's own process runs it (a stage, a script block, a group, a subexpression, a
+# ForEach-Object or if body, Invoke-Expression text), or an assignment of [Environment]::CurrentDirectory, a
+# [IO.Directory]::SetCurrentDirectory call or a session-state SetLocation call. PowerShell's location belongs to the
+# whole runspace, so a script block does not contain the change. Text handed to another process (pwsh -Command, cmd
+# /c, bash -c, Start-Process) runs there, and its change of directory does not persist.
+PERSISTENT_SHELL_KEY = "persistent_shell"
+_SESSION_DIRECTORY_CALL_RE = re.compile(
+    r"\[(?:system\.)?environment\]::currentdirectory\s*=(?!=)"
+    r"|\[(?:system\.)?io\.directory\]::setcurrentdirectory\s*\("
+    r"|\.(?:setlocation|pushcurrentlocation|poplocation)\s*\(",
+    re.IGNORECASE,
+)
+
+
+def _session_directory_call(text: str, _depth: int = 0) -> str | None:
+    """A .NET or session-state call that changes the directory, in text the shell's own process runs (c123, A6)."""
+    found = _SESSION_DIRECTORY_CALL_RE.search(_mask_quoted_spans(text, mask_double=True))
+    if found is not None:
+        return found.group(0).rstrip(" \t=(")
+    if _depth >= _INNER_COMMAND_DEPTH:
+        return None
+    inner = list(_string_subexpressions(text))
+    for line, _text in _walked_commands(text, same_process=True):
+        words = _shell_split(line) if line != UNINSPECTABLE_SHELL_COMMAND else None
+        if words and _executable_name(words[0]) in _EVALUATING_VERBS:
+            evaluated = _handed_evaluation(line)
+            inner.extend([evaluated] if evaluated else [])
+    for part in inner:
+        call = _session_directory_call(part, _depth + 1)
+        if call is not None:
+            return call
+    return None
+
+
+def _persistent_directory_change(payload: dict[str, Any]) -> str | None:
+    """The change of directory a persistent shell's command keeps for its session, as written; None when it makes none
+    (c123, owner decision A6)."""
+    if payload.get(PERSISTENT_SHELL_KEY) is not True:
+        return None
+    command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
+    if not command:
+        return None
+    for line, _text in _walked_commands(command, same_process=True):
+        if line == UNINSPECTABLE_SHELL_COMMAND:
+            return "a command the gate cannot inspect, which may change the directory"
+        words = _shell_split(line)
+        if words and _executable_name(words[0]).removesuffix(".exe") in _DIRECTORY_CHANGE_VERBS:
+            return line if len(line) <= 200 else line[:197] + "..."
+    return _session_directory_call(command)
+
+
+def _native_refusal(stderr: str, paths: list[str], *, check: str = "effect") -> dict[str, Any]:
+    """The native CLI's refusal with its own code (c123; batch design WP1, item 7).
+
+    The CLI prints click's `Error: <code>: <message>`, and the DeepSeek runtime renders every denial as
+    `Error: <reason>`, so hosts saw "Error: Error: <code>: ...". The gate strips click's prefix, returns the native code
+    as the reason code (with B148 the host shows it once) and the message, detail lines and checked targets (at most
+    five) as the reason. A line with no code (a bare `claim_expired`) keeps `native_effect_refused` with the cleaned text.
+    c123 (owner decision A1): check names the refused check in that text, "effect" or "program".
+    """
+    lines = (stderr or "").strip().splitlines()
+    first = lines[0].strip() if lines else ""
+    if first.startswith("Error:"):
+        first = first[len("Error:") :].strip()
+    detail = "\n".join(line.rstrip() for line in lines[1:]).strip()
+    shown = ", ".join(paths[:5]) + (f" and {len(paths) - 5} more" if len(paths) > 5 else "")
+    targets = f" (targets: {shown})" if paths else ""
+    match = re.fullmatch(r"([a-z][a-z0-9]*(?:_[a-z0-9]+)+):\s*(.+)", first)
+    if match:
+        reason = match.group(2) + targets + (f"\n{detail}" if detail else "")
+        return {"decision": "block", "reason_code": match.group(1), "reason": reason[:2000]}
+    cleaned = (first or f"The native CLI refused the {check} check.") + targets + (f"\n{detail}" if detail else "")
+    return {"decision": "block", "reason_code": "native_effect_refused", "reason": cleaned[:2000]}
+
+
 def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
-    """Route actual mutating targets through the CLI; never consult legacy packets."""
+    """Route actual mutating targets, and program runs, through the CLI; never consult legacy packets.
+
+    c123 (owner decision A1): a program run needs a live claim of the bound context, checked after the writes. The claim
+    does not bound the program: inside it the program can still write outside the claim's targets.
+    """
 
     def blocked(code: str, reason: str) -> dict[str, Any]:
         return {"decision": "block", "reason_code": code, "reason": reason}
 
     invalid = payload.get(INVALID_HOOK_PAYLOAD_KEY)
     if invalid:
-        return blocked("invalid_hook_payload", "Cannot identify the tool effect from the supplied payload.")
+        # c123 (item 9, entry 7): the reader's detail is kept.
+        return blocked("invalid_hook_payload", f"Cannot identify the tool effect from the supplied payload: {invalid}")
     direct_git = _direct_git_effect_from_payload(payload)
     if direct_git == UNINSPECTABLE_SHELL_COMMAND:
         # c122: name what the gate observed; the code stays the Git rule's.
@@ -3706,6 +5983,24 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             f"{owner_operation} is an owner operation (D61): the owner performs it from the GT-KB Home's controls "
             "or their own terminal.",
         )
+    # c123 (owner decision E1): the owner levers over project authorization, right after the owner operations and
+    # before the credential, traversal and file-effect checks (gt projects move-item also names a write cmdlet).
+    owner_lever = _owner_lever_from_payload(payload)
+    if owner_lever == UNINSPECTABLE_SHELL_COMMAND:
+        return blocked(
+            "owner_lever_only",
+            "A shell command that is encoded, empty, nested too deeply to inspect, or run through a program named by a "
+            "variable or an expression may hide an owner lever over project authorization "
+            "(GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001): name the program and its command literally; the owner "
+            "runs those levers in their own terminal.",
+        )
+    if owner_lever is not None:
+        return blocked(
+            "owner_lever_only",
+            f"{owner_lever} is an owner lever over project authorization "
+            "(GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001): the owner runs it in their own terminal. State the change "
+            "and the exact command for the owner to run.",
+        )
     credential = _credential_material_access(payload)
     if credential is not None:
         return blocked(
@@ -3716,10 +6011,17 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
         )
     traversal = _context_traversal(payload)
     if traversal is not None:
+        # c123 (item 9, entry 2): a walk from a directory the shell supplies gets its own first sentence.
+        opening = (
+            f"A recursive listing or search from a directory the shell supplies when it runs ({traversal}) can walk "
+            "into other contexts' scratch and checkouts: name the directory literally. "
+            if getattr(traversal, "unresolved_root", False)
+            else f"A recursive listing or search from here walks into other contexts' scratch and checkouts ({traversal}). "
+        )
         return blocked(
             "context_traversal",
-            f"A recursive listing or search from here walks into other contexts' scratch and checkouts ({traversal}). "
-            "Search tracked files with git grep or git ls-files in their ignore-honouring forms (not git grep "
+            opening
+            + "Search tracked files with git grep or git ls-files in their ignore-honouring forms (not git grep "
             "--no-exclude-standard or --no-index, and git ls-files --others only with --exclude-standard), use rg (it "
             "skips Git-ignored paths), or name the directories to search; this context's own scratch is "
             "scratchpad/<its session context>.",
@@ -3728,23 +6030,46 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     if named:
         own, available = _bound_session_context(payload, _context_root(_project_root(payload)))
         if not available:
+            # c123 (item 9, entry 3): name the cause the lookup observed when it gives one.
+            cause = getattr(available, "cause", None)
+            observed = f"The gate could not read this context's binding ({cause}). " if cause else ""
             return blocked(
                 "context_isolation_unavailable",
-                "Restore the native CLI/authority connection before reading or changing scratch or checkout paths.",
+                observed
+                + "Restore the native CLI/authority connection before reading or changing scratch or checkout paths.",
             )
-        foreign = [token for child, token in named if child.lower() != (own or "").lower()]
+        foreign = [(child, token) for child, token in named if child.lower() != (own or "").lower()]
         if foreign:
+            child, token = foreign[0]
+            # c123 (item 9, entry 5): a wildcard child spans every context, this one included.
+            reach = (
+                f"{token} reaches other contexts' scratch or checkouts"
+                if any(mark in child for mark in "*?[")
+                else f"{token} belongs to another context"
+            )
             return blocked(
                 "foreign_context_material",
-                f"A context uses only its own scratch and checkout; {foreign[0]} belongs to another context. Read "
+                f"A context uses only its own scratch and checkout; {reach}. Read "
                 "shared state through the gt CLI and review work through your own checkout.",
             )
+    # c123 (owner decision A6): a persistent shell may not change the directory its session keeps.
+    change = _persistent_directory_change(payload)
+    if change is not None:
+        return blocked(
+            "persistent_shell_directory_change",
+            "This shell keeps its working directory across calls, but the gate judges every call from the working "
+            f"directory the host reports, so this change of directory ({change}) would make later calls' relative "
+            "paths name other files than the ones the gate checks. Name each path absolutely instead (in PowerShell, "
+            "-LiteralPath 'C:\\full\\path') and leave the directory unchanged.",
+        )
     root = _project_root(payload)
     cwd = Path(str(payload.get("cwd") or root)).absolute()
     paths, mutating = changed_paths({**payload, "project_root": str(cwd)})
-    if not mutating:
+    # c123 (owner decision A1): a program run needs a live claim too, checked after the writes.
+    program = _program_run(payload)
+    if not mutating and program is None:
         return {}
-    if not paths:
+    if mutating and not paths:
         command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
         unresolved = _unresolved_write_target(command) if command else None
         if unresolved is not None:
@@ -3755,54 +6080,80 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
                 "expression, an environment variable, or a home or splat prefix), so the gate cannot check it. Write "
                 "the literal path (in PowerShell, -LiteralPath 'path'), or use the editor tool.",
             )
-        return blocked("unknown_effect_targets", "Use an explicit tool target or the ordinary CLI for this effect.")
+        # c123 (item 9, entry 6): name what the gate observed.
+        return blocked(
+            "unknown_effect_targets",
+            f"This call carries {_unknown_target_cause(payload)}, so the gate cannot check every target it writes. "
+            "Name each target literally in a command the gate reads, or use the editor tool.",
+        )
     native = str(os.environ.get("GTKB_NATIVE_CONTEXT_ID") or payload.get("session_id") or "").strip()
     supplied = str(payload.get("session_id") or "").strip()
     if not native or (supplied and supplied != native):
-        return blocked("invalid_native_context", "The tool must carry the current harness-native context identifier.")
-    argv = [
-        sys.executable,
-        "-m",
-        "groundtruth_kb",
-        "bridge",
-        "check-effects",
-        "--native-context-id",
-        native,
-        "--cwd",
-        str(cwd),
-        "--json",
-    ]
-    for path in paths:
-        argv.extend(["--path", path])
+        # c123 (owner decision A1): an unbound context runs no program either.
+        running = f" A program run ({program}) needs a live claim of the bound context." if program else ""
+        return blocked(
+            "invalid_native_context", "The tool must carry the current harness-native context identifier." + running
+        )
     env = dict(os.environ)
     env["GT_PROJECT_ROOT"] = str(root)
     env["PYTHONIOENCODING"] = "utf-8"
-    try:
-        result = subprocess.run(
-            argv,
-            cwd=root,
-            env=env,
-            capture_output=True,
-            text=True,
-            encoding="utf-8",
-            timeout=10,
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-        )
-        if result.returncode:
-            return blocked(
-                "native_effect_refused", result.stderr.strip()[:2000] or "The native CLI refused the effect check."
+    if mutating:
+        argv = [
+            sys.executable,
+            "-m",
+            "groundtruth_kb",
+            "bridge",
+            "check-effects",
+            "--native-context-id",
+            native,
+            "--cwd",
+            str(cwd),
+            "--json",
+        ]
+        for path in paths:
+            argv.extend(["--path", path])
+        try:
+            result = subprocess.run(
+                argv,
+                cwd=root,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
             )
-        current = json.loads(result.stdout)
-        if (
-            not isinstance(current, dict)
-            or current.get("status") != "current"
-            or current.get("scope") not in {"scratch", "implementation"}
-        ):
-            return blocked("invalid_effect_response", "The native CLI did not return a current effect check.")
-    except (OSError, ValueError, subprocess.TimeoutExpired):
-        return blocked(
-            "effect_check_unavailable", "Restore the native CLI/authority connection before retrying this effect."
-        )
+            if result.returncode:
+                # c123 (item 7): click's prefix stripped, the native code kept.
+                return _native_refusal(result.stderr, paths)
+            current = json.loads(result.stdout)
+            if (
+                not isinstance(current, dict)
+                or current.get("status") != "current"
+                or current.get("scope") not in {"scratch", "implementation"}
+            ):
+                return blocked("invalid_effect_response", "The native CLI did not return a current effect check.")
+        except subprocess.TimeoutExpired:
+            # c123 (item 9, entry 4): each failure names its cause.
+            return blocked(
+                "effect_check_unavailable",
+                "The native effect check did not answer within 10 seconds. Restore the native CLI/authority connection "
+                "before retrying this effect.",
+            )
+        except OSError as error:
+            return blocked(
+                "effect_check_unavailable",
+                f"The native effect check could not start ({error.__class__.__name__}). Restore the native "
+                "CLI/authority connection before retrying this effect.",
+            )
+        except ValueError:
+            return blocked(
+                "effect_check_unavailable",
+                "The native effect check exited 0 but printed output that is not JSON, so its answer cannot be read.",
+            )
+    # c123 (owner decision A1): a command with both a write and a program run has both checked.
+    if program is not None:
+        return _native_program_check(native, root, env, program)
     return {}
 
 

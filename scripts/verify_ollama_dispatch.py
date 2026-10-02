@@ -22,6 +22,7 @@ from urllib.parse import quote
 
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.config import GTConfig, GTConfigError
+from groundtruth_kb.harness_invocation import InvocationError, render, sample_values, surface_findings
 
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
 if str(_PROJECT_ROOT) not in sys.path:
@@ -39,7 +40,6 @@ from scripts.windows_subprocess import no_window_subprocess_kwargs  # noqa: E402
 
 OLLAMA_HARNESS_ID = "D"
 OLLAMA_HARNESS_NAME = "ollama"
-OLLAMA_DISPATCH_SKILL = "bridge-review"
 OLLAMA_DISPATCH_REQUIRED_TOOLS = ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 OLLAMA_SHIM_RELATIVE = Path("scripts") / "ollama_harness.py"
 OLLAMA_AUTOSTART_PROBE_TIMEOUT_SECONDS = 5.0
@@ -73,6 +73,18 @@ def _headless_argv(record: dict[str, Any]) -> list[str]:
     headless = surfaces.get("headless", {}) if isinstance(surfaces, dict) else {}
     argv = headless.get("argv", []) if isinstance(headless, dict) else []
     return argv if isinstance(argv, list) and argv and all(isinstance(part, str) and part for part in argv) else []
+
+
+def _flag_values(argv: list[str], flag: str) -> list[str]:
+    """Every value ``argv`` gives ``flag``, as ``flag VALUE`` or ``flag=VALUE``."""
+    values: list[str] = []
+    prefix = f"{flag}="
+    for index, part in enumerate(argv):
+        if part == flag and index + 1 < len(argv):
+            values.append(argv[index + 1])
+        elif part.startswith(prefix):
+            values.append(part[len(prefix) :])
+    return values
 
 
 def _as_string_list(value: Any) -> list[str]:
@@ -238,38 +250,43 @@ def evaluate_readiness(
         )
         return result
     shim = (project_root / OLLAMA_SHIM_RELATIVE).resolve()
-    command = [p.replace("{{PROJECT_ROOT}}", str(project_root)) for p in argv]
+    # c123 (batch design WP2 2.1): the registration names no role and one --model; a role skill no longer routes D.
+    # The template is checked as the dispatcher renders it, every contract placeholder filled.
+    try:
+        command = render(argv, sample_values(str(project_root)))
+    except InvocationError:
+        command = []
     invokes_shim = any(
         (Path(p) if Path(p).is_absolute() else project_root / p).resolve() == shim
         for p in command
         if p.endswith("ollama_harness.py")
     )
-    skill_positions = [i for i, p in enumerate(command) if p == "--skill"]
-    skill_ok = (
-        len(skill_positions) == 1
-        and skill_positions[0] + 1 < len(command)
-        and command[skill_positions[0] + 1] == OLLAMA_DISPATCH_SKILL
-    )
+    models = _flag_values(command, "--model")
+    role_free = not surface_findings(record.get("invocation_surfaces"))
     checks.append(
         {
             "name": "native headless argv",
-            "passed": invokes_shim and skill_ok,
-            "detail": "Exact selected-root shim and bridge-review skill",
+            "passed": invokes_shim and role_free and len(models) == 1 and bool(models[0]),
+            "detail": "Exact selected-root shim, no role in the registration and exactly one --model route key",
         }
     )
     checks.append({"name": "shim present", "passed": shim.is_file(), "detail": OLLAMA_SHIM_RELATIVE.as_posix()})
     if not all(c["passed"] for c in checks):
         return result
     try:
-        route = resolve_model(load_routing_config(project_root), None, skill=OLLAMA_DISPATCH_SKILL)
+        route = resolve_model(load_routing_config(project_root), models[0])
     except OllamaHarnessError:
         checks.append(
-            {"name": "routing skill route", "passed": False, "detail": "Invalid or unavailable selected-root routing"}
+            {
+                "name": "routing model route",
+                "passed": False,
+                "detail": "The registered --model does not resolve in the selected-root routing",
+            }
         )
         return result
     missing = sorted(set(OLLAMA_DISPATCH_REQUIRED_TOOLS) - set(route.allowed_tools))
     route_ok = route.tool_calling_supported is True and not missing
-    checks.append({"name": "routing skill route", "passed": route_ok, "detail": f"missing_tools={missing}"})
+    checks.append({"name": "routing model route", "passed": route_ok, "detail": f"missing_tools={missing}"})
     result.update(model_id=route.model_id, route_key=route.key, required_tools=list(OLLAMA_DISPATCH_REQUIRED_TOOLS))
     if not route_ok:
         return result

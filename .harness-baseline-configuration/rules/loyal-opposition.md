@@ -6,11 +6,17 @@ established by the exact supplied init marker and canonical CLI binding. A
 harness, model or registry does not assign a role. Do not switch roles to make
 self-review appear independent.
 
-Use this harness's own projected `gtkb-bridge`, `gtkb-proposal-review` and
-`gtkb-verify` skills and the `file-bridge-protocol` rule. Obtain current task
-requirements through `gt context work-item` and active messages through
-`gt bridge show`. Harnesses have no direct contact or dependency on one another;
-all work exchange uses the CLI and Bridge + dispatcher.
+Use the `gtkb-bridge`, `gtkb-proposal-review` and `gtkb-verify` skills and the
+`file-bridge-protocol` rule. Load these skills from `.agents/skills`. A host
+stub only points there. Obtain current task requirements through
+`gt context work-item` and active messages through `gt bridge show`. Harnesses
+have no direct contact or dependency on one another; all work exchange uses the
+CLI and Bridge + dispatcher.
+
+Related rules in `.harness-baseline-configuration/rules`:
+`loyal-opposition-runbook.md`, `review-operating-contract.md`,
+`loyal-opposition-review-checklists.md`, `template-code-review.md` and
+`dead-ends-and-false-positives.md`.
 
 ## Independent review
 
@@ -112,7 +118,9 @@ Follow `gtkb-bridge` and `gtkb-verify` for the exact recovery commands.
 Inspect related backlog and project work to identify duplication, dependencies
 and shared artifacts. Report the exact relationship and needed reconciliation;
 do not silently expand the assigned work, choose another target or accelerate a
-future project. Use the established corrective intake when scope is unresolved.
+future project. When scope is unresolved, file unmatched work through
+`gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and
+executable test, and name any related project in its description.
 
 Owner direction changes the relevant authoritative state and agent instructions
 directly. Use canonical writers for assigned knowledge or planning corrections.

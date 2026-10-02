@@ -1,11 +1,9 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Tests for scripts/cursor_harness.py Loyal Opposition skill-route resolution.
+"""Tests for scripts/cursor_harness.py, the headless Cursor Agent shim in groundtruth_kb.cursor_harness.
 
-The harness-registry Cursor invocation surfaces pass the canonical LO route keys
-'bridge-review' / 'verification', which have no SKILL.md. These tests assert the
-alias resolution maps them to the real skill contracts so headless LO dispatch
-loads a contract instead of failing closed, while genuinely unknown routes still
-fail closed.
+c123 (batch design WP2 2.1): the shim selects no role. It has no --skill option, no skill route aliases and no Loyal
+Opposition skill set. The dispatched prompt, whose first line is the init line, reaches Cursor Agent as it came, and
+every run that Cursor Agent ends with exit 0 and an empty stdout fails closed.
 """
 
 from __future__ import annotations
@@ -18,69 +16,25 @@ from types import SimpleNamespace
 import pytest
 from groundtruth_kb import cursor_harness
 
-_REPO_ROOT = Path(__file__).resolve().parents[2]
-
 
 def _load_harness():
     return cursor_harness
 
 
-@pytest.fixture
-def cursor_with_skills(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    harness = _load_harness()
-    monkeypatch.chdir(tmp_path)
-    for name in ("bridge", "proposal-review", "verify"):
-        source = _REPO_ROOT / ".agents" / "skills" / f"gtkb-{name}" / "SKILL.md"
-        target = tmp_path / ".agents" / "skills" / f"gtkb-{name}" / "SKILL.md"
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(source.read_bytes())
-    return harness
-
-
-def test_skill_route_alias_bridge_review_resolves(cursor_with_skills) -> None:
-    """WI-4933: 'bridge-review' aliases to the bridge protocol contract."""
-    harness = cursor_with_skills
-    content = harness._skill_system_prompt("bridge-review")
-    assert content is not None
-    assert "name: gtkb-bridge" in content
-    assert "Review an implementation proposal" in content
-
-
-def test_skill_route_alias_verification_resolves(cursor_with_skills) -> None:
-    """WI-4872: 'verification' aliases to the real verify skill contract."""
-    harness = cursor_with_skills
-    content = harness._skill_system_prompt("verification")
-    assert content is not None
-    assert "verify" in content.lower()
-
-
-def test_skill_route_non_aliased_resolves(cursor_with_skills) -> None:
-    """A real skill name resolves directly (no alias needed)."""
-    harness = cursor_with_skills
-    content = harness._skill_system_prompt("gtkb-proposal-review")
-    assert content is not None
-
-
-def test_skill_route_unknown_still_raises() -> None:
-    """Genuinely unknown routes still fail closed (CursorHarnessError preserved)."""
-    harness = _load_harness()
-    with pytest.raises(harness.CursorHarnessError, match="unknown or unreadable skill route"):
-        harness._skill_system_prompt("definitely-not-a-skill")
-
-
-def test_skill_route_none_returns_none() -> None:
-    """No skill route yields no system prompt."""
-    harness = _load_harness()
-    assert harness._skill_system_prompt(None) is None
-
-
-def test_cursor_adaptation_metadata_is_compact_and_alias_aware() -> None:
+def test_cursor_adaptation_metadata_is_compact_and_names_no_skill_route() -> None:
     harness = _load_harness()
     payload = harness.cursor_adaptation_metadata()
 
     assert payload["harness_id"] == "E"
     assert payload["adaptation_label"] == "cursor-native-cli"
-    assert payload["skill_route_aliases"]["bridge-review"] == "proposal-review"
+    # c123 (batch design WP2 2.1): no skill routes, so no alias table and no alias fingerprint; v2 marks the change.
+    assert payload["adaptation_version"] == "cursor-native-cli-v2"
+    assert "skill_route_aliases" not in payload
+    assert set(payload["input_fingerprints"]) == {
+        "scripts/cursor_harness.py",
+        "groundtruth_kb/cursor_harness.py",
+        "groundtruth_kb/local_env.py",
+    }
     assert "governed_lo_publication" not in payload
     assert payload["raw_prompt_included"] is False
     assert all(value.startswith("sha256:") for value in payload["input_fingerprints"].values())
@@ -300,18 +254,16 @@ def test_bridge_review_main_preserves_requested_mode_and_agent_output(mode, monk
     monkeypatch.delenv("GTKB_BRIDGE_POLLER_RUN_ID", raising=False)
     monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT")
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
         return subprocess.CompletedProcess(command, 0, stdout='{"message":"CLI delivery acknowledged"}\n', stderr="")
 
     monkeypatch.setattr(harness.subprocess, "run", fake_run)
+    # c123 (batch design WP2 2.1): no --skill; the init line that leads the dispatched prompt carries the role.
     args = [
         "--prompt",
         "::init gtkb lo\n::open build\nReview assigned work",
-        "--skill",
-        "bridge-review",
         "--output-format",
         "json",
         "--timeout",
@@ -326,8 +278,8 @@ def test_bridge_review_main_preserves_requested_mode_and_agent_output(mode, monk
     assert ("--mode" in command) == bool(mode)
     if mode:
         assert command[command.index("--mode") + 1] == mode
-    assert "SKILL CONTRACT" in command[-1]
-    assert args[1] in command[-1]
+    # c123 (batch design WP2 2.1): the prompt reaches Cursor Agent as it came, with no skill text before it.
+    assert command[-1] == args[1]
     assert "GTKB_BRIDGE_VERDICT_ENVELOPE" not in command[-1]
     assert kwargs["cwd"] == str(Path.cwd())
     assert kwargs["capture_output"] is True
@@ -341,7 +293,6 @@ def test_main_can_force_read_only_plan_mode(
     harness = _load_harness()
     calls = []
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda _skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
@@ -363,11 +314,11 @@ def test_main_uses_no_window_creationflags_on_windows(monkeypatch: pytest.Monkey
     monkeypatch.setattr(harness.os, "name", "nt", raising=False)
     monkeypatch.setattr(harness.subprocess, "CREATE_NO_WINDOW", expected_flag, raising=False)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/cursor.cmd", "agent"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         calls.append((command, kwargs))
-        return subprocess.CompletedProcess(command, 0, stdout="", stderr="")
+        # c123 (batch design WP2 2.1): every run needs stdout now, so the fixture agent writes some.
+        return subprocess.CompletedProcess(command, 0, stdout="agent stdout\n", stderr="")
 
     monkeypatch.setattr(harness.subprocess, "run", fake_run)
 
@@ -380,20 +331,19 @@ def test_bridge_review_zero_output_success_fails_closed(
 ) -> None:
     harness = _load_harness()
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
         "run",
         lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout=" \n", stderr=""),
     )
 
-    exit_code = harness.main(["--prompt", "review this", "--skill", "bridge-review"])
+    exit_code = harness.main(["--prompt", "::init gtkb lo\nreview this"])
 
     captured = capsys.readouterr()
     assert exit_code == 1
     assert captured.out == ""
-    assert "produced no stdout" in captured.err
-    assert "bridge-review" in captured.err
+    # c123 (batch design WP2 2.1): one refusal for every run, naming no skill, route or role.
+    assert captured.err == "cursor_harness: Cursor Agent produced no stdout\n"
 
 
 def test_verification_zero_output_success_fails_closed(
@@ -401,28 +351,27 @@ def test_verification_zero_output_success_fails_closed(
 ) -> None:
     harness = _load_harness()
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
         "run",
         lambda command, **_kwargs: subprocess.CompletedProcess(command, 0, stdout="", stderr=""),
     )
 
-    exit_code = harness.main(["--prompt", "verify this", "--skill", "verification"])
+    exit_code = harness.main(["--prompt", "::init gtkb lo\nverify this"])
 
     captured = capsys.readouterr()
     assert exit_code == 1
     assert captured.out == ""
-    assert "produced no stdout" in captured.err
-    assert "verification" in captured.err
+    # c123 (batch design WP2 2.1): one refusal for every run, naming no skill, route or role.
+    assert captured.err == "cursor_harness: Cursor Agent produced no stdout\n"
 
 
-def test_non_bridge_zero_output_success_is_preserved(
+def test_non_bridge_zero_output_success_also_fails_closed(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """c123 (batch design WP2 2.1): inverted. No role skill marks bridge work any more, so every run needs stdout."""
     harness = _load_harness()
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: "SKILL CONTRACT" if skill else None)
     monkeypatch.setattr(
         harness.subprocess,
         "run",
@@ -432,9 +381,29 @@ def test_non_bridge_zero_output_success_is_preserved(
     exit_code = harness.main(["--prompt", "ordinary prompt"])
 
     captured = capsys.readouterr()
-    assert exit_code == 0
+    assert exit_code == 1
     assert captured.out == ""
-    assert captured.err == ""
+    assert captured.err == "cursor_harness: Cursor Agent produced no stdout\n"
+
+
+def test_failed_run_without_stdout_keeps_the_agent_exit_code(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """c123 (batch design WP2 2.1): the empty-stdout refusal follows exit 0 only; a failed run keeps its own code."""
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(
+        harness.subprocess,
+        "run",
+        lambda command, **_kwargs: subprocess.CompletedProcess(command, 3, stdout="", stderr="agent failed\n"),
+    )
+
+    exit_code = harness.main(["--prompt", "ordinary prompt"])
+
+    captured = capsys.readouterr()
+    assert exit_code == 3
+    assert captured.out == ""
+    assert captured.err == "agent failed\n"
 
 
 def test_timeout_returns_124_with_safe_context_and_partial_output(
@@ -445,7 +414,6 @@ def test_timeout_returns_124_with_safe_context_and_partial_output(
 
     monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         raise subprocess.TimeoutExpired(
@@ -461,8 +429,6 @@ def test_timeout_returns_124_with_safe_context_and_partial_output(
         [
             "--prompt",
             prompt,
-            "--skill",
-            "bridge-review",
             "--output-format",
             "json",
             "--mode",
@@ -479,7 +445,8 @@ def test_timeout_returns_124_with_safe_context_and_partial_output(
     assert "Cursor Agent timed out after 7s" in captured.err
     assert "exit=124" in captured.err
     assert "executable=agent.exe" in captured.err
-    assert "skill=bridge-review" in captured.err
+    # c123 (batch design WP2 2.1): the diagnostic has no skill field.
+    assert "skill=" not in captured.err
     assert "output_format=json" in captured.err
     assert "mode=plan" in captured.err
     assert prompt not in captured.out
@@ -497,7 +464,6 @@ def test_timeout_redacts_and_truncates_partial_output(
     monkeypatch.setattr(harness, "_TIMEOUT_CAPTURE_LIMIT_BYTES", 64)
     monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
 
     def fake_run(command, **kwargs):
         raise subprocess.TimeoutExpired(
@@ -518,42 +484,58 @@ def test_timeout_redacts_and_truncates_partial_output(
     assert "partial_stdout_bytes=" in captured.err
 
 
-@pytest.mark.parametrize("route", ["../.codex/skills/review", "../../peer", "/absolute", "C:/peer"])
-def test_skill_route_refuses_paths_outside_shared_source(route, cursor_with_skills):
-    with pytest.raises(cursor_with_skills.CursorHarnessError, match="invalid skill route"):
-        cursor_with_skills._skill_system_prompt(route)
+@pytest.mark.parametrize(
+    "skill_arguments",
+    [
+        ["--skill", "bridge-review"],
+        ["--skill", "verification"],
+        ["--skill=bridge-review"],
+        ["--skill", "../.codex/skills/review"],
+        ["--skill", "../../peer"],
+        ["--skill", "/absolute"],
+        ["--skill", "C:/peer"],
+    ],
+)
+def test_skill_option_is_refused_before_environment_or_launch(skill_arguments, monkeypatch, capsys):
+    """c123 (batch design WP2 2.1): no argument selects a skill; any --skill is a usage error before any read."""
+    harness = _load_harness()
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A --skill argument must be refused before environment loading or launch")
+
+    monkeypatch.setattr(harness, "_load_project_env_local", forbidden)
+    monkeypatch.setattr(harness.subprocess, "run", forbidden)
+    with pytest.raises(SystemExit) as error:
+        harness.main(["--prompt", "review this", *skill_arguments])
+    assert error.value.code == 2
+    assert "unrecognized arguments: --skill" in capsys.readouterr().err
 
 
-def test_missing_shared_skill_never_falls_back_to_peer_projection(cursor_with_skills):
-    harness = cursor_with_skills
-    own = Path.cwd() / ".agents" / "skills" / "gtkb-verify" / "SKILL.md"
-    own.unlink()
-    for peer in (".codex", ".claude"):
-        target = Path.cwd() / peer / "skills" / "gtkb-verify" / "SKILL.md"
-        target.parent.mkdir(parents=True)
-        target.write_text("Peer-only instruction", encoding="utf-8")
-    with pytest.raises(harness.CursorHarnessError, match="shared authored skill source"):
-        harness._skill_system_prompt("verification")
-
-
-def test_shared_skill_junction_cannot_load_another_harness(tmp_path, monkeypatch):
+def test_prompt_carries_no_skill_text_from_own_or_peer_projections(tmp_path, monkeypatch):
+    """c123 (batch design WP2 2.1): no skill is loaded, its own or a peer's; the prompt goes as it came."""
     harness = _load_harness()
     monkeypatch.chdir(tmp_path)
-    if harness.os.name != "nt":
-        pytest.skip("Windows NTFS junction boundary")
-    peer = tmp_path / ".codex" / "skills" / "gtkb-verify"
-    peer.mkdir(parents=True)
-    (peer / "SKILL.md").write_text("Peer-only instruction", encoding="utf-8")
-    own = tmp_path / ".agents" / "skills"
-    own.mkdir(parents=True)
-    link = own / "gtkb-verify"
-    subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(peer)], check=True, capture_output=True)
-    try:
-        with pytest.raises(harness.CursorHarnessError, match="leaves the shared authored skill directory"):
-            harness._skill_system_prompt("gtkb-verify")
-        assert (peer / "SKILL.md").read_text(encoding="utf-8") == "Peer-only instruction"
-    finally:
-        link.rmdir()
+    monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
+    monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
+    monkeypatch.setattr(harness, "_cursor_agent_env", lambda **_kwargs: {})
+    for tree in (".agents", ".codex", ".claude"):
+        skill = tmp_path / tree / "skills" / "gtkb-verify" / "SKILL.md"
+        skill.parent.mkdir(parents=True)
+        skill.write_text(f"Instruction from {tree}", encoding="utf-8")
+    before = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    calls = []
+
+    def launch(command, **kwargs):
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout="agent stdout\n", stderr="")
+
+    monkeypatch.setattr(harness.subprocess, "run", launch)
+    prompt = "::init gtkb lo\nVerify the dispatched report"
+    assert harness.main(["--prompt", prompt]) == 0
+    assert calls[0][-1] == prompt
+    assert not any("Instruction from" in part for part in calls[0])
+    after = {p.relative_to(tmp_path).as_posix(): p.read_bytes() for p in tmp_path.rglob("*") if p.is_file()}
+    assert after == before
 
 
 @pytest.mark.parametrize("identifier", [None, "GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_INHERITED_SESSION_ID"])
@@ -563,7 +545,6 @@ def test_main_never_infers_other_process_ownership(identifier, outcome, exit_cod
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
     monkeypatch.setattr(harness, "_cursor_agent_env", lambda **kwargs: {})
     for key in ["GTKB_BRIDGE_POLLER_RUN_ID", "GTKB_INHERITED_SESSION_ID"]:
         monkeypatch.delenv(key, raising=False)

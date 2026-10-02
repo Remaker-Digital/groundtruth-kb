@@ -13,6 +13,11 @@ message. Bind the harness's actual native context identifier with
 and read it back with `gt session show`. A role is immutable for that context.
 Resolve missing inputs before an action that depends on them.
 
+`author_harness_id` is attribution, not a role. Use the registered id your
+launcher exported as `GTKB_AUTHOR_HARNESS_ID`, or the id the dispatched task
+names. If neither exists, do not pick one from `gt harness list`. Report the
+gap, and ask the owner when interactive.
+
 Load `gt context work-item <work-item> --json` and the exact dispatched bridge item
 through `gt bridge show <document> --content --json`. Inspect current membership,
 formal requirements, tests, dependencies and Git state. Read definitions through
@@ -31,6 +36,14 @@ Use the role-appropriate bridge skill in `.agents/skills`:
 The owner dispatches work until Dispatcher Next is qualified and activated.
 Only agents author proposals and verdicts; the harness transports them.
 
+When you find a defect or needed work outside your target, file it before any
+workaround. `gtkb-work-item` creates a work item in
+`PROJECT-GTKB-NEW-WORK-INTAKE`, which is never authorized and which the owner
+orders. The item carries its governing specification, an executable test in an
+active plan phase, and its acceptance. If the finding is not reproducible, or is
+a material owner choice, file an ADVISORY with `gtkb-advisory-proposal`. Then
+continue the assigned work.
+
 A program sequences projects. A project groups interdependent work that completes
 and commits together. Every work item has one parent project. Parent authorization
 is the owner's binary ordering choice; check it before NEW. Readiness also needs
@@ -39,8 +52,13 @@ claim and a registered checkout. These are distinct conditions.
 
 Prime Builder proposes, implements an independently accepted proposal and reports
 READY. Loyal Opposition independently reviews and verifies work it did not author.
+Prime Builder authors NEW, REVISED, READY, VERDICT-REJECTED, WITHDRAWN and
+BLOCKED. Loyal Opposition authors GO, NO-GO, NOT-READY, VERIFIED and SUPERSEDED.
+Either role authors ADVISORY.
 Review evidence identifies Git mode and object identity. The final project commit
-contains its complete independently verified work product. Keep bridge payloads
+contains its complete independently verified work product. Only the Loyal
+Opposition context whose VERIFIED delivery returns `project_ready_for_commit: true`
+makes the one project commit. Prime Builder never commits. Keep bridge payloads
 and generated projections out of that commit.
 
 For changed formal intent after VERIFIED before commit, use the native restart
@@ -50,10 +68,12 @@ Ordinary byte changes need fresh verification. Committed work remains terminal.
 
 ## Preserve the work and correct drift
 
-Use only this context's registered checkout and scratch directory. Revalidate the
-claim and scope through native services before protected effects. Refuse redirected
-paths and preserve unrelated bytes. Let native publication finish or safely resume
-the intended effect; final prose is not proof of delivery.
+Use only this context's registered checkout and its scratch directory,
+`scratchpad/<session-context-id>`, which is never cited in a bridge message or
+commit. Revalidate the claim and scope through native services before protected
+effects. Refuse redirected paths and preserve unrelated bytes. Let native
+publication finish or safely resume the intended effect; final prose is not proof
+of delivery.
 
 After authorized close/wrap harvest, use
 `gt session scratch-teardown --native-context-id <id>` for this context's scratch;

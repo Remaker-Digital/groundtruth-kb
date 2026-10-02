@@ -26,6 +26,7 @@ from groundtruth_kb.bridge.native import (
     EffectCheckRequest,
     FenceRequest,
     NativeBridgeService,
+    ProgramCheckRequest,
     PublishWorkRequest,
     ScratchTeardownRequest,
 )
@@ -184,6 +185,11 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
     @app.post("/v1/bridge/check-effects")
     def bridge_check_effects(request: EffectCheckRequest) -> Response:
         return _result(bridge.check_effects(request))
+
+    # c123 (batch design WP1 5): the effect gate's check before a program or test run, beside the target check.
+    @app.post("/v1/bridge/check-program")
+    def bridge_check_program(request: ProgramCheckRequest) -> Response:
+        return _result(bridge.check_program(request))
 
     @app.get("/v1/bridge/queue")
     def bridge_queue(role: Literal["pb", "lo"]) -> Response:

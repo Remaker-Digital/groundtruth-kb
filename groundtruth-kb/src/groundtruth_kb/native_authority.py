@@ -277,6 +277,34 @@ def _error(code: str, message: str, **details: Any) -> NoReturn:
     raise PostgresKernelError(code, message, details=details)
 
 
+def _refuse_role_bearing_surfaces(record_id: str, surfaces: dict[str, Any]) -> None:
+    """Refuse invocation surfaces that name a role or a placeholder outside the contract (c123; batch design WP2 2.1).
+
+    Roles bind to contexts through the init line; a registration that carried one in a dispatch tag, a role key or a
+    ``--skill`` argument let a launch argument stand in for the binding. Nothing is written when this refuses.
+    """
+    from groundtruth_kb.harness_invocation import PLACEHOLDERS, ROLE_FINDINGS, surface_findings
+
+    findings = surface_findings(surfaces)
+    if not findings:
+        return
+    listed = [{"code": finding.code, "path": finding.path, "value": finding.value} for finding in findings]
+    if any(finding.code in ROLE_FINDINGS for finding in findings):
+        _error(
+            "harness_surface_names_role",
+            "A harness registration names no role: roles bind to contexts through the init line, never through a "
+            "dispatch tag, a role key, an init marker or a --skill argument",
+            id=record_id,
+            findings=listed,
+        )
+    _error(
+        "unknown_invocation_placeholder",
+        f"A harness invocation uses only the contract's placeholders: {', '.join(sorted(PLACEHOLDERS))}",
+        id=record_id,
+        findings=listed,
+    )
+
+
 def _required(tx: PostgresTransaction, table: str, record_id: str, *, lock: bool = False) -> dict[str, Any]:
     record = tx.get(table, {"id": record_id}, lock=lock)
     if record is None:
@@ -775,6 +803,8 @@ class AuthorityService:
         from groundtruth_kb.harness_lifecycle import STATUS_ACTIVE, STATUS_REGISTERED, validate_transition
 
         fields = request.fields.model_dump(exclude_unset=True)
+        if fields.get("invocation_surfaces") is not None:
+            _refuse_role_bearing_surfaces(record_id, fields["invocation_surfaces"])
         with self.kernel.transaction() as tx:
             current = tx.get("harnesses", {"id": record_id}, lock=True)
             if current is None:
@@ -945,8 +975,17 @@ class AuthorityService:
     def set_project_authorization(self, record_id: str, request: ProjectAuthorizationChange) -> dict[str, Any]:
         """Apply owner-directed ordering to the existing project row.
 
-        Attribution describes the mutation, not proof of permission. This
-        operation neither changes membership nor revokes initiated attempts.
+        This operation neither changes membership nor revokes initiated
+        attempts.
+
+        c123 (owner decision E1): the service does not authenticate its
+        callers, so the actor is attribution, not proof of permission. For
+        agent harnesses, project authorization, membership moves
+        (move_work_item) and execution-project creation (amend_project at
+        version 0) are guarded at the effect gate as owner operations, which
+        the owner runs in their own terminal
+        (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001). A caller the gate does
+        not read, such as a program run inside a claim, is not refused here.
         """
         with self.kernel.transaction() as tx:
             current = _required(tx, "projects", record_id, lock=True)

@@ -149,7 +149,7 @@ def test_unparseable_target_output_with_exit_zero_is_an_allow(tmp_path):
         (
             "edit",
             {"path": "a.txt", "before": "x", "after": "y"},
-            {"tool_name": "Edit", "tool_input": {"file_path": "a.txt"}},
+            {"tool_name": "Edit", "tool_input": {"file_path": "a.txt", "old_string": "x", "new_string": "y"}},
         ),
         ("shell", {"command": "echo hi"}, {"tool_name": "Bash", "tool_input": {"command": "echo hi"}}),
         ("developer__shell", {"command": "dir"}, {"tool_name": "Bash", "tool_input": {"command": "dir"}}),
@@ -166,7 +166,12 @@ def test_unparseable_target_output_with_exit_zero_is_an_allow(tmp_path):
         (
             "developer__text_editor",
             {"command": "str_replace", "path": "a.txt", "old_str": "a", "new_str": "b"},
-            {"tool_name": "Edit", "tool_input": {"file_path": "a.txt"}},
+            {"tool_name": "Edit", "tool_input": {"file_path": "a.txt", "old_string": "a", "new_string": "b"}},
+        ),
+        (
+            "developer__text_editor",
+            {"command": "insert", "path": "a.txt", "insert_line": 3, "new_str": "z"},
+            {"tool_name": "Edit", "tool_input": {"file_path": "a.txt", "new_string": "z"}},
         ),
         (
             "developer__text_editor",

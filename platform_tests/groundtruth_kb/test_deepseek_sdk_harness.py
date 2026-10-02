@@ -507,3 +507,93 @@ def test_editor_views_reach_the_real_gate_which_refuses_credential_material(tmp_
     decisions = [json.loads(line) for line in log.read_text(encoding="utf-8").splitlines()]
     assert [d["tool"] for d in decisions] == ["str_replace_editor"] * 5 + ["pwsh"], "every view reached the gate"
     assert [d["allowed"] for d in decisions] == [False, False, False, True, True, False]
+
+
+# c123 (owner decision A6): the sdk-minimal profile mounts the pwsh tool from @deepseek-ai/dsh-tool-pwsh-persistent, whose
+# shell keeps its working directory across calls, while the guard reports a fixed cwd; the guard marks that tool's
+# payloads "persistent_shell": true, and the gate refuses a change of directory the session keeps.
+SDK_GUARD_CASES_HARNESS = r"""
+import { readFileSync } from 'node:fs';
+import { pathToFileURL } from 'node:url';
+const [modulePath, casesPath] = process.argv.slice(2);
+const guard = await import(pathToFileURL(modulePath).href);
+let check;
+guard.apply({ tools: { guard: (fn) => { check = fn; } } });
+const cases = JSON.parse(readFileSync(casesPath, 'utf8'));
+console.log(JSON.stringify(cases.map((item) => check(item) ?? null)));
+"""
+
+RECORDING_GATE = """import json, os, sys
+payload = json.load(sys.stdin)
+with open(os.environ["GTKB_GUARD_RECORD"], "a", encoding="utf-8") as record:
+    record.write(json.dumps(payload) + "\\n")
+print("{}")
+"""
+
+
+def _run_guard_cases(tmp_path, gate: Path, cases: list[dict], **extra_env: str) -> list:
+    import shutil
+
+    node = shutil.which("node")
+    assert node, "the DeepSeek SDK guard requires Node.js on PATH"
+    harness = tmp_path / "sdk-guard-cases.mjs"
+    harness.write_text(SDK_GUARD_CASES_HARNESS, encoding="utf-8")
+    cases_file = tmp_path / "sdk-guard-cases.json"
+    cases_file.write_text(json.dumps(cases), encoding="utf-8")
+    env = {
+        **os.environ,
+        "GTKB_GUARD_PYTHON": sys.executable,
+        "GTKB_GUARD_GATE": str(gate),
+        "GT_PROJECT_ROOT": str(tmp_path),
+        "GTKB_GUARD_CWD": str(tmp_path),
+        "GTKB_NATIVE_CONTEXT_ID": "deepseek-sdk-guard-persistent-test",
+        **extra_env,
+    }
+    done = subprocess.run(
+        [node, str(harness), str(SDK_SOURCE / "gtkb_guard.mjs"), str(cases_file)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=240,
+        env=env,
+        cwd=tmp_path,
+        creationflags=FLAGS,
+    )
+    assert done.returncode == 0, done.stderr[-2000:]
+    return json.loads(done.stdout.strip().splitlines()[-1])
+
+
+def test_the_guard_marks_only_the_persistent_pwsh_tools_payloads(tmp_path):
+    """The pwsh tool's payload carries "persistent_shell": true; the editor's payloads do not (c123, A6). A recording
+    gate stands in for the shared gate; no runtime, authority or network is involved."""
+    gate = tmp_path / "recording_gate.py"
+    gate.write_text(RECORDING_GATE, encoding="utf-8")
+    record = tmp_path / "payloads.jsonl"
+    cases = [
+        {"name": "pwsh", "arguments": {"command": "Get-Location"}},
+        {"name": "str_replace_editor", "arguments": {"command": "view", "path": "README.md"}},
+        {"name": "str_replace_editor", "arguments": {"command": "create", "path": "note.md", "file_text": "x"}},
+    ]
+
+    assert _run_guard_cases(tmp_path, gate, cases, GTKB_GUARD_RECORD=str(record)) == [None, None, None]
+
+    payloads = [json.loads(line) for line in record.read_text(encoding="utf-8").splitlines()]
+    assert [payload["tool_name"] for payload in payloads] == ["Bash", "Read", "Write"]
+    assert payloads[0]["persistent_shell"] is True
+    assert all("persistent_shell" not in payload for payload in payloads[1:])
+
+
+def test_the_real_gate_refuses_a_change_of_directory_from_the_persistent_pwsh_tool(tmp_path):
+    """The shared gate refuses the marked payload's Set-Location before any binding or authority check, and allows a
+    change of directory handed to a child shell and an ordinary read (c123, A6)."""
+    cases = [
+        {"name": "pwsh", "arguments": {"command": "Set-Location sub"}},
+        {"name": "pwsh", "arguments": {"command": 'pwsh -NoProfile -Command "Set-Location sub; Get-Location"'}},
+        {"name": "pwsh", "arguments": {"command": "Get-Location"}},
+    ]
+
+    results = _run_guard_cases(tmp_path, ROOT / "scripts" / "implementation_start_gate.py", cases)
+
+    assert results[0].startswith("persistent_shell_directory_change: "), results
+    assert "-LiteralPath" in results[0]
+    assert results[1:] == [None, None]

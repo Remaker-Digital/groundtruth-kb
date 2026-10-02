@@ -24,14 +24,20 @@ from pydantic import Field
 
 from groundtruth_kb.bridge.taxonomy import BRIDGE_KIND_BY_STATUS
 from groundtruth_kb.bridge.vocabulary import (
+    ACCEPTED_SCOPE_STATUSES,
     CANONICAL_STATUSES,
+    DEPENDENCY_GATED_STATUSES,
     LOYAL_OPPOSITION_ACTIONABLE_STATUSES,
     LOYAL_OPPOSITION_AUTHORED_STATUSES,
     NON_DISPATCHABLE_STATUSES,
+    POST_ACCEPTANCE_STATUSES,
     PRIME_ACTIONABLE_STATUSES,
     PRIME_AUTHORED_STATUSES,
+    PROPOSAL_STATUSES,
+    ROLE_NAMES,
     THREAD_START_STATUSES,
     TRANSITIONS,
+    WORK_ITEM_HEADER_STATUSES,
 )
 from groundtruth_kb.governance.credential_patterns import BASH_EXTRAS, CREDENTIAL_PATTERNS
 from groundtruth_kb.isolation.registry_check import ApplicationRegistryError, resolve_project_repository
@@ -64,7 +70,6 @@ from groundtruth_kb.session.worktree import (
     worktree_path,
 )
 
-ROLE_NAMES = {"pb": "prime-builder", "lo": "loyal-opposition"}
 ROLE_TOKENS = {value: key for key, value in ROLE_NAMES.items()}
 INIT = re.compile(r"^::init (gtkb|application) (pb|lo)$")
 ACTIVITIES = {"ops", "deliberation", "build", "test", "spec", "project"}
@@ -93,6 +98,10 @@ class FenceRequest(SessionRequest):
 class EffectCheckRequest(SessionRequest):
     cwd: Text
     paths: list[Text] = Field(min_length=1, max_length=256)
+
+
+class ProgramCheckRequest(SessionRequest):
+    """c123 (batch design WP1 5): the bound context whose live claim a program or test run needs."""
 
 
 class DeliverRequest(FenceRequest):
@@ -285,7 +294,7 @@ def parse_authored_message(content: str) -> dict[str, Any]:
         "author_session_context_id",
         "author_model",
     }
-    if status in {"NEW", "REVISED", "BLOCKED"}:
+    if status in WORK_ITEM_HEADER_STATUSES:
         required |= {"project", "work_item"}
     missing = sorted(key for key in required if not metadata.get(key))
     if missing:
@@ -343,7 +352,7 @@ def parse_authored_message(content: str) -> dict[str, Any]:
         "metadata": metadata,
         "subject": init_lines[0].split()[1] if init_lines else None,
     }
-    if status in {"NEW", "REVISED"}:
+    if status in PROPOSAL_STATUSES:
         try:
             observed_work_version = metadata.get("work_item_version", "")
             result["work_item_version"] = int(observed_work_version)
@@ -683,7 +692,7 @@ class NativeBridgeService:
             attempts = tx.cursor.fetchall()
             attempt = dict(attempts[0]) if len(attempts) == 1 else None
         change_paths = []
-        if attempt and attempt["go_context_id"] and attempt["head_status"] in {"GO", "READY", "NOT-READY", "VERIFIED"}:
+        if attempt and attempt["go_context_id"] and attempt["head_status"] in POST_ACCEPTANCE_STATUSES:
             try:
                 self._scope(tx, attempt, lock=lock)
             except PostgresKernelError as error:
@@ -833,9 +842,9 @@ class NativeBridgeService:
             _error("scope_changed", "Current project membership differs from the attempt")
         # Rejection and revision can address changed intent. Approval,
         # implementation and verification must use the accepted proposal scope.
-        if intended_status in {"GO", "READY", "VERIFIED"}:
+        if intended_status in ACCEPTED_SCOPE_STATUSES:
             self._scope(tx, attempt, lock=lock)
-        if intended_status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+        if intended_status in DEPENDENCY_GATED_STATUSES:
             _require_project_dependencies(tx, attempt["project_id"], lock=lock)
             self._require_work_dependencies(tx, work["id"], attempt=attempt, lock=lock)
 
@@ -1065,6 +1074,37 @@ class NativeBridgeService:
             document, fence = matches[0]
             return {"status": "current", "scope": "implementation", "document": document, "fence": fence}
 
+    def check_program(self, request: ProgramCheckRequest) -> dict[str, Any]:
+        """Report whether the bound context holds a live claim, which every program or test run needs.
+
+        c123 (batch design WP1 5): the effect gate reads a command's text, not what a program it starts writes, so a
+        program run is tied to a delivery instead. Any live claim of the bound context counts, whatever its intended
+        status: Prime Builder runs tests under its READY claim and a verifier under its verdict claim. Like
+        check_effects, this pre-tool check retains nothing and grants nothing. Inside a claim the program can still
+        write outside the claim's targets; publication and delivery recheck the fence and scope at their own
+        boundaries.
+        """
+        with self.kernel.transaction(read_only=True) as tx:
+            binding = self._binding(tx, request.native_context_id)
+            tx.cursor.execute(
+                sql.SQL(
+                    "SELECT count(*) AS claims FROM {}.work_intent_claims "
+                    "WHERE claimant_session_context_id=%s AND expires_at>clock_timestamp()"
+                ).format(sql.Identifier(tx.schema)),
+                (binding["session_context_id"],),
+            )
+            claims = int(tx.cursor.fetchone()["claims"])
+        if not claims:
+            _error(
+                "program_claim_required",
+                "Programs and tests run only inside a live claim of this context: claim the artifact this context "
+                "will deliver first (gt bridge claim <document> --native-context-id <id> --expected-version "
+                "<head version> --status <status> --request-id <new id>, with --work-item-id <work item> for work), "
+                "then run the program within that claim's 600 seconds; any intended status counts, a verifier's "
+                "verdict claim included",
+            )
+        return {"status": "current", "scope": "program", "claims": claims}
+
     def scratch_teardown(self, request: ScratchTeardownRequest) -> dict[str, Any]:
         """Remove exactly the bound context's disposable scratch directory and report every entry's outcome.
 
@@ -1209,7 +1249,7 @@ class NativeBridgeService:
                 if attempt["project_id"]
                 else self.project_root
             )
-            if claim["intended_status"] in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+            if claim["intended_status"] in DEPENDENCY_GATED_STATUSES:
                 self._require_work_dependencies(tx, attempt["work_item_id"], attempt=attempt, lock=True)
             head = subprocess.run(
                 ["git", "-C", str(source), "rev-parse", "HEAD"], capture_output=True, text=True, check=True
@@ -1382,10 +1422,13 @@ class NativeBridgeService:
             if tx.get("harnesses", {"id": metadata["author_harness_id"]}) is None:
                 # c120 (M13 host I, PB1 on c119): a native context id given as the harness was refused without naming
                 # the field. The code and details keep the canonical not_found's (docs/reference/cli.md).
+                # c123 (batch design WP4 4.1): the id is the one the launcher exported or the dispatched task names;
+                # AGENTS.md says not to pick one from gt harness list, so the refusal no longer points there.
                 _error(
                     "not_found",
-                    "author_harness_id must name a registered harness: use this host's id from gt harness list, "
-                    "not a native context id",
+                    "author_harness_id must name a registered harness: use the id your launcher exported as "
+                    "GTKB_AUTHOR_HARNESS_ID or the one the dispatched task names, not a native context id; if neither "
+                    "exists, do not choose one: report the gap, and ask the owner when interactive",
                     domain="harnesses",
                     id=metadata["author_harness_id"],
                     field="author_harness_id",
@@ -1415,7 +1458,7 @@ class NativeBridgeService:
             updates: dict[str, Any] = {"head_version": message["version"], "head_status": status}
             if status == "NEW" and project["authorization"] != "authorized":
                 _error("project_not_authorized", "The parent project is not authorized at NEW proposal filing")
-            if status in {"NEW", "REVISED", "GO", "READY", "VERIFIED"}:
+            if status in DEPENDENCY_GATED_STATUSES:
                 _require_project_dependencies(tx, project["id"])
                 self._require_work_dependencies(tx, work["id"], attempt=attempt)
             if status == "BLOCKED":
@@ -1435,7 +1478,7 @@ class NativeBridgeService:
                         raise ValueError()
                 except ValueError:
                     _error("invalid_blocked_observation", "BLOCKED must identify the observed read time")
-            if status in {"NEW", "REVISED"}:
+            if status in PROPOSAL_STATUSES:
                 if message["work_item_version"] != work["version"]:
                     _error(
                         "scope_changed",
@@ -1484,7 +1527,7 @@ class NativeBridgeService:
                     go_context_id=None,
                     report_context_id=None,
                 )
-            if status in {"GO", "READY", "VERIFIED"}:
+            if status in ACCEPTED_SCOPE_STATUSES:
                 self._scope(tx, attempt)
             if status == "GO":
                 if (

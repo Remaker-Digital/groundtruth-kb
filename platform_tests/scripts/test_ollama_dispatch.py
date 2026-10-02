@@ -9,32 +9,40 @@ from scripts import ollama_harness
 from scripts import verify_ollama_dispatch as verify
 
 OLLAMA_MODEL_ID = "fixture-review:current"
-OLLAMA_SURFACES = {
-    "headless": {
-        "argv": [
-            "groundtruth-kb/.venv/Scripts/python.exe",
-            "scripts/ollama_harness.py",
-            "-p",
-            "{{PROMPT}}",
-            "--skill",
-            "bridge-review",
-        ]
-    }
-}
+# c123 (batch design WP2 2.1): D's corrected registration (step 3). It binds with --init, carries the bridge target and
+# names exactly one --model; it has no role skill and no role-named tag. The routing default is another row, so a
+# route check that resolved the default instead of the registered --model would fail these tests.
+D_MODEL_ROUTE = "deepseek-v4-flash-cloud"
+D_ARGV = [
+    "groundtruth-kb/.venv/Scripts/python.exe",
+    "scripts/ollama_harness.py",
+    "--init",
+    "{{INIT_LINE}}",
+    "--bridge-document",
+    "{{DOCUMENT}}",
+    "--bridge-version",
+    "{{VERSION}}",
+    "--report",
+    "{{REPORT}}",
+    "-p",
+    "{{PROMPT}}",
+    "--model",
+    D_MODEL_ROUTE,
+]
+OLLAMA_SURFACES = {"dispatch": {"dispatch_tags": ["low-cost"]}, "headless": {"argv": D_ARGV}}
 
 
 def _ollama_record(
     *,
-    role: list[str] | None = None,
     status: str = "registered",
     surfaces: dict | None = None,
     event_driven_hooks: bool = True,
 ) -> dict:
+    # c123 (batch design WP2 2.1): a registration names no role, so the record carries no role field.
     return {
         "id": "D",
         "harness_name": "ollama",
         "harness_type": "ollama",
-        "role": [] if role is None else role,
         "status": status,
         "event_driven_hooks": event_driven_hooks,
         "invocation_surfaces": OLLAMA_SURFACES if surfaces is None else surfaces,
@@ -49,16 +57,18 @@ def _write_routing(root: Path, *, allowed_tools: list[str] | None = None) -> Non
     (root / ollama_harness.ROUTING_CONFIG_PATH).write_text(
         "schema_version = 1\n"
         "\n"
-        "[models.review-route]\n"
+        "[models.fixture-default]\n"
+        'model_id = "fixture-default:current"\n'
+        "tool_calling_supported = true\n"
+        'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
+        "\n"
+        f"[models.{D_MODEL_ROUTE}]\n"
         f'model_id = "{OLLAMA_MODEL_ID}"\n'
         "tool_calling_supported = true\n"
         f"allowed_tools = {tools_literal}\n"
         "\n"
         "[routing.ollama]\n"
-        'default_model = "review-route"\n'
-        "\n"
-        "[routing.ollama.skills]\n"
-        'bridge-review = "review-route"\n',
+        'default_model = "fixture-default"\n',
         encoding="utf-8",
     )
 
@@ -80,7 +90,7 @@ def test_readiness_passes_with_mocked_tags(
     monkeypatch.setattr(verify, "evaluate_ollama_autostart", lambda **_kwargs: {"checked": True, "configured": True})
     result = verify.evaluate_readiness(root)
     assert result["probe_passed"] is True
-    assert result["route_key"] == "review-route"
+    assert result["route_key"] == D_MODEL_ROUTE
 
 
 def test_readiness_fails_closed_when_daemon_unavailable(
@@ -161,8 +171,9 @@ def test_advertised_model_matches_exact_tag_or_default_latest(requested, adverti
         [],
         ["fixture", None],
         ["fixture", ""],
-        ["python", "foreign/scripts/ollama_harness.py", "--skill", "bridge-review"],
-        ["python", "scripts/ollama_harness.py", "--skill", "unrelated", "bridge-review"],
+        # c123 (batch design WP2 2.1): a foreign shim fails even with an otherwise valid argv; the skill forms moved
+        # to the role test below.
+        ["python", "foreign/scripts/ollama_harness.py", "--model", D_MODEL_ROUTE],
     ],
 )
 def test_malformed_launch_record_prevents_host_and_provider_checks(tmp_path, monkeypatch, native_harness_record, argv):
@@ -175,6 +186,86 @@ def test_malformed_launch_record_prevents_host_and_provider_checks(tmp_path, mon
     monkeypatch.setattr(verify, "call_ollama_tags", forbidden)
     monkeypatch.setattr(verify, "evaluate_ollama_autostart", forbidden)
     assert verify.evaluate_readiness(root)["probe_passed"] is False
+
+
+def test_the_corrected_d_registration_passes_the_argv_and_route_checks(tmp_path, monkeypatch, native_harness_record):
+    """c123 (batch design WP2 2.1): the readiness check renders D's template and resolves its one --model."""
+    assert " ".join(D_ARGV) == (
+        "groundtruth-kb/.venv/Scripts/python.exe scripts/ollama_harness.py --init {{INIT_LINE}} "
+        "--bridge-document {{DOCUMENT}} --bridge-version {{VERSION}} --report {{REPORT}} -p {{PROMPT}} "
+        "--model deepseek-v4-flash-cloud"
+    )
+    root = _write_project(tmp_path, native_harness_record)
+    monkeypatch.setattr(verify, "evaluate_ollama_autostart", lambda **kwargs: {"checked": False, "configured": None})
+
+    result = verify.evaluate_readiness(root, require_daemon=False)
+
+    assert [(check["name"], check["passed"]) for check in result["checks"]] == [
+        ("native headless argv", True),
+        ("shim present", True),
+        ("routing model route", True),
+    ]
+    assert (result["route_key"], result["model_id"]) == (D_MODEL_ROUTE, OLLAMA_MODEL_ID)
+    assert result["probe_passed"] is True
+
+
+@pytest.mark.parametrize(
+    "surfaces",
+    [
+        pytest.param({**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV, "--skill", "bridge-review"]}}, id="skill"),
+        pytest.param({**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV, "--skill=verification"]}}, id="skill_equals"),
+        pytest.param(
+            {**OLLAMA_SURFACES, "dispatch": {"dispatch_tags": ["low-cost", "loyal-opposition"]}}, id="role_tag"
+        ),
+        pytest.param({**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV, "::init gtkb lo"]}}, id="init_marker"),
+        pytest.param({**OLLAMA_SURFACES, "headless": {"argv": D_ARGV[:-2]}}, id="no_model"),
+        pytest.param(
+            {**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV, "--model", "fixture-default"]}}, id="two_models"
+        ),
+        pytest.param({**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV[:-2], "--model="]}}, id="empty_model"),
+        pytest.param({**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV[:-1], "{{ROLE}}"]}}, id="unknown_placeholder"),
+    ],
+)
+def test_a_registration_naming_a_role_or_not_exactly_one_model_fails_the_argv_check(
+    tmp_path, monkeypatch, native_harness_record, surfaces
+):
+    """c123 (batch design WP2 2.1): a role skill, a role tag or a model count other than one fails the argv check."""
+    root = _write_project(tmp_path, native_harness_record)
+    native_harness_record(root, _ollama_record(surfaces=surfaces))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A refused registration must not reach the routing, host or provider checks")
+
+    monkeypatch.setattr(verify, "load_routing_config", forbidden)
+    monkeypatch.setattr(verify, "call_ollama_tags", forbidden)
+    monkeypatch.setattr(verify, "evaluate_ollama_autostart", forbidden)
+
+    result = verify.evaluate_readiness(root)
+
+    assert result["probe_passed"] is False
+    assert [(check["name"], check["passed"]) for check in result["checks"]] == [
+        ("native headless argv", False),
+        ("shim present", True),
+    ]
+
+
+def test_a_registered_model_that_does_not_resolve_fails_the_route_check(tmp_path, monkeypatch, native_harness_record):
+    root = _write_project(tmp_path, native_harness_record)
+    surfaces = {**OLLAMA_SURFACES, "headless": {"argv": [*D_ARGV[:-1], "unrouted-fixture-route"]}}
+    native_harness_record(root, _ollama_record(surfaces=surfaces))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("An unresolved route must not reach the host or provider checks")
+
+    monkeypatch.setattr(verify, "call_ollama_tags", forbidden)
+    monkeypatch.setattr(verify, "evaluate_ollama_autostart", forbidden)
+
+    result = verify.evaluate_readiness(root)
+
+    assert result["probe_passed"] is False
+    assert result["checks"][-1]["name"] == "routing model route"
+    assert result["checks"][-1]["passed"] is False
+    assert "route_key" not in result
 
 
 def test_omitted_daemon_check_is_explicitly_unqualified(tmp_path, monkeypatch, native_harness_record):

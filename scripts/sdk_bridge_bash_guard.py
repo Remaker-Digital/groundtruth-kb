@@ -92,15 +92,17 @@ class BridgeDeliveryIncomplete(RuntimeError):
     code = "bridge_delivery_incomplete"
 
 
-def bridge_completion_target(skill, document, version):
-    """Require an exact successor for an explicitly selected bridge workload.
+def bridge_completion_target(document, version):
+    """Require an exact successor for an explicitly assigned bridge workload.
 
     Initialization binds a context; it does not assign bridge work. Prompt prose
     and init markers are never a substitute for the launcher's target arguments.
-    Bridge-only skills require those arguments, and partial targets fail before
-    model execution. Every explicit target still requires canonical delivery.
+    A partial target fails before model execution, and every explicit target
+    still requires canonical delivery. c123 (batch design WP2 2.3): the
+    requirement no longer follows a role skill; the registered templates of
+    the API launchers always carry both arguments.
     """
-    required = document is not None or version is not None or skill in {"bridge-review", "verification"}
+    required = document is not None or version is not None
     if not required:
         return None
     if not isinstance(document, str) or not document.strip() or type(version) is not int or version < 1:
@@ -172,3 +174,70 @@ def verify_bridge_completion(target, native_context_id, project_root: Path, time
         raise BridgeDeliveryIncomplete(
             "bridge_delivery_incomplete: Canonical delivery readback was unavailable or invalid"
         ) from exc
+
+
+class NativeBindFailed(RuntimeError):
+    code = "native_bind_failed"
+
+
+BOUND_STATUSES = frozenset({"init_requested", "already_initialized_idempotent"})
+
+
+def bind_native_context(native_context_id, init_line, project_root: Path, runner=None):
+    """Bind this run's native context through the native CLI before the first provider call (c123; WP2 2.1).
+
+    The launcher passes the exact init line it was given (``--init``) and never a role; the role is the binding's.
+    The checks are the DeepSeek SDK launcher's (infrastructure/deepseek-sdk/harness.py ``bind_context``): a
+    successful status, a binding with a session context and a role, and the same native context. Like that launcher
+    the call has no time limit of its own. Any failure raises NativeBindFailed, which the launchers end with exit 4.
+    """
+    argv = [
+        sys.executable,
+        "-m",
+        "groundtruth_kb",
+        "session",
+        "bind",
+        "--native-context-id",
+        native_context_id,
+        "--init-keyword",
+        init_line,
+        "--json",
+    ]
+    env = {key: value for key, value in os.environ.items() if not key.startswith(("PG", "GT_POSTGRES_"))}
+    env.pop("GTKB_AUTHOR_SESSION_CONTEXT_ID", None)
+    env.update(GT_PROJECT_ROOT=str(project_root), GTKB_NATIVE_CONTEXT_ID=native_context_id, PYTHONIOENCODING="utf-8")
+    try:
+        if runner is None:
+            completed = subprocess.run(
+                argv,
+                cwd=project_root,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+        else:
+            command = subprocess.list2cmdline(argv) if os.name == "nt" else shlex.join(argv)
+            completed = runner(command, project_root, env, None)
+        if completed.returncode:
+            raise NativeBindFailed(f"native_bind_failed: gt session bind exited {completed.returncode}")
+        # A runner may hand back no stdout at all; that is "no JSON", never a crash (exit 4, not a traceback).
+        result = json.loads(completed.stdout or "")
+    except (OSError, subprocess.SubprocessError, ValueError) as exc:
+        raise NativeBindFailed("native_bind_failed: gt session bind was unavailable or returned no JSON") from exc
+    binding = result.get("binding") if isinstance(result, dict) else None
+    if not isinstance(binding, dict) or result.get("status") not in BOUND_STATUSES:
+        raise NativeBindFailed("native_bind_failed: the initialization response lacks a successful outcome and binding")
+    if (
+        not isinstance(binding.get("session_context_id"), str)
+        or not binding["session_context_id"].strip()
+        or not isinstance(binding.get("role"), str)
+        or not binding["role"].strip()
+        or binding.get("native_context_id") != native_context_id
+    ):
+        raise NativeBindFailed(
+            "native_bind_failed: the binding lacks identity or role, or names a different native context"
+        )
+    return binding

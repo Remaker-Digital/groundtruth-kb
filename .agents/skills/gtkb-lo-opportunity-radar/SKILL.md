@@ -63,15 +63,20 @@ made deterministic.
 
 ### 5. Routing pass
 
-Report a material finding as a native ADVISORY with complete author provenance
-and no recipient or work-item reservation. Follow SPEC-ADVISORY-REPORT-TEMPLATE-001.
-State the recommendation, observed evidence, uncertainty and any unresolved
-material owner choice. Routine choices within existing direction need no
-blanket interview or permission transcript.
+A reproducible defect becomes a corrective work item. An opportunity or an
+uncertain finding stays a native ADVISORY. The owner selects which item is
+dispatched, and its implementation is a separate NEW chain.
 
-Detection does not promote backlog work or dispatch a harness. The owner selects
-any follow-up, which uses canonical project/work-item state and a separate NEW
-chain. Advisory classifications are optional analysis words, not disposition
+File unmatched work through `gtkb-work-item` into
+`PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and
+name any related project in its description. Report an advisory finding with
+complete author provenance and no recipient or work-item reservation. Follow
+SPEC-ADVISORY-REPORT-TEMPLATE-001. State the recommendation, observed evidence,
+uncertainty and any unresolved material owner choice. Routine choices within
+existing direction need no blanket interview or permission transcript.
+
+Filing neither dispatches nor authorizes work, and detection dispatches no
+harness. Advisory classifications are optional analysis words, not disposition
 records or authorization carriers.
 
 ## Output discipline

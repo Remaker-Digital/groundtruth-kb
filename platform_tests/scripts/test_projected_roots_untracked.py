@@ -34,14 +34,15 @@ PROFILES = ROOT / "scripts/harness_projection/profiles.toml"
 BASELINE = ".harness-baseline-configuration"
 SKILLS_ROOT = ".agents/skills"
 ROOT_CARRIERS = ("AGENTS.md", "CLAUDE.md", ".goosehints")
-# The tracked baseline after the D15 move: rules (32 after c107 retired active-workspace.md) + hooks incl.
-# manifest.toml and _hook_context.py (11) + routing.toml + goose-execution-floor.toml, which the gated commit
+# The tracked baseline after the D15 move: rules (29 since c123 retired standing-priorities.md,
+# template-decision-memo.md and the Loyal Opposition knowledge base index, owner decision D1 of 2026-10-01) + hooks
+# incl. manifest.toml and _hook_context.py (11) + routing.toml + goose-execution-floor.toml, which the gated commit
 # a3d2291 added as work product: it is the canonical Goose execution floor (scripts/goose_harness.py reads it and
 # config/registry/sot-artifacts.toml declares it, and the harness refuses to run when it is absent). 15.8 refreshes
 # TEST-12566 to this.
-TRACKED_BASELINE_SHAPE = {"rules": 32, "hooks": 11}
+TRACKED_BASELINE_SHAPE = {"rules": 29, "hooks": 11}
 TRACKED_BASELINE_SINGLETONS = ("routing.toml", "goose-execution-floor.toml")
-TRACKED_BASELINE_FILES = 45
+TRACKED_BASELINE_FILES = 42
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -186,7 +187,9 @@ def test_tracked_source_shape_after_the_d15_move() -> None:
 
     skills = _tracked(SKILLS_ROOT) | _stageable(SKILLS_ROOT)
     manifests = sorted(path for path in skills if path.count("/") == 3 and path.endswith("/SKILL.md"))
-    assert len(manifests) >= 38, manifests
+    # c123 (owner decision D1): four skills retired (gtkb-batch, gtkb-managed-skill-adoption-review, gtkb-propose,
+    # gtkb-send-review), so the floor follows the source's 34.
+    assert len(manifests) >= 34, manifests
     assert all(path.startswith(f"{SKILLS_ROOT}/") for path in skills)
     assert not _paths(_git("ls-files", "-z", "--others", "--ignored", "--exclude-standard", "--", SKILLS_ROOT)), (
         "the skills source is never ignored"

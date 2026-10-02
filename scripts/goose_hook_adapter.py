@@ -90,6 +90,18 @@ def _path(data: dict[str, Any]) -> str:
     return str(value) if value else ""
 
 
+def _edit_strings(data: dict[str, Any], old_key: str, new_key: str) -> dict[str, str]:
+    """An edit's strings in the canonical names, from Goose's own names or the canonical ones (c123, G38)."""
+    strings: dict[str, str] = {}
+    old = data.get(old_key, data.get("old_string"))
+    new = data.get(new_key, data.get("new_string"))
+    if isinstance(old, str):
+        strings["old_string"] = old
+    if isinstance(new, str):
+        strings["new_string"] = new
+    return strings
+
+
 def _normalize(payload: dict[str, Any]) -> dict[str, Any] | None:
     """Return the Claude-style payload for the target hook, or None for an unrecognized effect-capable tool."""
     tool = str(payload.get("tool_name") or payload.get("matcher_context") or "")
@@ -102,7 +114,8 @@ def _normalize(payload: dict[str, Any]) -> dict[str, Any] | None:
             "tool_input": {"file_path": path, "content": data.get("content", "")},
         }
     elif base == "edit":
-        adapted = {"tool_name": "Edit", "tool_input": {"file_path": path}}
+        # c123 (batch design WP2, G38): the edit's strings reach the content hooks (Goose names them before/after).
+        adapted = {"tool_name": "Edit", "tool_input": {"file_path": path, **_edit_strings(data, "before", "after")}}
     elif base == "text_editor":
         sub = str(data.get("command") or "").lower()
         if sub in READ_SUBCOMMANDS:
@@ -110,8 +123,12 @@ def _normalize(payload: dict[str, Any]) -> dict[str, Any] | None:
         elif sub in WRITE_SUBCOMMANDS:
             adapted = {"tool_name": "Write", "tool_input": {"file_path": path, "content": data.get("file_text", "")}}
         else:
-            # str_replace, insert, undo_edit and any unknown sub-command change the file.
-            adapted = {"tool_name": "Edit", "tool_input": {"file_path": path}}
+            # str_replace, insert, undo_edit and any unknown sub-command change the file; old_str and new_str (insert's
+            # text is new_str) reach the content hooks as old_string and new_string (c123, G38).
+            adapted = {
+                "tool_name": "Edit",
+                "tool_input": {"file_path": path, **_edit_strings(data, "old_str", "new_str")},
+            }
     elif base == "shell":
         adapted = {"tool_name": "Bash", "tool_input": {"command": str(data.get("command") or "")}}
     elif base in READ_ONLY_TOOLS or not (EFFECT_INPUT_KEYS & {str(key).lower() for key in data}):

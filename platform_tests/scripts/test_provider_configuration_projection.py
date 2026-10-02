@@ -74,7 +74,10 @@ def test_each_provider_filters_shared_routing_and_executes_authored_hooks(name, 
     loaded = provider.load_routing_config(projection_root)
     assert loaded.default_model in loaded.models
     assert {source["models"][key]["provider"] for key in loaded.models} == {name}
-    assert set(loaded.skill_routes.values()) <= set(loaded.models)
+    # c123 (batch design WP2 2.1): the shared routing carries no skill tables, and the loaded routing has no skill
+    # routes; a registration names its model with --model.
+    assert "skills" not in source["routing"][name]
+    assert not hasattr(loaded, "skill_routes")
     from groundtruth_kb.project.doctor import _check_provider_routing
 
     inspected = _check_provider_routing(projection_root, name)

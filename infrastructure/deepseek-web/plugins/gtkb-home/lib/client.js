@@ -191,7 +191,7 @@ window.__ModuleLoader__.load({
 			return jsxs("div", {
 				style: PAGE,
 				children: [
-					jsx(PageHeader, { title: "GTKB services", subtitle: "Start or stop the services GroundTruth KB runs on this computer.", onRefresh: load, busy: state.loading || busy !== null }),
+					jsx(PageHeader, { title: "GTKB services", subtitle: "Start or stop this installation's services; services another installation registered are shown as status only.", onRefresh: load, busy: state.loading || busy !== null }),
 					jsx(Notice, { notice: state.error ? { tone: "error", text: state.error } : notice }),
 					jsx("table", { style: TABLE, children: jsx("tbody", { children: rows.map((row) => jsxs("tr", {
 						style: ROW,

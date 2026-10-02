@@ -20,7 +20,7 @@ from psycopg import sql
 
 from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
-from platform_tests.groundtruth_kb.native_fixtures import link_project_formal, put, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, link_project_formal, put, work_fields
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
@@ -187,6 +187,157 @@ def test_native_effect_check_refuses_unregistered_checkout_and_redirected_target
     assert refused.json()["error"]["code"] == "effect_path_redirected"
     assert (preserved / "test_effect.py").read_bytes() == original
     assert client.post(f"/v1/bridge/{document}/check", json=fence).status_code == 200
+
+
+def test_native_program_check_counts_the_bound_contexts_live_claims_of_any_status(bridge):
+    # c123 (batch design WP1 5): a program or test run needs a live claim of the bound context, of any intended status
+    # (a verifier's verdict claim counts). The check counts that context's live claims and retains nothing; release,
+    # delivery and expiry each end a claim, and another context's claim never counts.
+    service, client, contexts, work_root = bridge
+    root = work_root.parents[2]
+    document = "program-check"
+
+    def check(context):
+        return client.post("/v1/bridge/check-program", json={"native_context_id": context})
+
+    def current(context, claims=1):
+        result = check(context)
+        assert result.status_code == 200, result.text
+        assert result.json() == {"status": "current", "scope": "program", "claims": claims}
+
+    def refused(context):
+        result = check(context)
+        assert result.status_code == 422, result.text
+        error = result.json()["error"]
+        assert error["code"] == "program_claim_required", error
+        return error
+
+    def expire(attempt):
+        with service.kernel.transaction() as tx:
+            tx.cursor.execute(
+                sql.SQL(
+                    "UPDATE {}.work_intent_claims SET expires_at=clock_timestamp()-interval '1 second' "
+                    "WHERE attempt_id=%s"
+                ).format(sql.Identifier(tx.schema)),
+                (attempt,),
+            )
+
+    def deliver_held(context, version, status, reservation):
+        content = authored(contexts[context], document, version, status)
+        body = {"native_context_id": context, "fence": reservation["fence"], "content": content}
+        delivered = client.post(f"/v1/bridge/{document}/deliver", json=body)
+        assert delivered.status_code == 200, delivered.text
+
+    # No claim; an unbound context gets the binding refusal check-effects gives; the request carries only the id.
+    error = refused("pb1")
+    assert error["message"].startswith("Programs and tests run only inside a live claim of this context"), error
+    assert "gt bridge claim" in error["message"] and "details" not in error, error
+    unbound = check("unbound")
+    effects = client.post(
+        "/v1/bridge/check-effects", json={"native_context_id": "unbound", "cwd": str(root), "paths": ["code.py"]}
+    )
+    assert unbound.status_code == effects.status_code == 422, unbound.text
+    assert unbound.json()["error"]["code"] == "no_session_binding", unbound.text
+    assert unbound.json()["error"] == effects.json()["error"]
+    for body in ({}, {"native_context_id": ""}, {"native_context_id": "pb1", "cwd": str(root)}):
+        malformed = client.post("/v1/bridge/check-program", json=body)
+        assert malformed.status_code == 422 and malformed.json()["code"] == "invalid_request", malformed.text
+
+    # A proposal claim counts for its holder only and the check changes nothing; release and delivery end the claim.
+    proposal = claim(client, document, "pb1", 0, "NEW")
+    assert proposal.status_code == 200, proposal.text
+    before = client.get("/v1/bridge/state-report").json()
+    current("pb1")
+    refused("lo1")
+    refused("pb2")
+    after = client.get("/v1/bridge/state-report").json()
+    assert datetime.fromisoformat(after.pop("observed_at")) >= datetime.fromisoformat(before.pop("observed_at"))
+    assert after == before
+    fence = {"native_context_id": "pb1", "fence": proposal.json()["fence"]}
+    assert client.post(f"/v1/bridge/{document}/release", json=fence).status_code == 200
+    refused("pb1")
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    refused("pb1")
+
+    # A reviewer's verdict claim, an implementation claim and an advisory claim of the same context all count.
+    review = claim(client, document, "lo1", 1, "GO")
+    assert review.status_code == 200, review.text
+    current("lo1")
+    deliver_held("lo1", 2, "GO", review.json())
+    refused("lo1")
+    report = claim(client, document, "pb2", 2, "READY")
+    assert report.status_code == 200, report.text
+    advisory = claim(client, "program-advisory", "pb2", 0, "ADVISORY", work_item_id=None)
+    assert advisory.status_code == 200, advisory.text
+    current("pb2", claims=2)
+    expire("program-advisory")
+    current("pb2")
+    deliver_held("pb2", 3, "READY", report.json())
+    refused("pb2")
+
+    # The verifier's verdict claim counts until it expires.
+    verdict = claim(client, document, "lo2", 3, "VERIFIED")
+    assert verdict.status_code == 200, verdict.text
+    current("lo2")
+    expire(document)
+    refused("lo2")
+
+
+def test_gt_bridge_check_program_answers_the_effect_gates_exact_call(bridge, tmp_path_factory):
+    # c123 (batch design WP1 5): the effect gate runs exactly this argv from the project root and reads exit 0 with the
+    # JSON answer, or a nonzero exit whose stderr carries click's "Error: <code>: <message>", as it reads check-effects.
+    import socket
+
+    _service, client, _contexts, _work_root = bridge
+    served = tmp_path_factory.mktemp("program-check-authority")
+    project = tmp_path_factory.mktemp("program-check-project")
+    with socket.socket() as listener:
+        listener.bind(("127.0.0.1", 0))
+        port = listener.getsockname()[1]
+    (project / "groundtruth.toml").write_text(
+        f'[groundtruth]\nproject_root="."\nauthority_url="http://127.0.0.1:{port}"\n', encoding="utf-8"
+    )
+    process, server_env = _serve_authority(served, port)
+    env = {key: value for key, value in server_env.items() if not key.startswith(("PG", "GT_POSTGRES_"))}
+    env.update(GT_PROJECT_ROOT=str(project), PYTHONIOENCODING="utf-8")
+
+    def gate_call(context):
+        return subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "groundtruth_kb",
+                "bridge",
+                "check-program",
+                "--native-context-id",
+                context,
+                "--json",
+            ],
+            cwd=project,
+            env=env,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+
+    try:
+        expected = client.post("/v1/bridge/check-program", json={"native_context_id": "pb1"}).json()["error"]
+        refused = gate_call("pb1")
+        assert refused.returncode == 1 and refused.stdout == "", (refused.stdout, refused.stderr)
+        assert f"Error: program_claim_required: {expected['message']}" in refused.stderr.splitlines(), refused.stderr
+        unbound = gate_call("never-bound")
+        assert unbound.returncode == 1 and unbound.stdout == "", (unbound.stdout, unbound.stderr)
+        assert any(line.startswith("Error: no_session_binding: ") for line in unbound.stderr.splitlines()), unbound
+        held = claim(client, "program-cli", "pb1", 0, "NEW")
+        assert held.status_code == 200, held.text
+        accepted = gate_call("pb1")
+        assert accepted.returncode == 0, accepted.stderr
+        assert json.loads(accepted.stdout) == {"status": "current", "scope": "program", "claims": 1}
+    finally:
+        process.terminate()
+        process.wait(timeout=30)
 
 
 def test_native_effect_gate_refuses_unavailable_authority_without_sqlite(tmp_path):

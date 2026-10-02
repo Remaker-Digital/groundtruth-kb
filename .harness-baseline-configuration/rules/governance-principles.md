@@ -23,8 +23,10 @@ procedure from rule files plus hook code plus example packets, procedures with
 steps expressible as "compute X from Y" — it must:
 
 1. Surface the repetition explicitly.
-2. File it as a backlog item in the MemBase `work_items` table (e.g., via
-   `gt backlog add`) with scope and tradeoff analysis.
+2. File it at discovery through `gtkb-work-item` as a work item in
+   `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and an executable test
+   in an active plan phase. Include the scope and tradeoff analysis. If it is
+   not yet a reproducible defect, file an ADVISORY instead.
 3. Not silently absorb the friction (which would make the cost invisible to
    governance).
 
@@ -49,23 +51,24 @@ for the purpose it was reached for.
    assume correctness, completeness, or optimality — including when the
    invocation appears to have succeeded.
 2. A defect, gap, mislabel, incorrect description, or overlooked case is
-   captured AT THE POINT OF DISCOVERY as an ADVISORY, which may become a
-   hygiene or enhancement work item. It is not batched to session end, and it
-   is not silently absorbed.
+   captured AT THE POINT OF DISCOVERY: a work item filed through
+   `gtkb-work-item` in `PROJECT-GTKB-NEW-WORK-INTAKE`, or an ADVISORY if it is
+   not yet a reproducible defect. It is not batched to session end, and it is
+   not silently absorbed.
 3. Capture at the point of discovery is not implementation approval. The
    captured item follows normal owner prioritization and the bridge protocol
    before any repair is implemented.
-4. When a defect blocks the current task: document it, work around it through
-   a lawful path if one exists, and file the after-action record for
-   independent review.
+4. When a defect blocks the current task, file the corrective work item or
+   ADVISORY before any workaround. Then use a lawful workaround if one exists,
+   and disclose it.
 
 Silent absorption is the failure mode this principle exists to prevent. A
 defect that is worked around but never recorded leaves the next session to
 rediscover it at full cost, and keeps that cost invisible to governance.
 
-This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Capture routes
-to the MemBase backlog per `GOV-STANDING-BACKLOG-001`; clause 4's after-action
-record follows the current bounded retention and independent-review contract.
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`. Captured work
+enters the standing backlog that `GOV-STANDING-BACKLOG-001` governs, in
+`PROJECT-GTKB-NEW-WORK-INTAKE`.
 Capture is not a grant to implement: current project ordering, owner-directed
 scope, independent review, executable tests and artifact claims still apply.
 Do not introduce an approval packet or per-mutation permission ledger.
@@ -75,17 +78,19 @@ Do not introduce an approval packet or per-mutation permission ledger.
 
 Read the specification literally. Implement the nouns and verbs it contains. A marker is not a record; a trigger is not an object.
 
-Justification: complexity drift follows a structural cost asymmetry — an addition needs a proposal, a removal needs a proposal plus owner approval — so elaboration accumulates unless a named, always-loaded principle makes excess citable in review.
+Justification: complexity drift follows a structural cost asymmetry: wherever a removal costs more process than an addition, elaboration accumulates unless a named, always-loaded principle makes excess citable in review.
 
 Operational mandate: when two designs satisfy the specification, the one with fewer artifacts, fewer state locations, and fewer concepts wins by default. The more elaborate design must justify its excess against the specification text. The burden of proof falls on the addition, never on the removal. When an agent notices that an implementation exceeds its specification, it must:
 
 1. Surface the excess explicitly.
-2. File it as a backlog item in the MemBase `work_items` table (e.g., via
-   `gt backlog add`) with the excess named against the specification text.
+2. File it at discovery through `gtkb-work-item` as a work item in
+   `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and an executable test
+   in an active plan phase. Name the excess against the specification text. If
+   it is not yet a reproducible defect, file an ADVISORY instead.
 3. Not silently absorb the elaboration (which would make the cost invisible
    to governance).
 
-This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`. Capture routes to the MemBase backlog per `GOV-STANDING-BACKLOG-001`. The principle does not authorize deleting protected behavior or settling a material owner choice. Apply existing direction through the current canonical writer and preserve independent verification; an approval-evidence artifact is not required.
+This principle extends `GOV-ARTIFACT-ORIENTED-GOVERNANCE-001`, `ADR-ARTIFACT-ORIENTED-DEVELOPMENT-001`, and `DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001`. Captured work enters the standing backlog that `GOV-STANDING-BACKLOG-001` governs, in `PROJECT-GTKB-NEW-WORK-INTAKE`. The principle does not authorize deleting protected behavior or settling a material owner choice. Apply existing direction through the current canonical writer and preserve independent verification; an approval-evidence artifact is not required.
 
 ## Event-Oriented Naming Principle
 
@@ -107,9 +112,11 @@ on an event, prefer a verb or event form. When an agent encounters an entity nou
 standing for a triggered concept, it must:
 
 1. Surface the naming mismatch explicitly.
-2. File it as a backlog item in the MemBase `work_items` table (e.g., via
-   `gt backlog add`), naming the triggered concept and the persistence
-   machinery the noun has attracted.
+2. File it at discovery through `gtkb-work-item` as a work item in
+   `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and an executable test
+   in an active plan phase. Name the triggered concept and the persistence
+   machinery the noun has attracted. If it is not yet a reproducible defect,
+   file an ADVISORY instead.
 3. Not silently extend the noun with further fields, records, or lifecycle
    state.
 
@@ -146,9 +153,10 @@ superseded lifecycle requirements and historical deliberations are not authority
 ## Release And Adoption Work-Queue Principle
 
 Per `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
-`GOV-GTKB-ADOPTION-ENFORCEMENT-001`: new candidate skills, plug-ins, or
-doctor checks identified during adoption work must be added to the top of the
-outstanding work queue until adopted, explicitly rejected, or superseded.
+`GOV-GTKB-ADOPTION-ENFORCEMENT-001`, new candidate skills, plug-ins, or doctor
+checks identified during adoption work are adoption candidates. File adoption
+candidates in the intake, `PROJECT-GTKB-NEW-WORK-INTAKE`. The owner orders work;
+agents never reorder it.
 
 ## Retained working priorities
 
@@ -156,9 +164,9 @@ Technical work has elevated priority over creative/content work.
 Implementation, executable tests, result analysis and working capabilities take
 priority over marketing and cosmetic changes within the owner's selected work.
 
-Never remove code, tests, features, or procedure entries without explicit owner approval
-in the current session. Existing explicit owner direction covering the removal
-satisfies this requirement; do not ask again for the same decision. Temporary
+Removing obsolete material at its source is ordinary governed work: a work item,
+independent review and verification.
+Owner approval gates new artifacts, tables, gates and workflow steps. Temporary
 output follows the current authorized cleanup scope and retention requirements.
 
 Formal retrieval: SPEC-0282, SPEC-0735, SPEC-0472, SPEC-0744, SPEC-0850.

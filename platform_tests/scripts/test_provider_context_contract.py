@@ -153,10 +153,16 @@ def test_goose_launcher_exports_harness_identity_without_role_or_inherited_conte
 
 def test_cursor_launcher_passes_no_inherited_context_or_role(monkeypatch, tmp_path):
     _inherit(monkeypatch)
+    # c123 (batch design WP4 4.1): the shim names its own harness. Values inherited from another launcher's process
+    # never win; an earlier Goose case can leave GTKB_AUTHOR_HARNESS_ID=G in os.environ, so start from Goose's names.
+    for name, value in (("GTKB_HARNESS_NAME", "goose"), ("GTKB_HARNESS_ID", "G"), ("GTKB_AUTHOR_HARNESS_ID", "G")):
+        monkeypatch.setenv(name, value)
     monkeypatch.setattr(cursor_harness, "load_env_local", lambda **_kwargs: {})
     env = cursor_harness._cursor_agent_env(project_root=tmp_path)
     assert "GTKB_AUTHOR_SESSION_CONTEXT_ID" not in env and "GTKB_NATIVE_CONTEXT_ID" not in env
     assert env["GTKB_HARNESS_NAME"] == "cursor" and env["GTKB_HARNESS_ID"] == "E"
+    # c123 (batch design WP4 4.1): also exported under the name the other launchers use for author_harness_id.
+    assert env["GTKB_AUTHOR_HARNESS_ID"] == "E"
     assert "GTKB_AUTHOR_IDENTITY" not in env or env["GTKB_AUTHOR_IDENTITY"] == INHERITED["GTKB_AUTHOR_IDENTITY"]
     assert not any(
         env.get(name, "").startswith(("prime-builder", "loyal-opposition"))
@@ -168,7 +174,6 @@ def test_cursor_launcher_passes_no_inherited_context_or_role(monkeypatch, tmp_pa
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cursor_harness, "_load_project_env_local", lambda **_kwargs: None)
     monkeypatch.setattr(cursor_harness, "_resolve_agent_command", lambda: ["C:/Tools/agent.exe"])
-    monkeypatch.setattr(cursor_harness, "_skill_system_prompt", lambda skill, **_kwargs: None)
     launches = []
 
     def launch(command, **kwargs):
@@ -181,6 +186,7 @@ def test_cursor_launcher_passes_no_inherited_context_or_role(monkeypatch, tmp_pa
     child = launches[0][1]["env"]
     assert "GTKB_AUTHOR_SESSION_CONTEXT_ID" not in child and "GTKB_NATIVE_CONTEXT_ID" not in child
     assert child["GTKB_HARNESS_ID"] == "E"
+    assert child["GTKB_AUTHOR_HARNESS_ID"] == "E"
 
 
 def test_no_launcher_source_assigns_a_role_bearing_identity() -> None:

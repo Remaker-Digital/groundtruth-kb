@@ -46,6 +46,20 @@ SCHEMA_FORMAT = "gtkb.postgresql.schema.v1"
 # Exact installed predecessor for the approved repository/scope transition.
 # This is an explicit administration precondition, never a startup/read alias.
 REPOSITORY_SCOPE_PREDECESSOR_SHA256 = "2f25071544591b01b44e0da491a19bd9adee509627114a4dad528205a8f6e2ca"
+# c123 (batch design WP5 G17): the c121 and c122 releases' schema, before storage constrained the bridge statuses.
+BRIDGE_STATUS_PREDECESSOR_SHA256 = "4b5f8275cec878ade811adf5692436835ef06c147d79a24686a29dad327980fb"
+# Each supported predecessor and the steps, in order and in one transaction, that bring it to this release. Every
+# step's checks run before any step's DDL, so a refused transition changes nothing.
+SCHEMA_TRANSITIONS: dict[str, tuple[str, ...]] = {
+    REPOSITORY_SCOPE_PREDECESSOR_SHA256: ("repository_scope", "bridge_status"),
+    BRIDGE_STATUS_PREDECESSOR_SHA256: ("bridge_status",),
+}
+# The bridge status columns the status step constrains, with the column that names each row's attempt.
+BRIDGE_STATUS_COLUMNS = (
+    ("bridge_attempts", "head_status", "id"),
+    ("bridge_items", "status", "attempt_id"),
+    ("work_intent_claims", "intended_status", "attempt_id"),
+)
 # PostgreSQL ships this exact comment on the stock ``public`` schema of a freshly created
 # database. It is the absence of kernel metadata, not drift from it, so a table-free ``public``
 # schema carrying exactly this string is an uninitialized target (WI-7690). The match is exact:
@@ -872,6 +886,30 @@ def schema_sql_bytes() -> bytes:
 
 def schema_sql_sha256() -> str:
     return hashlib.sha256(schema_sql_bytes()).hexdigest()
+
+
+def bridge_status_check_values() -> tuple[str, ...]:
+    """The statuses the schema resource's three bridge status CHECKs admit (c123; batch design WP5 G17).
+
+    The status step of a transition adds exactly these, so an upgraded catalog constrains what a fresh one does. The
+    resource is the one source: the schema hash covers its bytes, and a list generated at run time could change a
+    fresh catalog without changing the hash. Tests bind it to bridge/vocabulary.py's CANONICAL_STATUSES.
+    """
+    text = schema_sql_bytes().decode("utf-8")
+    lists: list[tuple[str, ...]] = []
+    for table, column, _key in BRIDGE_STATUS_COLUMNS:
+        block = re.search(rf"CREATE TABLE \{{schema\}}\.{table} \((.*?)\n\);", text, re.DOTALL)
+        check = (
+            re.search(rf"\n    {column} TEXT[^,]*?CHECK \({column} IN \(([^)]*)\)\)", block.group(1), re.DOTALL)
+            if block
+            else None
+        )
+        lists.append(tuple(re.findall(r"'([^']*)'", check.group(1))) if check else ())
+    if not lists[0] or any(values != lists[0] for values in lists):
+        raise PostgresKernelError(
+            "schema_resource_invalid", "Packaged PostgreSQL schema does not list one bridge status set"
+        )
+    return lists[0]
 
 
 def _schema_metadata(*, catalog_sha256: str) -> dict[str, Any]:
@@ -2140,18 +2178,22 @@ class PostgresKernel:
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL initialization failed") from exc
 
     def upgrade_schema(self, *, expected_schema_sha256: str) -> dict[str, Any]:
-        """Apply the supported repository/scope DDL without rewriting domain history.
+        """Apply the supported predecessor's transition steps without rewriting domain history.
 
         The operator selects the exact predecessor explicitly. Ordinary startup
         still refuses drift. All checks, table changes and the existing schema
         metadata update share one transaction; no row is assigned a repository
-        or application scope by this structural transition.
+        or application scope, and no status is rewritten, by this structural
+        transition. c123 (batch design WP5 G17): SCHEMA_TRANSITIONS names the
+        steps of each supported predecessor, and every step's checks run before
+        any step's DDL.
         """
-        if expected_schema_sha256 != REPOSITORY_SCOPE_PREDECESSOR_SHA256:
+        steps = SCHEMA_TRANSITIONS.get(expected_schema_sha256)
+        if steps is None:
             raise PostgresKernelError(
                 "unsupported_schema_upgrade",
                 "The requested PostgreSQL predecessor has no supported transition",
-                details={"supported_schema_sha256": REPOSITORY_SCOPE_PREDECESSOR_SHA256},
+                details={"supported_schema_sha256": sorted(SCHEMA_TRANSITIONS)},
             )
         connection = self._connect()
         try:
@@ -2200,47 +2242,40 @@ class PostgresKernel:
                         "The PostgreSQL catalog does not match the exact supported predecessor; inspect the drift",
                     )
                 scope_pattern = r"^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$"
-                unresolved = {}
-                for table in ("specifications", "tests"):
-                    cursor.execute(
-                        sql.SQL(
-                            "SELECT id FROM {}.{} WHERE application_scope IS NOT NULL "
-                            "AND application_scope !~ %s ORDER BY id"
-                        ).format(sql.Identifier(schema_name), sql.Identifier(table)),
-                        (scope_pattern,),
-                    )
-                    unresolved[table] = [row["id"] for row in cursor.fetchall()]
-                if any(unresolved.values()):
-                    raise PostgresKernelError(
-                        "application_scope_reconciliation_required",
-                        "Reconcile these current record scopes through the existing writer before transition; "
-                        "repository or application associations are never inferred",
-                        details=unresolved,
-                    )
-                cursor.execute(
-                    sql.SQL(
-                        "ALTER TABLE {}.projects ADD COLUMN repository_ref TEXT CHECK ("
-                        "repository_ref IS NULL OR repository_ref = 'platform' OR "
-                        "repository_ref ~ '^application:[A-Za-z][A-Za-z0-9_-]*$'), "
-                        "DROP CONSTRAINT projects_check, ADD CONSTRAINT projects_check CHECK (("
-                        "kind = 'program' AND \"authorization\" IS NULL AND parent_project_id IS NULL "
-                        "AND repository_ref IS NULL) OR (kind = 'project' AND \"authorization\" IS NOT NULL "
-                        "AND \"authorization\" IN ('authorized', 'not authorized')))"
-                    ).format(sql.Identifier(schema_name))
-                )
-                for table in ("specifications", "tests"):
-                    constraint = sql.Identifier(table + "_application_scope_check")
-                    cursor.execute(
-                        sql.SQL(
-                            "ALTER TABLE {}.{} DROP CONSTRAINT {}, ADD CONSTRAINT {} CHECK (application_scope ~ {})"
-                        ).format(
-                            sql.Identifier(schema_name),
-                            sql.Identifier(table),
-                            constraint,
-                            constraint,
-                            sql.Literal(scope_pattern),
+                if "repository_scope" in steps:
+                    unresolved = {}
+                    for table in ("specifications", "tests"):
+                        cursor.execute(
+                            sql.SQL(
+                                "SELECT id FROM {}.{} WHERE application_scope IS NOT NULL "
+                                "AND application_scope !~ %s ORDER BY id"
+                            ).format(sql.Identifier(schema_name), sql.Identifier(table)),
+                            (scope_pattern,),
                         )
-                    )
+                        unresolved[table] = [row["id"] for row in cursor.fetchall()]
+                    if any(unresolved.values()):
+                        raise PostgresKernelError(
+                            "application_scope_reconciliation_required",
+                            "Reconcile these current record scopes through the existing writer before transition; "
+                            "repository or application associations are never inferred",
+                            details=unresolved,
+                        )
+                statuses = bridge_status_check_values()
+                if "bridge_status" in steps:
+                    self._require_canonical_bridge_statuses(cursor, schema_name, statuses)
+                if "repository_scope" in steps:
+                    self._apply_repository_scope_step(cursor, schema_name, scope_pattern)
+                if "bridge_status" in steps:
+                    for table, column, _key in BRIDGE_STATUS_COLUMNS:
+                        cursor.execute(
+                            sql.SQL("ALTER TABLE {}.{} ADD CONSTRAINT {} CHECK ({} IN ({}))").format(
+                                sql.Identifier(schema_name),
+                                sql.Identifier(table),
+                                sql.Identifier(f"{table}_{column}_check"),
+                                sql.Identifier(column),
+                                sql.SQL(", ").join(sql.Literal(status) for status in statuses),
+                            )
+                        )
                 current_metadata = _schema_metadata(catalog_sha256=self._catalog_sha256(cursor, schema_name))
                 cursor.execute(
                     sql.SQL("COMMENT ON SCHEMA {} IS {}").format(
@@ -2257,6 +2292,7 @@ class PostgresKernel:
                 return {
                     "status": "upgraded",
                     "upgraded_from": expected_schema_sha256,
+                    "steps": list(steps),
                     "schema_sha256": schema_sql_sha256(),
                     "schema_version": SCHEMA_VERSION,
                     "table_count": len(ALL_TABLES),
@@ -2271,6 +2307,70 @@ class PostgresKernel:
             ) from exc
         except Exception as exc:  # intentional-catch: native driver failures get a non-sensitive diagnostic
             raise PostgresKernelError("postgres_operation_failed", "PostgreSQL schema transition failed") from exc
+
+    @staticmethod
+    def _require_canonical_bridge_statuses(cursor: Any, schema_name: str, statuses: Sequence[str]) -> None:
+        """Refuse a transition while any bridge status column holds a value outside ``statuses`` (c123; WP5 G17).
+
+        The refusal names the column, the values and the attempts, never message content; no DDL has run. A NULL
+        head_status (an attempt with no item yet) is allowed, as the constraint allows it.
+        """
+        violations: dict[str, Any] = {}
+        for table, column, key in BRIDGE_STATUS_COLUMNS:
+            cursor.execute(
+                sql.SQL(
+                    "SELECT {} AS attempt_id, {} AS value FROM {}.{} WHERE {} IS NOT NULL AND {} <> ALL(%s)"
+                ).format(
+                    sql.Identifier(key),
+                    sql.Identifier(column),
+                    sql.Identifier(schema_name),
+                    sql.Identifier(table),
+                    sql.Identifier(column),
+                    sql.Identifier(column),
+                ),
+                (list(statuses),),
+            )
+            rows = cursor.fetchall()
+            if rows:
+                violations[f"{table}.{column}"] = {
+                    "values": sorted({row["value"] for row in rows}),
+                    "attempt_ids": sorted({row["attempt_id"] for row in rows}),
+                }
+        if violations:
+            raise PostgresKernelError(
+                "bridge_status_reconciliation_required",
+                "Reconcile these bridge statuses through the native bridge before transition; the transition rewrites "
+                "no status",
+                details=violations,
+            )
+
+    @staticmethod
+    def _apply_repository_scope_step(cursor: Any, schema_name: str, scope_pattern: str) -> None:
+        """The repository/scope step of the 2f25 predecessor (its DDL as before c123)."""
+        cursor.execute(
+            sql.SQL(
+                "ALTER TABLE {}.projects ADD COLUMN repository_ref TEXT CHECK ("
+                "repository_ref IS NULL OR repository_ref = 'platform' OR "
+                "repository_ref ~ '^application:[A-Za-z][A-Za-z0-9_-]*$'), "
+                "DROP CONSTRAINT projects_check, ADD CONSTRAINT projects_check CHECK (("
+                "kind = 'program' AND \"authorization\" IS NULL AND parent_project_id IS NULL "
+                "AND repository_ref IS NULL) OR (kind = 'project' AND \"authorization\" IS NOT NULL "
+                "AND \"authorization\" IN ('authorized', 'not authorized')))"
+            ).format(sql.Identifier(schema_name))
+        )
+        for table in ("specifications", "tests"):
+            constraint = sql.Identifier(table + "_application_scope_check")
+            cursor.execute(
+                sql.SQL(
+                    "ALTER TABLE {}.{} DROP CONSTRAINT {}, ADD CONSTRAINT {} CHECK (application_scope ~ {})"
+                ).format(
+                    sql.Identifier(schema_name),
+                    sql.Identifier(table),
+                    constraint,
+                    constraint,
+                    sql.Literal(scope_pattern),
+                )
+            )
 
     def status(self) -> dict[str, Any]:
         connection = self._connect()

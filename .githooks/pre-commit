@@ -25,7 +25,7 @@ PYTHON_BIN="${PYTHON:-python}"
 # Inspect actual staged paths. Bridge messages, generated harness output and
 # runtime state are not work product. The projector roots (.agent .claude .codex
 # .cursor .goose .api-harness) are gitignored at the repository top level and
-# refused here as postimages (owner ruling D14, 2026-09-17), so the ignore rule
+# refused here as postimages (owner ruling of 2026-09-17), so the ignore rule
 # and the refusal state one policy; rendered output comes from `gt harness
 # project`, never from a commit. config/governance/ carries no derived files: the
 # timer inventory derives to .groundtruth/derived/, a non-product prefix refused

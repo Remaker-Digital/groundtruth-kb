@@ -54,7 +54,10 @@ class _NativeCheck:
         if self.claimed:
             answer = {"status": "current", "scope": "implementation"}
             return subprocess.CompletedProcess(argv, 0, json.dumps(answer), "")
-        return subprocess.CompletedProcess(argv, 1, "", "implementation_claim_required: no claim covers the path")
+        # c123 (batch design WP1, item 7): the CLI's real refusal format, click's prefix included.
+        return subprocess.CompletedProcess(
+            argv, 1, "", "Error: implementation_claim_required: no claim covers the path\n"
+        )
 
 
 def _checked_paths(argv: list[str]) -> list[str]:
@@ -66,8 +69,9 @@ def test_the_home_q1_append_needs_a_claim_and_names_its_target(tmp_path, monkeyp
     unclaimed = _NativeCheck(claimed=False)
     monkeypatch.setattr(effect_gate.subprocess, "run", unclaimed)
     refused = effect_gate.gate_decision(_payload(tmp_path, HOME_Q1))
-    assert refused["decision"] == "block" and refused["reason_code"] == "native_effect_refused", refused
-    assert "implementation_claim_required" in refused["reason"]
+    # c123 (item 7): the native code is the reason code, and the reason carries no "Error:" prefix to double.
+    assert refused["decision"] == "block" and refused["reason_code"] == "implementation_claim_required", refused
+    assert refused["reason"].startswith("no claim covers the path") and "Error" not in refused["reason"]
     assert [_checked_paths(call) for call in unclaimed.calls] == [["m13-sentinel/sentinel.txt"]]
     claimed = _NativeCheck(claimed=True)
     monkeypatch.setattr(effect_gate.subprocess, "run", claimed)
@@ -86,8 +90,9 @@ WRITES_WITH_TARGETS = [
     ("ri notes.txt", ["notes.txt"]),
     ("ren a.txt b.txt", ["a.txt", "b.txt"]),
     ("rni a.txt b.txt", ["a.txt", "b.txt"]),
-    ("copy a.txt b.txt", ["a.txt", "b.txt"]),
-    ("cpi a.txt b.txt", ["a.txt", "b.txt"]),
+    # c123 (owner decision A5, row 18): a copy's source is read, not written; these two rows named a.txt before.
+    ("copy a.txt b.txt", ["b.txt"]),
+    ("cpi a.txt b.txt", ["b.txt"]),
     ("move a.txt b.txt", ["a.txt", "b.txt"]),
     ("mi a.txt b.txt", ["a.txt", "b.txt"]),
     ("ni notes.txt", ["notes.txt"]),
@@ -115,8 +120,57 @@ WRITES_WITH_TARGETS = [
     # cmd switches and POSIX flags are not targets.
     ("mkdir -p a/b", ["a/b"]),
     ("rmdir /s /q olddir", ["olddir"]),
-    ("copy /y a.txt b.txt", ["a.txt", "b.txt"]),
+    # c123 (owner decision A5, row 18): the source left this row too.
+    ("copy /y a.txt b.txt", ["b.txt"]),
     ("mkdir.exe newdir", ["newdir"]),
+    # c123 (owner decision A5, row 18): sed's and awk's script is no target, and a copy writes only its destination.
+    ("sed -i 's/a/b/' f.txt", ["f.txt"]),
+    ("sed -i -e 's/a/b/' f.txt g.txt", ["f.txt", "g.txt"]),
+    ("sed -i.bak -f script.sed f.txt", ["f.txt"]),
+    ("sed -ni 's/a/b/p' f.txt", ["f.txt"]),
+    ("sed -Ei 's/a+/b/' f.txt", ["f.txt"]),
+    ("sed --in-place --expression='s/a/b/' f.txt", ["f.txt"]),
+    ("awk -i inplace '{print}' f.txt", ["f.txt"]),
+    ("awk -i inplace -v n=1 -f prog.awk f.txt", ["f.txt"]),
+    ("cp a.txt b.txt", ["b.txt"]),
+    ("cp -r src dst", ["dst"]),
+    ("cp a.txt b.txt dir", ["dir"]),
+    ("cp -t dir a.txt b.txt", ["dir"]),
+    ("Copy-Item a.txt b.txt", ["b.txt"]),
+    ("Copy-Item -Path a.txt -Destination b.txt -Recurse", ["b.txt"]),
+    ("Copy-Item -Path a.txt b.txt", ["b.txt"]),
+    ("Copy-Item a.txt -Destination:b.txt -ErrorAction SilentlyContinue", ["b.txt"]),
+    ("Copy-ItemProperty -Path a.txt -Destination b.txt -Name p", ["b.txt"]),
+    ("copy a.txt", ["."]),
+    # An option the gate does not know may take the destination's place: every operand is a target, as before.
+    ("Copy-Item a.txt b.txt -Frobnicate c", ["a.txt", "b.txt", "c"]),
+    # c123 (owner decision A5, row 17): the system write tools name what they write.
+    ("robocopy src dst /MIR", ["dst"]),
+    ("robocopy src dst /PURGE", ["dst"]),
+    ("robocopy src dst /MOVE", ["dst", "src"]),
+    ("robocopy src dst /E /LOG:copy.log", ["copy.log", "dst"]),
+    ("xcopy src dst /E /I", ["dst"]),
+    ("xcopy src", ["."]),
+    ("tar -czf out.tgz dir", ["out.tgz"]),
+    ("tar czf out.tgz dir", ["out.tgz"]),
+    ("tar -xzf in.tgz", ["."]),
+    ("tar -xzf in.tgz -C outdir", ["outdir"]),
+    ("tar --extract --file=in.tar --directory=outdir", ["outdir"]),
+    ("7z a out.7z dir", ["out.7z"]),
+    ("7z x in.7z -oout", ["out"]),
+    ("7z e in.7z", ["."]),
+    ("expand in.cab out.dll", ["out.dll"]),
+    ("certutil -decode in.b64 out.bin", ["out.bin"]),
+    ("certutil -urlcache -split -f https://example.invalid/x.exe x.exe", ["x.exe"]),
+    ("mklink /J link target", ["link"]),
+    ("icacls x.txt /grant user:F", ["x.txt"]),
+    ("icacls dir /save acl.txt /T", ["acl.txt"]),
+    ("attrib +R x.txt", ["x.txt"]),
+    ("takeown /F x.txt", ["x.txt"]),
+    ("fsutil file createnew x.bin 100", ["x.bin"]),
+    ("fsutil hardlink create new.txt old.txt", ["new.txt"]),
+    ("cipher /w:sub", ["sub"]),
+    ("cipher /e x.txt", ["x.txt"]),
 ]
 
 
@@ -148,6 +202,14 @@ UNREAD_WRITES = [
     "python -X utf8 -c \"import shutil; shutil.rmtree('build')\"",
     "Set-Location sub; python -c \"import os; os.makedirs('d')\"",
     "E:\\tools\\python.exe -c \"import os; os.unlink('x')\"",
+    # c123 (owner decision A5, row 17): system write tools that write what they do not name.
+    "robocopy src dst /SAVE:job",
+    "tar -c dir",
+    "tar -xPf in.tar",
+    "expand -r in.cab",
+    "certutil -urlcache -f https://example.invalid/x.exe",
+    "fsutil behavior set disable8dot3 1",
+    "cipher /k",
 ]
 
 
@@ -162,7 +224,8 @@ def test_a_write_whose_target_is_not_read_is_refused_whole(tmp_path, monkeypatch
 # A claim check covers every write or none: one unread write makes the whole command unreadable.
 PAIRED_WITH_AN_UNREAD_WRITE = [
     "Set-Content a.txt x; 1..2 | % { Set-Content notes.txt $_ }",
-    "Set-Content a.txt x; echo y > notes.txt",
+    # c123 (B149): "Set-Content a.txt x; echo y > notes.txt" left this list: a redirect's target is now read, so both of
+    # its writes are checked (test_every_readable_write_in_a_command_is_checked).
     "Set-Content a.txt x; [IO.File]::Delete('notes.txt')",
     "Set-Content a.txt ([IO.File]::Delete('notes.txt'))",
     "Set-Content a.txt x; python -c \"open('notes.txt','a')\"",
@@ -179,13 +242,20 @@ def test_a_readable_write_paired_with_an_unread_write_is_refused_whole(tmp_path,
     assert result["reason_code"] == "unknown_effect_targets" and not claimed.calls, result
 
 
-def test_every_readable_write_in_a_command_is_checked(tmp_path, monkeypatch):
-    command = "Add-Content a.txt x; Rename-Item b.txt c.txt; del d.txt; mkdir e"
-    assert _judged(tmp_path, command) == (["a.txt", "b.txt", "c.txt", "d.txt", "e"], True)
+@pytest.mark.parametrize(
+    ("command", "targets"),
+    [
+        ("Add-Content a.txt x; Rename-Item b.txt c.txt; del d.txt; mkdir e", ["a.txt", "b.txt", "c.txt", "d.txt", "e"]),
+        # c123 (B149): moved here from PAIRED_WITH_AN_UNREAD_WRITE; the redirect's target is read.
+        ("Set-Content a.txt x; echo y > notes.txt", ["a.txt", "notes.txt"]),
+    ],
+)
+def test_every_readable_write_in_a_command_is_checked(tmp_path, monkeypatch, command, targets):
+    assert _judged(tmp_path, command) == (targets, True)
     claimed = _NativeCheck(claimed=True)
     monkeypatch.setattr(effect_gate.subprocess, "run", claimed)
     assert effect_gate.gate_decision(_payload(tmp_path, command)) == {}
-    assert [_checked_paths(call) for call in claimed.calls] == [["a.txt", "b.txt", "c.txt", "d.txt", "e"]]
+    assert [_checked_paths(call) for call in claimed.calls] == [targets]
 
 
 READS = [
@@ -210,6 +280,20 @@ READS = [
     "python -c \"print('a'.replace('a', 'b'))\"",
     'python -c "import webbrowser; print(webbrowser.open)"',
     "python -c \"import os; print(os.getcwd(), os.path.exists('x'))\"",
+    # c123 (owner decision A5, rows 17 and 18): the system tools' listing and display forms, and sed without -i.
+    "robocopy src dst /L",
+    "tar -tf in.tar",
+    "tar -xOf in.tar member",
+    "7z l in.7z",
+    "expand -d in.cab",
+    "certutil -hashfile x SHA256",
+    "icacls x.txt",
+    "attrib x.txt",
+    "fsutil fsinfo drives",
+    "fsutil file queryextents x",
+    "cipher /c x.txt",
+    "sed -n 'p' f.txt",
+    "cat x | sed 's/a/b/'",
 ]
 
 

@@ -426,7 +426,9 @@ def test_provider_binds_claims_authors_and_delivers_through_separate_cli(provide
             creationflags=flags,
         )
         try:
-            deadline = time.monotonic() + 30
+            # Measured (c123's timer table, owner decision 2026-10-02): 1.3 s quiet, 6.6 s under
+            # saturation; Rule R 33.7 s, rounded up.
+            deadline = time.monotonic() + 40
             http = AuthorityClient(url, timeout=1)
             while True:
                 try:
@@ -441,9 +443,9 @@ def test_provider_binds_claims_authors_and_delivers_through_separate_cli(provide
             if provider is not ollama:
                 args.append("fixture-key")
             args.extend([8, tmp_path])
+            # c123 (batch design WP2 2.1): no role skill; the assigned target alone makes this bridge work.
             result = provider.run_tool_loop(
                 *args,
-                skill="bridge-review",
                 bridge_document=document,
                 bridge_version=2,
                 chat_func=chat,

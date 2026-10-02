@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import argparse
 import contextlib
-import fnmatch
+import dataclasses
 import json
 import os
 import re
@@ -62,7 +62,6 @@ MAX_TOOL_OUTPUT_CHARS = 6000
 MAX_GREP_RESULTS = 50
 MAX_GLOB_RESULTS = 100
 MAX_REPEATED_TOOL_SIGNATURE_TURNS = 4
-LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 
 
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
@@ -109,7 +108,6 @@ class RoutingConfig:
     schema_version: int
     models: dict[str, ModelRoute]
     default_model: str
-    skill_routes: dict[str, str]
     timeout_seconds: float | None = None
     session_timeout_seconds: float | None = None
     max_turns: int | None = None
@@ -130,6 +128,7 @@ class GuardExecutionResult:
     stdout: str
     stderr: str = ""
     timed_out: bool = False
+    duration_ms: int = 0  # c123 (batch design WP2, item 9)
 
 
 GuardRunner = Callable[[Path, dict[str, Any], Mapping[str, str], float], GuardExecutionResult]
@@ -222,26 +221,6 @@ def infer_model_version(model_id: str) -> str:
     return model_id.rsplit(":", 1)[1] or "unversioned"
 
 
-def _parse_skill_routes(routing: Mapping[str, Any], models: Mapping[str, ModelRoute]) -> dict[str, str]:
-    skills_raw = routing.get("skills") or {}
-    if not isinstance(skills_raw, dict):
-        raise OllamaHarnessError("routing.skills must be a table when present")
-    skill_routes: dict[str, str] = {}
-    for skill_name, route_spec in skills_raw.items():
-        if not isinstance(skill_name, str) or not skill_name:
-            raise OllamaHarnessError("routing.skills entries must use non-empty skill names")
-        if isinstance(route_spec, str):
-            route_key = route_spec
-        elif isinstance(route_spec, dict):
-            route_key = route_spec.get("model")
-        else:
-            raise OllamaHarnessError(f"routing.skills.{skill_name} must name a configured model")
-        if not isinstance(route_key, str) or route_key not in models:
-            raise OllamaHarnessError(f"routing.skills.{skill_name} must name a configured model")
-        skill_routes[skill_name] = route_key
-    return skill_routes
-
-
 def validate_advertised_models(config: RoutingConfig, advertised_model_ids: Iterable[str]) -> None:
     advertised: set[str] = set()
     for model_id in advertised_model_ids:
@@ -330,11 +309,13 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
     default_model = routing.get("default_model")
     if not isinstance(default_model, str) or default_model not in models:
         raise OllamaHarnessError("routing.default_model must name a configured model")
+    if "skills" in routing:
+        # c123 (batch design WP2 2.1): a role skill no longer selects D's model; its registration names --model.
+        raise OllamaHarnessError(f"routing.ollama.skills: {base.RETIRED_SKILL_TABLES}")
     config = RoutingConfig(
         schema_version=1,
         models=models,
         default_model=default_model,
-        skill_routes=_parse_skill_routes(routing, models),
         timeout_seconds=_as_optional_positive_float(
             routing.get("timeout_seconds"),
             field="routing.ollama.timeout_seconds",
@@ -353,18 +334,16 @@ def load_routing_config(project_root: Path, advertised_model_ids: Iterable[str] 
     return config
 
 
-def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str | None = None) -> ModelRoute:
-    if skill is not None and not skill:
-        raise OllamaHarnessError("skill route key must be a non-empty string")
-    route_key = requested_model or (config.skill_routes.get(skill) if skill else None) or config.default_model
+def resolve_model(config: RoutingConfig, requested_model: str | None) -> ModelRoute:
+    route_key = requested_model or config.default_model
     try:
         return config.models[route_key]
     except KeyError as exc:
         raise OllamaHarnessError(f"unknown model route: {route_key}") from exc
 
 
-def build_system_prompt(skill: str | None, project_root: Path) -> str:
-    """Load shared root instructions and the selected skill without assigning a role."""
+def build_system_prompt(project_root: Path) -> str:
+    """Load the shared root instructions; a role is never loaded from a launch argument (c123, WP2 2.1)."""
     root_source = project_root / "AGENTS.md"
     if not root_source.resolve().is_relative_to(project_root.resolve()):
         raise OllamaHarnessError("Shared root instructions resolve outside the project root")
@@ -374,17 +353,7 @@ def build_system_prompt(skill: str | None, project_root: Path) -> str:
         raise OllamaHarnessError("Shared root instructions are unavailable: AGENTS.md") from exc
     if not root_instructions.strip():
         raise OllamaHarnessError("Shared root instructions are unavailable: empty AGENTS.md")
-    if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return root_instructions
-    selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
-    sources = [project_root / ".agents" / "skills" / name / "SKILL.md" for name in ("gtkb-bridge", selected)]
-    try:
-        instructions = [path.read_text(encoding="utf-8") for path in sources]
-    except (OSError, UnicodeError) as exc:
-        raise OllamaHarnessError("Current canonical bridge skill instructions are unavailable") from exc
-    if any(not text.strip() for text in instructions):
-        raise OllamaHarnessError("Current canonical bridge skill instructions are unavailable: empty source")
-    return "\n\n".join([root_instructions, *instructions])
+    return root_instructions
 
 
 def _schema(name: str, description: str, properties: dict[str, Any], required: list[str]) -> dict[str, Any]:
@@ -441,7 +410,7 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
         ),
         "Bash": _schema(
             "Bash",
-            "Run a bounded local shell command after guards allow it; bridge artifact and retired-index mutations are denied.",
+            base.bash_tool_description(),  # c123 (batch design WP2, item 8): names the shell that runs it
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
@@ -658,7 +627,9 @@ def invoke_guard_adapter(
     guard_runner: GuardRunner | None = None,
     guard_paths: Sequence[Path] | None = None,
     timeout: float = 10.0,
+    decision_log: base.DecisionLogFunc | None = None,
 ) -> None:
+    """D's fail-closed guard adapter; c123 (batch design WP2, item 9): each guard's decision goes to decision_log."""
     if tool_name not in MUTATING_TOOLS:
         return
     tool_input = _guard_tool_input(tool_name, arguments, project_root)
@@ -687,27 +658,43 @@ def invoke_guard_adapter(
         )
         if not guard_path.is_file():
             raise OllamaHarnessError(f"guard script is missing: {relative_guard_path.as_posix()}")
+        started = time.monotonic()
         result = runner(guard_path, payload, env, timeout)
+        if isinstance(result, GuardExecutionResult) and not result.duration_ms:
+            result = dataclasses.replace(result, duration_ms=int((time.monotonic() - started) * 1000))
+        label = base._bounded_native_hook_diagnostic_token(guard_path.name, fallback="guard")
+        refusal: str | None = None
+        reason: str | None = None
+        data: Any = None
         if result.timed_out:
-            raise OllamaHarnessError(f"guard timed out: {_relative_path(project_root, guard_path)}")
-        if result.returncode != 0:
-            raise OllamaHarnessError(
-                f"guard exited nonzero: {_relative_path(project_root, guard_path)} ({result.returncode})"
-            )
-        stdout = (result.stdout or "").strip()
-        if not stdout:
-            raise OllamaHarnessError(f"guard emitted empty output: {_relative_path(project_root, guard_path)}")
-        try:
-            data = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            raise OllamaHarnessError(
-                f"guard emitted malformed JSON: {_relative_path(project_root, guard_path)}"
-            ) from exc
-        if not isinstance(data, dict):
-            raise OllamaHarnessError(f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}")
-        reason = _decision_reason(data)
-        if reason:
-            raise OllamaHarnessError(f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}")
+            refusal = f"guard timed out: {_relative_path(project_root, guard_path)}"
+        elif result.returncode != 0:
+            refusal = f"guard exited nonzero: {_relative_path(project_root, guard_path)} ({result.returncode})"
+        elif not (result.stdout or "").strip():
+            refusal = f"guard emitted empty output: {_relative_path(project_root, guard_path)}"
+        else:
+            try:
+                data = json.loads((result.stdout or "").strip())
+            except json.JSONDecodeError:
+                refusal = f"guard emitted malformed JSON: {_relative_path(project_root, guard_path)}"
+            if refusal is None and not isinstance(data, dict):
+                refusal = f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}"
+            if refusal is None:
+                reason = _decision_reason(data)
+                if reason:
+                    refusal = f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}"
+        base._log_decision(
+            decision_log,
+            "guard_adapter",
+            tool_name,
+            label,
+            result,
+            allowed=refusal is None,
+            reason=reason or refusal,
+            reason_code=base._reason_code(data) if isinstance(data, dict) else None,
+        )
+        if refusal is not None:
+            raise OllamaHarnessError(refusal)
 
 
 def _require_string(arguments: Mapping[str, Any], *names: str) -> str:
@@ -804,11 +791,18 @@ def _dispatch_write(
     model_metadata: ModelMetadata,
     project_root: Path,
     guard_runner: GuardRunner | None,
+    *,
+    decision_log: base.DecisionLogFunc | None = None,
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     content = str(arguments.get("content", ""))
     invoke_guard_adapter(
-        "Write", {"path": str(path), "content": content}, model_metadata, project_root, guard_runner=guard_runner
+        "Write",
+        {"path": str(path), "content": content},
+        model_metadata,
+        project_root,
+        guard_runner=guard_runner,
+        decision_log=decision_log,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="")
@@ -820,6 +814,8 @@ def _dispatch_edit(
     model_metadata: ModelMetadata,
     project_root: Path,
     guard_runner: GuardRunner | None,
+    *,
+    decision_log: base.DecisionLogFunc | None = None,
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=False)
     old_string = _require_string(arguments, "old_string")
@@ -830,6 +826,7 @@ def _dispatch_edit(
         model_metadata,
         project_root,
         guard_runner=guard_runner,
+        decision_log=decision_log,
     )
     try:
         content = path.read_text(encoding="utf-8")
@@ -848,50 +845,26 @@ def _dispatch_edit(
     return f"edited {_relative_path(project_root, path)}"
 
 
-def _iter_text_files(root: Path) -> Iterable[Path]:
-    for path in root.rglob("*"):
-        if path.is_file():
-            yield path
-
-
 def _dispatch_grep(arguments: Mapping[str, Any], project_root: Path) -> str:
-    pattern = _require_string(arguments, "pattern")
-    base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
-    max_results = _positive_int_argument(arguments, "max_results", MAX_GREP_RESULTS)
-    regex = re.compile(pattern)
-    roots = [base] if base.is_file() else list(_iter_text_files(base))
-    matches: list[str] = []
-    for file_path in roots:
-        rel = _relative_path_or_none(project_root, file_path)
-        if rel is None:
-            continue
-        try:
-            for line_no, line in enumerate(
-                file_path.read_text(encoding="utf-8", errors="ignore").splitlines(), start=1
-            ):
-                if regex.search(line):
-                    matches.append(f"{rel}:{line_no}:{line[:300]}")
-                    if len(matches) >= max_results:
-                        return "\n".join(matches)
-        except OSError:
-            continue
-    return "\n".join(matches)
+    """D's Grep, through the shared bounded walker (c123; batch design WP2, item 11).
+
+    D walked the whole tree with rglob, with no skip and no entry limit, the other contexts' scratch and checkouts
+    among it; the shared walker skips .git, .venv, caches and the shared context parents, and stops at its limit.
+    D's own _relative_path still decides whether a match lies under the root, so a match that resolves outside it
+    is skipped as before.
+    """
+    try:
+        return base._dispatch_grep(arguments, project_root, relative_path=_relative_path)
+    except base.CloudHarnessError as exc:
+        raise OllamaHarnessError(str(exc)) from exc
 
 
 def _dispatch_glob(arguments: Mapping[str, Any], project_root: Path) -> str:
-    pattern = _require_string(arguments, "pattern")
-    base = _resolve_tool_path(project_root, str(arguments.get("path") or "."), allow_missing=False)
-    max_results = _positive_int_argument(arguments, "max_results", MAX_GLOB_RESULTS)
-    matches: list[str] = []
-    for path in base.rglob("*"):
-        rel = _relative_path_or_none(project_root, path)
-        if rel is None:
-            continue
-        if fnmatch.fnmatch(rel, pattern) or fnmatch.fnmatch(path.name, pattern):
-            matches.append(rel)
-            if len(matches) >= max_results:
-                break
-    return "\n".join(sorted(matches))
+    """D's Glob, through the shared bounded walker (c123; batch design WP2, item 11), with D's own _relative_path."""
+    try:
+        return base._dispatch_glob(arguments, project_root, relative_path=_relative_path)
+    except base.CloudHarnessError as exc:
+        raise OllamaHarnessError(str(exc)) from exc
 
 
 def _default_command_runner(
@@ -900,20 +873,9 @@ def _default_command_runner(
     env: Mapping[str, str],
     timeout: float,
 ) -> subprocess.CompletedProcess[str]:
-    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000) if os.name == "nt" else 0
-    return subprocess.run(
-        command,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        capture_output=True,
-        cwd=str(project_root),
-        env=dict(env),
-        timeout=timeout,
-        shell=True,
-        check=False,
-        creationflags=creationflags,
-    )
+    """D's Bash runner is the shared one (c123; batch design WP2, item 8): a named shell, UTF-8 with replacement, the
+    process tree ended on a timeout or an interrupt."""
+    return base._default_command_runner(command, project_root, env, timeout)
 
 
 def _dispatch_bash(
@@ -922,13 +884,20 @@ def _dispatch_bash(
     project_root: Path,
     guard_runner: GuardRunner | None,
     command_runner: CommandRunner | None,
+    *,
+    decision_log: base.DecisionLogFunc | None = None,
 ) -> str:
     command = _require_string(arguments, "command")
     timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
     bridge_denial = bridge_bash_mutation_reason(command)
     if bridge_denial:
+        base._log_decision(
+            decision_log, "bridge_shell", "Bash", "bridge_shell", None, allowed=False, reason=bridge_denial
+        )
         raise OllamaHarnessError(bridge_denial)
-    invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, guard_runner=guard_runner)
+    invoke_guard_adapter(
+        "Bash", {"command": command}, model_metadata, project_root, guard_runner=guard_runner, decision_log=decision_log
+    )
     env = set_author_metadata_env(
         os.environ,
         model_metadata.model_id,
@@ -966,22 +935,24 @@ def dispatch_tool_call(
     *,
     guard_runner: GuardRunner | None = None,
     command_runner: CommandRunner | None = None,
-    skill: str | None = None,
+    decision_log: base.DecisionLogFunc | None = None,
 ) -> str:
     if tool_name not in CANONICAL_TOOLS:
         raise OllamaHarnessError(f"unsupported tool: {tool_name}")
     if tool_name == "Read":
         return _dispatch_read(arguments, project_root)
     if tool_name == "Write":
-        return _dispatch_write(arguments, model_metadata, project_root, guard_runner)
+        return _dispatch_write(arguments, model_metadata, project_root, guard_runner, decision_log=decision_log)
     if tool_name == "Edit":
-        return _dispatch_edit(arguments, model_metadata, project_root, guard_runner)
+        return _dispatch_edit(arguments, model_metadata, project_root, guard_runner, decision_log=decision_log)
     if tool_name == "Grep":
         return _dispatch_grep(arguments, project_root)
     if tool_name == "Glob":
         return _dispatch_glob(arguments, project_root)
     if tool_name == "Bash":
-        return _dispatch_bash(arguments, model_metadata, project_root, guard_runner, command_runner)
+        return _dispatch_bash(
+            arguments, model_metadata, project_root, guard_runner, command_runner, decision_log=decision_log
+        )
     raise OllamaHarnessError(f"unsupported tool: {tool_name}")
 
 
@@ -1029,7 +1000,6 @@ def run_tool_loop(
     max_turns: int,
     project_root: Path,
     *,
-    skill: str | None = None,
     bridge_document: str | None = None,
     bridge_version: int | None = None,
     system_prompt: str | None = None,
@@ -1040,16 +1010,28 @@ def run_tool_loop(
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
     telemetry: Any | None = None,
+    guard_log: base.GuardDecisionLog | None = None,
+    native_context_id: str | None = None,
+    binding: Mapping[str, Any] | None = None,
 ) -> str:
     try:
-        completion_target = bridge_completion_target(skill, bridge_document, bridge_version)
+        completion_target = bridge_completion_target(bridge_document, bridge_version)
     except BridgeDeliveryIncomplete as exc:
         raise OllamaHarnessIncomplete(str(exc)) from exc
     if max_turns < 1:
         raise OllamaHarnessError("max_turns must be at least 1")
     if session_timeout <= 0:
         raise OllamaHarnessError("session_timeout must be positive")
-    metadata = ModelMetadata(model_route.model_id, model_route.model_version, endpoint, model_route.key)
+    metadata = ModelMetadata(
+        model_route.model_id,
+        model_route.model_version,
+        endpoint,
+        model_route.key,
+        # c123 (batch design WP2, item 10): the launcher names the id it printed before the first provider call.
+        **({"native_context_id": native_context_id} if native_context_id else {}),
+    )
+    # c123 (batch design WP2, item 9): each guard decision goes to the guard log.
+    decision_log = guard_log.record if guard_log is not None else None
     hook_metadata = base.ModelMetadata(
         metadata.model_id,
         metadata.model_version,
@@ -1073,12 +1055,16 @@ def run_tool_loop(
 
     invoke(base.NATIVE_HOOK_SESSION_START)
     invoke(base.NATIVE_HOOK_USER_PROMPT_SUBMIT, prompt=prompt)
-    identity = (
-        f"Native context identifier: {metadata.native_context_id}. "
-        "Bind only the exact init marker supplied in the task through gt session bind. "
-        "The response has an initialization status and an immutable binding object. "
-        "Use the binding object for authored provenance; initialization status grants no bridge action."
-    )
+    if binding is not None:
+        # c123 (batch design WP2 2.1): the launcher bound the context with its --init line; state the bound facts.
+        identity = base.bound_identity(metadata.native_context_id, binding, completion_target)
+    else:
+        identity = (
+            f"Native context identifier: {metadata.native_context_id}. "
+            "Bind only the exact init marker supplied in the task through gt session bind. "
+            "The response has an initialization status and an immutable binding object. "
+            "Use the binding object for authored provenance; initialization status grants no bridge action."
+        )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": "\n\n".join(part for part in (identity, system_prompt) if part)}
     ]
@@ -1189,7 +1175,9 @@ def run_tool_loop(
                         requested_timeout,
                         _remaining_timeout(session_deadline, "session timeout exceeded before Bash tool call"),
                     )
-                block = invoke(base.NATIVE_HOOK_PRE_TOOL_USE, tool_name=tool_name, tool_input=arguments)
+                block = invoke(
+                    base.NATIVE_HOOK_PRE_TOOL_USE, tool_name=tool_name, tool_input=arguments, decision_log=decision_log
+                )
                 block_reason = base._native_hook_block_reason(block)
                 if block_reason:
                     result = f"ERROR: native hook blocked {tool_name}: {block_reason}"
@@ -1202,7 +1190,7 @@ def run_tool_loop(
                             project_root,
                             guard_runner=guard_runner,
                             command_runner=command_runner,
-                            skill=skill,
+                            decision_log=decision_log,
                         )
                     except OllamaHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"
@@ -1217,6 +1205,10 @@ def run_tool_loop(
                 )
         stop_reason = "max_turn_exhaustion"
         raise OllamaHarnessError("max-turn exhaustion before final assistant text")
+    except KeyboardInterrupt:
+        # c123 (batch design WP2, item 10): Ctrl+C or CTRL_BREAK (raised as the same interrupt) is classified.
+        stop_reason = "interrupted"
+        raise
     except OllamaHarnessError as exc:
         message = str(exc).lower()
         if isinstance(exc, OllamaHarnessIncomplete):
@@ -1245,7 +1237,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Ollama harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Ollama.")
     parser.add_argument("--model", help="Routing model key from .harness-baseline-configuration/routing.toml.")
-    parser.add_argument("--skill", help="Skill or task route key from .harness-baseline-configuration/routing.toml.")
+    parser.add_argument(
+        "--init", help="The exact init line; the launcher binds the context with it before the first model call."
+    )
     parser.add_argument("--bridge-document", help="Assigned canonical bridge document.")
     parser.add_argument("--bridge-version", type=int, help="Exact successor version this task must deliver.")
     parser.add_argument("--endpoint", default=DEFAULT_ENDPOINT, help="Ollama endpoint; default is localhost.")
@@ -1257,6 +1251,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_SESSION_TIMEOUT_SECONDS,
         help="Maximum wall-clock seconds for the whole harness tool loop.",
     )
+    parser.add_argument("--report", help="Write the run report (JSON) to this path.")
+    parser.add_argument("--guard-log", help="Append the guard decisions (JSONL) to this path; else GTKB_GUARD_LOG.")
     return parser
 
 
@@ -1302,37 +1298,92 @@ def resolve_runtime_max_turns(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run one D launch (c123, batch design WP2 items 9 and 10: guard log, report, exit codes).
+
+    Exit codes: 0 final answer; 3 bridge delivery incomplete; 4 the --init bind failed (c123, WP2 2.1, no model call
+    made); 5 interrupted; 1 every other failure.
+    """
     ensure_utf8_output_streams()
+    base.install_break_handler()
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     parser = build_arg_parser()
     args = parser.parse_args(raw_argv)
     project_root = resolve_project_root(Path.cwd())
+    native_context_id = str(uuid4())
+    guard_log = base.GuardDecisionLog(base.guard_log_path(args.guard_log), native_context_id)
+    report = base.RunReport(
+        harness="ollama",
+        native_context_id=native_context_id,
+        route_key=args.model,
+        requested_model=None,
+        endpoint=args.endpoint,
+        guard_log=guard_log,
+    )
+    exit_code, error = 1, None
+    try:
+        exit_code, error = _run(args, raw_argv, project_root, native_context_id, guard_log, report)
+    except KeyboardInterrupt:
+        print("ollama_harness: interrupted", file=sys.stderr)
+        exit_code, error = base.EXIT_INTERRUPTED, "interrupted"
+        if report.data["stop_reason"] is None:
+            report.finish("interrupted")
+    finally:
+        report.write(Path(args.report) if args.report else None, exit_code=exit_code, error=error)
+    return exit_code
+
+
+def _run(
+    args: argparse.Namespace,
+    raw_argv: list[str],
+    project_root: Path,
+    native_context_id: str,
+    guard_log: base.GuardDecisionLog,
+    report: base.RunReport,
+) -> tuple[int, str | None]:
     try:
         config = load_routing_config(project_root)
         operation_timeout, session_timeout = resolve_runtime_timeouts(args, config, raw_argv)
         max_turns = resolve_runtime_max_turns(args, config, raw_argv)
         advertised_model_ids = call_ollama_tags(args.endpoint, operation_timeout)
         validate_advertised_models(config, advertised_model_ids)
-        model_route = resolve_model(config, args.model, skill=args.skill)
-        system_prompt = build_system_prompt(args.skill, project_root)
+        model_route = resolve_model(config, args.model)
+        report.data["route_key"] = model_route.key
+        report.data["requested_model"] = model_route.model_id
+        system_prompt = build_system_prompt(project_root)
+        print(f"ollama_harness: native_context_id={native_context_id}", file=sys.stderr)
+        try:
+            base.check_launch_inputs(project_root, _OLLAMA_HOOK_PROFILE, args.bridge_document, args.bridge_version)
+        except base.CloudHarnessIncomplete as exc:
+            raise OllamaHarnessIncomplete(str(exc)) from exc
+        except base.CloudHarnessError as exc:
+            raise OllamaHarnessError(str(exc)) from exc
+        try:
+            binding = base.bind_for_run(args.init, native_context_id, project_root, report)
+        except base.NativeBindFailed as exc:
+            print(f"ollama_harness: {exc}", file=sys.stderr)
+            return base.EXIT_BIND_FAILED, str(exc)
         text = run_tool_loop(
             args.prompt,
             model_route,
             args.endpoint,
             max_turns,
             project_root,
-            skill=args.skill,
             bridge_document=args.bridge_document,
             bridge_version=args.bridge_version,
             system_prompt=system_prompt,
             timeout=operation_timeout,
             session_timeout=session_timeout,
+            telemetry=report,
+            guard_log=guard_log,
+            native_context_id=native_context_id,
+            binding=binding,
         )
     except OllamaHarnessError as exc:
         print(f"ollama_harness: {exc}", file=sys.stderr)
-        return 1
+        incomplete = isinstance(exc, OllamaHarnessIncomplete)
+        return (base.EXIT_DELIVERY_INCOMPLETE if incomplete else 1), str(exc)
     print(text)
-    return 0
+    return 0, None
 
 
 if __name__ == "__main__":

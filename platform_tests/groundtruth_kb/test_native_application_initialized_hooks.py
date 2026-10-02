@@ -16,6 +16,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shlex
 import shutil
 import socket
 import subprocess
@@ -329,16 +330,22 @@ def _ready(client, app, during_claim=None):
 
 
 def _gate(app, host, payload: dict, *, context: str) -> dict:
-    """Execute the projected native effect gate exactly as the emitted registration names it."""
+    """Execute the projected native effect gate exactly as the emitted registration names it.
+
+    c123 (batch design WP2 2.4): the registration runs the gate through the fail-closed Claude hook adapter, so the
+    adapter runs with the registered arguments: its deadline, the host-root-relative gate and the harness name.
+    """
     settings = json.loads((app["root"] / ".claude/settings.json").read_text(encoding="utf-8"))
     commands = [entry["command"] for group in settings["hooks"]["PreToolUse"] for entry in group["hooks"]]
     command = next(command for command in commands if "implementation_start_gate.py" in command)
-    script = command.split('" -B "', 1)[1].split('"', 1)[0].replace("$CLAUDE_PROJECT_DIR", str(app["root"]))
-    assert Path(script).is_file(), script
+    arguments = [
+        part.strip('"') for part in shlex.split(command.replace("$CLAUDE_PROJECT_DIR", str(app["root"])), posix=False)
+    ]
+    assert Path(arguments[2]).is_file(), arguments
     env = _cli_env()
     env.update(GTKB_NATIVE_CONTEXT_ID=context, GTKB_PROJECT_ROOT=str(app["root"]))
     result = subprocess.run(
-        [sys.executable, "-P", script],
+        [sys.executable, "-P", *arguments[1:]],
         input=json.dumps(payload),
         cwd=app["root"],
         env=env,

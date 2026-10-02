@@ -138,10 +138,56 @@ class _StatusClient:
             "FAIL",
             "1 ambiguities",
         ),
-        ({"status": "fail", "ambiguities": [], "source_issues": [], "validation_issues": []}, "FAIL", "without listed"),
+        # c123 (batch design WP3 3.4): no findings and no term counts; the detail says the cause is not stated here.
+        (
+            {"status": "fail", "ambiguities": [], "source_issues": [], "validation_issues": []},
+            "FAIL",
+            "no findings and no term counts, so the cause is not stated here",
+        ),
         ({"ambiguities": [], "source_defects": []}, "UNKNOWN", "not the native contract"),
         ({"status": "pass", "ambiguities": 0, "source_issues": [], "validation_issues": []}, "UNKNOWN", "not the"),
         (["pass"], "UNKNOWN", "not the native contract"),
+        # c123 (batch design WP3 3.4): no findings, and the authority's own counts name the empty active term set.
+        (
+            {
+                "status": "fail",
+                "ambiguities": [],
+                "source_issues": [],
+                "validation_issues": [],
+                "records": 0,
+                "active_records": 0,
+                "inactive_records": 0,
+            },
+            "FAIL",
+            "fail: no active canonical terms (0 active, 0 inactive of 0 records)",
+        ),
+        (
+            {
+                "status": "fail",
+                "ambiguities": [],
+                "source_issues": [],
+                "validation_issues": [],
+                "records": 4,
+                "active_records": 0,
+                "inactive_records": 4,
+            },
+            "FAIL",
+            "(0 active, 4 inactive of 4 records); no term resolves until one is active",
+        ),
+        # c123 (batch design WP3 3.4): findings keep their text whatever the counts say.
+        (
+            {
+                "status": "fail",
+                "ambiguities": [],
+                "source_issues": [],
+                "validation_issues": [{"id": "OTHER"}],
+                "records": 1,
+                "active_records": 0,
+                "inactive_records": 1,
+            },
+            "FAIL",
+            "fail: 1 validation issues",
+        ),
     ],
 )
 def test_formal_component_follows_the_authority_status_contract(payload, expected, fragment) -> None:
@@ -153,6 +199,10 @@ def test_formal_component_follows_the_authority_status_contract(payload, expecte
 def test_a_retired_formal_source_cannot_display_pass(native_application) -> None:
     """The service's own failing state (a term whose formal source is retired) is FAIL through the public CLI."""
     client = native_application.client
+    # c123 (batch design WP3 3.4): before any term is seeded the authority fails; the detail names the empty term set.
+    empty = json.loads(native_application.invoke("status", "--component", "formal", "--json").output)
+    assert empty["components"][0]["status"] == "FAIL"
+    assert "no active canonical terms (0 active, 0 inactive of 0 records)" in empty["components"][0]["detail"]
     for domain, record_id, fields in (
         ("specifications", "SPEC-1", {"title": "Required effect", "description": "Preserve work", "status": "active"}),
         ("specifications", "SPEC-2", {"title": "Other meaning", "status": "active"}),

@@ -48,6 +48,8 @@ def generated_harness_root(tmp_path_factory):
         "scripts/antigravity_hook_adapter.py",
         "scripts/codex_hook_adapter.py",
         "scripts/goose_hook_adapter.py",
+        # c123 (batch design WP2 2.4): the Claude projection runs every hook through this adapter.
+        "scripts/claude_hook_adapter.py",
         "scripts/implementation_start_gate.py",
     ):
         target = root / relative

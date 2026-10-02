@@ -29,9 +29,9 @@ list is not proof that the required scope is complete. Missing or inactive
 requirements must be reconciled, not silently omitted or replaced by an old
 approval, retained disclosure, deliberation or another harness's state.
 
-Reserve the intended GO or NO-GO response with `gt bridge claim`, using this
-context's native identifier and the predecessor version just read. Keep the
-returned fence. A conflicting or changed predecessor requires a fresh read,
+Reserve the intended GO, NO-GO or SUPERSEDED response with `gt bridge claim`,
+using this context's native identifier and the predecessor version just read.
+Keep the returned fence. A conflicting or changed predecessor requires a fresh read,
 not a whole-thread claim or an attempt to take over another context's work.
 Use `gt bridge check` before protected effects and release an unfinished claim.
 
@@ -52,7 +52,9 @@ Evaluate these questions against the actual source and canonical requirements:
 - Can deletion, consolidation or a direct correction achieve the same required
   result more simply? Explain the actual alternative considered.
 
-Inspect or run the applicable nonmutating checks. Do not implement the proposal
+Inspect or run the applicable nonmutating checks. Programs and tests,
+`python -m pytest` included, run only inside this context's live verdict claim,
+and test time counts against the claim window. Do not implement the proposal
 while reviewing it. Distinguish inspected evidence, executed checks, assumptions
 and remaining uncertainty. Do not infer owner decisions; apply an explicit
 owner correction to its canonical source through the supported CLI when needed.
@@ -61,8 +63,15 @@ owner correction to its canonical source through the supported CLI when needed.
 
 Author GO only when the proposal is ready for implementation. Otherwise author
 NO-GO with concrete findings: the observed issue, governing requirement,
-consequence, affected scope and correction needed. The Prime Builder answers a
-NO-GO with REVISED. A report-phase rejection uses NOT-READY under `gtkb-verify`.
+consequence, affected scope and correction needed. Scope that spans several work
+items, or a scratch path used as a target or as evidence, is a NO-GO. The Prime
+Builder answers a NO-GO with REVISED. A report-phase rejection uses NOT-READY
+under `gtkb-verify`.
+
+If the proposal's scoped subject is no longer live, author SUPERSEDED instead of
+GO or NO-GO. It carries `supersession_source: <current canonical id>` and
+`residual_work_item: <id or none>`, closes the attempt and is not verification.
+It never closes another context's live claim.
 
 Write the complete UTF-8 message in this context's scratch directory. Both GO
 and NO-GO use `bridge_kind: lo_verdict`, name the actual author and session, and
@@ -71,7 +80,8 @@ three nonblank lines contain the status, `::init gtkb pb`, and the supplied
 canonical activity as `::open <activity>`. Author the current Document, next
 Version and Date metadata exactly once. The claimed attempt supplies Project
 and Work Item identity; if the verdict repeats either field, it must match
-that current claim.
+that current claim. SUPERSEDED also uses `bridge_kind: lo_verdict`, but it is
+non-dispatchable: it omits both envelope lines and `recipient_role`.
 
 The body explains the reviewed requirements, source evidence, checks and
 results, simpler alternative considered, findings and required next action.

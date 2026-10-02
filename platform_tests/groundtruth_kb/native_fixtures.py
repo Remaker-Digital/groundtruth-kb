@@ -187,7 +187,9 @@ def _serve_authority(tmp_path, port):
         stderr=log,
         creationflags=FLAGS,
     )
-    http = AuthorityClient(f"http://127.0.0.1:{port}", timeout=1)
+    # Measured (c123's timer table, owner decision 2026-10-02): an attempt's answer took 0.16 s quiet and
+    # 0.46 s under saturation; Rule R 1.4 s, rounded up to 10 s. The 25 s window around the attempts is unchanged.
+    http = AuthorityClient(f"http://127.0.0.1:{port}", timeout=10)
     deadline = time.monotonic() + 25
     while True:
         try:
@@ -260,7 +262,8 @@ def register(client, identifier="A", *, active=True):
                     "argv": ["runner", "--model", "private-model", "private-prompt"],
                     "env": {"TOKEN": "private-credential"},
                 },
-                "private-surface-content": {"role": "loyal-opposition", "output": "private-generated-text"},
+                # A role-free private value: the authority refuses a registration that names a role (c123, WP2 2.1).
+                "private-surface-content": {"mode": "private-mode-value", "output": "private-generated-text"},
             },
         },
     )

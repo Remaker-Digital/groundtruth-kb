@@ -3,11 +3,17 @@
 Verifies that the wrapper correctly integrates the guard: exports model
 configuration, records the run window, loads the canonical floor contract from
 the neutral baseline (refusing to run without it), and calls evaluate_run.
+
+c123 (batch design WP2 2.1 and 2.2): the wrapper also passes Goose no role
+prompt (no --skill, no --system), and --model names a routing.toml route whose
+model_id is what goose run receives; an unknown route key stops the run before
+Goose starts.
 """
 
 from __future__ import annotations
 
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -22,12 +28,46 @@ import goose_harness  # noqa: E402
 from goose_execution_guard import ExecutionFloorConfig, export_model_configuration  # noqa: E402
 from goose_harness import (  # noqa: E402
     FLOOR_CONFIG_RELATIVE_PATH,
+    PROFILES_RELATIVE_PATH,
+    ROUTING_RELATIVE_PATH,
     GooseHarnessError,
     _load_floor_config,
     build_arg_parser,
-    build_system_prompt,
+    resolve_goose_model,
     resolve_project_root,
 )
+
+
+def _goose_project(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """A project root with the checkout's floor contract, Goose profile and routing table, and ``sh`` on PATH."""
+    root = tmp_path / "project"
+    root.mkdir()
+    (root / "groundtruth.toml").write_text("[groundtruth]\n", encoding="utf-8")
+    for relative in (FLOOR_CONFIG_RELATIVE_PATH, PROFILES_RELATIVE_PATH, ROUTING_RELATIVE_PATH):
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes((PROJECT_ROOT / relative).read_bytes())
+    interpreter = tmp_path / "bin" / ("sh.exe" if os.name == "nt" else "sh")
+    interpreter.parent.mkdir()
+    interpreter.write_bytes(b"")
+    interpreter.chmod(0o755)
+    monkeypatch.setenv("PATH", str(interpreter.parent) + os.pathsep + os.environ.get("PATH", ""))
+    return root
+
+
+def _record_launches(monkeypatch: pytest.MonkeyPatch) -> tuple[list[list[str]], list[str]]:
+    """Record each goose command line and each exported model; the fixture run fails right after the spawn."""
+    launches: list[list[str]] = []
+    exported: list[str] = []
+    monkeypatch.setattr(goose_harness, "_find_goose_cli", lambda: "goose-fixture")
+    monkeypatch.setattr(goose_harness, "export_model_configuration", exported.append)
+
+    def launch(command, **kwargs):
+        launches.append(command)
+        return subprocess.CompletedProcess(command, 1, stdout="", stderr="controlled failure")
+
+    monkeypatch.setattr(goose_harness.subprocess, "run", launch)
+    return launches, exported
 
 
 class TestIntegration:
@@ -114,27 +154,92 @@ enabled = false
         assert args.prompt == "test prompt"
         assert args.max_turns == 40
         assert args.timeout == 3600.0
-
-    def test_build_system_prompt_known_skill(self):
-        """build_system_prompt returns content for known skills."""
-        prompt = build_system_prompt("bridge-review")
-        assert prompt is not None
-        assert "Loyal Opposition" in prompt
-
-    def test_build_system_prompt_unknown_skill(self):
-        """build_system_prompt returns None for unknown skills."""
-        prompt = build_system_prompt("nonexistent-skill")
-        assert prompt is None
-
-    def test_build_system_prompt_none(self):
-        """build_system_prompt returns None for None input."""
-        assert build_system_prompt(None) is None
+        assert args.model is None
+        # c123 (batch design WP2 2.1): no --skill; a role is never a launch argument.
+        assert "skill" not in vars(args)
+        with pytest.raises(SystemExit):
+            parser.parse_args(["-p", "test prompt", "--skill", "bridge-review"])
 
     def test_resolve_project_root(self, tmp_path):
         """resolve_project_root finds a directory with groundtruth.toml."""
         (tmp_path / "groundtruth.toml").write_text("")
         root = resolve_project_root(tmp_path)
         assert root == tmp_path
+
+
+class TestRoleFreeLaunchAndModelRoute:
+    """c123 (batch design WP2 2.1 and 2.2): no role prompt reaches Goose, and --model is a routing.toml route key."""
+
+    def test_no_system_prompt_is_passed_to_goose(self, tmp_path, monkeypatch):
+        """c123 (batch design WP2 2.1): no --system; the dispatched prompt, init line first, is Goose's only text."""
+        root = _goose_project(tmp_path, monkeypatch)
+        launches, _exported = _record_launches(monkeypatch)
+        prompt = "::init gtkb lo\nReview the dispatched proposal"
+        argv = ["-p", prompt, "--model", "goose-deepseek-v4-pro", "--project-root", str(root)]
+        assert goose_harness.main(argv) == 1
+        (command,) = launches
+        assert command[:2] == ["goose-fixture", "run"]
+        assert "--system" not in command
+        assert command[command.index("--text") + 1] == prompt
+        assert not any("Loyal Opposition" in part or "Prime Builder" in part for part in command)
+
+    def test_a_registered_route_key_reaches_goose_as_its_model_id(self, tmp_path, monkeypatch):
+        """c123 (batch design WP2 2.2): G's registered key resolves through the checkout's routing.toml."""
+        root = _goose_project(tmp_path, monkeypatch)
+        launches, exported = _record_launches(monkeypatch)
+        argv = ["-p", "probe", "--model", "goose-deepseek-v4-pro", "--project-root", str(root)]
+        assert goose_harness.main(argv) == 1
+        (command,) = launches
+        assert command.count("--model") == 1
+        assert command[command.index("--model") + 1] == "deepseek-v4-pro"
+        assert "goose-deepseek-v4-pro" not in command
+        assert exported == ["deepseek-v4-pro"]
+
+    @pytest.mark.parametrize(
+        "route_key",
+        ["gtkb-v4f-goose", "alibaba-deepseek-v4-pro", "deepseek-v4-pro"],
+        ids=["c121-registered-key", "alibaba-row", "openrouter-row-named-like-the-goose-model-id"],
+    )
+    def test_an_unknown_route_key_exits_1_before_goose_runs(self, tmp_path, monkeypatch, capsys, route_key):
+        """c123 (batch design WP2 2.2): a free-text key or another provider's row fails closed before any spawn."""
+        root = _goose_project(tmp_path, monkeypatch)
+        launches, exported = _record_launches(monkeypatch)
+        assert goose_harness.main(["-p", "probe", "--model", route_key, "--project-root", str(root)]) == 1
+        assert launches == [] and exported == []
+        captured = capsys.readouterr()
+        assert captured.err == f"goose_harness: unknown model route: {route_key}\n"
+        assert captured.out == ""
+
+    def test_without_model_no_model_is_passed(self, tmp_path, monkeypatch):
+        """c123 (batch design WP2 2.2): without --model nothing is resolved and goose run gets no --model."""
+        root = _goose_project(tmp_path, monkeypatch)
+        (root / ROUTING_RELATIVE_PATH).unlink()
+        launches, exported = _record_launches(monkeypatch)
+        assert goose_harness.main(["-p", "probe", "--project-root", str(root)]) == 1
+        (command,) = launches
+        assert "--model" not in command
+        assert exported == [""]
+
+    @pytest.mark.parametrize(
+        "routing,message",
+        [
+            (None, "routing config is unreadable"),
+            ("[models.fixture\n", "routing config is unreadable"),
+            (
+                '[models.fixture]\nprovider = "goose"\nmodel_id = ""\n',
+                "models.fixture.model_id must be a non-empty string",
+            ),
+        ],
+        ids=["absent", "malformed", "empty-model-id"],
+    )
+    def test_resolve_goose_model_fails_closed(self, tmp_path, routing, message):
+        """c123 (batch design WP2 2.2): an unreadable table or an empty model_id is refused, never guessed."""
+        if routing is not None:
+            path = tmp_path / ROUTING_RELATIVE_PATH
+            path.parent.mkdir(parents=True)
+            path.write_text(routing, encoding="utf-8")
+        with pytest.raises(GooseHarnessError, match=message):
+            resolve_goose_model(tmp_path, "fixture")
 
 
 class TestGooseHarnessImports:

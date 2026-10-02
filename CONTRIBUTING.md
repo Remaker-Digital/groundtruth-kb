@@ -1,7 +1,7 @@
 # Contributing to GroundTruth KB
 
 Thanks for your interest in GT-KB. This repository builds the GT-KB platform
-itself, and it is developed *using* the platform's own governance model — so
+itself, and it is developed *using* the platform's own governance model, so
 contributing here means working through that model.
 
 ## The contribution model in one paragraph
@@ -13,11 +13,13 @@ Opposition** agent independently reviews every proposal (`GO` / `NO-GO`) and
 verifies every implementation against its linked specifications (`VERIFIED`).
 Nothing is "done" until specification-derived tests have actually run.
 
-The coordination surface is the **file bridge**: versioned markdown files under
-[`bridge/`](bridge/); after WI-4510 Phase-3 cutover dispatcher/TAFE bridge
-state is canonical and retired bridge-index artifacts are not live queue
-authority. See [`.harness-baseline-configuration/rules/file-bridge-protocol.md`](.harness-baseline-configuration/rules/file-bridge-protocol.md)
-for the full protocol.
+The coordination surface is the **native bridge**: proposals, reviews, reports
+and verifications are versioned items in the GT-KB authority, authored and read
+through `gt bridge` and the four role skills in [`.agents/skills/`](.agents/skills/)
+(`gtkb-bridge`, `gtkb-bridge-propose`, `gtkb-proposal-review` and `gtkb-verify`).
+There are no bridge files, and the native bridge refuses `bridge/` paths. See
+[`.harness-baseline-configuration/rules/file-bridge-protocol.md`](.harness-baseline-configuration/rules/file-bridge-protocol.md)
+for the protocol.
 
 ## Development setup
 
@@ -46,7 +48,7 @@ python -m pytest -q --tb=short
 Code quality conventions live in [`pyproject.toml`](pyproject.toml) (`ruff`
 config, line length 120, `py312` target). The pre-commit hook additionally runs
 a redacted secret scan, dev-environment inventory-drift checks, and
-narrative-artifact evidence checks — **do not bypass commit hooks**; fix the
+narrative-artifact evidence checks. **Do not bypass commit hooks**; fix the
 underlying issue.
 
 ## Proposing a change
@@ -54,12 +56,14 @@ underlying issue.
 1. **Specify first.** Capture the requirement as a specification before writing
    code. Owner-articulated requirements become specifications through the
    governed approval path, not silently.
-2. **Propose via the bridge.** File an implementation proposal under `bridge/`
-   that cites the governing specifications and the tests that will prove it.
-3. **Get a `GO`.** Loyal Opposition reviews the proposal. Address `NO-GO`
-   findings and revise.
-4. **Implement and verify.** Implement the approved proposal, then file a report;
-   verification runs the specification-derived tests and records `VERIFIED`.
+2. **Propose through the native bridge.** Author a `NEW` implementation proposal
+   with `gt bridge` (the `gtkb-bridge-propose` skill) that cites the governing
+   specifications and the tests that will prove it.
+3. **Get a `GO`.** Loyal Opposition reviews the proposal (`gtkb-proposal-review`).
+   Address `NO-GO` findings in a `REVISED` proposal.
+4. **Implement and verify.** Implement the approved proposal, then author a
+   `READY` report; verification (`gtkb-verify`) runs the specification-derived
+   tests and records `VERIFIED` or `NOT-READY`.
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/)
 (`feat:`, `fix:`, `refactor:`, `chore:`, `docs:`, `test:`, …).

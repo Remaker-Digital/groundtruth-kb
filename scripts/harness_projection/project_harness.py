@@ -306,7 +306,12 @@ def _projected_timeout(profile: dict, hook: dict) -> int | None:
     raw = hook.get("timeout_seconds")
     floor = int(profile.get("hook_timeout_floor_seconds") or 0)
     if raw is None:
-        return floor if floor > 0 else None
+        if floor > 0:
+            return floor
+        # c123 (batch design WP2 2.4): a profile can register its host's documented default for a hook the manifest
+        # gives no timeout, so an adapter deadline derived from it stays below the timeout the host applies.
+        default = int(profile.get("hook_timeout_default_seconds") or 0)
+        return default if default > 0 else None
     timeout_val = int(raw)
     if floor > 0:
         timeout_val = max(timeout_val, floor)
@@ -318,7 +323,7 @@ def _hook_target(hook: dict, profile: dict) -> str:
 
     Shared hooks (script_root = "project_scripts") live under scripts/; every other
     hook under the baseline hooks root. Adapter-based hosts (stdin_adapter: codex,
-    cursor, antigravity) resolve the target against their own host root and refuse
+    cursor, antigravity, claude) resolve the target against their own host root and refuse
     ``..``, so they get the plain host-root-relative path also under --application
     (R12); the other hosts get runtime_relative() (``../../`` under --application).
     """
@@ -725,6 +730,36 @@ def _powershell_expansion_safe(command: str) -> str:
     return command.replace("`", "``").replace("$", "`$")
 
 
+# c123 (owner decision B5): keys a settings_json profile may declare in [native_settings] are rendered beside the hooks.
+# The projector owns the comment and the hooks, and a projection never carries permissions: interactive sessions keep
+# the host's own prompts, and a dispatched registration sets its permission mode on its own command line (B1).
+RESERVED_NATIVE_SETTINGS = frozenset({"_comment", "hooks", "permissions"})
+
+
+def _native_settings(profile: dict, gaps: list[str]) -> dict | None:
+    """The profile's declared [native_settings] for its settings.json, or None (a gap) when they cannot be rendered."""
+    declared = profile.get("native_settings")
+    name = profile.get("name")
+    if declared is None:
+        return {}
+    if not isinstance(declared, dict):
+        gaps.append(f"invalid_native_settings: {name}: native_settings must be a table")
+        return None
+    reserved = sorted(set(declared) & RESERVED_NATIVE_SETTINGS)
+    if reserved:
+        gaps.append(
+            f"invalid_native_settings: {name}: {', '.join(reserved)} cannot be declared; the projector renders the "
+            "comment and the hooks, and a projection never carries permissions"
+        )
+        return None
+    try:
+        json.dumps(declared)
+    except (TypeError, ValueError) as error:
+        gaps.append(f"invalid_native_settings: {name}: {error}")
+        return None
+    return dict(declared)
+
+
 def render_hooks_registration(
     profile: dict, manifest: dict, tokens: dict[str, str], gaps: list[str]
 ) -> tuple[str, str] | None:
@@ -793,11 +828,15 @@ def render_hooks_registration(
             events.setdefault(native_event, []).append({"hooks": [action]})
         return profile["hooks_json_path"], json.dumps({"hooks": events}, indent=2) + "\n"
     if mode in {"settings_json", "native_cwd_hooks_json"}:
-        if mode == "native_cwd_hooks_json":
+        settings_adapter = mode == "settings_json" and bool(profile.get("stdin_adapter"))
+        if mode == "native_cwd_hooks_json" or settings_adapter:
             adapter_path = PROJECT_ROOT / profile["stdin_adapter"]
             if not adapter_path.is_file() or adapter_path.resolve() != adapter_path:
                 gaps.append(f"Missing or redirected native hook adapter: {profile['stdin_adapter']}")
                 return None
+        native_settings = _native_settings(profile, gaps) if mode == "settings_json" else {}
+        if native_settings is None:
+            return None
         matchers = profile.get("intent_matchers", {})
         events_out: dict[str, list[dict]] = {}
         for hook in manifest.get("hook", []):
@@ -810,6 +849,19 @@ def render_hooks_registration(
             script_path = f"${profile['project_dir_var']}/{_hook_target(hook, profile)}"
             interpreter = projected_interpreter(windowless=True, project_dir_var=profile["project_dir_var"])
             command = f'"{interpreter}" -B "{script_path}"'
+            if settings_adapter:
+                # c123 (batch design WP2 2.4): the adapter runs the host-root-relative target and answers a target that
+                # fails, prints no readable decision or misses its deadline with the host's blocking exit 2. Without a
+                # deadline a hung target would reach the host's timeout, which lets the tool run, so that is a gap.
+                deadline = _adapter_deadline(profile, hook)
+                if deadline is None:
+                    gaps.append(
+                        f"hook {hook['script']}: an adapter-run settings registration needs a projected timeout and "
+                        "the profile's adapter_deadline_margin_seconds"
+                    )
+                    continue
+                adapter = f"${profile['project_dir_var']}/{runtime_relative(str(profile['stdin_adapter']))}"
+                command = f'"{interpreter}" -B "{adapter}" --deadline {deadline} {_hook_target(hook, profile)}'
             for arg in hook.get("args", []):
                 command += " " + substitute(arg, tokens, "hooks/manifest.toml", gaps)
             command += " " + " ".join(_identity_args(profile))
@@ -832,6 +884,7 @@ def render_hooks_registration(
             "description"
             if mode == "native_cwd_hooks_json"
             else "_comment": "PROJECTION, NOT CANONICAL - rendered from the baseline hooks/manifest.toml by the GT-KB projection engine; edit the baseline and re-project.",
+            **native_settings,
             "hooks": events_out,
         }
         return profile["hooks_json_path"], json.dumps(payload, indent=2) + "\n"
@@ -1007,6 +1060,11 @@ def validate_profile(profile: dict, plan: Plan) -> None:
     pointer_files = profile.get("pointer_files")
     if pointer_files is not None and not isinstance(pointer_files, dict):
         plan.gaps.append(f"invalid_pointer_file: {profile['name']}: pointer_files must be a table")
+    if profile.get("native_settings") is not None and profile.get("hooks_projection") != "settings_json":
+        # c123 (owner decision B5): only the settings_json renderer writes declared native settings.
+        plan.gaps.append(
+            f"unsupported_native_settings: {profile['name']}: only a settings_json projection renders them"
+        )
     _validate_output_roots(profile, plan)
 
 
@@ -1213,6 +1271,61 @@ def projection_inputs() -> dict[str, str]:
     }
 
 
+def _codex_trust_entries(text: str | None) -> dict[tuple[str, int, int], str]:
+    """Codex keys each hook's trust grant by hooks.json path, event, group index and handler index.
+
+    Codex 0.156.1 stores a grant as ``hooks.state.'<path>:pre_tool_use:<n>:0'.trusted_hash`` over its own digest of
+    the entry (c123; batch design WP2 2.5), so an entry whose text changes, or which moves to another index, needs a
+    fresh grant in Codex's /hooks screen. Text that does not parse as a hooks file yields no entries.
+    """
+    try:
+        hooks = json.loads(text).get("hooks") if text else None
+    except (ValueError, AttributeError):
+        return {}
+    if not isinstance(hooks, dict):
+        return {}
+    entries: dict[tuple[str, int, int], str] = {}
+    for event, groups in hooks.items():
+        for group_index, group in enumerate(groups if isinstance(groups, list) else []):
+            handlers = group.get("hooks") if isinstance(group, dict) else None
+            for handler_index, handler in enumerate(handlers if isinstance(handlers, list) else []):
+                entries[(str(event), group_index, handler_index)] = json.dumps(
+                    {"matcher": group.get("matcher"), "handler": handler}, sort_keys=True
+                )
+    return entries
+
+
+def codex_trust_changes(previous: str | None, current: str) -> int:
+    """How many of ``current``'s entries need a fresh Codex trust grant against ``previous``.
+
+    An entry is counted when its text differs from, or did not exist at, the same index; a removed entry needs no
+    grant, so it is not counted.
+    """
+    before, after = _codex_trust_entries(previous), _codex_trust_entries(current)
+    return sum(1 for key, text in after.items() if before.get(key) != text)
+
+
+def _codex_trust_notice(harness: str, plan: Plan) -> str | None:
+    """The operator notice for a write that changes the Codex hook entries Codex has trusted (c123; WP2 2.5).
+
+    The comparison is against the installed hooks.json, which is what Codex hashed; the ownership manifest names paths
+    only. Trust itself is never written: it is granted in Codex's own /hooks screen.
+    """
+    profile = load_profiles()["harnesses"].get(harness) or {}
+    rel = profile.get("hooks_json_path")
+    if profile.get("hooks_projection") != "native_cwd_hooks_json" or not isinstance(rel, str) or rel not in plan.writes:
+        return None
+    target = output_root() / rel
+    try:
+        previous = target.read_text(encoding="utf-8") if target.is_file() else None
+    except (OSError, UnicodeDecodeError):
+        previous = None
+    changed = codex_trust_changes(previous, plan.writes[rel])
+    if not changed:
+        return None
+    return f"Codex hook trust must be granted again for {changed} changed entries of {target.resolve()}"
+
+
 def run(harness: str, mode: str) -> int:
     inputs = projection_inputs() if mode == "render-json" else {}
     plan = build_plan(harness)
@@ -1274,6 +1387,7 @@ def run(harness: str, mode: str) -> int:
         for b in bytecode:
             print("  - (bytecode; removed on the next write)", b)
         return 1 if drift else 0
+    trust_notice = _codex_trust_notice(harness, plan)
     for rel, content in plan.writes.items():
         target = output_root() / rel
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1296,6 +1410,8 @@ def run(harness: str, mode: str) -> int:
         if remove_planned_path(output_root() / rel, output_root() / root if root else config_root):
             removed += 1
     print(f"PROJECTED {harness}: {len(plan.writes)} files, {removed} leftovers removed")
+    if trust_notice:
+        print(trust_notice)
     return 0
 
 

@@ -70,6 +70,15 @@ def payload(root, event="PreToolUse"):
     }
 
 
+def forwarded(root, supplied, event):
+    """What the adapter hands the hook: the native payload and its root; on a tool event an apply_patch command is also
+    the canonical patch (c123; batch design WP2, G38)."""
+    expected = {**supplied, "project_root": str(root)}
+    if event in {"PreToolUse", "PostToolUse"}:
+        expected["tool_input"] = {**supplied["tool_input"], "patch": supplied["tool_input"]["command"]}
+    return expected
+
+
 def run(runtime, data, *, event="PreToolUse", args=(), timeout=8):
     root, _ = runtime
     # Run the exact generated shell command, including both Windows and
@@ -141,7 +150,7 @@ def test_windows_rendering_runs_under_a_powershell_shell_with_literal_arguments(
     args = ("argument with spaces", "a&b;literal", "an'apostrophe", "café")
     assert run_through_powershell(runtime, supplied, event=event, args=args) == {}
     observed = json.loads((root / "observed.json").read_text())
-    assert observed["payload"] == {**supplied, "project_root": str(root)}
+    assert observed["payload"] == forwarded(root, supplied, event)
     assert observed["native"] == supplied["session_id"]
     assert observed["root"] == str(root) and observed["harness"] == "codex"
     assert observed["args"] == [*args, "--harness", "codex"]
@@ -155,12 +164,28 @@ def test_rendered_native_events_preserve_identity_utf8_cwd_and_literal_arguments
     args = ("argument with spaces", "a&b;literal", "an'apostrophe", "café")
     assert run(runtime, supplied, event=event, args=args) == {}
     observed = json.loads((root / "observed.json").read_text())
-    assert observed["payload"] == {**supplied, "project_root": str(root)}
+    assert observed["payload"] == forwarded(root, supplied, event)
     assert observed["native"] == supplied["session_id"]
     assert observed["root"] == str(root) and observed["harness"] == "codex"
     assert observed["args"] == [*args, "--harness", "codex"]
     assert not (root / "nested cwd/café.py").exists()
     assert not (root / ".claude").exists()
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "tool_input"),
+    [
+        ("Bash", {"command": "echo hi"}),
+        ("apply_patch", {"command": "*** Begin Patch\n*** End Patch\n", "patch": "the native patch"}),
+    ],
+)
+def test_a_command_without_a_patch_or_a_native_patch_key_is_forwarded_as_it_came(runtime, tool_name, tool_input):
+    """c123 (G38): only an apply_patch command gains the patch key, and a patch the payload already names is kept."""
+    root, _ = runtime
+    supplied = {**payload(root), "tool_name": tool_name, "tool_input": tool_input}
+    assert run(runtime, supplied) == {}
+    observed = json.loads((root / "observed.json").read_text())
+    assert observed["payload"]["tool_input"] == tool_input
 
 
 @pytest.mark.parametrize(

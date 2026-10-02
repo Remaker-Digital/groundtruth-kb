@@ -228,7 +228,19 @@ def _merge_hook_registration(
             merged.extend(rendered_entries)
         if merged:
             merged_events[event] = merged
-    result = {**{k: v for k, v in current.items() if k not in {key, "_comment", "version"}}, **wanted}
+    # c123 round r35: the file keeps its own key order. A key the rendering has takes the rendered value where the
+    # file has it, the rendering's other keys follow, the application's own keys stay where they are, and _comment
+    # and version are the rendering's only. A file the rendering wrote is then current byte for byte (the earlier
+    # merge moved every rendered key after the application's own, so c123's autoMemoryEnabled was reordered on
+    # every plan).
+    result: dict[str, Any] = {}
+    for name, value in current.items():
+        if name in wanted:
+            result[name] = wanted[name]
+        elif name not in {key, "_comment", "version"}:
+            result[name] = value
+    for name, value in wanted.items():
+        result.setdefault(name, value)
     result[key] = merged_events
     return (json.dumps(result, indent=2) + "\n").encode("utf-8"), preserved
 

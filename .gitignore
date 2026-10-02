@@ -491,15 +491,8 @@ applications/Agent_Red/harness-state/*/session-lifecycle-guard.json
 .codex/gtkb-hooks/last-bridge-audit*.json
 .codex/gtkb-hooks/session-lifecycle-guard.json
 
-# Root-level harness-state replaces applications/Agent_Red/harness-state/.
-# Durable operating-role.md and session-startup-preferences.json ARE tracked;
-# the per-harness session-lifecycle-guard.json is runtime-mutable.
-harness-state/*/session-lifecycle-guard.json
-# WI-5325: live and archived per-harness session-envelope runtime state remains
-# in-root and readable, but is not a git-tracked source or governance artifact.
-harness-state/*/session-envelope.json
-harness-state/*/session-envelopes/
-harness-state/*/session-envelope-archive/
+# Root-level harness-state/ is retired runtime residue: nothing in it is tracked (c123, G44(a)).
+/harness-state/
 
 # =============================================================================
 # MEMORY.md trim backups (added 2026-04-28 S319)

@@ -395,7 +395,10 @@ CREATE TABLE {schema}.bridge_attempts (
     work_item_id TEXT REFERENCES {schema}.work_items(id),
     project_id TEXT REFERENCES {schema}.projects(id),
     head_version INTEGER NOT NULL DEFAULT 0 CHECK (head_version >= 0),
-    head_status TEXT,
+    -- The twelve canonical bridge statuses (SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001; bridge/vocabulary.py).
+    head_status TEXT
+        CHECK (head_status IN ('ADVISORY', 'BLOCKED', 'GO', 'NEW', 'NO-GO', 'NOT-READY', 'READY', 'REVISED',
+            'SUPERSEDED', 'VERDICT-REJECTED', 'VERIFIED', 'WITHDRAWN')),
     disposition TEXT NOT NULL DEFAULT 'active'
         CHECK (disposition IN ('active', 'abandoned', 'withdrawn', 'superseded', 'committed')),
     work_item_version INTEGER,
@@ -419,7 +422,9 @@ CREATE TABLE {schema}.bridge_attempts (
 CREATE TABLE {schema}.bridge_items (
     attempt_id TEXT NOT NULL REFERENCES {schema}.bridge_attempts(id),
     version INTEGER NOT NULL CHECK (version >= 1),
-    status TEXT NOT NULL,
+    status TEXT NOT NULL
+        CHECK (status IN ('ADVISORY', 'BLOCKED', 'GO', 'NEW', 'NO-GO', 'NOT-READY', 'READY', 'REVISED',
+            'SUPERSEDED', 'VERDICT-REJECTED', 'VERIFIED', 'WITHDRAWN')),
     author_session_context_id TEXT NOT NULL,
     delivery_fence BIGINT NOT NULL,
     content TEXT NOT NULL,
@@ -432,7 +437,9 @@ CREATE TABLE {schema}.bridge_items (
 CREATE TABLE {schema}.work_intent_claims (
     attempt_id TEXT PRIMARY KEY REFERENCES {schema}.bridge_attempts(id),
     next_version INTEGER NOT NULL CHECK (next_version >= 1),
-    intended_status TEXT NOT NULL,
+    intended_status TEXT NOT NULL
+        CHECK (intended_status IN ('ADVISORY', 'BLOCKED', 'GO', 'NEW', 'NO-GO', 'NOT-READY', 'READY', 'REVISED',
+            'SUPERSEDED', 'VERDICT-REJECTED', 'VERIFIED', 'WITHDRAWN')),
     predecessor_sha256 TEXT,
     claimant_session_context_id TEXT NOT NULL,
     fence BIGINT GENERATED ALWAYS AS IDENTITY UNIQUE,

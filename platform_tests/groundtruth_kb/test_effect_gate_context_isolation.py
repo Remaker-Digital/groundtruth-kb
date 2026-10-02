@@ -235,6 +235,28 @@ READ_ONLY_GIT = [
     "git --version",
     # M13 host I, Q6 continuation: refused five times on c117, which left the agent believing Git was broken.
     "& 'C:\\Program Files\\Git\\cmd\\git.exe' --version 2>&1 | Out-String",
+    # c123 (owner decision A3): the list forms of branch, stash, remote, reflog and symbolic-ref.
+    "git branch",
+    "git branch --show-current",
+    "git branch -a",
+    "git branch -r",
+    "git branch -vv",
+    "git branch --list 'feature/*'",
+    "git branch --contains HEAD",
+    "git branch --merged main",
+    "git branch --no-merged",
+    "git branch --format='%(refname:short)' --sort=-committerdate",
+    "git branch -a 2>&1",
+    "git stash list",
+    "git stash show -p stash@{0}",
+    "git remote",
+    "git remote -v",
+    "git remote get-url origin",
+    "git remote show origin",
+    "git reflog",
+    "git reflog show -5",
+    "git symbolic-ref HEAD",
+    "git symbolic-ref --short HEAD",
 ]
 
 
@@ -245,7 +267,32 @@ def test_read_only_git_reads_pass(project, command):
 
 @pytest.mark.parametrize(
     "command",
-    ["git hash-object -w m13-sentinel/sentinel.txt", "git branch -D feature", "git config user.name someone"],
+    [
+        "git hash-object -w m13-sentinel/sentinel.txt",
+        "git branch -D feature",
+        "git config user.name someone",
+        # c123 (owner decision A3): the writing forms beside the list forms stay refused, as does an unknown option.
+        "git branch feature",
+        "git branch -m old new",
+        "git branch -c a b",
+        "git branch -q feature",
+        "git branch -f main HEAD~1",
+        "git branch --set-upstream-to=origin/x",
+        "git branch --unset-upstream",
+        "git branch --frobnicate",
+        "git stash",
+        "git stash pop",
+        "git stash drop",
+        "git stash push -m x",
+        "git stash list --output=stashes.txt",
+        "git remote add origin https://example.invalid/x.git",
+        "git remote set-url origin https://example.invalid/x.git",
+        "git remote remove origin",
+        "git reflog expire --all",
+        "git reflog delete HEAD@{1}",
+        "git symbolic-ref HEAD refs/heads/x",
+        "git symbolic-ref -d HEAD",
+    ],
 )
 def test_git_forms_that_can_write_stay_refused(project, command):
     assert _decision(project, "Bash", {"command": command})["reason_code"] == "direct_git_effect_requires_lifecycle"
@@ -301,5 +348,7 @@ def test_the_registered_hook_script_refuses_a_traversal_natively_and_allows_a_su
     denied = _hook({**base, "tool_input": {"command": "Get-ChildItem . -Recurse | Select-String password"}}, tmp_path)
     assert denied["hookSpecificOutput"]["permissionDecision"] == "deny"
     assert "other contexts' scratch" in denied["hookSpecificOutput"]["permissionDecisionReason"]
+    # c123 (batch design WP1, B148): the host sees the reason code first.
+    assert denied["hookSpecificOutput"]["permissionDecisionReason"].startswith("context_traversal: ")
     allowed = _hook({**base, "tool_input": {"command": "Get-ChildItem docs -Recurse -Filter *.md"}}, tmp_path)
     assert allowed == {}

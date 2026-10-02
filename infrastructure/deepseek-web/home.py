@@ -4,11 +4,12 @@ The Home server is the pinned DeepSeek Harness Web UI (install.py) on 127.0.0.1 
 manifest (release.json) and GT-KB's one committed configuration file, gtkb-home.patch.yml: the OpenRouter preset route,
 the GT-KB Home effect guard, the GT-KB Home plugin (branding, attribution, controls) and the disabled upstream brand.
 
-start  verifies the installation, writes the profile manifest into the Home state folder, proves the composed
-       configuration contains every GT-KB row (--dump-config), starts the server detached with a minimal environment,
-       and waits for the guard's and the plugin's activation lines and the ready line; otherwise it stops what it
-       started and fails. The OpenRouter credential is loaded by name through GT-KB's .env.local loader and placed only
-       in the server's environment. The sign-in line goes to a user-private URL file, never to the log.
+start  verifies the installation, writes the profile manifest into the Home state folder, seeds a fresh state's
+       acknowledgement of upstream's Internal Testing Notice, proves the composed configuration contains every GT-KB
+       row (--dump-config), starts the server detached with a minimal environment, and waits for the guard's and the
+       plugin's activation lines and the ready line; otherwise it stops what it started and fails. The OpenRouter
+       credential is loaded by name through GT-KB's .env.local loader and placed only in the server's environment.
+       The sign-in line goes to a user-private URL file, never to the log.
 stop   asks the server to run its own teardown through the plugin's loopback control route (per-start secret), then
        ends the positively identified process tree if it has not exited.
 status reports the run record, process identity, liveness and whether a model credential was supplied.
@@ -45,6 +46,11 @@ ACTIVATION_LINES = ("gtkb-home-effect-guard active", "gtkb-home active")
 REQUIRED_ROWS = ("gtkb-home-effect-guard", "gtkb-home", "llm-pi-ai", "agent-default-model")
 DISABLED_ROWS = ("ui-brand-official", "llm-deepseek")
 CREDENTIAL_NAME = "GTKB_OPENROUTER_API_KEY"
+# c123 (owner decision C3): upstream's Internal Testing Notice shows until the Home's user settings acknowledge exactly
+# this version. Verified in the pinned @deepseek-ai/dsh-client-ui-settings-models 0.1.2-rc.1, lib/client.js, the
+# onboarding copy: namespace "ui-onboarding", field "welcomeNoticeVersion", WELCOME_NOTICE_VERSION "2026-08-13.1". A
+# lockfile pin test fails when that package changes.
+WELCOME_NOTICE_VERSION = "2026-08-13.1"
 ENV_ALLOWLIST = (
     "SYSTEMROOT",
     "WINDIR",
@@ -127,6 +133,23 @@ def write_profile_manifest(state: Path, release: dict) -> Path:
     return manifest
 
 
+def seed_onboarding_acknowledgement(state: Path) -> Path:
+    """c123 (owner decision C3): a fresh Home state acknowledges upstream's Internal Testing Notice, so it never shows.
+
+    The server keeps its user settings in <state>/settings.yaml. The file is written only when it does not exist: an
+    existing document holds the owner's own settings (the Models page writes there) and is never touched, and the
+    server refuses to start on a document it cannot read.
+    """
+    settings = state / "settings.yaml"
+    state.mkdir(parents=True, exist_ok=True)
+    try:
+        with settings.open("x", encoding="utf-8", newline="\n") as stream:
+            stream.write(f'ui-onboarding:\n  welcomeNoticeVersion: "{WELCOME_NOTICE_VERSION}"\n')
+    except FileExistsError:
+        pass
+    return settings
+
+
 def credential() -> dict[str, str]:
     value = os.environ.get(CREDENTIAL_NAME, "")
     if not value:
@@ -147,6 +170,8 @@ def base_environment(state: Path) -> dict[str, str]:
         DSH_PERMISSION_MODE="workspace-write",
         GTKB_GUARD_PYTHON=str(ROOT / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe"),
         GTKB_GUARD_GATE=str(ROOT / "scripts" / "implementation_start_gate.py"),
+        # c123 (batch design WP3 3.2): the guard's decision log, under the SDK launcher's file name.
+        GTKB_GUARD_LOG=str(state / "logs" / "guard-decisions.jsonl"),
         GT_PROJECT_ROOT=str(ROOT),
         GTKB_HOME_ROOT=str(ROOT),
     )
@@ -227,14 +252,39 @@ def ours(record: dict) -> bool:
     )
 
 
+def refuse_another_root(state: Path, record: dict) -> None:
+    """c123 (batch design WP3 3.3): leave the run record of another installation's live Home as it is.
+
+    Every installation shares the default state folder, so a run record there can be another root's: while its process
+    is alive and the record names another root or, in a record from before records named their root, while that live
+    process runs another tree's launcher. Start and stop then refuse, and the record and the URL file stay.
+    """
+    identity = process_identity(record["pid"])
+    if not identity or identity.get("created") != record["created"]:
+        return
+    owner = record.get("root")
+    if owner is None:
+        if str(launcher_script()) in (identity.get("cmd") or ""):
+            return
+        owner = "another installation"
+    elif Path(owner) == ROOT:
+        return
+    raise HomeError(
+        f"The run record in {state} belongs to the live Home of {owner}, not to this installation ({ROOT}); it is "
+        "kept. Use that installation's home.py, or give this one its own --state folder"
+    )
+
+
 def start(state: Path, port: int = PORT) -> dict:
     record_path = run_record_path(state)
     if record_path.is_file():
         record = json.loads(record_path.read_text(encoding="utf-8"))
         if ours(record):
             return {"started": False, "already_running": True, "pid": record["pid"]}
+        refuse_another_root(state, record)
     release = verify_installation()
     write_profile_manifest(state, release)
+    seed_onboarding_acknowledgement(state)
     node = node_executable()
     env = base_environment(state)
     prove_composition(node, env)
@@ -283,10 +333,12 @@ def start(state: Path, port: int = PORT) -> dict:
         "pid": process.pid,
         "created": identity["created"],
         "started_at": datetime.now(UTC).isoformat(),
+        "root": str(ROOT),  # c123 (batch design WP3 3.3): whose Home this is; another root's start and stop read it
         "port": port,
         "control": control,
         "url_file": str(url_file),
         "log_file": str(log_file),
+        "guard_log": env["GTKB_GUARD_LOG"],  # c123 (batch design WP3 3.2): the guard's decision log
         "credential_supplied": credential_supplied,
     }
     record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
@@ -299,6 +351,7 @@ def stop(state: Path) -> dict:
         return {"stopped": False, "reason": "no run record"}
     record = json.loads(record_path.read_text(encoding="utf-8"))
     if not ours(record):
+        refuse_another_root(state, record)
         record_path.unlink(missing_ok=True)
         return {"stopped": False, "reason": "the recorded process is not running"}
     graceful = False
@@ -346,6 +399,7 @@ def status(state: Path) -> dict:
         "started_at": record["started_at"],
         "credential_supplied": record.get("credential_supplied"),
         "log": record["log_file"],
+        "guard_log": record.get("guard_log"),  # c123 (batch design WP3 3.2): None in a record from before the log
     }
 
 

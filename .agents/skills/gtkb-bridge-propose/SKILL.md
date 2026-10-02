@@ -39,6 +39,8 @@ Write the smallest cohesive proposal that explains the intended result, exact
 targets, relevant formal requirements, test work and acceptance criteria. Include
 necessary removal or supersession effects and interactions with current work.
 Use current source content to justify scope; a list of IDs alone is not analysis.
+A proposal covers exactly one work item, and the service keeps one active chain
+per work item. Split larger scope into sibling work items of one project.
 
 A dispatchable proposal has exactly these three nonblank envelope lines, in any
 order, before its typed metadata:
@@ -64,6 +66,70 @@ Use the returned bound session identifier for `author_session_context_id`. Do no
 invent provenance, duplicate metadata keys or include retired permission fields.
 List the paths the proposal actually changes, including test artifacts. Changing
 a baseline does not authorize editing a generated projection.
+
+`author_harness_id` is attribution, not a role. Use the registered id your
+launcher exported as `GTKB_AUTHOR_HARNESS_ID`, or the id the dispatched task
+names. If neither exists, do not pick one from `gt harness list`. Report the
+gap, and ask the owner when interactive.
+
+## Explain the complete change
+
+Write the intended before/after behavior, governing requirements and rationale;
+exact source and test artifact paths; implementation approach and affected
+interfaces; removal/supersession effects; dependencies and concurrency; complete
+verification commands, expected results and failure/recovery checks; operational
+effects and their containment; and justified exclusions. Reconcile any material
+unanswered owner choice explicitly. A reference list or structural check is not
+substantive review or behavioral evidence.
+
+Use exact relative artifact paths, without glob patterns, generated harness
+paths, bridge payloads or temporary state. Read and include the current work-item
+version and all applicable formal versions. Do not silently bind a newer version
+than the one used to write the proposal. Incorporate needed information directly;
+prior deliberations, handoffs and old bridge messages are not current authority.
+
+Programs and tests, `python -m pytest` included, run only inside a live claim of
+this context, and test time counts against the claim window. Before a claim,
+read and inspect only; the proposal names its verification commands, and the
+Prime Builder runs them under its READY claim after GO.
+
+## Authored header example
+
+Replace every dollar placeholder from the current reads and actual attribution.
+Use NEW or REVISED as appropriate, with the next claimed positive version. The
+example's `::open build` stands for the activity the dispatch supplies. These
+placeholders are explanatory text; the CLI never fills them or invents provenance.
+Keep the metadata together before the blank line introducing the complete body.
+
+```text
+::init gtkb lo
+::open build
+$status
+bridge_kind: implementation_proposal
+Document: $document
+Version: $next_version
+Date: $date
+author_identity: $author_identity
+author_harness_id: $harness_id
+author_session_context_id: $bound_session_id
+author_model: $model
+recipient_role: loyal-opposition
+Project: $project_id
+Work Item: $work_item_id
+work_item_version: $work_item_version
+target_paths: $target_paths_json
+test_artifact_targets: $test_targets_json
+spec_versions: $spec_versions_json
+
+$complete_body
+```
+
+Project and Work Item are the current canonical identifiers, never permission
+carriers. The native service resolves and checks their relationship against the
+claim. Authored session attribution uses the returned bound session identifier,
+not an invented harness role. Current requirements:
+`DCL-BRIDGE-KIND-TAXONOMY-ENUM-001` and
+`DCL-BRIDGE-PROPOSAL-PROJECT-LINKAGE-MANDATORY-001`.
 
 ## Claim and deliver
 

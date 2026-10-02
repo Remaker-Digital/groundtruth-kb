@@ -33,14 +33,19 @@ from unittest.mock import patch
 
 import pytest
 
-# Make scripts/ importable for the helper module.
+# Make scripts/ importable for the helper module, only while it is imported. c123: a scripts/ entry left on sys.path
+# made test modules collected later in the same process import their launchers' shared modules a second time under
+# top-level names (the Alibaba launcher's tests then patched one copy while the launcher used the other).
 _REPO_ROOT = Path(__file__).resolve().parents[2]
+_saved_path = list(sys.path)
 sys.path.insert(0, str(_REPO_ROOT / "scripts"))
-
-from rollback_e1_write_set import (  # noqa: E402
-    rollback,
-    validate_agent_red_destination,
-)
+try:
+    from rollback_e1_write_set import (  # noqa: E402
+        rollback,
+        validate_agent_red_destination,
+    )
+finally:
+    sys.path[:] = _saved_path
 
 # ---------------------------------------------------------------------------
 # M5 + M6: outside paths rejected before destructive operation

@@ -36,7 +36,6 @@ _PLATFORM_KEY_PREFIXES = (
     "CODEX_",
     "CURSOR_",
     "ANTIGRAVITY_",
-    "TAFE_",
     "MEMBASE_",
     "BRIDGE_",
     "GITHUB_",

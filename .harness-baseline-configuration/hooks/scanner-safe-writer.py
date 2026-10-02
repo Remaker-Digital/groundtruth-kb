@@ -91,7 +91,7 @@ HOOKS = Path(__file__).resolve().parent
 if str(HOOKS) not in sys.path:
     sys.path.insert(0, str(HOOKS))
 # The authored sibling module requires the installation-relative path setup above.
-from _hook_context import resolve_root  # noqa: E402
+from _hook_context import resolve_root, tool_input_of, tool_path, write_content  # noqa: E402
 
 try:
     from groundtruth_kb.governance.credential_patterns import (
@@ -431,18 +431,16 @@ def main() -> None:
         emit_pass()
         sys.exit(0)
 
-    tool_input = payload.get("tool_input", {})
-    if not isinstance(tool_input, dict):
-        emit_pass()
-        sys.exit(0)
-
-    file_path = tool_input.get("file_path", "") or ""
+    # c123 (batch design WP2, G38): read the path and the content under any key a route has used; the API harnesses
+    # send `path`, which this hook did not read, so it never judged their writes.
+    tool_input = tool_input_of(payload)
+    file_path = tool_path(tool_input)
     if not _is_in_scope(file_path):
         emit_pass()
         sys.exit(0)
 
-    content = tool_input.get("content", "") or ""
-    if not isinstance(content, str) or not content:
+    content = write_content(tool_input)
+    if not content:
         emit_pass()
         sys.exit(0)
 

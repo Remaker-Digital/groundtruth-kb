@@ -8,7 +8,6 @@ skips.  Every test uses and permanently removes a unique PostgreSQL schema.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import subprocess
@@ -60,6 +59,7 @@ from platform_tests.groundtruth_kb.postgres_fixtures import (
     EXPECTED_TABLES,
     _create_sqlite_fixture,
     _required_service,
+    repository_scope_predecessor_sql,
 )
 from platform_tests.groundtruth_kb.postgres_fixtures import isolated_postgres as isolated_postgres
 
@@ -1195,24 +1195,28 @@ class TestPublicSchemaCommentInitialization:
 
 # Explicit transition from the installed repository/scope predecessor.
 PREDECESSOR = "2f25071544591b01b44e0da491a19bd9adee509627114a4dad528205a8f6e2ca"
+# c123 (batch design WP5 G17): the 2f25 path runs the repository/scope step, then the bridge status step.
+BRIDGE_STATUS_CONSTRAINTS = (
+    "bridge_attempts_head_status_check",
+    "bridge_items_status_check",
+    "work_intent_claims_intended_status_check",
+)
 
 
 def predecessor_sql():
-    """Reconstruct the exact measured predecessor; the hash prevents a moving fixture."""
-    current = kernel_module.schema_sql_bytes()
-    new_scope = (
-        b"application_scope TEXT CHECK (application_scope ~ '^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$')"
-    )
-    old_scope = b"application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application'))"
-    assert current.count(new_scope) == 2
-    current = current.replace(new_scope, old_scope)
-    lines = current.splitlines(keepends=True)
-    assert sum(line.startswith(b"    repository_ref TEXT CHECK") for line in lines) == 1
-    current = b"".join(line for line in lines if not line.startswith(b"    repository_ref TEXT CHECK"))
-    assert current.count(b" AND repository_ref IS NULL") == 1
-    current = current.replace(b" AND repository_ref IS NULL", b"")
-    assert hashlib.sha256(current).hexdigest() == PREDECESSOR
-    return current
+    """Reconstruct the exact measured predecessor; the hash prevents a moving fixture (now in postgres_fixtures)."""
+    return repository_scope_predecessor_sql()
+
+
+def bridge_status_constraints(service):
+    """The three bridge status CHECKs of the current schema: name, type, validated flag and definition."""
+    with psycopg.connect(service=service) as connection:
+        return connection.execute(
+            "SELECT c.conname, c.contype, c.convalidated, pg_get_constraintdef(c.oid) FROM pg_constraint c "
+            "JOIN pg_class t ON t.oid = c.conrelid JOIN pg_namespace n ON n.oid = t.relnamespace "
+            "WHERE n.nspname = current_schema() AND c.conname = ANY(%s) ORDER BY c.conname",
+            (list(BRIDGE_STATUS_CONSTRAINTS),),
+        ).fetchall()
 
 
 @pytest.fixture
@@ -1270,10 +1274,16 @@ def test_ordinary_initialization_still_refuses_the_supported_predecessor(predece
 def test_explicit_transition_preserves_versions_history_and_unresolved_repository(predecessor):
     kernel, service, _ = predecessor
     before = snapshot(service)
+    assert bridge_status_constraints(service) == []
     result = kernel.upgrade_schema(expected_schema_sha256=PREDECESSOR)
     assert result["status"] == "upgraded"
+    assert result["steps"] == ["repository_scope", "bridge_status"]
     assert result["unresolved_project_repositories"] == 1
     assert result["schema_sha256"] == kernel_module.schema_sql_sha256()
+    constraints = bridge_status_constraints(service)
+    assert [(row[0], row[1], row[2]) for row in constraints] == [
+        (name, "c", True) for name in BRIDGE_STATUS_CONSTRAINTS
+    ]
     after = snapshot(service)
     for row in after["rows"]["projects"]:
         assert row[0].pop("repository_ref") is None

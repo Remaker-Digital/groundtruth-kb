@@ -109,7 +109,14 @@ def _to_claude_pretooluse_inner(payload: dict[str, Any]) -> dict[str, Any]:
         if normalized.mutation_class.value in ("shell", "opaque") and normalized.command:
             return {"tool_name": "Bash", "tool_input": {"command": normalized.command}}
         if normalized.mutation_class.value in ("write", "edit", "delete"):
+            # c123 (batch design WP2, G38): start from the raw tool input, so the content hooks see what the call
+            # writes; the path aliases are added. Cursor's raw key names are to be confirmed from a recorded payload
+            # on E's interactive track; until then every raw key passes through.
             tool_input: dict[str, Any] = {}
+            if isinstance(normalized.raw_payload, dict):
+                raw = normalized.raw_payload.get("tool_input") or normalized.raw_payload.get("toolInput")
+                if isinstance(raw, dict):
+                    tool_input = dict(raw)
             if normalized.target_paths:
                 tool_input["file_path"] = normalized.target_paths[0]
                 tool_input["path"] = normalized.target_paths[0]

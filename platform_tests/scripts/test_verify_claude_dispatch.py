@@ -16,6 +16,26 @@ from scripts import verify_claude_dispatch, verify_codex_dispatch, verify_ollama
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT_PATH = REPO_ROOT / "scripts" / "verify_claude_dispatch.py"
+# c123 (owner decision B1): the dispatched permission posture every Claude argv here carries, with owner decision B5's
+# setting sources, and host B's corrected registration (batch design WP2 2.4 change 1).
+POSTURE = [
+    "--permission-mode",
+    "bypassPermissions",
+    "--setting-sources",
+    "project",
+    "--strict-mcp-config",
+    "--disallowedTools",
+    "WebFetch,WebSearch",
+]
+DISPATCHED_ARGV = ["claude", "--model", "claude-sonnet-5", "--effort", "max", *POSTURE, "-p", "{{PROMPT}}"] + [
+    "--add-dir",
+    "{{PROJECT_ROOT}}",
+    "--output-format",
+    "json",
+]
+INTERPRETER = "groundtruth-kb/.venv/Scripts/pythonw.exe"
+ADAPTER = "scripts/claude_hook_adapter.py"
+STATIC_CHECKS = ["headless argv", "headless executable", "permission posture", "hook interpreter", "hook adapter"]
 
 
 def _load_module():
@@ -34,11 +54,34 @@ def _claude_record(**overrides):
         "harness_name": "claude",
         "harness_type": "claude",
         "id": "B",
-        "invocation_surfaces": {"headless": {"argv": ["claude", "-p", "{{PROMPT}}"]}},
+        "invocation_surfaces": {"headless": {"argv": ["claude", *POSTURE, "-p", "{{PROMPT}}"]}},
         "status": "suspended",
     }
     record.update(overrides)
     return record
+
+
+def _hook_command(target: str, *, variable: str = "$CLAUDE_PROJECT_DIR", adapter: bool = True) -> str:
+    """One hook command in the projector's settings_json form (c123; batch design WP2 2.4)."""
+    if adapter:
+        return f'"{variable}/{INTERPRETER}" -B "{variable}/{ADAPTER}" --deadline 13 {target} --harness claude'
+    return f'"{variable}/{INTERPRETER}" -B "{variable}/{target}" --harness claude'
+
+
+def _project_hooks(root: Path, *commands: str, interpreter: bool = True, adapter: bool = True) -> Path:
+    """A projected .claude/settings.json; the interpreter and the adapter it names exist unless told otherwise."""
+    groups = [
+        {"matcher": "Write|Edit|Bash", "hooks": [{"type": "command", "command": command, "timeout": 15}]}
+        for command in commands or (_hook_command("scripts/implementation_start_gate.py"),)
+    ]
+    settings = root / ".claude" / "settings.json"
+    settings.parent.mkdir(parents=True, exist_ok=True)
+    settings.write_text(json.dumps({"autoMemoryEnabled": False, "hooks": {"PreToolUse": groups}}), encoding="utf-8")
+    for present, relative in ((interpreter, INTERPRETER), (adapter, ADAPTER)):
+        if present:
+            (root / relative).parent.mkdir(parents=True, exist_ok=True)
+            (root / relative).write_bytes(b"")
+    return settings
 
 
 def test_suspended_installation_can_pass_prerequisites_without_dispatchability(
@@ -46,6 +89,7 @@ def test_suspended_installation_can_pass_prerequisites_without_dispatchability(
 ) -> None:
     module = _load_module()
     native_harness_record(tmp_path, _claude_record())
+    _project_hooks(tmp_path)
 
     result = module.evaluate_readiness(project_root=tmp_path, executable_resolver=lambda _name: "claude.exe")
 
@@ -58,6 +102,7 @@ def test_suspended_installation_can_pass_prerequisites_without_dispatchability(
 def test_legacy_dispatch_flag_cannot_establish_dispatchability(tmp_path: Path, native_harness_record) -> None:
     module = _load_module()
     native_harness_record(tmp_path, _claude_record(status="active", can_receive_dispatch=True))
+    _project_hooks(tmp_path)
 
     result = module.evaluate_readiness(project_root=tmp_path, executable_resolver=lambda _name: "claude.exe")
 
@@ -76,9 +121,10 @@ def test_evaluate_readiness_errors_for_wrong_harness_type(tmp_path: Path, native
 
 def test_live_readiness_runs_bounded_prompt_probe(tmp_path: Path, native_harness_record) -> None:
     module = _load_module()
+    _project_hooks(tmp_path)
 
     def fake_run(command, **kwargs):
-        assert command == ["claude.exe", "-p", "Reply READY", "--add-dir", str(tmp_path)]
+        assert command == ["claude.exe", *POSTURE, "-p", "Reply READY", "--add-dir", str(tmp_path)]
         assert kwargs["cwd"] == tmp_path
         assert kwargs["stdin"] == subprocess.DEVNULL
         assert kwargs["capture_output"] is True
@@ -93,7 +139,9 @@ def test_live_readiness_runs_bounded_prompt_probe(tmp_path: Path, native_harness
         _claude_record(
             status="active",
             can_receive_dispatch=True,
-            invocation_surfaces={"headless": {"argv": ["claude", "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}"]}},
+            invocation_surfaces={
+                "headless": {"argv": ["claude", *POSTURE, "-p", "{{PROMPT}}", "--add-dir", "{{PROJECT_ROOT}}"]}
+            },
         ),
     )
 
@@ -118,6 +166,7 @@ def test_live_readiness_runs_bounded_prompt_probe(tmp_path: Path, native_harness
 def test_live_readiness_fails_closed_on_timeout(tmp_path: Path, native_harness_record) -> None:
     module = _load_module()
     native_harness_record(tmp_path, _claude_record(status="active", can_receive_dispatch=True))
+    _project_hooks(tmp_path)
 
     def timeout_run(command, **kwargs):
         raise subprocess.TimeoutExpired(command, kwargs["timeout"])
@@ -135,6 +184,231 @@ def test_live_readiness_fails_closed_on_timeout(tmp_path: Path, native_harness_r
     assert not ({"ready", "dispatchable", "dispatchable_now", "can_receive_dispatch", "role"} & result.keys())
     assert result["probe_passed"] is False
     assert result["first_failed_check"].startswith("live claude prompt probe")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [["--init", "{{INIT_LINE}}"], ["--report={{REPORT}}"], ["--model", "{{MODEL}}"]],
+    ids=["unfilled-binding", "unfilled-report", "unknown-placeholder"],
+)
+def test_live_probe_refuses_a_template_it_cannot_fill_without_starting_a_process(
+    tmp_path: Path, native_harness_record, extra
+) -> None:
+    """c123 (batch design WP2 2.1): the probe fills PROMPT and PROJECT_ROOT only; any other placeholder is refused."""
+    module = _load_module()
+    native_harness_record(
+        tmp_path,
+        _claude_record(
+            status="active",
+            invocation_surfaces={"headless": {"argv": ["claude", *POSTURE, "-p", "{{PROMPT}}", *extra]}},
+        ),
+    )
+    _project_hooks(tmp_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A template the live probe cannot fill must not start a process")
+
+    result = module.evaluate_readiness(
+        project_root=tmp_path,
+        executable_resolver=lambda _name: "claude.exe",
+        require_live=True,
+        live_runner=forbidden,
+    )
+
+    assert result["static_ok"] is True
+    assert result["probe_passed"] is False
+    assert result["live_probe"] == {"ok": False, "error": "InvocationError"}
+    assert result["first_failed_check"] == "live claude prompt probe: InvocationError"
+
+
+# c123 (batch design WP2 2.4): readiness reads the dispatched permission posture (owner decisions B1 and B5) from the
+# registered argv, and requires the projected hooks it relies on to start and to fail closed.
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        DISPATCHED_ARGV,
+        ["claude", "--permission-mode=bypassPermissions", "--setting-sources=project", "--strict-mcp-config"]
+        + ["--disallowed-tools", "WebSearch WebFetch", "-p", "{{PROMPT}}"],
+        ["claude", *POSTURE[:-2], "--disallowedTools", "WebFetch", "--disallowedTools", "WebSearch,Task", "-p", "x"],
+    ],
+    ids=["registered_b_row", "equals_forms_and_alias", "two_deny_lists"],
+)
+def test_the_dispatched_posture_passes_and_is_reported(tmp_path, native_harness_record, argv):
+    native_harness_record(tmp_path, _claude_record(invocation_surfaces={"headless": {"argv": argv}}))
+    _project_hooks(tmp_path)
+
+    result = verify_claude_dispatch.evaluate_readiness(
+        project_root=tmp_path, executable_resolver=lambda _: "claude.exe"
+    )
+
+    assert result["static_ok"] is True and result["first_failed_check"] == ""
+    assert result["permission_posture"] == {"ok": True, "problems": []}
+    assert [check["name"] for check in result["checks"]] == STATIC_CHECKS
+    hooks = result["projected_hooks"]
+    assert hooks["interpreter_ok"] is True and hooks["adapter_ok"] is True
+    assert hooks["interpreters"] == [str(tmp_path / INTERPRETER)]
+    assert result["harness_qualification"] == "unqualified"
+
+
+C121_B_ARGV = ["claude", "--model", "claude-sonnet-5", "--effort", "max", "-p", "{{PROMPT}}"] + [
+    "--add-dir",
+    "{{PROJECT_ROOT}}",
+    "--output-format",
+    "json",
+]
+
+
+@pytest.mark.parametrize(
+    ("argv", "problems"),
+    [
+        (
+            C121_B_ARGV,
+            [
+                "no --permission-mode bypassPermissions",
+                "no --strict-mcp-config",
+                "WebFetch and WebSearch are not disallowed (--disallowedTools WebFetch,WebSearch)",
+                "no --setting-sources project",
+            ],
+        ),
+        (["claude", "--permission-mode", "plan", *POSTURE[2:], "-p", "{{PROMPT}}"], ["--permission-mode is 'plan'"]),
+        (["claude", *POSTURE, "--permission-mode", "bypassPermissions", "-p", "x"], ["--permission-mode is given 2"]),
+        (
+            ["claude", *POSTURE, "--dangerously-skip-permissions", "-p", "x"],
+            ["--dangerously-skip-permissions is given"],
+        ),
+        (["claude", *POSTURE[:-1], "WebFetch", "-p", "x"], ["WebSearch is not disallowed"]),
+        (
+            ["claude", *POSTURE[:-1], "WebFetch(domain:example.com),WebSearch", "-p", "x"],
+            ["WebFetch is not disallowed"],
+        ),
+        (["claude", *POSTURE, "{{PROMPT}}"], ["the --disallowedTools list takes {{PROMPT}}"]),
+        (["claude", *POSTURE[:2], "--setting-sources", "user,project", *POSTURE[4:], "-p", "x"], ["is 'user,project'"]),
+        (["claude", *POSTURE, "--bare", "-p", "x"], ["--bare skips the GT-KB hooks"]),
+        (["claude", *POSTURE, "--safe-mode", "-p", "x"], ["--safe-mode skips the GT-KB hooks"]),
+    ],
+    ids=[
+        "c121_b_row",
+        "other_mode",
+        "mode_twice",
+        "second_spelling",
+        "web_search_allowed",
+        "scoped_rule_keeps_the_tool",
+        "list_takes_the_prompt",
+        "user_settings_loaded",
+        "bare",
+        "safe_mode",
+    ],
+)
+def test_a_missing_or_wrong_posture_fails_static_readiness_before_any_launch(
+    tmp_path, native_harness_record, argv, problems
+):
+    native_harness_record(tmp_path, _claude_record(invocation_surfaces={"headless": {"argv": argv}}))
+    _project_hooks(tmp_path)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A registration without the dispatched posture must not start a session")
+
+    result = verify_claude_dispatch.evaluate_readiness(
+        project_root=tmp_path, executable_resolver=lambda _: "claude.exe", require_live=True, live_runner=forbidden
+    )
+
+    assert result["static_ok"] is False and result["probe_passed"] is False
+    assert result["live_probe"] is None
+    assert result["permission_posture"]["ok"] is False
+    reported = result["permission_posture"]["problems"]
+    for problem in problems:
+        assert any(problem in line for line in reported), (problem, reported)
+    assert result["first_failed_check"] == "permission posture: " + "; ".join(reported)
+
+
+def test_the_hook_interpreter_must_exist_under_the_root(tmp_path, native_harness_record):
+    """A hook that cannot start is a non-blocking error in Claude Code: under bypassPermissions the tool runs."""
+    native_harness_record(tmp_path, _claude_record(status="active"))
+    _project_hooks(tmp_path, interpreter=False)
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("A root whose hook interpreter is missing must not start a session")
+
+    result = verify_claude_dispatch.evaluate_readiness(
+        project_root=tmp_path, executable_resolver=lambda _: "claude.exe", require_live=True, live_runner=forbidden
+    )
+
+    assert result["static_ok"] is False and result["live_probe"] is None
+    assert result["permission_posture"]["ok"] is True
+    assert result["projected_hooks"]["missing_interpreters"] == [str(tmp_path / INTERPRETER)]
+    assert result["first_failed_check"] == f"hook interpreter: missing {tmp_path / INTERPRETER}"
+
+
+def test_an_application_root_resolves_the_host_interpreter_its_hooks_name(tmp_path, native_harness_record):
+    """Under an application the projector renders the host's interpreter and adapter two levels up."""
+    application = tmp_path / "applications" / "Alpha"
+    application.mkdir(parents=True)
+    native_harness_record(application, _claude_record())
+    command = _hook_command("scripts/implementation_start_gate.py", variable="${CLAUDE_PROJECT_DIR}/../..")
+    _project_hooks(application, command, interpreter=False, adapter=False)
+    for relative in (INTERPRETER, ADAPTER):
+        (tmp_path / relative).parent.mkdir(parents=True, exist_ok=True)
+        (tmp_path / relative).write_bytes(b"")
+
+    result = verify_claude_dispatch.evaluate_readiness(
+        project_root=application, executable_resolver=lambda _: "claude.exe"
+    )
+
+    hooks = result["projected_hooks"]
+    assert result["static_ok"] is True, result["first_failed_check"]
+    assert Path(hooks["interpreters"][0]).resolve() == (tmp_path / INTERPRETER).resolve()
+    assert Path(hooks["adapters"][0]).resolve() == (tmp_path / ADAPTER).resolve()
+    assert not (application / INTERPRETER).exists() and not (application / ADAPTER).exists()
+
+
+@pytest.mark.parametrize(
+    ("prepare", "failed"),
+    [
+        (lambda root: None, "hook interpreter: the root has no readable projected .claude/settings.json"),
+        (
+            lambda root: (root / ".claude").mkdir() or (root / ".claude/settings.json").write_text("{}"),
+            "hook interpreter: the projected .claude/settings.json registers no hook command",
+        ),
+        (
+            lambda root: _project_hooks(root, "pythonw -B scripts/implementation_start_gate.py --harness claude"),
+            "hook interpreter: 1 of 1 hook commands do not start with a quoted interpreter path",
+        ),
+        (
+            lambda root: _project_hooks(
+                root, _hook_command(".harness-baseline-configuration/hooks/x.py", adapter=False)
+            ),
+            f"hook adapter: 1 of 1 hook commands do not run {ADAPTER}",
+        ),
+    ],
+    ids=["no_projection", "no_hooks", "bare_interpreter", "pre_adapter_projection"],
+)
+def test_projected_hooks_that_cannot_start_or_would_fail_open_fail_readiness(
+    tmp_path, native_harness_record, prepare, failed
+):
+    native_harness_record(tmp_path, _claude_record())
+    prepare(tmp_path)
+
+    result = verify_claude_dispatch.evaluate_readiness(
+        project_root=tmp_path, executable_resolver=lambda _: "claude.exe"
+    )
+
+    assert result["static_ok"] is False
+    assert result["first_failed_check"] == failed
+
+
+def test_a_missing_adapter_fails_readiness(tmp_path, native_harness_record):
+    native_harness_record(tmp_path, _claude_record())
+    _project_hooks(tmp_path, adapter=False)
+
+    result = verify_claude_dispatch.evaluate_readiness(
+        project_root=tmp_path, executable_resolver=lambda _: "claude.exe"
+    )
+
+    assert result["projected_hooks"]["interpreter_ok"] is True
+    assert result["projected_hooks"]["adapter_ok"] is False
+    assert result["first_failed_check"] == f"hook adapter: missing {tmp_path / ADAPTER}"
 
 
 @pytest.mark.parametrize(
@@ -157,6 +431,7 @@ def test_malformed_command_is_not_repaired_into_launchable_arguments(module, arg
 def test_live_report_does_not_retain_prompt_command_output_or_exception_details(tmp_path, native_harness_record):
     private = "private-fixture-value"
     native_harness_record(tmp_path, _claude_record())
+    _project_hooks(tmp_path)
 
     def fail(command, **kwargs):
         raise subprocess.TimeoutExpired(command, kwargs["timeout"], output=private, stderr=private)

@@ -8,6 +8,7 @@ imports another test module. Not collected; defines no test.
 
 from __future__ import annotations
 
+import hashlib
 import os
 import sqlite3
 import uuid
@@ -17,8 +18,60 @@ from pathlib import Path
 import psycopg
 import pytest
 from groundtruth_kb.config import PostgreSQLConfig
-from groundtruth_kb.postgres_kernel import COORDINATION_TABLES, PostgresKernel
+from groundtruth_kb.postgres_kernel import (
+    BRIDGE_STATUS_PREDECESSOR_SHA256,
+    COORDINATION_TABLES,
+    REPOSITORY_SCOPE_PREDECESSOR_SHA256,
+    PostgresKernel,
+    schema_sql_bytes,
+)
 from psycopg import sql
+
+# c123 (batch design WP5 G17): the supported predecessors, reconstructed from this release's schema; each hash pins
+# its reconstruction, so neither fixture can drift. c121 (also c122's) first, then the 2f25 repository/scope one.
+_BRIDGE_STATUS_LIST = (
+    b"('ADVISORY', 'BLOCKED', 'GO', 'NEW', 'NO-GO', 'NOT-READY', 'READY', 'REVISED',\n"
+    b"            'SUPERSEDED', 'VERDICT-REJECTED', 'VERIFIED', 'WITHDRAWN'))"
+)
+_BRIDGE_STATUS_COMMENT = (
+    b"    -- The twelve canonical bridge statuses (SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001; bridge/vocabulary.py).\n"
+)
+
+
+def c121_schema_sql() -> bytes:
+    """The c121 and c122 schema (4b5f8275...): this release's without the three bridge status CHECKs."""
+    current = schema_sql_bytes()
+    assert current.count(_BRIDGE_STATUS_COMMENT) == 1
+    current = current.replace(_BRIDGE_STATUS_COMMENT, b"")
+    for column, prefix in (
+        (b"head_status", b"    head_status TEXT"),
+        (b"status", b"    status TEXT NOT NULL"),
+        (b"intended_status", b"    intended_status TEXT NOT NULL"),
+    ):
+        constrained = prefix + b"\n        CHECK (" + column + b" IN " + _BRIDGE_STATUS_LIST + b",\n"
+        assert current.count(constrained) == 1
+        current = current.replace(constrained, prefix + b",\n")
+    assert hashlib.sha256(current).hexdigest() == BRIDGE_STATUS_PREDECESSOR_SHA256
+    return current
+
+
+def repository_scope_predecessor_sql() -> bytes:
+    """The installed repository/scope predecessor (2f25...): c121's schema with the repository/scope DDL reverted."""
+    current = c121_schema_sql()
+    new_scope = (
+        b"application_scope TEXT CHECK (application_scope ~ '^(gtkb_platform|application:[A-Za-z][A-Za-z0-9_-]*)$')"
+    )
+    old_scope = b"application_scope TEXT CHECK (application_scope IN ('gtkb_platform', 'agent_red_application'))"
+    assert current.count(new_scope) == 2
+    current = current.replace(new_scope, old_scope)
+    lines = current.splitlines(keepends=True)
+    assert sum(line.startswith(b"    repository_ref TEXT CHECK") for line in lines) == 1
+    current = b"".join(line for line in lines if not line.startswith(b"    repository_ref TEXT CHECK"))
+    assert current.count(b" AND repository_ref IS NULL") == 1
+    current = current.replace(b" AND repository_ref IS NULL", b"")
+    assert hashlib.sha256(current).hexdigest() == REPOSITORY_SCOPE_PREDECESSOR_SHA256
+    return current
+
 
 EXPECTED_TABLES = {
     "canonical_terms",

@@ -64,9 +64,11 @@ class PostgreSQLConfig:
     service: str = "gtkb"
     connect_timeout_seconds: int = 10
     # Measured (2026-09-30): a writer waiting out a publication on the same project waited up to 6.7 s on a
-    # saturated workstation; the measurement rule of 2026-09-29 gives 20 s.
-    lock_timeout_ms: int = 20000
-    statement_timeout_ms: int = 30000
+    # saturated workstation; the measurement rule of 2026-09-29 gave 20 s. Re-measured for c123 (owner decision
+    # 2026-10-02, c123's timer table): the longest lock wait, which was also the longest statement, took 5.2 s on
+    # the host as it is and 14.0 s under saturation; the rule gives 37.7 s for each, rounded up to 40 s.
+    lock_timeout_ms: int = 40000
+    statement_timeout_ms: int = 40000
 
 
 @dataclass

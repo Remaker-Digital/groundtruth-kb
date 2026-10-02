@@ -197,7 +197,18 @@ def test_default_subprocess_runners_pin_utf8_decode_options(ollama_harness_modul
         captured.append(dict(kwargs))
         return subprocess.CompletedProcess(args=args, returncode=0, stdout="out", stderr="err")
 
+    class FakePopen:
+        """c123 (batch design WP2, item 8): the Bash runner starts its command with Popen and a bounded communicate."""
+
+        def __init__(self, args, **kwargs):  # noqa: ANN001, ANN204
+            captured.append(dict(kwargs))
+            self.args, self.returncode, self.pid = args, 0, 0
+
+        def communicate(self, timeout=None):  # noqa: ANN001, ANN202
+            return "out", "err"
+
     monkeypatch.setattr(subprocess, "run", fake_run)
+    monkeypatch.setattr(subprocess, "Popen", FakePopen)
 
     guard_path = tmp_path / "guard.py"
     guard_path.write_text("# fixture guard\n", encoding="utf-8")
@@ -248,7 +259,8 @@ def test_dispatch_readiness_requires_full_lo_tool_set(verify_module) -> None:
     assert verify_module.OLLAMA_DISPATCH_REQUIRED_TOOLS == ("Read", "Write", "Edit", "Grep", "Glob", "Bash")
 
 
-def test_default_ollama_bridge_review_route_uses_deepseek_v4_flash_cloud(ollama_harness_module, tmp_path) -> None:
+def test_default_and_registered_ollama_route_use_deepseek_v4_flash_cloud(ollama_harness_module, tmp_path) -> None:
+    """c123 (batch design WP2 2.1): D's registration names --model deepseek-v4-flash-cloud; no skill table routes D."""
     (tmp_path / ollama_harness_module.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
     (tmp_path / ollama_harness_module.ROUTING_CONFIG_PATH).write_text(
         "schema_version = 1\n"
@@ -274,17 +286,14 @@ def test_default_ollama_bridge_review_route_uses_deepseek_v4_flash_cloud(ollama_
         'allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]\n'
         "[routing.ollama]\n"
         'default_model = "deepseek-v4-flash-cloud"\n'
-        "timeout_seconds = 3600\n"
-        "[routing.ollama.skills]\n"
-        'bridge-review = "deepseek-v4-flash-cloud"\n'
-        'verification = "deepseek-v4-flash-cloud"\n'
-        'implementation = "deepseek-v4-flash-cloud"\n',
+        "timeout_seconds = 3600\n",
         encoding="utf-8",
     )
 
     config = ollama_harness_module.load_routing_config(tmp_path)
-    route = ollama_harness_module.resolve_model(config, None, skill="bridge-review")
+    route = ollama_harness_module.resolve_model(config, "deepseek-v4-flash-cloud")
 
+    assert ollama_harness_module.resolve_model(config, None) == route
     assert route.key == "deepseek-v4-flash-cloud"
     assert route.model_id == "deepseek-v4-flash:cloud"
     assert config.timeout_seconds == 3600

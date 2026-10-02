@@ -1,9 +1,10 @@
 """Static bridge-guidance consistency for TEST-11783.
 
-Read the authored neutral baseline and the selected package vocabulary. These
-checks establish documented status, routing and successor agreement only;
-test_native_bridge.py separately exercises the native service and its guards.
-Headings, wrapping and grouped rows are presentation choices, not authority.
+Read the authored neutral baseline, the root instructions, the gtkb-bridge skill
+and the selected package vocabulary. These checks establish documented status,
+routing and successor agreement only; test_native_bridge.py separately
+exercises the native service and its guards. Headings, wrapping and grouped
+rows are presentation choices, not authority.
 """
 
 from __future__ import annotations
@@ -26,6 +27,10 @@ from groundtruth_kb.bridge.vocabulary import (
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_DOC = PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "file-bridge-protocol.md"
+ROOT_INSTRUCTIONS = PROJECT_ROOT / "AGENTS.md"
+BRIDGE_SKILL = PROJECT_ROOT / ".agents" / "skills" / "gtkb-bridge" / "SKILL.md"
+# A list of status tokens as the guidance writes it: "A, B and C".
+STATUS_LIST = r"(?<![A-Za-z-])((?:[A-Z][A-Z-]*(?:, | and ))*[A-Z][A-Z-]*)"
 
 
 def _read(path: Path) -> str:
@@ -156,3 +161,26 @@ def test_post_implementation_section_names_ready() -> None:
     assert "NEW is never an implementation report" in text
     assert "VERIFIED to VERIFIED requires canonical fresh-verification work" in text
     assert "preserving its membership and existing artifact bytes" in text
+
+
+def _named_statuses(path: Path, lead: str, tail: str = r"\.") -> frozenset[str]:
+    """The statuses one whitespace-normalized sentence of the guidance lists after ``lead``."""
+    text = " ".join(_read(path).split())
+    match = re.search(lead + STATUS_LIST + tail, text)
+    assert match, f"{path.name}: no sentence matches {lead!r} ... {tail!r}"
+    return frozenset(re.split(r", | and ", match.group(1)))
+
+
+def test_bridge_skill_names_exactly_the_non_dispatchable_statuses() -> None:
+    """The gtkb-bridge skill lists the statuses that carry no envelope lines (c123, batch design WP4 G14)."""
+    assert _named_statuses(BRIDGE_SKILL, "", r" are non-dispatchable\.") == NON_DISPATCHABLE_STATUSES
+
+
+def test_root_instructions_name_each_role_s_authored_statuses() -> None:
+    """AGENTS.md names who authors each status; ADVISORY belongs to either role (c123, batch design WP4 G14)."""
+    either = _named_statuses(ROOT_INSTRUCTIONS, "Either role authors ")
+    prime = _named_statuses(ROOT_INSTRUCTIONS, "Prime Builder authors ")
+    loyal = _named_statuses(ROOT_INSTRUCTIONS, "Loyal Opposition authors ")
+    assert either == PRIME_AUTHORED_STATUSES & LOYAL_OPPOSITION_AUTHORED_STATUSES
+    assert prime | either == PRIME_AUTHORED_STATUSES
+    assert loyal | either == LOYAL_OPPOSITION_AUTHORED_STATUSES

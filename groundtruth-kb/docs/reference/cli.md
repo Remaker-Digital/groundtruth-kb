@@ -1181,6 +1181,12 @@ refused (`project_repository_frozen`). A new execution project defaults to
 authorization value; `PROJECT-GTKB-NEW-WORK-INTAKE` is created
 `not authorized`.
 
+Because a new execution project starts authorized, creating one
+(`--expected-version 0` without `--kind program`) is an owner operation: agent
+harnesses refuse that call, and the owner runs it in their own terminal (see
+[Project Lifecycle Commands](#project-lifecycle-commands)). Amending an
+existing program or project and creating a program stay available to agents.
+
 ---
 
 ### gt projects dependencies
@@ -1260,10 +1266,20 @@ Git commit, all through the native authority. Finalization is performed by
 the independent Loyal Opposition context after every project member is
 VERIFIED; Prime Builder contexts are refused (`independent_verifier_required`).
 
+The authority does not authenticate its callers. For agent harnesses, the
+owner's levers over execution are owner operations guarded at GT-KB's effect
+gate (`GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001`):
+`gt projects set-authorization`, `gt projects move-item`, and
+`gt projects record` when it creates an execution project. The gate refuses
+them from an agent's shell in every harness, and the owner runs them in their
+own terminal. The service itself refuses no caller, so a program run inside a
+claim, whose own requests the gate does not read, is outside this boundary.
+
 ### gt projects set-authorization
 
 Apply the owner's explicit ordering choice to an execution project. Existing
-bridge chains continue; membership does not change.
+bridge chains continue; membership does not change. An owner operation: agent
+harnesses refuse it, and the owner runs it in their own terminal.
 
 ```
 gt projects set-authorization <PROJECT_ID> --authorization "authorized"|"not authorized" --expected-version <n> --actor <name> --change-reason <text> [--json]
@@ -1432,7 +1448,10 @@ an unreachable authority exits 1 with `authority_unavailable`.
 ### gt projects move-item
 
 Move one open work item atomically from one execution project to another,
-preserving both projects' authorization.
+preserving both projects' authorization. An owner operation: a move can carry
+intake work into an authorized project, so agent harnesses refuse it and the
+owner runs it in their own terminal (see
+[Project Lifecycle Commands](#project-lifecycle-commands)).
 
 ```
 gt projects move-item --work-item-id <id> --from-project <id> --to-project <id> --expected-version <n> --actor <name> --change-reason <text> [--membership-order <n>] [--json]
@@ -1785,6 +1804,36 @@ and scope at its own boundary.
 
 ---
 
+### gt bridge check-program
+
+Check that the bound context holds a live claim before it runs a program or
+tests, without granting or recording permission. This is the pre-tool check
+the harness effect gates call before a program run, whose own writes the gate
+cannot read.
+
+```
+gt bridge check-program --native-context-id <id> [--json]
+```
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `--native-context-id` | string | *required* | The bound context that runs the program |
+| `--json` | flag | off | Emit the result as JSON |
+
+`POST /v1/bridge/check-program`. A context holding at least one live claim, of
+any intended status (a verifier's verdict claim counts), returns
+`{"status": "current", "scope": "program", "claims": <n>}`, where `claims` is
+the number of its live claims. Otherwise the check is refused
+`program_claim_required`: programs and tests run only inside a live claim of
+this context, so claim the artifact the context will deliver with
+`gt bridge claim` first and run the program within that claim's 600 seconds.
+An unbound context is `no_session_binding`. The claim ties the run to a
+delivery; it does not bound what the program writes, which can still fall
+outside the claim's targets. Nothing is retained: publication and delivery
+recheck the fence and scope at their own boundaries.
+
+---
+
 ### gt bridge publish-work
 
 Publish only the claimed implementation artifacts from this context's
@@ -1845,7 +1894,9 @@ work item differ from the attempt), `author_context_mismatch`
 `attempt_closed`, `project_subject_mismatch`, `bridge_version_collision` (a
 stored version with different bytes or fence), `stale_artifact_fence`,
 `claim_does_not_match_artifact` (version or status differ from the claim),
-`not_found` for an unknown `author_harness_id`, `scope_changed`,
+`not_found` for an unknown `author_harness_id` (the id is the one the launcher
+exported as `GTKB_AUTHOR_HARNESS_ID` or the one the dispatched task names),
+`scope_changed`,
 `project_not_authorized` (NEW on a project not `authorized`),
 `interactive_owner_decision_required` (BLOCKED without `--headless`) and
 `invalid_blocked_observation` (BLOCKED must report the current
@@ -2569,6 +2620,7 @@ gt [--config <path>] [--version]
 │   ├── check <DOCUMENT> --native-context-id --fence [--json]
 │   ├── check-delivery <DOCUMENT> --version --native-context-id [--json]
 │   ├── check-effects --native-context-id --cwd --path ... [--json]
+│   ├── check-program --native-context-id [--json]
 │   ├── claim <DOCUMENT> --native-context-id --expected-version --status --request-id [--work-item-id] [--json]
 │   ├── deliver <DOCUMENT> --native-context-id --fence --content-file [--headless] [--json]
 │   ├── publish-work <DOCUMENT> --native-context-id --fence --preimages-file [--json]
@@ -2772,6 +2824,7 @@ primary interface._
 | `gt bridge check` | Check that the exact current artifact claim is still live and current. |
 | `gt bridge check-delivery` | Verify this context's exact assigned delivery, including the purged terminal head. |
 | `gt bridge check-effects` | Check current scratch/implementation scope without granting or recording permission. |
+| `gt bridge check-program` | Check that this context holds the live claim a program or test run needs, without granting permission. |
 | `gt bridge claim` | Reserve one exact successor slot for 600 seconds, without renewal. |
 | `gt bridge deliver` | Publish the author's complete UTF-8 bytes and consume the exact claim. |
 | `gt bridge publish-work` | Publish only the claimed artifacts from this context's registered checkout. |
@@ -2916,12 +2969,12 @@ primary interface._
 | `gt projects formal-links record` | Apply a version-checked project formal-link amendment and return canonical readback. |
 | `gt projects formal-links show` | Read one current project formal-link record. |
 | `gt projects list` | List current program and project records in deterministic ID order. |
-| `gt projects move-item` | Move one open work item atomically, preserving both projects' authorization. |
+| `gt projects move-item` | Move one open work item atomically, preserving both projects' authorization. Owner operation: agent harnesses refuse it. |
 | `gt projects prepare-commit` | Prepare the complete project Git commit and materialize the verifying checkout. |
 | `gt projects readiness` | Explain whether the project's exact prerequisite outcomes are available. |
-| `gt projects record` | Apply a version-checked program or project amendment and return canonical readback. |
+| `gt projects record` | Apply a version-checked program or project amendment and return canonical readback. Creating an execution project is an owner operation: agent harnesses refuse it. |
 | `gt projects retire` | Retire one active program or project by status only with history; memberships and links are preserved; open members are refused. |
-| `gt projects set-authorization` | Apply the owner's explicit ordering choice; existing bridge chains continue. |
+| `gt projects set-authorization` | Apply the owner's explicit ordering choice; existing bridge chains continue. Owner operation: agent harnesses refuse it. |
 | `gt projects show` | Read one current program or project record, including its planning relationships. |
 
 ### gt push

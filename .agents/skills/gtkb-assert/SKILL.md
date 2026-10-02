@@ -34,6 +34,6 @@ Only an aggregate PASS exits successfully. Required behavioral validation remain
 
 Before a bridge verdict or protected effect, use the current canonical scope and perform the complete applicable executable testing and independent review. The returned observation includes its specification version; a result for a changed definition must not be reused. Capture the command process exit code directly, without substituting a later formatting pipeline's status.
 
-If a required evaluator, command or binding is missing or contradicts current formal guidance, carry the concrete defect into the existing corrective work. Do not repair the reported score by adding marker text, ignoring requirements or inventing an approval/evidence ledger.
+If a required evaluator, command or binding is missing or contradicts current formal guidance, carry the concrete defect into the existing corrective work, or file unmatched work through `gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and name any related project in its description. Do not repair the reported score by adding marker text, ignoring requirements or inventing an approval/evidence ledger.
 
 © 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.

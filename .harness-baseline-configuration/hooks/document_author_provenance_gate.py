@@ -35,8 +35,28 @@ class Candidate:
 
 
 def _emit_block(message: str) -> int:
-    print(json.dumps({"decision": "block", "reason": message}, sort_keys=True))
-    return 2
+    """Deny through the structured path and exit 0, as every other gate does (c123; batch design WP2, G39).
+
+    The gate used Claude's exit-code protocol (stdout JSON and exit 2): Claude ignores stdout on exit 2, so it blocked
+    with no reason; the Codex and Antigravity adapters gave a generic one; and the API harnesses ended the run.
+    """
+    try:
+        from groundtruth_kb.governance.output import emit_deny
+    except ImportError:  # the package is not importable here: the same structured shape
+        print(
+            json.dumps(
+                {
+                    "hookSpecificOutput": {
+                        "hookEventName": "PreToolUse",
+                        "permissionDecision": "deny",
+                        "permissionDecisionReason": message,
+                    }
+                }
+            )
+        )
+        return 0
+    emit_deny("PreToolUse", message)
+    return 0
 
 
 def _emit_pass() -> int:
@@ -54,7 +74,22 @@ def _tool_input(payload: dict[str, Any]) -> dict[str, Any]:
     return value if isinstance(value, dict) else {}
 
 
+def _readers() -> Any:
+    """The shared payload readers (c123; batch design WP2, G38); None when the sibling module cannot be imported."""
+    hooks_dir = str(Path(__file__).resolve().parent)
+    if hooks_dir not in sys.path:
+        sys.path.insert(0, hooks_dir)
+    try:
+        import _hook_context
+    except ImportError:
+        return None
+    return _hook_context
+
+
 def _extract_patch_text(payload: dict[str, Any]) -> str:
+    readers = _readers()
+    if readers is not None:
+        return readers.patch_text(payload)
     tool_input = _tool_input(payload)
     candidates: list[Any] = [
         tool_input.get("patch"),
@@ -103,9 +138,11 @@ def _candidate_from_write(payload: dict[str, Any], project_root: Path) -> Candid
     if tool_name != "Write":
         return None
     tool_input = _tool_input(payload)
-    file_path = tool_input.get("file_path")
-    content = tool_input.get("content")
-    if not isinstance(file_path, str) or not isinstance(content, str):
+    # c123 (G38): the API harnesses send `path`, which this gate did not read, so it never judged their writes.
+    readers = _readers()
+    file_path = (readers.tool_path(tool_input) if readers is not None else "") or tool_input.get("file_path")
+    content = (readers.write_content(tool_input) if readers is not None else "") or tool_input.get("content")
+    if not isinstance(file_path, str) or not file_path or not isinstance(content, str):
         return None
     absolute = Path(file_path)
     if not absolute.is_absolute():

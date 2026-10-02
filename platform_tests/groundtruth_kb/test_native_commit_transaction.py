@@ -16,9 +16,10 @@ from platform_tests.groundtruth_kb.finalization_fixtures import commit_environme
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put
 
-# Per-test limit from measurement (owner decision 2026-09-29): the test took 79.8 s on the host as it is and 102.3 s
-# under saturation (1.28 times); the limit is 102.3 s x 1.28, rounded up to 10 s.
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(140)]
+# Per-test limit from measurement (c123's timer table, owner decision 2026-10-02): the test took 36.0 s on the
+# host as it is and 78.1 s under saturation (2.17 times); the limit is 78.1 s x 2.17, rounded up to 10 s. The
+# 2026-09-29 measurement gave 140 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(170)]
 
 
 def test_current_formal_roots_cannot_change_between_reference_check_and_project_commit(commit_environment):
@@ -78,7 +79,9 @@ fi
         "status": "active",
     }
     try:
-        deadline = time.monotonic() + 40
+        # Measured (c123's timer table, owner decision 2026-10-02): 5.1 s quiet, 14.7 s under saturation;
+        # Rule R 42.5 s, rounded up.
+        deadline = time.monotonic() + 50
         while not ready.exists() and process.poll() is None and time.monotonic() < deadline:
             time.sleep(0.05)
         # String messages survive pytest's repr elision; a refusal's diagnostic details stay in the evidence.
@@ -100,7 +103,9 @@ fi
                 assert not mutation.done(), mutation.result().text
             finally:
                 release.touch()
-            output, error = process.communicate(timeout=30)
+            # Measured (c123's timer table, owner decision 2026-10-02): 3.1 s quiet, 13.4 s under
+            # saturation; Rule R 58.0 s, rounded up.
+            output, error = process.communicate(timeout=60)
             assert process.returncode == 0, f"stdout: {output}\nstderr: {error}"
             response = mutation.result(timeout=15)
             committed_head = base(checkout)

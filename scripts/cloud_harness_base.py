@@ -33,21 +33,25 @@ GT-KB helpers only â€” no heavyweight agent framework, per ``ADR-OLLAMA-HAR
 from __future__ import annotations
 
 import contextlib
+import dataclasses
 import fnmatch
 import functools
 import http.client
 import json
 import os
 import re
+import signal
 import ssl
 import subprocess
 import sys
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from typing import Any
@@ -56,6 +60,8 @@ from uuid import uuid4
 try:
     from sdk_bridge_bash_guard import (
         BridgeDeliveryIncomplete,
+        NativeBindFailed,  # noqa: F401 - re-exported: the launchers catch base.NativeBindFailed
+        bind_native_context,
         bridge_bash_mutation_reason,
         bridge_completion_target,
         verify_bridge_completion,
@@ -63,6 +69,8 @@ try:
 except ModuleNotFoundError:  # pragma: no cover
     from scripts.sdk_bridge_bash_guard import (
         BridgeDeliveryIncomplete,
+        NativeBindFailed,  # noqa: F401 - re-exported: the launchers catch base.NativeBindFailed
+        bind_native_context,
         bridge_bash_mutation_reason,
         bridge_completion_target,
         verify_bridge_completion,
@@ -138,7 +146,6 @@ SKIPPED_SCAN_DIR_NAMES = frozenset(
         "build",
     }
 )
-LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
 
 
 CANONICAL_TOOLS = frozenset({"Read", "Write", "Edit", "Grep", "Glob", "Bash"})
@@ -246,7 +253,6 @@ class RoutingConfig:
     schema_version: int
     models: dict[str, ModelRoute]
     default_model: str
-    skill_routes: dict[str, str]
     timeout_seconds: float | None = None
     session_timeout_seconds: float | None = None
     max_turns: int | None = None
@@ -269,6 +275,8 @@ class GuardExecutionResult:
     stdout: str
     stderr: str = ""
     timed_out: bool = False
+    # c123 (batch design WP2, item 9): how long the hook ran, for the guard decision log.
+    duration_ms: int = 0
 
 
 @dataclass(frozen=True)
@@ -523,24 +531,8 @@ def infer_model_version(model_id: str) -> str:
     return "unversioned"
 
 
-def _parse_skill_routes(routing: Mapping[str, Any], models: Mapping[str, ModelRoute]) -> dict[str, str]:
-    skills_raw = routing.get("skills") or {}
-    if not isinstance(skills_raw, dict):
-        raise CloudHarnessError("routing.skills must be a table when present")
-    skill_routes: dict[str, str] = {}
-    for skill_name, route_spec in skills_raw.items():
-        if not isinstance(skill_name, str) or not skill_name:
-            raise CloudHarnessError("routing.skills entries must use non-empty skill names")
-        if isinstance(route_spec, str):
-            route_key = route_spec
-        elif isinstance(route_spec, dict):
-            route_key = route_spec.get("model")
-        else:
-            raise CloudHarnessError(f"routing.skills.{skill_name} must name a configured model")
-        if not isinstance(route_key, str) or route_key not in models:
-            raise CloudHarnessError(f"routing.skills.{skill_name} must name a configured model")
-        skill_routes[skill_name] = route_key
-    return skill_routes
+RETIRED_SKILL_TABLES = "routing skill tables are retired; registrations name --model"
+"""c123 (batch design WP2 2.1): a role skill no longer selects a model; a registration names its --model."""
 
 
 def resolve_configuration_path(project_root: Path, relative: Path) -> Path:
@@ -588,17 +580,23 @@ def load_routing_config(project_root: Path, *, provider_key: str, config_path: P
         omit_payload_model = _as_bool(row.get("omit_payload_model"), field=f"models.{key}.omit_payload_model")
         models[key] = ModelRoute(key, model_id, model_version, True, allowed_tools, omit_payload_model)
 
-    routing = raw.get("routing", {}).get(provider_key)
+    sections = raw.get("routing", {})
+    routing = sections.get(provider_key) if isinstance(sections, dict) else None
     if not isinstance(routing, dict):
         raise CloudHarnessError(f"routing config must define [routing.{provider_key}]")
     default_model = routing.get("default_model")
     if not isinstance(default_model, str) or default_model not in models:
         raise CloudHarnessError(f"routing.{provider_key}.default_model must name a configured {provider_key} model")
+    # c123 (batch design WP2 2.1): the shared file holds no skill table in any section. Every launcher that reads it
+    # refuses one, including a table in another provider's section (Goose reads only its model rows).
+    retired = sorted(name for name, section in sections.items() if isinstance(section, dict) and "skills" in section)
+    if retired:
+        name = provider_key if provider_key in retired else retired[0]
+        raise CloudHarnessError(f"routing.{name}.skills: {RETIRED_SKILL_TABLES}")
     return RoutingConfig(
         schema_version=1,
         models=models,
         default_model=default_model,
-        skill_routes=_parse_skill_routes(routing, models),
         timeout_seconds=_as_optional_positive_float(
             routing.get("timeout_seconds"), field=f"routing.{provider_key}.timeout_seconds"
         ),
@@ -609,10 +607,8 @@ def load_routing_config(project_root: Path, *, provider_key: str, config_path: P
     )
 
 
-def resolve_model(config: RoutingConfig, requested_model: str | None, skill: str | None = None) -> ModelRoute:
-    if skill is not None and not skill:
-        raise CloudHarnessError("skill route key must be a non-empty string")
-    route_key = requested_model or (config.skill_routes.get(skill) if skill else None) or config.default_model
+def resolve_model(config: RoutingConfig, requested_model: str | None) -> ModelRoute:
+    route_key = requested_model or config.default_model
     try:
         return config.models[route_key]
     except KeyError as exc:
@@ -712,6 +708,23 @@ def _schema(name: str, description: str, properties: dict[str, Any], required: l
     }
 
 
+def bash_tool_description(platform_name: str | None = None) -> str:
+    """The Bash tool's description, naming the shell that actually runs it (c123; batch design WP2, item 8).
+
+    The tool keeps the name Bash, which hooks, routing and adapters match; on Windows it runs cmd.exe.
+    """
+    if (platform_name or os.name) == "nt":
+        return (
+            "Runs one command with the Windows command processor (cmd.exe /c) in the project root, after guards allow "
+            "it. Use cmd syntax: double quotes, %VAR%, 2>nul, &&. POSIX forms ($VAR, 2>/dev/null, single-quoted "
+            "arguments) do not work. Bridge artifact and retired-index mutations are denied."
+        )
+    return (
+        "Runs one command with /bin/sh -c in the project root, after guards allow it. Bridge artifact and "
+        "retired-index mutations are denied."
+    )
+
+
 def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
     schemas = {
         "Read": _schema(
@@ -750,7 +763,7 @@ def build_tool_schemas(allowed_tools: Iterable[str]) -> list[dict[str, Any]]:
         ),
         "Bash": _schema(
             "Bash",
-            "Run a bounded local shell command after guards allow it; bridge artifact and retired-index mutations are denied.",
+            bash_tool_description(),
             {"command": {"type": "string"}, "timeout_seconds": {"type": "number", "minimum": 1}},
             ["command"],
         ),
@@ -1229,6 +1242,8 @@ def _default_guard_runner(
             [sys.executable, "-B", str(guard_path)],
             input=json.dumps(payload),
             text=True,
+            encoding="utf-8",
+            errors="replace",  # c123 (WP2, item 8): a hook's output never decodes empty
             capture_output=True,
             cwd=str(payload.get("cwd") or Path.cwd()),
             env=dict(env),
@@ -1263,6 +1278,8 @@ def _default_native_hook_runner(
             expanded_command,
             input=json.dumps(payload),
             text=True,
+            encoding="utf-8",
+            errors="replace",  # c123 (WP2, item 8): a hook's output never decodes empty
             capture_output=True,
             cwd=str(payload.get("cwd") or Path.cwd()),
             env=dict(env),
@@ -1300,6 +1317,210 @@ def _native_hook_block_reason(data: Mapping[str, Any] | None) -> str | None:
         return str(data.get("reason") or data.get("permissionDecisionReason") or "native hook blocked tool use")
     reason = _decision_reason(dict(data))
     return reason
+
+
+# c123 (batch design WP2, item 9): the callback a guard decision goes to (GuardDecisionLog.record).
+DecisionLogFunc = Callable[[dict[str, Any]], None]
+_REASON_CODE_RE = re.compile(r"([a-z][a-z0-9]*(?:_[a-z0-9]+)+):")
+
+
+def _reason_code(data: Mapping[str, Any] | None) -> str | None:
+    """A hook's reason code, when its reason starts with one (`<code>: ...`, as the effect gate's does)."""
+    if not isinstance(data, Mapping):
+        return None
+    if data.get("reason_code"):
+        return str(data["reason_code"])
+    specific = data.get("hookSpecificOutput")
+    reason = str(specific.get("permissionDecisionReason") or "") if isinstance(specific, Mapping) else ""
+    match = _REASON_CODE_RE.match(reason or str(data.get("reason") or ""))
+    return match.group(1) if match else None
+
+
+def _log_decision(
+    decision_log: DecisionLogFunc | None,
+    layer: str,
+    tool_name: str | None,
+    hook: str,
+    result: Any,
+    *,
+    allowed: bool,
+    reason: str | None,
+    reason_code: str | None = None,
+) -> None:
+    """Send one guard decision to the log; logging never changes a decision (c123, item 9)."""
+    if decision_log is None:
+        return
+    with contextlib.suppress(Exception):
+        decision_log(
+            {
+                "layer": layer,
+                "tool": tool_name,
+                "hook": hook,
+                "status": getattr(result, "returncode", None),
+                "allowed": allowed,
+                "reason": reason,
+                "reason_code": reason_code,
+                "duration_ms": getattr(result, "duration_ms", 0),
+            }
+        )
+
+
+def _exit_two_block_reason(result: GuardExecutionResult) -> str | None:
+    """The reason of a PreToolUse hook that blocked with exit 2: its JSON reason on stdout, else its stderr tail."""
+    stdout = (result.stdout or "").strip()
+    if stdout:
+        try:
+            data = json.loads(stdout)
+        except json.JSONDecodeError:
+            data = None
+        reason = _native_hook_block_reason(data) if isinstance(data, dict) else None
+        if reason:
+            return reason
+    tail = (result.stderr or "").strip()
+    return tail[-500:] if tail else None
+
+
+def _hook_failure_block(
+    decision_log: DecisionLogFunc | None, tool_name: str | None, label: str, result: GuardExecutionResult
+) -> dict[str, Any]:
+    """The block for a PreToolUse hook that failed: a nonzero exit other than 2, or output that is not one JSON object."""
+    reason = f"hook_failed: tool={tool_name}; hook={label}; exit={result.returncode}"
+    _log_decision(
+        decision_log, "native_hook", tool_name, label, result, allowed=False, reason=reason, reason_code="hook_failed"
+    )
+    return {"decision": "block", "reason": reason, "hook_failure": True}
+
+
+class GuardDecisionLog:
+    """Append-only JSONL of an API-harness run's guard decisions; writing it never raises (c123, WP2 item 9).
+
+    Each record: time, native context id, tool, layer (bridge_shell, native_hook or guard_adapter), hook (the script's
+    base name), status (its exit code), allowed, reason, reason code when there is one, and duration in milliseconds.
+    Tool input is never written. The first failed write prints one warning to stderr; later ones are silent. Without a
+    path the decisions are only counted, for the run report.
+    """
+
+    def __init__(self, path: Path | None, native_context_id: str) -> None:
+        self.path = path
+        self.native_context_id = native_context_id
+        self.counts = {"allowed": 0, "blocked": 0}
+        self._warned = False
+
+    def record(self, entry: Mapping[str, Any]) -> None:
+        self.counts["allowed" if entry.get("allowed") else "blocked"] += 1
+        if self.path is None:
+            return
+        fields = ("tool", "layer", "hook", "status", "allowed", "reason", "reason_code", "duration_ms")
+        line = {"time": datetime.now(UTC).isoformat(), "native_context_id": self.native_context_id}
+        line.update({key: entry.get(key) for key in fields})
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(line, sort_keys=True) + "\n")
+        except OSError as exc:
+            if not self._warned:
+                self._warned = True
+                print(f"guard decision log not written ({exc.__class__.__name__}): {self.path}", file=sys.stderr)
+
+
+class RunReport:
+    """The run report of an API-harness launch (c123; batch design WP2, item 10).
+
+    It implements the telemetry protocol run_tool_loop already calls (set_model, record_turn, finish) and holds what a
+    reader needs to judge a run without its transcript: the native context id (and, once the launcher binds the
+    context, its session context and role), harness, route key, requested and response model, an endpoint label (the
+    host, never a key), turns, tool calls by name, token usage when the provider returns it, the stop reason and exit
+    code, the guard-log path and decision counts, and a bounded error text. No prompt, message, tool input or key.
+    """
+
+    def __init__(
+        self,
+        *,
+        harness: str,
+        native_context_id: str,
+        route_key: str | None,
+        requested_model: str | None,
+        endpoint: str | None,
+        guard_log: GuardDecisionLog | None = None,
+    ) -> None:
+        self._guard_log = guard_log
+        self.data: dict[str, Any] = {
+            "harness": harness,
+            "native_context_id": native_context_id,
+            "session_context_id": None,
+            "role": None,
+            "route_key": route_key,
+            "requested_model": requested_model,
+            "response_model": None,
+            "endpoint": urllib.parse.urlsplit(endpoint).hostname if endpoint else None,
+            "turns": 0,
+            "tool_calls": {},
+            "token_usage": {},
+            "stop_reason": None,
+            "exit_code": None,
+            "guard_log": str(guard_log.path) if guard_log is not None and guard_log.path is not None else None,
+            "guard_decisions": None,
+            "error": None,
+        }
+
+    def set_model(self, model_id: str, model_version: str | None = None) -> None:
+        self.data["response_model"] = model_id
+
+    def set_binding(self, binding: Mapping[str, Any]) -> None:
+        """Record the session context and role the launcher's bind returned (c123; batch design WP2 2.1)."""
+        self.data["session_context_id"] = binding.get("session_context_id")
+        self.data["role"] = binding.get("role")
+
+    def record_turn(self, turn: int, tool_names: Sequence[str], provider_response: Any = None) -> None:
+        self.data["turns"] = max(int(self.data["turns"]), int(turn))
+        for name in tool_names:
+            self.data["tool_calls"][name] = self.data["tool_calls"].get(name, 0) + 1
+        usage = provider_response.get("usage") if isinstance(provider_response, Mapping) else None
+        if isinstance(usage, Mapping):
+            for key, value in usage.items():
+                if isinstance(value, int | float) and not isinstance(value, bool):
+                    self.data["token_usage"][key] = self.data["token_usage"].get(key, 0) + value
+
+    def finish(self, stop_reason: str | None = None) -> None:
+        self.data["stop_reason"] = stop_reason
+        if self._guard_log is not None:
+            self.data["guard_decisions"] = dict(self._guard_log.counts)
+
+    def write(self, path: Path | None, *, exit_code: int, error: str | None = None) -> None:
+        """Record the exit code and error, and write the report to path when there is one; never raises."""
+        self.data["exit_code"] = exit_code
+        if error:
+            self.data["error"] = error[:500]
+        if path is None:
+            return
+        with contextlib.suppress(OSError):
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(self.data, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+
+
+# c123 (batch design WP2, item 10): the launchers' exit codes, as host I's launcher defines them; 1 is every other
+# failure, startup included.
+EXIT_DELIVERY_INCOMPLETE = 3
+EXIT_BIND_FAILED = 4
+EXIT_INTERRUPTED = 5
+
+
+def install_break_handler() -> None:
+    """On Windows, raise the same interrupt for CTRL_BREAK as for Ctrl+C: a hidden child receives no console Ctrl+C."""
+    if os.name == "nt" and hasattr(signal, "SIGBREAK"):
+        with contextlib.suppress(ValueError, OSError):
+            signal.signal(signal.SIGBREAK, signal.default_int_handler)
+
+
+def guard_log_path(argument: str | None, environ: Mapping[str, str] | None = None) -> Path | None:
+    """Where the guard decision log goes: --guard-log, else GTKB_GUARD_LOG, else nowhere (c123, item 9).
+
+    A launcher that binds its context (the registration contract, a later round) defaults to the bound context's
+    scratch; until then an unbound run writes no file, and its report says so.
+    """
+    environ = os.environ if environ is None else environ
+    value = argument or environ.get("GTKB_GUARD_LOG")
+    return Path(value) if value else None
 
 
 def _bounded_native_hook_diagnostic_token(value: str | None, *, fallback: str, max_chars: int = 80) -> str:
@@ -1455,10 +1676,32 @@ def _native_hook_payload(
     if tool_name is not None:
         payload["tool_name"] = tool_name
     if tool_input is not None:
-        payload["tool_input"] = dict(tool_input)
+        payload["tool_input"] = _canonical_native_tool_input(tool_name, tool_input, project_root)
     if tool_response is not None:
         payload["tool_response"] = tool_response[:MAX_TOOL_OUTPUT_CHARS]
     return payload
+
+
+def _canonical_native_tool_input(
+    tool_name: str | None, tool_input: Mapping[str, Any], project_root: Path
+) -> dict[str, Any]:
+    """Claude's PreToolUse shape for an API tool call (c123; batch design WP2, G38).
+
+    The model's raw arguments name the file `path`, which two hooks did not read, so the provenance gate never judged
+    an API harness's Write or Edit. Write and Edit get the guard adapter's mapping (an absolute file_path, content or
+    old_string and new_string) over the raw keys, which stay, and Read gets the absolute file_path; if the path cannot
+    be resolved the raw input goes on, so building the payload never ends the run.
+    """
+    raw = dict(tool_input)
+    try:
+        if tool_name in ("Write", "Edit"):
+            return {**raw, **_guard_tool_input(tool_name, raw, project_root)}
+        if tool_name == "Read":
+            path = _resolve_tool_path(project_root, str(raw.get("path") or raw.get("file_path")), allow_missing=False)
+            return {**raw, "file_path": str(path)}
+    except (CloudHarnessError, ValueError):  # ValueError: POSIX refuses an embedded NUL there (Windows: OSError)
+        return raw
+    return raw
 
 
 def invoke_native_hooks(
@@ -1472,6 +1715,7 @@ def invoke_native_hooks(
     tool_input: Mapping[str, Any] | None = None,
     tool_response: str | None = None,
     native_hook_runner: NativeHookRunner | None = None,
+    decision_log: DecisionLogFunc | None = None,
 ) -> dict[str, Any] | None:
     if profile.hook_tier != HOOK_TIER_NATIVE_FULL:
         return None
@@ -1497,7 +1741,10 @@ def invoke_native_hooks(
     user_prompt_event = event_name == NATIVE_HOOK_USER_PROMPT_SUBMIT
     fail_soft_execution = stop_event or post_tool_event or user_prompt_event
     for command, hook_timeout in _iter_native_hook_commands(hooks, event_name, tool_name):
+        started = time.monotonic()
         result = runner(command, payload, env, hook_timeout)
+        if isinstance(result, GuardExecutionResult) and not result.duration_ms:
+            result = dataclasses.replace(result, duration_ms=int((time.monotonic() - started) * 1000))
         command_label = command[:120]
         if result.timed_out:
             if event_name == NATIVE_HOOK_PRE_TOOL_USE:
@@ -1511,23 +1758,51 @@ def invoke_native_hooks(
         if stop_event and result.returncode == 2:
             reason = (result.stderr or result.stdout or "native Stop hook requested continuation").strip()
             return {"decision": "block", "reason": reason}
+        pre_tool_event = event_name == NATIVE_HOOK_PRE_TOOL_USE
+        label = _native_hook_command_label(command)
+        if pre_tool_event and result.returncode == 2:
+            # c123 (batch design WP2, G39): exit 2 is Claude's exit-code block; its reason is the JSON reason on
+            # stdout, else the stderr tail. It refuses the tool call, never the run.
+            reason = _exit_two_block_reason(result) or f"hook={label} exited 2"
+            _log_decision(decision_log, "native_hook", tool_name, label, result, allowed=False, reason=reason)
+            return {"decision": "block", "reason": reason}
         if result.returncode != 0:
             if fail_soft_execution:
                 continue
+            if pre_tool_event:
+                # c123 (G39): a failing PreToolUse hook blocks the call; three in a row end the run (run_tool_loop).
+                return _hook_failure_block(decision_log, tool_name, label, result)
             raise CloudHarnessError(f"native hook exited nonzero: {event_name}: {command_label} ({result.returncode})")
         stdout = (result.stdout or "").strip()
         if not stdout:
+            _log_decision(decision_log, "native_hook", tool_name, label, result, allowed=True, reason=None)
             continue
         try:
             data = json.loads(stdout)
         except json.JSONDecodeError as exc:
             if fail_soft_execution:
                 continue
+            if pre_tool_event:
+                return _hook_failure_block(decision_log, tool_name, label, result)
             raise CloudHarnessError(f"native hook emitted malformed JSON: {event_name}: {command_label}") from exc
         if not isinstance(data, dict):
             if fail_soft_execution:
                 continue
+            if pre_tool_event:
+                return _hook_failure_block(decision_log, tool_name, label, result)
             raise CloudHarnessError(f"native hook output must be a JSON object: {event_name}: {command_label}")
+        if pre_tool_event:
+            block_reason = _native_hook_block_reason(data)
+            _log_decision(
+                decision_log,
+                "native_hook",
+                tool_name,
+                label,
+                result,
+                allowed=not block_reason,
+                reason=block_reason,
+                reason_code=_reason_code(data),
+            )
         reason = _native_hook_block_reason(data)
         if reason:
             if event_name in {NATIVE_HOOK_PRE_TOOL_USE, NATIVE_HOOK_STOP}:
@@ -1602,11 +1877,13 @@ def invoke_guard_adapter(
     guard_runner: GuardRunner | None = None,
     guard_paths: Sequence[Path] | None = None,
     timeout: float = 10.0,
+    decision_log: DecisionLogFunc | None = None,
 ) -> None:
     """Fail-closed guard-adapter enforcement (generalized DCL-OLLAMA-TOOL-PARITY-GATE-001).
 
     Runs the required guard sequence for a mutating tool; any guard denial, timeout,
     nonzero exit, empty/malformed output, or missing guard script fails closed.
+    c123 (batch design WP2, item 9): each guard's decision goes to decision_log.
     """
     if tool_name not in MUTATING_TOOLS:
         return
@@ -1638,27 +1915,43 @@ def invoke_guard_adapter(
         )
         if not guard_path.is_file():
             raise CloudHarnessError(f"guard script is missing: {relative_guard_path.as_posix()}")
+        started = time.monotonic()
         result = runner(guard_path, payload, env, timeout)
+        if isinstance(result, GuardExecutionResult) and not result.duration_ms:
+            result = dataclasses.replace(result, duration_ms=int((time.monotonic() - started) * 1000))
+        label = _bounded_native_hook_diagnostic_token(guard_path.name, fallback="guard")
+        refusal: str | None = None
+        reason: str | None = None
         if result.timed_out:
-            raise CloudHarnessError(f"guard timed out: {_relative_path(project_root, guard_path)}")
-        if result.returncode != 0:
-            raise CloudHarnessError(
-                f"guard exited nonzero: {_relative_path(project_root, guard_path)} ({result.returncode})"
-            )
-        stdout = (result.stdout or "").strip()
-        if not stdout:
-            raise CloudHarnessError(f"guard emitted empty output: {_relative_path(project_root, guard_path)}")
-        try:
-            data = json.loads(stdout)
-        except json.JSONDecodeError as exc:
-            raise CloudHarnessError(
-                f"guard emitted malformed JSON: {_relative_path(project_root, guard_path)}"
-            ) from exc
-        if not isinstance(data, dict):
-            raise CloudHarnessError(f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}")
-        reason = _decision_reason(data)
-        if reason:
-            raise CloudHarnessError(f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}")
+            refusal = f"guard timed out: {_relative_path(project_root, guard_path)}"
+        elif result.returncode != 0:
+            refusal = f"guard exited nonzero: {_relative_path(project_root, guard_path)} ({result.returncode})"
+        elif not (result.stdout or "").strip():
+            refusal = f"guard emitted empty output: {_relative_path(project_root, guard_path)}"
+        else:
+            try:
+                data = json.loads((result.stdout or "").strip())
+            except json.JSONDecodeError:
+                data = None
+                refusal = f"guard emitted malformed JSON: {_relative_path(project_root, guard_path)}"
+            if refusal is None and not isinstance(data, dict):
+                refusal = f"guard output must be a JSON object: {_relative_path(project_root, guard_path)}"
+            if refusal is None:
+                reason = _decision_reason(data)
+                if reason:
+                    refusal = f"guard denied {tool_name}: {_relative_path(project_root, guard_path)}: {reason}"
+        _log_decision(
+            decision_log,
+            "guard_adapter",
+            tool_name,
+            label,
+            result,
+            allowed=refusal is None,
+            reason=reason or refusal,
+            reason_code=_reason_code(data) if refusal is None or reason else None,
+        )
+        if refusal is not None:
+            raise CloudHarnessError(refusal)
 
 
 def _require_string(arguments: Mapping[str, Any], *names: str) -> str:
@@ -1756,6 +2049,8 @@ def _dispatch_write(
     project_root: Path,
     profile: AdopterProfile,
     guard_runner: GuardRunner | None,
+    *,
+    decision_log: DecisionLogFunc | None = None,
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=True)
     content = str(arguments.get("content", ""))
@@ -1766,6 +2061,7 @@ def _dispatch_write(
         project_root,
         profile,
         guard_runner=guard_runner,
+        decision_log=decision_log,
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8", newline="")
@@ -1778,6 +2074,8 @@ def _dispatch_edit(
     project_root: Path,
     profile: AdopterProfile,
     guard_runner: GuardRunner | None,
+    *,
+    decision_log: DecisionLogFunc | None = None,
 ) -> str:
     path = _resolve_tool_path(project_root, _require_string(arguments, "path", "file_path"), allow_missing=False)
     old_string = _require_string(arguments, "old_string")
@@ -1789,6 +2087,7 @@ def _dispatch_edit(
         project_root,
         profile,
         guard_runner=guard_runner,
+        decision_log=decision_log,
     )
     try:
         content = path.read_text(encoding="utf-8")
@@ -1807,13 +2106,36 @@ def _dispatch_edit(
     return f"edited {_relative_path(project_root, path)}"
 
 
+# c123 (batch design WP2, item 11): the shared context parents. A walk from the root that holds them skips them, as rg
+# does (they are Git-ignored), so Grep and Glob do not read other contexts' scratch and checkouts; a walk that starts
+# inside them (a context naming its own scratch) reads them.
+CONTEXT_PARENT_DIR_NAMES = frozenset({"scratchpad", ".worktrees"})
+
+
+def _walk_context_root(root: Path) -> str | None:
+    """The directory whose scratchpad and .worktrees a walk from root skips; None when the walk starts inside one."""
+    for candidate in (root, *root.parents):
+        if candidate.name.lower() in CONTEXT_PARENT_DIR_NAMES:
+            return None
+    for candidate in (root, *root.parents):
+        if (candidate / ".git").exists():
+            return os.path.normcase(os.path.abspath(candidate))
+    return os.path.normcase(os.path.abspath(root))
+
+
 def _iter_bounded_paths(root: Path, *, max_entries: int = MAX_FILE_SCAN_ENTRIES) -> Iterable[Path]:
     if root.is_file():
         yield root
         return
     seen = 0
+    context_root = _walk_context_root(root)
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(name for name in dirnames if name not in SKIPPED_SCAN_DIR_NAMES)
+        at_context_root = context_root is not None and os.path.normcase(os.path.abspath(dirpath)) == context_root
+        dirnames[:] = sorted(
+            name
+            for name in dirnames
+            if name not in SKIPPED_SCAN_DIR_NAMES and not (at_context_root and name.lower() in CONTEXT_PARENT_DIR_NAMES)
+        )
         for name in [*dirnames, *sorted(filenames)]:
             seen += 1
             if seen > max_entries:
@@ -1887,23 +2209,70 @@ def _dispatch_glob(
     return "\n".join(sorted(matches))
 
 
+def shell_command_line(command: str, platform_name: str | None = None) -> str | list[str]:
+    """The command line the Bash tool runs: cmd.exe /d /s /c on Windows, /bin/sh -c elsewhere (c123, WP2 item 8).
+
+    On Windows the whole line is one string, so list2cmdline does not re-escape the command's own quotes; /s keeps
+    them as written and /d skips AutoRun commands.
+    """
+    if (platform_name or os.name) == "nt":
+        comspec = os.environ.get("COMSPEC") or "cmd.exe"  # Windows environment names are case-insensitive
+        return f'"{comspec}" /d /s /c "{command}"'
+    return ["/bin/sh", "-c", command]
+
+
+def end_process_tree(process: subprocess.Popen[str]) -> None:
+    """End a command's whole process tree (taskkill /T /F on Windows), so no grandchild keeps its pipes open."""
+    if os.name == "nt":
+        with contextlib.suppress(OSError):
+            subprocess.run(
+                ["taskkill", "/T", "/F", "/PID", str(process.pid)],
+                capture_output=True,
+                check=False,
+                **no_window_subprocess_kwargs(),
+            )
+    with contextlib.suppress(OSError):
+        process.kill()
+
+
 def _default_command_runner(
     command: str,
     project_root: Path,
     env: Mapping[str, str],
     timeout: float,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        command,
+    """Run one Bash tool command (c123; batch design WP2, item 8).
+
+    The shell is named, not implicit; output is decoded as UTF-8 with replacement, so an undecodable byte no longer
+    empties the result; the child gets PYTHONUTF8 and PYTHONIOENCODING so gt and pytest print UTF-8; stdin is empty, so
+    a command waiting for input ends instead of hanging. On a timeout or an interrupt the whole process tree ends before
+    the output is drained.
+    """
+    child_env = {**dict(env), "PYTHONUTF8": "1", "PYTHONIOENCODING": "utf-8"}
+    process = subprocess.Popen(
+        shell_command_line(command),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         text=True,
-        capture_output=True,
+        encoding="utf-8",
+        errors="replace",
         cwd=str(project_root),
-        env=dict(env),
-        timeout=timeout,
-        shell=True,
-        check=False,
+        env=child_env,
         **no_window_subprocess_kwargs(),
     )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as exc:
+        end_process_tree(process)
+        stdout, stderr = process.communicate()
+        raise subprocess.TimeoutExpired(exc.cmd, timeout, output=stdout, stderr=stderr) from None
+    except KeyboardInterrupt:
+        end_process_tree(process)
+        with contextlib.suppress(Exception):
+            process.communicate()
+        raise
+    return subprocess.CompletedProcess(process.args, process.returncode, stdout, stderr)
 
 
 def _dispatch_bash(
@@ -1913,13 +2282,24 @@ def _dispatch_bash(
     profile: AdopterProfile,
     guard_runner: GuardRunner | None,
     command_runner: CommandRunner | None,
+    *,
+    decision_log: DecisionLogFunc | None = None,
 ) -> str:
     command = _require_string(arguments, "command")
     timeout = float(arguments.get("timeout_seconds") or DEFAULT_TIMEOUT_SECONDS)
     bridge_denial = bridge_bash_mutation_reason(command)
     if bridge_denial:
+        _log_decision(decision_log, "bridge_shell", "Bash", "bridge_shell", None, allowed=False, reason=bridge_denial)
         raise CloudHarnessError(bridge_denial)
-    invoke_guard_adapter("Bash", {"command": command}, model_metadata, project_root, profile, guard_runner=guard_runner)
+    invoke_guard_adapter(
+        "Bash",
+        {"command": command},
+        model_metadata,
+        project_root,
+        profile,
+        guard_runner=guard_runner,
+        decision_log=decision_log,
+    )
     env = set_author_metadata_env(
         os.environ,
         model_metadata.model_id,
@@ -1963,16 +2343,18 @@ def dispatch_tool_call(
     relative_path: RelativePathFunc = _relative_path,
     iter_text_files: IterFilesFunc = _iter_text_files,
     iter_bounded_paths: IterFilesFunc = _iter_bounded_paths,
-    skill: str | None = None,
+    decision_log: DecisionLogFunc | None = None,
 ) -> str:
     if tool_name not in CANONICAL_TOOLS:
         raise CloudHarnessError(f"unsupported tool: {tool_name}")
     if tool_name == "Read":
         return _dispatch_read(arguments, project_root)
     if tool_name == "Write":
-        return _dispatch_write(arguments, model_metadata, project_root, profile, guard_runner)
+        return _dispatch_write(
+            arguments, model_metadata, project_root, profile, guard_runner, decision_log=decision_log
+        )
     if tool_name == "Edit":
-        return _dispatch_edit(arguments, model_metadata, project_root, profile, guard_runner)
+        return _dispatch_edit(arguments, model_metadata, project_root, profile, guard_runner, decision_log=decision_log)
     if tool_name == "Grep":
         return _dispatch_grep(arguments, project_root, relative_path=relative_path, iter_text_files=iter_text_files)
     if tool_name == "Glob":
@@ -1980,7 +2362,9 @@ def dispatch_tool_call(
             arguments, project_root, relative_path=relative_path, iter_bounded_paths=iter_bounded_paths
         )
     if tool_name == "Bash":
-        return _dispatch_bash(arguments, model_metadata, project_root, profile, guard_runner, command_runner)
+        return _dispatch_bash(
+            arguments, model_metadata, project_root, profile, guard_runner, command_runner, decision_log=decision_log
+        )
     raise CloudHarnessError(f"unsupported tool: {tool_name}")
 
 
@@ -2042,6 +2426,63 @@ def _final_text_from_message(message: Mapping[str, Any]) -> str:
     return content
 
 
+def check_launch_inputs(
+    project_root: Path,
+    profile: AdopterProfile | NativeHookProfile,
+    bridge_document: str | None,
+    bridge_version: int | None,
+) -> None:
+    """Refuse a launch's own inputs before its ``--init`` bind (c123; batch design WP2 2.1).
+
+    The loop reads the bridge target and the projected hook settings again; checking them first means a launch that
+    would stop before its first model call registers no session, as in the DeepSeek SDK launcher, which checks its
+    target before it binds. A partial target raises CloudHarnessIncomplete (exit 3); unreadable hook settings raise
+    CloudHarnessError (exit 1).
+    """
+    try:
+        bridge_completion_target(bridge_document, bridge_version)
+    except BridgeDeliveryIncomplete as exc:
+        raise CloudHarnessIncomplete(str(exc)) from exc
+    if profile.hook_tier == HOOK_TIER_NATIVE_FULL:
+        _load_native_hook_settings(project_root, profile)
+
+
+def bind_for_run(
+    init_line: str | None, native_context_id: str, project_root: Path, report: RunReport | None = None
+) -> dict[str, Any] | None:
+    """Bind this run's native context when the launcher was given ``--init`` (c123; batch design WP2 2.1).
+
+    None when no init line was given: the run stays unbound and the model is asked to bind, as before. A failed bind
+    raises NativeBindFailed before any provider call; the launchers end the run with EXIT_BIND_FAILED.
+    """
+    if init_line is None:
+        return None
+    binding = bind_native_context(native_context_id, init_line, project_root)
+    if report is not None:
+        report.set_binding(binding)
+    return dict(binding)
+
+
+def bound_identity(native_context_id: str, binding: Mapping[str, Any], target: tuple[str, int] | None) -> str:
+    """The bound facts the system message states, as the DeepSeek SDK launcher states them (c123; WP2 2.1)."""
+    facts = (
+        f"Native context identifier: {native_context_id}. "
+        f"Bound session context: {binding['session_context_id']}. Immutable role: {binding['role']}. "
+        "The launcher bound this context with the init line it was given; do not bind it again. "
+        f"Read gt context session --native-context-id {native_context_id} --json for bounded current startup sources. "
+        "Report unavailable host observations truthfully; this read does not select an activity or work."
+    )
+    if target is None:
+        return facts
+    document, version = target
+    return (
+        f"{facts} Assigned bridge document: {document}. The artifact you deliver must be version {version}. "
+        "Claim it with `gt bridge claim` before authoring, deliver the complete authored item with "
+        "`gt bridge deliver --content-file <your file>` using the fence returned by the claim, and read the result "
+        "back. The harness verifies delivery through `gt bridge check-delivery`; final prose is not delivery."
+    )
+
+
 def run_tool_loop(
     prompt: str,
     model_route: ModelRoute,
@@ -2051,7 +2492,6 @@ def run_tool_loop(
     project_root: Path,
     profile: AdopterProfile,
     *,
-    skill: str | None = None,
     bridge_document: str | None = None,
     bridge_version: int | None = None,
     system_prompt: str | None = None,
@@ -2062,6 +2502,9 @@ def run_tool_loop(
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
     telemetry: Any | None = None,
+    guard_log: GuardDecisionLog | None = None,
+    native_context_id: str | None = None,
+    binding: Mapping[str, Any] | None = None,
 ) -> str:
     """Framework-free tool-call loop shared across cloud harnesses (dialect-agnostic).
 
@@ -2069,9 +2512,11 @@ def run_tool_loop(
     owns request-build, tool-schema shaping, and response-parse; ``chat_func`` overrides
     only the transport (used by tests). The loop's control flow, tool dispatch, guard
     enforcement, no-progress dedup, and session-timeout are shared across dialects.
+    ``binding`` is the launcher's bind result when it was given ``--init`` (c123; batch design WP2 2.1); the system
+    message then states the bound facts instead of asking the model to bind.
     """
     try:
-        completion_target = bridge_completion_target(skill, bridge_document, bridge_version)
+        completion_target = bridge_completion_target(bridge_document, bridge_version)
     except BridgeDeliveryIncomplete as exc:
         raise CloudHarnessIncomplete(str(exc)) from exc
     if max_turns < 1:
@@ -2087,6 +2532,8 @@ def run_tool_loop(
         endpoint,
         model_route.key,
         requested_model_id=model_route.model_id,
+        # c123 (batch design WP2, item 10): the launcher names the id it printed before the first provider call.
+        **({"native_context_id": native_context_id} if native_context_id else {}),
     )
     session_deadline = time.monotonic() + session_timeout
     native_hooks_started = False
@@ -2100,15 +2547,18 @@ def run_tool_loop(
         )
         native_hooks_started = True
 
-    identity = (
-        f"Native context identifier: {metadata.native_context_id}. "
-        "Bind only the exact init marker supplied in the task through gt session bind. "
-        "The response has an initialization status and an immutable binding object. "
-        "Use the binding object for authored provenance; initialization status grants no bridge action. "
-        "After resolving the binding, read gt context session --native-context-id "
-        f"{metadata.native_context_id} --json for bounded current startup sources. "
-        "Report unavailable host observations truthfully; this read does not select an activity or work."
-    )
+    if binding is not None:
+        identity = bound_identity(metadata.native_context_id, binding, completion_target)
+    else:
+        identity = (
+            f"Native context identifier: {metadata.native_context_id}. "
+            "Bind only the exact init marker supplied in the task through gt session bind. "
+            "The response has an initialization status and an immutable binding object. "
+            "Use the binding object for authored provenance; initialization status grants no bridge action. "
+            "After resolving the binding, read gt context session --native-context-id "
+            f"{metadata.native_context_id} --json for bounded current startup sources. "
+            "Report unavailable host observations truthfully; this read does not select an activity or work."
+        )
     messages: list[dict[str, Any]] = [
         {"role": "system", "content": "\n\n".join(part for part in (identity, system_prompt) if part)}
     ]
@@ -2127,6 +2577,9 @@ def run_tool_loop(
     repeated_tool_signature_turns = 0
     native_stop_blocks = 0
     native_stop_completed = False
+    # c123 (batch design WP2, items 7 and 9): a failing PreToolUse hook blocks its call (the turn limit and the
+    # repeated-call limit bound a broken install); each decision goes to the guard log.
+    decision_log = guard_log.record if guard_log is not None else None
 
     stop_reason = "process_error"
     try:
@@ -2258,6 +2711,7 @@ def run_tool_loop(
                     tool_name=tool_name,
                     tool_input=arguments,
                     native_hook_runner=native_hook_runner,
+                    decision_log=decision_log,
                 )
                 block_reason = _native_hook_block_reason(block)
                 if block_reason:
@@ -2272,7 +2726,7 @@ def run_tool_loop(
                             profile,
                             guard_runner=guard_runner,
                             command_runner=command_runner,
-                            skill=skill,
+                            decision_log=decision_log,
                         )
                     except CloudHarnessError as tool_err:
                         result = f"ERROR: {tool_err}"
@@ -2296,6 +2750,10 @@ def run_tool_loop(
                 )
         stop_reason = "max_turn_exhaustion"
         raise CloudHarnessError("max-turn exhaustion before final assistant text")
+    except KeyboardInterrupt:
+        # c123 (batch design WP2, item 10): Ctrl+C or CTRL_BREAK (raised as the same interrupt) is classified.
+        stop_reason = "interrupted"
+        raise
     except CloudHarnessError as exc:
         message = str(exc).lower()
         if isinstance(exc, CloudHarnessIncomplete):

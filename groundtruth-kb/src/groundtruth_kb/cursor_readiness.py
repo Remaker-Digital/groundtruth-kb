@@ -8,6 +8,8 @@ qualification. An actual prompt launch is opt-in with --live.
 from __future__ import annotations
 
 import argparse
+import contextlib
+import io
 import json
 import math
 import subprocess
@@ -20,12 +22,11 @@ from urllib.parse import quote
 from groundtruth_kb import cursor_harness
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.config import GTConfig, GTConfigError
+from groundtruth_kb.harness_invocation import render, sample_values, surface_findings
 
 HARNESS_ID = "E"
 HARNESS_NAME = "cursor"
 CURSOR_SHIM_RELATIVE = Path("scripts") / "cursor_harness.py"
-CURSOR_DISPATCH_SKILL = "bridge-review"
-CURSOR_VERIFICATION_SKILL = "verification"
 DEFAULT_LIVE_PROMPT = "Reply with READY only."
 DEFAULT_TIMEOUT_SECONDS = 60.0
 
@@ -66,9 +67,23 @@ def _argv_uses_cursor_shim(argv: list[str]) -> bool:
     return CURSOR_SHIM_RELATIVE.as_posix() in normalized
 
 
-def _argv_selects_skill(argv: list[str], skill: str) -> bool:
-    positions = [index for index, part in enumerate(argv) if part == "--skill"]
-    return len(positions) == 1 and positions[0] + 1 < len(argv) and argv[positions[0] + 1] == skill
+def _shim_arguments_parse(argv: list[str], project_root: Path) -> bool:
+    """The rendered template's shim arguments parse with the shim's own parser (c123; batch design WP2 2.1)."""
+    normalized = [part.replace("\\", "/") for part in argv]
+    try:
+        start = normalized.index(CURSOR_SHIM_RELATIVE.as_posix()) + 1
+        arguments = render(argv[start:], sample_values(str(project_root)))
+    except ValueError:  # InvocationError is a ValueError: an unknown or unfilled placeholder
+        return False
+    try:
+        # Both streams are captured, so a --help in a template never prints into --json or doctor output.
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            parsed = cursor_harness.build_arg_parser().parse_args(arguments)
+    except SystemExit:
+        return False
+    # The shim's main refuses, after parsing, a timeout that is not finite and positive; so does this check.
+    timeout = getattr(parsed, "timeout", None)
+    return timeout is None or (math.isfinite(timeout) and timeout > 0)
 
 
 def _first_failed_detail(checks: list[dict[str, Any]]) -> str:
@@ -82,7 +97,6 @@ def _run_live_probe(
     *,
     project_root: Path,
     prompt: str,
-    skill: str,
     timeout: float,
     runner: Callable[..., subprocess.CompletedProcess[str]] | None = None,
 ) -> dict[str, Any]:
@@ -91,8 +105,6 @@ def _run_live_probe(
         str(project_root / CURSOR_SHIM_RELATIVE),
         "--prompt",
         prompt,
-        "--skill",
-        skill,
         "--timeout",
         str(timeout),
     ]
@@ -187,22 +199,20 @@ def evaluate_readiness(
     )
 
     argv = _headless_argv(record)
-    argv_ok = bool(argv) and _argv_uses_cursor_shim(argv) and _argv_selects_skill(argv, CURSOR_DISPATCH_SKILL)
-    add_check("native headless argv", argv_ok, "configured" if argv else "missing argv")
+    # c123 (batch design WP2 2.1): the shim, no role in the registration, and arguments the shim itself accepts.
+    findings = surface_findings(record.get("invocation_surfaces"))
+    argv_ok = bool(argv) and _argv_uses_cursor_shim(argv) and not findings and _shim_arguments_parse(argv, project_root)
+    if not argv:
+        argv_detail = "missing argv"
+    elif findings:
+        argv_detail = "the registration names a role: " + ", ".join(sorted({finding.code for finding in findings}))
+    else:
+        argv_detail = "configured" if argv_ok else "the template does not run the shim with arguments it accepts"
+    add_check("native headless argv", argv_ok, argv_detail)
 
     shim_path = project_root / CURSOR_SHIM_RELATIVE
     shim_ok = shim_path.is_file()
     add_check("cursor harness shim", shim_ok, CURSOR_SHIM_RELATIVE.as_posix())
-
-    try:
-        for skill in (CURSOR_DISPATCH_SKILL, CURSOR_VERIFICATION_SKILL):
-            cursor_harness._skill_system_prompt(skill, project_root=project_root)
-        instructions_ok = True
-        instructions_detail = "Current review routes load from this harness's own projection"
-    except cursor_harness.CursorHarnessError as exc:
-        instructions_ok = False
-        instructions_detail = str(exc)
-    add_check("local review instructions", instructions_ok, instructions_detail)
 
     resolver = agent_resolver or cursor_harness._resolve_agent_command
     try:
@@ -217,7 +227,7 @@ def evaluate_readiness(
 
     auth_probe: dict[str, Any] | None = None
     auth_ok = False
-    if record_ok and argv_ok and shim_ok and instructions_ok and agent_ok:
+    if record_ok and argv_ok and shim_ok and agent_ok:
         try:
             auth_probe = _run_auth_probe(
                 agent_command,
@@ -239,12 +249,11 @@ def evaluate_readiness(
 
     live_probe: dict[str, Any] | None = None
     live_ok = True
-    if require_live and record_ok and argv_ok and shim_ok and instructions_ok and agent_ok and auth_ok:
+    if require_live and record_ok and argv_ok and shim_ok and agent_ok and auth_ok:
         try:
             live_probe = _run_live_probe(
                 project_root=project_root,
                 prompt=live_prompt,
-                skill=CURSOR_DISPATCH_SKILL,
                 timeout=timeout,
                 runner=live_runner,
             )
@@ -254,12 +263,12 @@ def evaluate_readiness(
             live_probe = {"ok": False, "error": type(exc).__name__}
             live_ok = False
             detail = live_probe["error"]
-        add_check("live bridge-review probe", live_ok, detail)
+        add_check("live prompt probe", live_ok, detail)
     elif require_live:
         live_ok = False
-        add_check("live bridge-review probe", False, "not run because launch prerequisites failed")
+        add_check("live prompt probe", False, "not run because launch prerequisites failed")
 
-    probe_passed = record_ok and argv_ok and shim_ok and instructions_ok and agent_ok and auth_ok and live_ok
+    probe_passed = record_ok and argv_ok and shim_ok and agent_ok and auth_ok and live_ok
     return {
         "auth_probe": auth_probe,
         "cursor_adaptation": cursor_harness.cursor_adaptation_metadata(project_root),
@@ -282,7 +291,7 @@ def main(argv: list[str] | None = None, *, project_root: Path | None = None) -> 
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--recipient", default=HARNESS_ID)
     parser.add_argument("--project-root", default=project_root or Path.cwd(), type=Path)
-    parser.add_argument("--live", action="store_true", help="Run a live non-mutating bridge-review prompt probe.")
+    parser.add_argument("--live", action="store_true", help="Run a live non-mutating prompt probe.")
     parser.add_argument("--prompt", default=DEFAULT_LIVE_PROMPT)
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
     parser.add_argument("--json", action="store_true")

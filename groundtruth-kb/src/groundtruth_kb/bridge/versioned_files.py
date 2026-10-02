@@ -8,7 +8,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-from groundtruth_kb.bridge.vocabulary import ACCEPTED_ON_READ
+from groundtruth_kb.bridge.vocabulary import ACCEPTED_ON_READ, TERMINAL_STATUSES
 
 __all__ = [
     "BridgeHeaderBlock",
@@ -21,7 +21,6 @@ __all__ = [
 ]
 
 _BRIDGE_FILE_RE = re.compile(r"^(?P<slug>.+)-(?P<version>\d+)\.md$")
-_TERMINAL_STATUS_TOKENS = frozenset({"VERIFIED", "WITHDRAWN", "SUPERSEDED"})
 _LEADING_MARKER_RE = re.compile(r"^[#>*\-\s`]+")
 _STATUS_TOKEN_RE = re.compile(r"^([A-Z][A-Z-]*)")
 _INIT_PREFIX = "::init"
@@ -276,7 +275,7 @@ def classify_committed_archive_verdicts(
 
         # --- terminal first status ---
         status = status_from_bridge_file(path)
-        if status is None or status not in _TERMINAL_STATUS_TOKENS:
+        if status is None or status not in TERMINAL_STATUSES:
             continue
 
         # --- metadata coherence ---

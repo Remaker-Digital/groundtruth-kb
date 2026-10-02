@@ -41,7 +41,8 @@ def _dispatch(monkeypatch, tmp_path: Path, env_file: dict[str, str], process: di
     monkeypatch.setattr(env_loader, "load_env_local", fake_load_env_local)
     monkeypatch.setattr(orh, "load_routing_config", lambda _project_root: config)
     monkeypatch.setattr(orh, "run_tool_loop", fake_run_tool_loop)
-    return orh.main(["-p", "hello", "--skill", "bridge-review"]), seen
+    # c123 (batch design WP2 2.1): the launcher has no --skill; the credential choice never depended on one.
+    return orh.main(["-p", "hello"]), seen
 
 
 def test_the_gtkb_named_credential_from_env_local_authenticates(monkeypatch, tmp_path):

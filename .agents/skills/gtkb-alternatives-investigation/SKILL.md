@@ -4,8 +4,6 @@ description: Investigate technical alternatives and recommend the least-regret o
 argument-hint: [decision]
 allowed-tools: Bash, Read, Grep, Glob, Agent
 license: "Proprietary - Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: investigation
@@ -16,7 +14,9 @@ Investigate distinct solution paths and recommend the best option under the real
 
 ## Default Deliverable
 
-Use `.harness-baseline-configuration/rules/template-decision-memo.md`.
+Give the comparison in your reply or this context's scratch. Include a do-less
+option. Apply the owner's choice with `gtkb-adr`, `gtkb-spec` or
+`gtkb-work-item`. Subagents keep this context's role and only read.
 
 ## Required Comparison Dimensions
 

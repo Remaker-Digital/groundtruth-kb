@@ -4,8 +4,6 @@ description: Read current specifications, tests, test plans, work items, project
 argument-hint: "[query-type] [filter]"
 allowed-tools: Bash, Read
 license: "Proprietary - (c) 2026 Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: knowledge-management
@@ -22,9 +20,10 @@ to import, and no fallback when the service is unavailable: an unavailable
 authority is reported, never inferred from a file, a dashboard, a generated
 projection or a prior session.
 
-**Arguments:** `$ARGUMENTS[0]` = query type, remaining args = filters. Map them
-to the commands below; [the CLI reference](references/api-reference.md) lists
-every option and the response shapes.
+**Arguments:** the first argument names the query type and any others are
+filters. Map them to the commands below;
+[the CLI reference](references/api-reference.md) lists every option and the
+response shapes.
 
 ## Quick Reference
 
@@ -46,8 +45,8 @@ every option and the response shapes.
 | Programs and projects | `gt projects list --kind program --json`; `gt projects list --kind project --status active --json`; `gt projects show <PROJECT-ID> --json` |
 | Bridge queue and one attempt | `gt bridge queue --role pb --json` (or `--role lo`); `gt bridge show <document> --content --json` |
 | Terminology | `gt terms list --status active --scope platform --json`; `gt terms show <TERM-ID> --json` |
-| Version history of one record (R04) | `gt <domain> show <ID> --history --json`, e.g. `gt spec show <ID> --history --json` — available once the realignment update is installed; the current production service returns `authority_error` for this route |
-| Deliberation history (R20–R23; read-only, no authorization or completion result) | `gt deliberations list --limit 200 --json`; `gt deliberations show <DELIB-ID> --json` — available once the realignment update is installed; the current production service returns `invalid_request` for these routes |
+| Version history of one record | `gt <domain> show <ID> --history --json`, e.g. `gt spec show <ID> --history --json` |
+| Deliberation history (read-only, no authorization or completion result) | `gt deliberations list --limit 200 --json`; `gt deliberations show <DELIB-ID> --json` |
 
 Omit `--json` for the human-readable rendering: `<ID> v<version>: <title>`,
 then the body and the remaining fields.

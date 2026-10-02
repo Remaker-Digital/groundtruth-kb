@@ -88,7 +88,7 @@ def test_absent_provider_is_inapplicable_but_partial_installation_is_unverified(
         "unknown_tool",
         "not_tool_calling",
         "missing_default",
-        "bad_skill_route",
+        "retired_skill_table",
     ],
 )
 def test_invalid_provider_routing_is_not_a_pass(tmp_path, change):
@@ -104,14 +104,28 @@ def test_invalid_provider_routing_is_not_a_pass(tmp_path, change):
         "unknown_tool": ('"Bash"', '"UnknownTool"'),
         "not_tool_calling": ("tool_calling_supported=true", "tool_calling_supported=false"),
         "missing_default": ('default_model="fixture"', 'default_model="missing"'),
-        "bad_skill_route": (
-            'default_model="fixture"',
-            'default_model="fixture"\n[routing.ollama.skills]\nreview="missing"',
+        # c123 (batch design WP2 2.1): a skill table fails even when it names a valid route. The target is the ollama
+        # section alone; the old target also matched [routing.peer], so its doubled table failed only as bad TOML.
+        "retired_skill_table": (
+            '[routing.ollama]\ndefault_model="fixture"\n',
+            '[routing.ollama]\ndefault_model="fixture"\n[routing.ollama.skills]\nbridge-review="fixture"\n',
         ),
     }
     path.write_text(text.replace(*replacements[change]), encoding="utf-8")
     result = doctor._check_provider_routing(tmp_path, "ollama")
     assert result.status == "fail", result.message
+
+
+@pytest.mark.parametrize("provider", ["ollama", "openrouter", "alibaba-cloud-studio"])
+def test_a_retired_skill_table_is_the_named_finding(tmp_path, provider):
+    """c123 (batch design WP2 2.1): the launchers refuse a skill table, so the doctor names it as the one finding."""
+    path = routing(tmp_path, provider)
+    section = f'[routing.{provider}]\ndefault_model="fixture"\n'
+    skills = f'[routing.{provider}.skills]\nbridge-review="fixture"\n'
+    path.write_text(path.read_text(encoding="utf-8").replace(section, section + skills), encoding="utf-8")
+    result = doctor._check_provider_routing(tmp_path, provider)
+    assert result.status == "fail"
+    assert result.message == "routing skill tables are retired; registrations name --model"
 
 
 @pytest.fixture

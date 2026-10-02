@@ -32,7 +32,6 @@ RETIRED_REGISTRIES = (
 # Skills whose retired per-skill tests this module replaces; they must remain in the catalog.
 NAMED_SKILLS = (
     "gtkb-verify",
-    "gtkb-managed-skill-adoption-review",
     "gtkb-advisory-disposition",
     "gtkb-advisory-proposal",
     "gtkb-advisory-intake",

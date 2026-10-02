@@ -20,10 +20,22 @@ STANDALONE = ADMIN / "standalone"
 SHARED = ADMIN / "shared"
 SCRIPTS = Path(__file__).resolve().parents[2] / "scripts"
 CLAUDE_DIR = Path(__file__).resolve().parents[2] / ".claude"
-# The never-remove rule's authored carrier (M15, R1 option B: root CLAUDE.md is a pointer to AGENTS.md).
+# The removal rule's authored carrier; the root CLAUDE.md is only a pointer to AGENTS.md.
 GOVERNANCE_RULE = (
     Path(__file__).resolve().parents[2] / ".harness-baseline-configuration" / "rules" / "governance-principles.md"
 )
+# Subtraction first: removing obsolete material is governed work, and owner approval gates additions.
+GOVERNED_REMOVAL = (
+    "Removing obsolete material at its source is ordinary governed work: a work item, independent review and "
+    "verification."
+)
+APPROVAL_GATES_ADDITIONS = "Owner approval gates new artifacts, tables, gates and workflow steps."
+RETIRED_NEVER_REMOVE = "Never remove code, tests, features, or procedure entries"
+
+
+def _governance_rule_text() -> str:
+    """The rule as one whitespace-normalized line: it wraps, and its checkout may carry CRLF."""
+    return " ".join(GOVERNANCE_RULE.read_text(encoding="utf-8").split())
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -238,15 +250,20 @@ class TestSpec0851WizardAutoPresent:
 
 
 class TestSpec0472NeverRemoveWithoutApproval:
-    """SPEC-0472: Code, tests, features MUST NEVER be removed without approval."""
+    """SPEC-0472 v4: removing obsolete material is governed work; owner approval gates additions.
+
+    The class and function names are kept for the bound TEST records; the never-remove clause they once named is
+    retired (subtraction first, owner decision of 2026-10-01).
+    """
 
     def test_rule_in_claude_md(self):
-        # R1 option B: the root CLAUDE.md is the @AGENTS.md pointer; the rule is carried by the authored
-        # governance-principles rule that every host reads on demand.
-        src = GOVERNANCE_RULE.read_text(encoding="utf-8")
-        assert "Never remove" in src or "never remove" in src, "the governance rule must enforce never-remove"
-        assert "explicit owner approval" in src.lower() or "owner approval" in src.lower(), (
-            "Must require explicit owner approval"
+        # The root CLAUDE.md is the @AGENTS.md pointer; the rule is carried by the authored governance-principles rule
+        # that every host reads on demand.
+        text = _governance_rule_text()
+        assert GOVERNED_REMOVAL in text, "removal of obsolete material must be ordinary governed work"
+        assert APPROVAL_GATES_ADDITIONS in text, "owner approval must gate new artifacts and workflow steps"
+        assert RETIRED_NEVER_REMOVE not in text and "never remove" not in text.lower(), (
+            "the retired never-remove clause must stay removed"
         )
 
 
@@ -324,11 +341,12 @@ class TestSpec0704PersistentCustomerMemory:
 
 
 class TestSpec0744NeverRemoveRule:
-    """SPEC-0744: Never remove code/tests/features without owner approval."""
+    """SPEC-0744 (a restatement of SPEC-0472): removal of obsolete material is governed work, not owner-gated."""
 
     def test_protected_behavior_rule(self):
-        src = GOVERNANCE_RULE.read_text(encoding="utf-8")
-        assert "Never remove" in src, "Must enforce never-remove rule"
+        text = _governance_rule_text()
+        assert GOVERNED_REMOVAL in text, "removal of obsolete material must be ordinary governed work"
+        assert RETIRED_NEVER_REMOVE not in text, "the retired never-remove clause must stay removed"
 
 
 class TestSpec0787StagingEnvironmentExists:
@@ -365,9 +383,9 @@ class TestSpec0797AGNTCYIsolation:
 
 
 class TestSpec0850NeverRemoveRule2:
-    """SPEC-0850: Never remove code/tests/features without approval (restatement)."""
+    """SPEC-0850 (a restatement of SPEC-0472): owner approval gates additions, and removal is governed work."""
 
     def test_protected_removal_rule(self):
-        src = GOVERNANCE_RULE.read_text(encoding="utf-8")
-        assert "NEVER" in src or "never" in src, "Must have never-remove rule"
-        assert "owner approval" in src.lower(), "Must require owner approval"
+        text = _governance_rule_text()
+        assert APPROVAL_GATES_ADDITIONS in text, "owner approval must gate new artifacts and workflow steps"
+        assert GOVERNED_REMOVAL in text, "removal of obsolete material must be ordinary governed work"

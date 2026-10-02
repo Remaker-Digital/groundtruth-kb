@@ -149,21 +149,11 @@ timeout_seconds = 900
 session_timeout_seconds = 3600
 max_turns = 600
 
-[routing.ollama.skills]
-bridge-review = "deepseek-v4-flash-cloud"
-verification = "deepseek-v4-flash-cloud"
-implementation = "deepseek-v4-flash-cloud"
-
 [routing.alibaba-cloud-studio]
 default_model = "alibaba-deepseek-v4-pro"
 timeout_seconds = 900
 session_timeout_seconds = 3600
 max_turns = 600
-
-[routing.alibaba-cloud-studio.skills]
-bridge-review = "alibaba-deepseek-v4-pro"
-verification = "alibaba-deepseek-v4-pro"
-implementation = "alibaba-deepseek-v4-pro"
 
 [routing.openrouter]
 default_model = "openrouter-cloud-default"
@@ -171,17 +161,7 @@ timeout_seconds = 900
 session_timeout_seconds = 3600
 max_turns = 600
 
-[routing.openrouter.skills]
-bridge-review = "openrouter-cloud-default"
-verification = "openrouter-cloud-default"
-implementation = "openrouter-cloud-default"
-
 [routing.goose]
 default_model = "goose-deepseek-v4-pro"
 timeout_seconds = 3600
 max_turns = 200
-
-[routing.goose.skills]
-bridge-review = "goose-deepseek-v4-pro"
-verification = "goose-deepseek-v4-pro"
-implementation = "goose-deepseek-v4-pro"

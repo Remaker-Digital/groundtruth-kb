@@ -20,7 +20,10 @@ from __future__ import annotations
 import http.client
 import io
 import json
+import os
 import re
+import subprocess
+import sys
 import threading
 from pathlib import Path
 
@@ -34,6 +37,7 @@ READ_TRUNCATION_MARKER_RE = re.compile(
     r"Continue with offset=(\d+)\.\]$"
 )
 
+# c123 (batch design WP2 2.1): no [routing.testcloud.skills] table; the loader refuses one (see the refusal test).
 ROUTING_TOML = """
 schema_version = 1
 
@@ -54,9 +58,6 @@ default_model = "tc-default"
 timeout_seconds = 900
 session_timeout_seconds = 3600
 max_turns = 600
-
-[routing.testcloud.skills]
-bridge-review = "tc-default"
 """
 
 
@@ -174,10 +175,47 @@ def test_load_routing_config_filters_to_adopter_provider(tmp_path: Path) -> None
     assert "foreign-row" not in config.models
 
 
-def test_resolve_model_default_and_skill(tmp_path: Path) -> None:
+def test_resolve_model_default_and_named_route(tmp_path: Path) -> None:
     config = base.load_routing_config(_root(tmp_path), provider_key="testcloud", config_path=CFG_PATH)
     assert base.resolve_model(config, None).key == "tc-default"
-    assert base.resolve_model(config, None, skill="bridge-review").key == "tc-default"
+    # c123 (batch design WP2 2.1): a registration names its route with --model; there is no skill argument.
+    assert base.resolve_model(config, "tc-default").key == "tc-default"
+    for unrouted in ("foreign-row", "bridge-review"):
+        with pytest.raises(base.CloudHarnessError, match=f"unknown model route: {unrouted}"):
+            base.resolve_model(config, unrouted)
+    with pytest.raises(TypeError):
+        base.resolve_model(config, None, skill="bridge-review")
+
+
+@pytest.mark.parametrize(
+    "table",
+    [
+        '[routing.testcloud.skills]\nbridge-review = "tc-default"\n',
+        '[routing.testcloud.skills.bridge-review]\nmodel = "tc-default"\n',
+        "[routing.testcloud.skills]\n",
+    ],
+    ids=["string_route", "table_route", "empty_table"],
+)
+def test_load_routing_config_refuses_a_retired_skill_table(tmp_path: Path, table: str) -> None:
+    """c123 (batch design WP2 2.1): a role skill no longer selects a model, so a skill table is refused, not read."""
+    root = _root(tmp_path)
+    (root / CFG_PATH).write_text(ROUTING_TOML.strip() + "\n\n" + table, encoding="utf-8")
+
+    assert base.RETIRED_SKILL_TABLES == "routing skill tables are retired; registrations name --model"
+    with pytest.raises(
+        base.CloudHarnessError, match=re.escape(f"routing.testcloud.skills: {base.RETIRED_SKILL_TABLES}")
+    ):
+        base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH)
+
+
+def test_load_routing_config_refuses_a_retired_skill_table_in_another_providers_section(tmp_path: Path) -> None:
+    """c123 (batch design WP2 2.1): the shared file is refused for a stale table in any section, Goose's included."""
+    root = _root(tmp_path)
+    table = '[routing.goose.skills]\nbridge-review = "goose-route"\n'
+    (root / CFG_PATH).write_text(ROUTING_TOML.strip() + "\n\n" + table, encoding="utf-8")
+
+    with pytest.raises(base.CloudHarnessError, match=re.escape(f"routing.goose.skills: {base.RETIRED_SKILL_TABLES}")):
+        base.load_routing_config(root, provider_key="testcloud", config_path=CFG_PATH)
 
 
 def test_routing_config_carries_runtime_limits_and_cli_overrides(tmp_path: Path) -> None:
@@ -884,7 +922,8 @@ def test_native_full_hooks_lifecycle_runs_in_order(tmp_path: Path) -> None:
     pre_payload = hook_events[2][1]
     post_payload = hook_events[3][1]
     assert pre_payload["tool_name"] == "Read"
-    assert pre_payload["tool_input"] == {"path": "note.txt"}
+    # c123 (batch design WP2, G38): beside the model's raw path, the hooks get Claude's absolute file_path.
+    assert pre_payload["tool_input"] == {"path": "note.txt", "file_path": str((root / "note.txt").resolve())}
     assert post_payload["tool_response"] == "file body"
     assert hook_events[0][2]["GTKB_PROJECT_ROOT"] == str(root)
 
@@ -1260,18 +1299,20 @@ def test_native_stop_repeated_blocks_fail_closed_at_eight_block_limit(tmp_path: 
 
 
 @pytest.mark.parametrize(
-    ("hook_result", "error_match"),
+    "hook_result",
     [
-        (base.GuardExecutionResult(returncode=1, stdout="", stderr="failed"), "native hook exited nonzero"),
-        (base.GuardExecutionResult(returncode=0, stdout="not json", stderr=""), "native hook emitted malformed JSON"),
+        base.GuardExecutionResult(returncode=1, stdout="", stderr="failed"),
+        base.GuardExecutionResult(returncode=0, stdout="not json", stderr=""),
+        base.GuardExecutionResult(returncode=0, stdout="[1]", stderr=""),
     ],
-    ids=("nonzero", "malformed"),
+    ids=("nonzero", "malformed", "not-an-object"),
 )
 def test_native_pretool_non_timeout_errors_remain_fail_closed(
     tmp_path: Path,
     hook_result: base.GuardExecutionResult,
-    error_match: str,
 ) -> None:
+    """c123 (batch design WP2, G39): a failing PreToolUse hook blocks its call as hook_failed; it no longer ends the
+    run. The call stays refused (fail-closed)."""
     root = _root(tmp_path)
     _write_native_hook_settings(
         root,
@@ -1281,16 +1322,21 @@ def test_native_pretool_non_timeout_errors_remain_fail_closed(
     def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
         return hook_result
 
-    with pytest.raises(base.CloudHarnessError, match=error_match):
-        base.invoke_native_hooks(
-            base.NATIVE_HOOK_PRE_TOOL_USE,
-            _meta(),
-            root,
-            _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
-            tool_name="Read",
-            tool_input={"path": "note.txt"},
-            native_hook_runner=hook_runner,
-        )
+    block = base.invoke_native_hooks(
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        _meta(),
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        tool_name="Read",
+        tool_input={"path": "note.txt"},
+        native_hook_runner=hook_runner,
+    )
+
+    assert block == {
+        "decision": "block",
+        "reason": f"hook_failed: tool=Read; hook=pre; exit={hook_result.returncode}",
+        "hook_failure": True,
+    }
 
 
 def test_native_full_hooks_empty_pretool_output_allows_later_hooks_and_tool(tmp_path: Path) -> None:
@@ -1764,3 +1810,337 @@ def test_cloud_template_inherits_local_diagnostic_contract(tmp_path: Path, monke
 
     assert result["schema_id"] == "gtkb.harness_diagnostic.v1"
     assert captured == {"project_root": root, "harness_id": "H"}
+
+
+# ---- c123 (batch design WP2, items 7 to 11) ---------------------------------------------------------------------
+
+
+def _pretool(root: Path, hook_result: base.GuardExecutionResult, **kwargs) -> dict | None:
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_PRE_TOOL_USE: [{"matcher": "Read", "hooks": [{"type": "command", "command": "pre hook"}]}]},
+    )
+    return base.invoke_native_hooks(
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        _meta(),
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        tool_name="Read",
+        tool_input={"path": "note.txt"},
+        native_hook_runner=lambda *_args: hook_result,
+        **kwargs,
+    )
+
+
+@pytest.mark.parametrize(
+    ("hook_result", "reason"),
+    [
+        (
+            base.GuardExecutionResult(2, json.dumps({"decision": "block", "reason": "provenance missing"}), ""),
+            "provenance missing",
+        ),
+        (base.GuardExecutionResult(2, "", "stderr reason\n"), "stderr reason"),
+        (base.GuardExecutionResult(2, "", ""), "hook=pre exited 2"),
+    ],
+    ids=("json-reason", "stderr-reason", "bare"),
+)
+def test_a_pretool_exit_two_blocks_the_call_with_its_reason(
+    tmp_path: Path, hook_result: base.GuardExecutionResult, reason: str
+) -> None:
+    assert _pretool(_root(tmp_path), hook_result) == {"decision": "block", "reason": reason}
+
+
+def test_a_blocked_write_does_not_end_the_run(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / "note.txt").write_text("file body", encoding="utf-8")
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_PRE_TOOL_USE: [{"matcher": "Write", "hooks": [{"type": "command", "command": "gate.py"}]}]},
+    )
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read", "Write"))
+    turns: list[dict] = []
+
+    def hook_runner(_command: str, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(2, json.dumps({"decision": "block", "reason": "missing provenance"}), "")
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        turns.append(payload)
+        if len(turns) == 1:
+            call = {"id": "c1", "function": {"name": "Write", "arguments": {"path": "x.md", "content": "y"}}}
+            return {"choices": [{"message": {"content": "", "tool_calls": [call]}}]}
+        if len(turns) == 2:
+            assert "missing provenance" in str(payload["messages"])
+            call = {"id": "c2", "function": {"name": "Read", "arguments": {"path": "note.txt"}}}
+            return {"choices": [{"message": {"content": "", "tool_calls": [call]}}]}
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    result = base.run_tool_loop(
+        "write then read",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        5,
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        chat_func=chat,
+        native_hook_runner=hook_runner,
+    )
+
+    assert result == "done"
+    assert not (root / "x.md").exists()
+
+
+@pytest.mark.parametrize(
+    ("tool", "arguments", "canonical"),
+    [
+        ("Write", {"path": "docs/new.md", "content": "text"}, {"file_path": "docs/new.md", "content": "text"}),
+        (
+            "Edit",
+            {"path": "note.txt", "old_string": "file", "new_string": "note"},
+            {"file_path": "note.txt", "old_string": "file", "new_string": "note"},
+        ),
+        ("Read", {"path": "note.txt"}, {"file_path": "note.txt"}),
+    ],
+)
+def test_the_native_hooks_get_an_api_file_tool_call_in_claude_shape(
+    tmp_path: Path, tool: str, arguments: dict, canonical: dict
+) -> None:
+    """c123 (batch design WP2, G38): the raw keys stay and Claude's keys are added, the path made absolute, so the
+    content hooks that read only file_path judge an API harness's writes (test_hook_payload_conformance.py)."""
+    root = _root(tmp_path)
+    (root / "note.txt").write_text("file body", encoding="utf-8")
+    _write_native_hook_settings(
+        root,
+        {base.NATIVE_HOOK_PRE_TOOL_USE: [{"matcher": tool, "hooks": [{"type": "command", "command": "pre hook"}]}]},
+    )
+    seen: list[dict] = []
+
+    def runner(_command: str, payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        seen.append(dict(payload))
+        return base.GuardExecutionResult(0, "{}", "")
+
+    base.invoke_native_hooks(
+        base.NATIVE_HOOK_PRE_TOOL_USE,
+        _meta(),
+        root,
+        _profile(hook_tier=base.HOOK_TIER_NATIVE_FULL),
+        tool_name=tool,
+        tool_input=arguments,
+        native_hook_runner=runner,
+    )
+
+    assert len(seen) == 1
+    assert seen[0]["tool_input"] == {
+        **arguments,
+        **canonical,
+        "file_path": str((root / canonical["file_path"]).resolve()),
+    }
+
+
+def test_the_guard_log_records_each_layer_and_never_the_input(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    log_path = tmp_path / "log" / "guard-decisions.jsonl"
+    log = base.GuardDecisionLog(log_path, "native-1")
+    _pretool(root, base.GuardExecutionResult(0, "{}", ""), decision_log=log.record)
+    _pretool(root, base.GuardExecutionResult(2, "", "refused"), decision_log=log.record)
+    guard = root / "guard.py"
+    guard.write_text("", encoding="utf-8")
+
+    def deny(_path: Path, _payload: dict, _env: dict, _timeout: float) -> base.GuardExecutionResult:
+        return base.GuardExecutionResult(0, json.dumps({"decision": "deny", "reason": "credential_like: no"}), "")
+
+    with pytest.raises(base.CloudHarnessError, match="guard denied Write"):
+        base.invoke_guard_adapter(
+            "Write",
+            {"path": "note.txt", "content": "SECRET-CONTENT-NEVER-LOGGED"},
+            _meta(),
+            root,
+            _profile(),
+            guard_runner=deny,
+            guard_paths=[guard],
+            decision_log=log.record,
+        )
+    with pytest.raises(base.CloudHarnessError):
+        base._dispatch_bash(
+            {"command": "echo x > bridge/item-001.md"},
+            _meta(),
+            root,
+            _profile(),
+            None,
+            None,
+            decision_log=log.record,
+        )
+
+    records = [json.loads(line) for line in log_path.read_text(encoding="utf-8").splitlines()]
+    assert [record["layer"] for record in records] == ["native_hook", "native_hook", "guard_adapter", "bridge_shell"]
+    assert [record["allowed"] for record in records] == [True, False, False, False]
+    assert records[2]["reason_code"] == "credential_like"
+    assert all(record["native_context_id"] == "native-1" for record in records)
+    assert "SECRET-CONTENT-NEVER-LOGGED" not in log_path.read_text(encoding="utf-8")
+    assert log.counts == {"allowed": 1, "blocked": 3}
+
+
+def test_an_unwritable_guard_log_warns_once_and_never_fails(tmp_path: Path, capsys) -> None:
+    log = base.GuardDecisionLog(tmp_path, "native-1")  # a directory: every append fails
+
+    log.record({"allowed": True})
+    log.record({"allowed": False})
+
+    assert capsys.readouterr().err.count("guard decision log not written") == 1
+    assert log.counts == {"allowed": 1, "blocked": 1}
+
+
+def test_the_guard_log_path_prefers_the_option_then_the_environment() -> None:
+    assert base.guard_log_path("a.jsonl", {"GTKB_GUARD_LOG": "b.jsonl"}) == Path("a.jsonl")
+    assert base.guard_log_path(None, {"GTKB_GUARD_LOG": "b.jsonl"}) == Path("b.jsonl")
+    assert base.guard_log_path(None, {}) is None
+
+
+def test_the_run_report_counts_turns_tools_and_usage_and_holds_no_content(tmp_path: Path) -> None:
+    guard_log = base.GuardDecisionLog(None, "native-1")
+    report = base.RunReport(
+        harness="testcloud",
+        native_context_id="native-1",
+        route_key="tc",
+        requested_model="testvendor/tc-model",
+        endpoint="https://test.cloud/api/v1?key=never",
+        guard_log=guard_log,
+    )
+    guard_log.record({"allowed": False})
+    report.set_model("testvendor/tc-model-2")
+    report.record_turn(1, ["Read", "Bash"], provider_response={"usage": {"prompt_tokens": 10, "nested": {"x": 1}}})
+    report.record_turn(2, ["Read"], provider_response={"usage": {"prompt_tokens": 5}, "message": "PROMPT-TEXT"})
+    report.finish("final_response")
+    path = tmp_path / "report.json"
+    report.write(path, exit_code=0)
+
+    written = json.loads(path.read_text(encoding="utf-8"))
+    assert written["turns"] == 2
+    assert written["tool_calls"] == {"Read": 2, "Bash": 1}
+    assert written["token_usage"] == {"prompt_tokens": 15}
+    assert written["endpoint"] == "test.cloud"
+    assert written["guard_decisions"] == {"allowed": 0, "blocked": 1}
+    assert (written["stop_reason"], written["exit_code"]) == ("final_response", 0)
+    assert "PROMPT-TEXT" not in path.read_text(encoding="utf-8")
+
+
+def test_an_interrupt_is_classified_and_propagates(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    report = base.RunReport(harness="t", native_context_id="n", route_key="tc", requested_model=None, endpoint=None)
+
+    def chat(*_args) -> dict:
+        raise KeyboardInterrupt
+
+    with pytest.raises(KeyboardInterrupt):
+        base.run_tool_loop(
+            "x", route, "https://test.cloud/api/v1", "key", 3, root, _profile(), chat_func=chat, telemetry=report
+        )
+
+    assert report.data["stop_reason"] == "interrupted"
+
+
+def test_the_launcher_names_the_native_context_id(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    route = base.ModelRoute("tc", "testvendor/tc-model", "tc-model", True, ("Read",))
+    seen: list[str] = []
+
+    def chat(_endpoint: str, _api_key: str, payload: dict, _timeout: float) -> dict:
+        seen.append(payload["messages"][0]["content"])
+        return {"choices": [{"message": {"content": "done"}}]}
+
+    base.run_tool_loop(
+        "x",
+        route,
+        "https://test.cloud/api/v1",
+        "key",
+        3,
+        root,
+        _profile(),
+        chat_func=chat,
+        native_context_id="named-context-id",
+    )
+
+    assert "Native context identifier: named-context-id." in seen[0]
+
+
+def test_bind_for_run_binds_only_with_an_init_line_and_records_the_binding(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """c123 (batch design WP2 2.1): without --init the run stays unbound; with it the bind's facts reach the report."""
+    binding = {"session_context_id": "session-1", "role": "loyal-opposition", "native_context_id": "native-1"}
+    calls: list[tuple[str, str, Path]] = []
+
+    def bind(native_context_id: str, init_line: str, project_root: Path, runner=None) -> dict:
+        calls.append((native_context_id, init_line, project_root))
+        return binding
+
+    monkeypatch.setattr(base, "bind_native_context", bind)
+    report = base.RunReport(
+        harness="t", native_context_id="native-1", route_key="tc", requested_model=None, endpoint=None
+    )
+
+    assert base.bind_for_run(None, "native-1", tmp_path, report) is None
+    assert calls == [] and (report.data["session_context_id"], report.data["role"]) == (None, None)
+    bound = base.bind_for_run("::init gtkb lo", "native-1", tmp_path, report)
+    assert bound == binding and bound is not binding
+    assert calls == [("native-1", "::init gtkb lo", tmp_path)]
+    assert (report.data["session_context_id"], report.data["role"]) == ("session-1", "loyal-opposition")
+
+
+def test_the_bash_tool_names_the_shell_that_runs_it() -> None:
+    assert "cmd.exe /c" in base.bash_tool_description("nt")
+    assert "/bin/sh -c" in base.bash_tool_description("posix")
+    schema = base.build_tool_schemas(["Bash"])[0]
+    assert base.bash_tool_description() in json.dumps(schema)
+
+
+def test_the_shell_command_line_keeps_the_command_whole() -> None:
+    windows = base.shell_command_line('echo "a b" && dir', "nt")
+    assert isinstance(windows, str)
+    assert windows.endswith(' /d /s /c "echo "a b" && dir"')
+    assert base.shell_command_line("echo x", "posix") == ["/bin/sh", "-c", "echo x"]
+
+
+def test_undecodable_command_output_is_replaced_not_lost(tmp_path: Path) -> None:
+    command = f'"{sys.executable}" -c "import sys; sys.stdout.buffer.write(bytes([111, 107, 255]))"'
+
+    completed = base._default_command_runner(command, tmp_path, dict(os.environ), 60)
+
+    assert completed.returncode == 0
+    assert completed.stdout == "ok�"
+
+
+@pytest.mark.skipif(os.name != "nt", reason="the process-tree end is the Windows path (taskkill /T)")
+def test_a_timed_out_command_ends_its_whole_process_tree(tmp_path: Path) -> None:
+    script = tmp_path / "parent.py"
+    script.write_text(
+        "import subprocess, sys, time\n"
+        "child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(120)'])\n"
+        "print(child.pid, flush=True)\n"
+        "time.sleep(120)\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(subprocess.TimeoutExpired) as expired:
+        base._default_command_runner(f'"{sys.executable}" "{script}"', tmp_path, dict(os.environ), 5)
+
+    grandchild = int(str(expired.value.output).split()[0])
+    listing = subprocess.run(
+        ["tasklist", "/FI", f"PID eq {grandchild}", "/NH"], capture_output=True, text=True, check=False
+    ).stdout
+    assert str(grandchild) not in listing
+
+
+def test_grep_and_glob_skip_other_contexts_scratch_and_checkouts(tmp_path: Path) -> None:
+    root = _root(tmp_path)
+    (root / ".git").mkdir()
+    for relative in ("src/a.txt", "scratchpad/SENV-a/b.txt", ".worktrees/SENV-b/c.txt", ".venv/d.txt"):
+        (root / relative).parent.mkdir(parents=True, exist_ok=True)
+        (root / relative).write_text("needle\n", encoding="utf-8")
+
+    assert base._dispatch_grep({"pattern": "needle", "path": "."}, root) == "src/a.txt:1:needle"
+    assert base._dispatch_glob({"pattern": "*.txt", "path": "."}, root) == "src/a.txt"
+    assert base._dispatch_grep({"pattern": "needle", "path": "scratchpad/SENV-a"}, root) == (
+        "scratchpad/SENV-a/b.txt:1:needle"
+    )

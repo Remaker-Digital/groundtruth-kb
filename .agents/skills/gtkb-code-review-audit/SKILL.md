@@ -4,8 +4,6 @@ description: Review code and tests for bugs, regressions, unsafe assumptions, mi
 argument-hint: [target]
 allowed-tools: Bash, Read, Grep, Glob, Agent
 license: "Proprietary - Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: review
@@ -39,6 +37,13 @@ Use `.harness-baseline-configuration/rules/template-code-review.md` unless the o
 - Prefer behavioral assertions over existence or shape-only assertions.
 - Call out synthetic green states such as `WARN` or `SKIP` counted as success where relevant.
 - Name verification gaps clearly when tests were not run or cannot prove the reviewed claim.
+
+## Routing
+
+Findings about the reviewed change belong in the review or its verdict. For a
+defect outside that change, file unmatched work through `gtkb-work-item` into
+`PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and
+name any related project in its description.
 
 ---
 

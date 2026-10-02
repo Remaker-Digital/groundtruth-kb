@@ -90,6 +90,11 @@ def _stubs(plan, stub_dir: str) -> dict[str, str]:
     }
 
 
+def _authored_skill_names() -> set[str]:
+    """The skills the one source holds; a stub host receives exactly one pointer per name."""
+    return {p.parent.name for p in (PROJECT_ROOT / SKILLS_ROOT).glob("*/SKILL.md")}
+
+
 @pytest.mark.parametrize(
     "harness",
     [
@@ -323,8 +328,8 @@ def test_antigravity_projection_idempotent_and_clean() -> None:
 
     profile = project_harness.load_profiles()["harnesses"]["antigravity"]
     stubs = _stubs(plan_a, ".agent/skills")
-    assert len(stubs) == 38, sorted(stubs)
-    assert set(stubs) == {p.parent.name for p in (PROJECT_ROOT / SKILLS_ROOT).glob("*/SKILL.md")}
+    assert len(stubs) == len(_authored_skill_names()), sorted(stubs)
+    assert set(stubs) == _authored_skill_names()
     # R4 / R14 (b): the one declared pointer in the host's rules directory, declared
     # bytes verbatim, and nothing else under rules/ (the 24 rule copies retire).
     pointer = plan_a.writes[".agent/rules/gtkb-pointer.md"]
@@ -497,6 +502,96 @@ def test_projected_timeout_applies_cursor_floor() -> None:
     assert project_harness._projected_timeout(other, {"timeout_seconds": 5}) == 5
 
 
+def test_projected_timeout_registers_a_declared_host_default_only_where_the_manifest_gives_none() -> None:
+    """c123 (batch design WP2 2.4): Claude's documented 600 s default is registered, never a lower manifest bound."""
+    claude = {"hook_timeout_default_seconds": 600}
+    assert project_harness._projected_timeout(claude, {}) == 600
+    assert project_harness._projected_timeout(claude, {"timeout_seconds": 5}) == 5
+    assert project_harness._projected_timeout({**claude, "hook_timeout_floor_seconds": 30}, {}) == 30
+    profile = {**claude, "stdin_adapter": "scripts/claude_hook_adapter.py", "adapter_deadline_margin_seconds": 2}
+    assert project_harness._adapter_deadline(profile, {}) == 598
+    assert project_harness._adapter_deadline(profile, {"timeout_seconds": 15}) == 13
+
+
+# c123 (batch design WP2 2.4): the Claude projection runs every hook through the Claude hook adapter, turns Claude
+# Code's auto-memory off (owner decision B5), and carries no permissions key, so interactive sessions keep Claude Code's
+# own prompts while the dispatched registration sets its permission mode on its command line (owner decision B1).
+
+
+def test_claude_settings_run_the_adapter_turn_auto_memory_off_and_carry_no_permissions() -> None:
+    profile = project_harness.load_profiles()["harnesses"]["claude"]
+    assert profile["stdin_adapter"] == "scripts/claude_hook_adapter.py"
+    plan = project_harness.build_plan("claude")
+    assert not plan.gaps, plan.gaps
+    settings = json.loads(plan.writes[".claude/settings.json"])
+    assert "permissions" not in settings
+    assert settings["autoMemoryEnabled"] is False
+    assert set(settings) == {"_comment", "autoMemoryEnabled", "hooks"}
+    manifest = tomllib.loads((BASELINE / "hooks/manifest.toml").read_text(encoding="utf-8"))
+    entries = [entry for groups in settings["hooks"].values() for group in groups for entry in group["hooks"]]
+    assert len(entries) == len(manifest["hook"])
+    head = (
+        '"$CLAUDE_PROJECT_DIR/groundtruth-kb/.venv/Scripts/pythonw.exe" -B '
+        '"$CLAUDE_PROJECT_DIR/scripts/claude_hook_adapter.py" --deadline '
+    )
+    for entry, hook in zip(entries, manifest["hook"], strict=True):
+        timeout = hook.get("timeout_seconds", 600)
+        assert entry["timeout"] == timeout, (hook["script"], entry)
+        assert entry["command"].startswith(f"{head}{timeout - 2} "), entry["command"]
+        assert entry["command"].endswith(" --harness claude"), entry["command"]
+
+
+def test_the_api_settings_projections_keep_their_direct_hooks_and_no_native_settings() -> None:
+    for harness in ("ollama", "openrouter", "alibaba-cloud-studio"):
+        profile = project_harness.load_profiles()["harnesses"][harness]
+        assert "stdin_adapter" not in profile and "native_settings" not in profile, harness
+        settings = json.loads(project_harness.build_plan(harness).writes[profile["hooks_json_path"]])
+        assert set(settings) == {"_comment", "hooks"}, harness
+        assert not any("claude_hook_adapter" in command for command in _commands(settings)), harness
+
+
+@pytest.mark.parametrize("key", ["permissions", "hooks", "_comment"])
+def test_native_settings_never_carry_permissions_or_the_projectors_own_keys(monkeypatch, key):
+    profiles = project_harness.load_profiles()
+    profiles["harnesses"]["claude"]["native_settings"] = {"autoMemoryEnabled": False, key: {"allow": ["Bash(*)"]}}
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
+    plan = project_harness.build_plan("claude")
+    assert ".claude/settings.json" not in plan.writes
+    assert any(gap.startswith("invalid_native_settings: claude:") and key in gap for gap in plan.gaps), plan.gaps
+
+
+def test_native_settings_on_a_projection_that_cannot_render_them_are_a_gap(monkeypatch):
+    profiles = project_harness.load_profiles()
+    profiles["harnesses"]["codex"]["native_settings"] = {"autoMemoryEnabled": False}
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
+    plan = project_harness.build_plan("codex")
+    assert any(gap.startswith("unsupported_native_settings: codex:") for gap in plan.gaps), plan.gaps
+
+
+def test_an_adapter_run_settings_hook_without_a_deadline_is_a_gap(monkeypatch):
+    """A hung target would reach Claude Code's own timeout, which lets the tool run."""
+    profiles = project_harness.load_profiles()
+    del profiles["harnesses"]["claude"]["hook_timeout_default_seconds"]
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
+    plan = project_harness.build_plan("claude")
+    manifest = tomllib.loads((BASELINE / "hooks/manifest.toml").read_text(encoding="utf-8"))
+    unbounded = [hook["script"] for hook in manifest["hook"] if "timeout_seconds" not in hook]
+    assert unbounded, "the manifest has hooks without a timeout of their own"
+    for script in unbounded:
+        assert any(gap.startswith(f"hook {script}: an adapter-run settings registration") for gap in plan.gaps)
+
+
+def test_a_missing_claude_hook_adapter_is_a_gap(tmp_path, monkeypatch):
+    profiles = project_harness.load_profiles()
+    profile = dict(profiles["harnesses"]["claude"], name="claude")
+    tokens = project_harness.token_map(profile, profiles["baseline"])
+    manifest = tomllib.loads((BASELINE / "hooks/manifest.toml").read_text(encoding="utf-8"))
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    gaps: list[str] = []
+    assert project_harness.render_hooks_registration(profile, manifest, tokens, gaps) is None
+    assert gaps == ["Missing or redirected native hook adapter: scripts/claude_hook_adapter.py"]
+
+
 def test_cursor_plan_maps_native_events_and_wraps_adapters() -> None:
     plan = project_harness.build_plan("cursor")
     hooks = json.loads(plan.writes[".cursor/hooks.json"])
@@ -587,6 +682,60 @@ def test_write_mode_deletes_leftovers(tmp_path: Path, monkeypatch) -> None:
     assert (tmp_path / ".cursor" / "hooks.json").is_file()
 
 
+# c123 (batch design WP2 2.5): Codex keys each hook's trust grant by the hooks.json path, the event, the group index and
+# the handler index, so a projection that changes an entry's text or moves it needs a fresh grant in Codex's /hooks.
+def _codex_hooks(*commands: str) -> str:
+    groups = [{"matcher": "Bash", "hooks": [{"type": "command", "command": command}]} for command in commands]
+    return json.dumps({"description": "fixture", "hooks": {"PreToolUse": groups}}, indent=2) + "\n"
+
+
+@pytest.mark.parametrize(
+    "previous,current,changed",
+    [
+        (None, _codex_hooks("a", "b"), 2),
+        (_codex_hooks("a", "b"), _codex_hooks("a", "b"), 0),
+        (_codex_hooks("a", "b"), _codex_hooks("a", "c"), 1),
+        (_codex_hooks("a", "b"), _codex_hooks("z", "a", "b"), 3),
+        (_codex_hooks("a", "b", "c"), _codex_hooks("a", "b"), 0),
+        ("not a hooks file", _codex_hooks("a"), 1),
+    ],
+    ids=["first_projection", "unchanged", "text_changed", "inserted_first", "removed_last", "unparseable_previous"],
+)
+def test_codex_trust_changes_counts_changed_and_moved_entries_only(previous, current, changed) -> None:
+    assert project_harness.codex_trust_changes(previous, current) == changed
+
+
+def test_codex_write_prints_the_trust_notice_only_when_an_entry_changes(tmp_path, monkeypatch, capsys) -> None:
+    plan = project_harness.Plan()
+    plan.writes[".codex/hooks.json"] = _codex_hooks("a", "b")
+    monkeypatch.setattr(project_harness, "build_plan", lambda harness: plan)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    target = (tmp_path / ".codex" / "hooks.json").resolve()
+    notice = "Codex hook trust must be granted again for {} changed entries of " + str(target)
+
+    assert project_harness.run("codex", "write") == 0
+    assert notice.format(2) in capsys.readouterr().out
+    assert project_harness.run("codex", "write") == 0
+    assert "Codex hook trust" not in capsys.readouterr().out
+    plan.writes[".codex/hooks.json"] = _codex_hooks("a", "c")
+    assert project_harness.run("codex", "write") == 0
+    assert notice.format(1) in capsys.readouterr().out
+    # A check or a dry run writes nothing, so it never asks for a grant.
+    plan.writes[".codex/hooks.json"] = _codex_hooks("d")
+    for mode in ("check", "dry-run"):
+        project_harness.run("codex", mode)
+        assert "Codex hook trust" not in capsys.readouterr().out
+
+
+def test_no_trust_notice_for_a_host_without_codex_hooks(tmp_path, monkeypatch, capsys) -> None:
+    plan = project_harness.Plan()
+    plan.writes[".cursor/hooks.json"] = '{"version":1,"hooks":{}}\n'
+    monkeypatch.setattr(project_harness, "build_plan", lambda harness: plan)
+    monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
+    assert project_harness.run("cursor", "write") == 0
+    assert "Codex hook trust" not in capsys.readouterr().out
+
+
 @pytest.mark.parametrize("harness", ["claude", "codex", "cursor", "goose", "antigravity", "openrouter"])
 def test_projected_advisory_guidance_has_no_ledger_producer_or_grilling_hook(tmp_path, monkeypatch, harness):
     """Project authored inputs in isolation, preserving unrelated local runtime files."""
@@ -615,7 +764,7 @@ def test_projected_advisory_guidance_has_no_ledger_producer_or_grilling_hook(tmp
     shutil.copyfile(
         PROJECT_ROOT / "scripts/implementation_start_gate.py", tmp_path / "scripts/implementation_start_gate.py"
     )
-    for name in ("codex_hook_adapter.py", "antigravity_hook_adapter.py"):
+    for name in ("codex_hook_adapter.py", "antigravity_hook_adapter.py", "claude_hook_adapter.py"):
         shutil.copyfile(PROJECT_ROOT / "scripts" / name, tmp_path / "scripts" / name)
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
     plan = project_harness.build_plan(harness)
@@ -642,6 +791,11 @@ def _expected_command(harness: str, profile: dict, target: str, timeout: int | N
     """The exact registration shape of projector item 7 for one host and one hook target."""
     mode = profile["hooks_projection"]
     var = profile["project_dir_var"]
+    if mode == "settings_json" and profile.get("stdin_adapter"):
+        # c123 (batch design WP2 2.4): Claude's commands run the hook adapter, which runs the host-root-relative target
+        # with a deadline below the hook's registered timeout.
+        head = f'"${var}/groundtruth-kb/.venv/Scripts/pythonw.exe" -B "${var}/{profile["stdin_adapter"]}" --deadline '
+        return re.compile("^" + re.escape(head) + r"\d+ " + re.escape(f"{target} --harness {harness}") + "$")
     if mode == "settings_json":
         shape = f'"${var}/groundtruth-kb/.venv/Scripts/pythonw.exe" -B "${var}/{target}" --harness {harness}'
         return re.compile("^" + re.escape(shape) + "$")
@@ -698,7 +852,7 @@ def test_application_projection_targets(tmp_path, monkeypatch, harness):
     assert not plan.gaps, plan.gaps
     if profile["skills_discovery"] == "pointer_stubs":
         stubs = _stubs(plan, profile["skills_stub_dir"])
-        assert len(stubs) == 38
+        assert len(stubs) == len(_authored_skill_names())
         for name, text in stubs.items():
             assert f"Read and follow `../../{SKILLS_ROOT}/{name}/SKILL.md`" in text, name
             assert f"Canonical source: {SKILLS_ROOT}/{name}/SKILL.md" in text, name

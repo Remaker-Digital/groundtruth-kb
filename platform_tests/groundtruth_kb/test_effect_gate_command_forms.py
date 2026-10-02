@@ -7,6 +7,8 @@ Invoke-Expression, nor past a program named by a variable (`& { git clean -fdx }
 variable inside a write target was read as a literal path (host I on c120, `Set-Content -Path "$d\\x.txt"`); and git
 diff, log and show wrote their --output file under the read-only exemption. Owner decision 2026-09-30 20:52 ("Fix
 first: c122"): those four groups only. Every command here is judged, never run; the native effect check is a recorder.
+c123 (batch design WP1, B149): a redirect's target is read, so group 1's redirects reach the native check with their
+target instead of being refused whole.
 """
 
 from __future__ import annotations
@@ -30,17 +32,28 @@ def _own_context(monkeypatch):
 
 
 class _NativeCheck:
-    """Stands in for `gt bridge check-effects`: records each call and answers as a claim would."""
+    """Stands in for `gt bridge check-effects`: records each call and answers as a claim would.
+
+    c123 (owner decision A1): it answers `gt bridge check-program` too, as a live claim would, and paths() reads the
+    effect checks only.
+    """
 
     def __init__(self) -> None:
         self.calls: list[list[str]] = []
 
     def __call__(self, argv, **_kwargs):
         self.calls.append(list(argv))
+        if "check-program" in argv:
+            answer = {"status": "current", "scope": "program", "claims": 1}
+            return subprocess.CompletedProcess(argv, 0, json.dumps(answer), "")
         return subprocess.CompletedProcess(argv, 0, json.dumps({"status": "current", "scope": "implementation"}), "")
 
     def paths(self) -> list[list[str]]:
-        return [[call[index + 1] for index, token in enumerate(call) if token == "--path"] for call in self.calls]
+        effects = [call for call in self.calls if "check-effects" in call]
+        return [[call[index + 1] for index, token in enumerate(call) if token == "--path"] for call in effects]
+
+    def programs(self) -> int:
+        return sum("check-program" in call for call in self.calls)
 
 
 @pytest.fixture
@@ -64,26 +77,31 @@ def _decide(project: Path, command: str) -> dict:
     return effect_gate.gate_decision(_payload(project, command))
 
 
-# Group 1: a redirect after a safe-prefix command writes its target. The target is not read yet (B149, batched), so
-# the command is refused whole before the native check, as every other redirect to a file already was.
+# Group 1: a redirect after a safe-prefix command writes its target. Since c123 (batch design WP1, B149) the target is
+# read, so the command reaches the native check with that path, as a direct write does.
 SAFE_PREFIX_REDIRECTS = [
-    r"Get-Content a.txt > E:\GT-KB\groundtruth-kb\src\groundtruth_kb\cli.py",
-    "git diff > patch.txt",
-    "python -m pytest -q > out.txt",
-    "git log 2> err.txt",
-    "rg x *> out.txt",
-    "git show HEAD:README.md >> notes.txt",
+    (
+        r"Get-Content a.txt > E:\GT-KB\groundtruth-kb\src\groundtruth_kb\cli.py",
+        "E:/GT-KB/groundtruth-kb/src/groundtruth_kb/cli.py",
+    ),
+    ("git diff > patch.txt", "patch.txt"),
+    ("python -m pytest -q > out.txt", "out.txt"),
+    ("git log 2> err.txt", "err.txt"),
+    ("rg x *> out.txt", "out.txt"),
+    ("git show HEAD:README.md >> notes.txt", "notes.txt"),
     # Nested: the inner command was skipped as safe before c122.
-    'pwsh -c "Get-Content a.txt > b.txt"',
+    ('pwsh -c "Get-Content a.txt > b.txt"', "b.txt"),
 ]
 
 
-@pytest.mark.parametrize("command", SAFE_PREFIX_REDIRECTS)
-def test_a_redirect_after_a_safe_prefix_is_a_write(tmp_path, native, command):
+@pytest.mark.parametrize(("command", "target"), SAFE_PREFIX_REDIRECTS)
+def test_a_redirect_after_a_safe_prefix_is_a_write(tmp_path, native, command, target):
     assert not effect_gate._is_safe_command(command)
-    assert effect_gate.changed_paths(_payload(tmp_path, command)) == ([], True)
-    assert _decide(tmp_path, command)["reason_code"] == "unknown_effect_targets"
-    assert native.calls == []
+    assert effect_gate.changed_paths(_payload(tmp_path, command)) == ([target], True)
+    assert _decide(tmp_path, command) == {}
+    assert native.paths() == [[target]]
+    # c123 (owner decision A1): the test run is a program run, checked after its redirect's write.
+    assert native.programs() == (1 if "pytest" in command else 0)
 
 
 @pytest.mark.parametrize(
@@ -205,8 +223,8 @@ READS = [
     "git ls-files | xargs grep -l x",
     "find docs -name '*.py' -exec grep -l x {} +",
     "command -v git",
-    "uv run pytest -q",
-    'uv run --with rich python -c "print(1)"',
+    # c123 (owner decision A1): "uv run pytest -q" and 'uv run --with rich python -c "print(1)"' left this list; uv
+    # run is a program run (test_uv_run_is_a_program_run).
     "Start-Process notepad",
     "& 'C:\\Program Files\\Git\\cmd\\git.exe' --version 2>&1 | Out-String",
     "gt services status; gt home status",
@@ -222,6 +240,15 @@ READS = [
 @pytest.mark.parametrize("command", READS)
 def test_reads_and_expressions_stay_allowed(tmp_path, native, command):
     assert _decide(tmp_path, command) == {}
+    # c123 (owner decision A1): a read needs no claim, so no native check runs.
+    assert native.calls == []
+
+
+@pytest.mark.parametrize("command", ["uv run pytest -q", 'uv run --with rich python -c "print(1)"'])
+def test_uv_run_is_a_program_run(tmp_path, native, command):
+    # c123 (owner decision A1): uv run syncs the environment and runs a program, so it needs a live claim.
+    assert _decide(tmp_path, command) == {}
+    assert native.programs() == 1 and native.paths() == []
 
 
 # Group 3: a write target whose value the shell supplies when it runs. Host I's two commands of its c120 Q6 session

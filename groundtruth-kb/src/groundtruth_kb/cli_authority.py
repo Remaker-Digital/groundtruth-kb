@@ -224,6 +224,16 @@ def _domain_group(name: str, domain: str, *, read_only: bool = False, help: str 
             body["kind"] = kind
         _emit(_call(ctx, "PUT", f"/v1/{domain}/{quote(record_id, safe='')}", body=body), json_output)
 
+    if domain == "projects":
+        # c123 (owner decision E1): a new execution project starts authorized, so creating one is an owner operation
+        # the effect gate refuses in agent harnesses; amendments and program creation stay available to agents.
+        record.help = (
+            "Apply a version-checked program or project amendment and return canonical readback.\n\n"
+            "Creating an execution project (--expected-version 0 without --kind program) is an owner operation: it "
+            "starts authorized, so agent harnesses refuse that call (GT-KB's effect gate) and the owner runs it in "
+            "their own terminal. Amendments and program creation stay available to agents."
+        )
+
     return group
 
 
@@ -412,6 +422,7 @@ def native_assert(
 NATIVE_COMMANDS["assert"] = native_assert
 
 
+# c123 (owner decision E1): project authorization is an owner operation the effect gate refuses in agent harnesses.
 @projects_group.command("set-authorization")
 @click.argument("project_id")
 @click.option("--authorization", type=click.Choice(["authorized", "not authorized"]), required=True)
@@ -421,7 +432,10 @@ NATIVE_COMMANDS["assert"] = native_assert
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
 def set_project_authorization(ctx: click.Context, /, project_id: str, json_output: bool, **body: Any) -> None:
-    """Apply the owner's explicit ordering choice; existing bridge chains continue."""
+    """Apply the owner's explicit ordering choice; existing bridge chains continue.
+
+    Owner operation: agent harnesses refuse it (GT-KB's effect gate), and the owner runs it in their own terminal.
+    """
     _emit(
         _call(ctx, "PUT", f"/v1/projects/{quote(project_id, safe='')}/authorization", body=body),
         json_output,
@@ -474,6 +488,7 @@ def retire_work_item(ctx: click.Context, /, record_id: str, json_output: bool, *
     )
 
 
+# c123 (owner decision E1): a move can carry intake work into an authorized project, so it is an owner operation.
 @projects_group.command("move-item")
 @click.option("--work-item-id", required=True)
 @click.option("--from-project", "source_project_id", required=True)
@@ -485,7 +500,11 @@ def retire_work_item(ctx: click.Context, /, record_id: str, json_output: bool, *
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
 def move_item(ctx: click.Context, /, work_item_id: str, json_output: bool, **body: Any) -> None:
-    """Move one open work item atomically, preserving both projects' authorization."""
+    """Move one open work item atomically, preserving both projects' authorization.
+
+    Owner operation: a move can carry work into an authorized project, so agent harnesses refuse it (GT-KB's effect
+    gate) and the owner runs it in their own terminal.
+    """
     _emit(_call(ctx, "POST", f"/v1/work-items/{quote(work_item_id, safe='')}/move", body=body), json_output)
 
 
@@ -758,6 +777,17 @@ def bridge_check_effects(ctx: click.Context, /, json_output: bool, **body: Any) 
     """Check current scratch/implementation scope without granting or recording permission."""
     body["paths"] = list(body["paths"])
     _emit(_call(ctx, "POST", "/v1/bridge/check-effects", body=body), json_output)
+
+
+# c123 (batch design WP1 5): the effect gate runs this before a program or test run and reads exit 0 with the JSON
+# answer, or click's "Error: <code>: <message>" on stderr, through the same error path as check-effects.
+@native_bridge_group.command("check-program")
+@click.option("--native-context-id", required=True)
+@click.option("--json", "json_output", is_flag=True)
+@click.pass_context
+def bridge_check_program(ctx: click.Context, /, json_output: bool, **body: Any) -> None:
+    """Check that this context holds the live claim a program or test run needs, without granting permission."""
+    _emit(_call(ctx, "POST", "/v1/bridge/check-program", body=body), json_output)
 
 
 @native_bridge_group.command("check-delivery")

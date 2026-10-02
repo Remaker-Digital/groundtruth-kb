@@ -273,5 +273,7 @@ def test_each_command_hands_the_adapter_a_deadline_below_its_projected_timeout()
     assert "--deadline" not in actions[2]["command"], "no projected timeout, no adapter deadline"
     assert GOOSE["adapter_deadline_margin_seconds"] == 2
     assert project_harness._adapter_deadline({**GOOSE, "adapter_deadline_margin_seconds": 20}, manifest["hook"][0]) == 1
-    for name in ("claude", "codex", "cursor", "antigravity", "ollama", "openrouter", "alibaba-cloud-studio"):
+    # c123 (batch design WP2 2.4): the Claude hook adapter also refuses at a deadline below the registered timeout.
+    assert PROFILES["harnesses"]["claude"]["adapter_deadline_margin_seconds"] == 2
+    for name in ("codex", "cursor", "antigravity", "ollama", "openrouter", "alibaba-cloud-studio"):
         assert "adapter_deadline_margin_seconds" not in PROFILES["harnesses"][name], name

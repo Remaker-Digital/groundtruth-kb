@@ -43,6 +43,8 @@ def root(tmp_path, monkeypatch):
         "codex_hook_adapter.py",
         "antigravity_hook_adapter.py",
         "cursor_hook_adapter.py",
+        # c123 (batch design WP2 2.4): the rendered Claude registration runs its hooks through this adapter.
+        "claude_hook_adapter.py",
         "lo_file_safety_payloads.py",
     ):
         shutil.copyfile(ROOT / "scripts" / name, root / "scripts" / name)

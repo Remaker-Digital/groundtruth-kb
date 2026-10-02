@@ -16,6 +16,7 @@ import pytest
 from scripts import ollama_harness as oh_o
 from scripts import openrouter_harness as oh_r
 
+# c123 (batch design WP2 2.1): no [routing.openrouter.skills] table; the shared loader refuses one.
 DEEPSEEK_ROUTING = """
 schema_version = 1
 
@@ -42,9 +43,6 @@ default_model = "ollama-keep"
 
 [routing.openrouter]
 default_model = "deepseek-v4-pro"
-
-[routing.openrouter.skills]
-bridge-review = "deepseek-v4-pro"
 """
 
 
@@ -74,9 +72,11 @@ def test_openrouter_default_resolves_to_deepseek(tmp_path: Path) -> None:
     assert route.tool_calling_supported is True
 
 
-def test_openrouter_skill_route_resolves(tmp_path: Path) -> None:
+def test_openrouter_named_model_route_resolves(tmp_path: Path) -> None:
+    # c123 (batch design WP2 2.1 and 2.2): F's registration names --model deepseek-v4-flash; no skill selects a route.
     config = oh_r.load_routing_config(_fixture_root(tmp_path, DEEPSEEK_ROUTING))
-    assert oh_r.resolve_model(config, None, skill="bridge-review").key == "deepseek-v4-pro"
+    route = oh_r.resolve_model(config, "deepseek-v4-flash")
+    assert (route.key, route.model_id) == ("deepseek-v4-flash", "deepseek/deepseek-v4-flash")
 
 
 def test_ollama_loader_ignores_openrouter_rows(tmp_path: Path) -> None:
@@ -103,16 +103,17 @@ def test_generated_openrouter_models_preserve_only_the_provider_baseline(generat
 
 
 @pytest.mark.timeout(300)
-def test_generated_openrouter_default_and_skill_routes_resolve(generated_harness_root: Path) -> None:
+def test_generated_openrouter_default_and_named_routes_resolve(generated_harness_root: Path) -> None:
     config = oh_r.load_routing_config(generated_harness_root)
     baseline = tomllib.loads(
         (generated_harness_root / ".harness-baseline-configuration/routing.toml").read_text(encoding="utf-8")
     )
     expected = baseline["routing"]["openrouter"]
     assert config.default_model == expected["default_model"]
-    assert config.skill_routes == expected["skills"]
+    # c123 (batch design WP2 2.1): the baseline carries no skill table; every model row is selectable by its key.
+    assert "skills" not in expected
     route = oh_r.resolve_model(config, None)
     assert route.key == expected["default_model"]
     assert route.tool_calling_supported is True
-    for skill, key in expected["skills"].items():
-        assert oh_r.resolve_model(config, None, skill=skill).key == key
+    for key in config.models:
+        assert oh_r.resolve_model(config, key).key == key

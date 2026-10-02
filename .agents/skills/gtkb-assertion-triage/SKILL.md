@@ -21,7 +21,7 @@ The assertion command is read-only. Its observations concern the returned source
 
 Distinguish an implementation defect, an incorrect assertion, missing behavioral coverage, and a requirement that the owner has changed or retired. Repeated failures alone establish none of those conclusions. Do not call a failure harmless, accept it as expected, retire a valid requirement, or weaken a test merely to improve a score. A change of requirement belongs directly in its canonical formal record under the owner's direction.
 
-Correct the affected implementation or test through the assigned work. Reuse existing corrective work where it covers the defect; otherwise use the canonical intake with a linked executable test. Preserve coherent project scope and the actual unresolved obligation. Report unsupported or missing evaluation as UNASSESSED, or PARTIAL alongside evaluated checks.
+Correct the affected implementation or test through the assigned work. Reuse existing corrective work where it covers the defect; otherwise file unmatched work through `gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and name any related project in its description. Preserve coherent project scope and the actual unresolved obligation. Report unsupported or missing evaluation as UNASSESSED, or PARTIAL alongside evaluated checks.
 
 Use current CLI domain writers for resulting formal or work-item amendments, then read back the current state. Owner decisions are applied directly to authoritative state; their conversational history remains in session logs. Do not produce approval packets, decision files, retained triage snapshots or a second authority store.
 

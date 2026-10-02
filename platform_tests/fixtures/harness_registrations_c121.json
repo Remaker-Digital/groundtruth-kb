@@ -1,0 +1,359 @@
+{
+ "source": "final-install-identity-20260930T180821.json host_registrations (GET /v1/harnesses on the c121 install)",
+ "records": [
+  {
+   "id": "A",
+   "harness_name": "codex",
+   "harness_type": "codex",
+   "status": "active",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": true,
+     "can_receive_dispatch": true,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_max_items": 1,
+     "dispatch_quality": 90,
+     "dispatch_tags": [
+      "event-source",
+      "prime-builder"
+     ],
+     "event_driven_hooks": true
+    },
+    "headless": {
+     "argv": [
+      "codex",
+      "exec",
+      "--model",
+      "gpt-5.5",
+      "-c",
+      "approval_policy=\"never\"",
+      "-c",
+      "model_reasoning_effort=\"xhigh\"",
+      "-c",
+      "default_permissions=\":workspace\"",
+      "{{PROMPT}}",
+      "--cd",
+      "{{PROJECT_ROOT}}",
+      "--add-dir",
+      ".codex"
+     ],
+     "can_receive_dispatch": true
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-07-16T20:11:56+00:00"
+  },
+  {
+   "id": "B",
+   "harness_name": "claude",
+   "harness_type": "claude",
+   "status": "active",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": false,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_max_items": 3,
+     "dispatch_quality": 90,
+     "dispatch_tags": [
+      "loyal-opposition"
+     ],
+     "event_driven_hooks": false
+    },
+    "headless": {
+     "argv": [
+      "claude",
+      "--model",
+      "claude-sonnet-5",
+      "--effort",
+      "max",
+      "-p",
+      "{{PROMPT}}",
+      "--add-dir",
+      "{{PROJECT_ROOT}}",
+      "--output-format",
+      "json"
+     ]
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-08-07T04:24:22+00:00"
+  },
+  {
+   "id": "C",
+   "harness_name": "antigravity",
+   "harness_type": "antigravity",
+   "status": "active",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": false,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_quality": 90,
+     "dispatch_tags": [
+      "loyal-opposition"
+     ],
+     "event_driven_hooks": false
+    },
+    "headless": {
+     "argv": [
+      "agy",
+      "--print",
+      "{{PROMPT}}",
+      "--print-timeout",
+      "30m",
+      "--model",
+      "Gemini 3.5 Flash (High)",
+      "--dangerously-skip-permissions",
+      "--add-dir",
+      "{{PROJECT_ROOT}}"
+     ],
+     "can_receive_dispatch": true,
+     "prompt_transport": "stdin",
+     "stdin": true
+    },
+    "interactive": {
+     "kind": "ide",
+     "name": "Antigravity IDE"
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-08-29T06:38:21+00:00"
+  },
+  {
+   "id": "D",
+   "harness_name": "ollama",
+   "harness_type": "ollama",
+   "status": "suspended",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": true,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_max_items": 2,
+     "dispatch_quality": 100,
+     "dispatch_tags": [
+      "low-cost",
+      "loyal-opposition"
+     ],
+     "event_driven_hooks": false
+    },
+    "headless": {
+     "argv": [
+      "groundtruth-kb/.venv/Scripts/python.exe",
+      "scripts/ollama_harness.py",
+      "-p",
+      "{{PROMPT}}",
+      "--skill",
+      "bridge-review"
+     ],
+     "max_items": 1
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-08-07T04:09:37+00:00"
+  },
+  {
+   "id": "E",
+   "harness_name": "cursor",
+   "harness_type": "cursor",
+   "status": "active",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": false,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_max_items": 3,
+     "dispatch_quality": 90,
+     "dispatch_tags": [
+      "prime-builder"
+     ],
+     "event_driven_hooks": false
+    },
+    "headless": {
+     "argv": [
+      "groundtruth-kb/.venv/Scripts/python.exe",
+      "scripts/cursor_harness.py",
+      "-p",
+      "{{PROMPT}}",
+      "--skill",
+      "bridge-review"
+     ]
+    },
+    "interactive": {
+     "kind": "ide",
+     "name": "Cursor IDE"
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-08-26T17:50:22+00:00"
+  },
+  {
+   "id": "F",
+   "harness_name": "openrouter",
+   "harness_type": "openrouter",
+   "status": "active",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": true,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_quality": 90,
+     "dispatch_tags": [
+      "low-cost",
+      "loyal-opposition"
+     ],
+     "event_driven_hooks": false
+    },
+    "headless": {
+     "argv": [
+      "groundtruth-kb/.venv/Scripts/python.exe",
+      "scripts/openrouter_harness.py",
+      "-p",
+      "{{PROMPT}}",
+      "--model",
+      "gtkb-v4f-openrouter",
+      "--skill",
+      "bridge-review",
+      "--max-turns",
+      "200",
+      "--timeout",
+      "60",
+      "--session-timeout",
+      "5400"
+     ],
+     "max_items": 1
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-08-07T08:55:46+00:00"
+  },
+  {
+   "id": "G",
+   "harness_name": "goose",
+   "harness_type": "goose-desktop",
+   "status": "active",
+   "version": 1,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": false,
+     "dispatch_availability": 90,
+     "dispatch_cost": 40,
+     "dispatch_max_items": 1,
+     "dispatch_quality": 80,
+     "dispatch_tags": [
+      "loyal-opposition",
+      "alibaba-deepseek"
+     ],
+     "event_driven_hooks": false
+    },
+    "headless": {
+     "argv": [
+      "groundtruth-kb/.venv/Scripts/python.exe",
+      "scripts/goose_harness.py",
+      "-p",
+      "{{PROMPT}}",
+      "--skill",
+      "bridge-review",
+      "--model",
+      "gtkb-v4f-goose"
+     ],
+     "max_items": 1
+    },
+    "interactive": {
+     "kind": "desktop",
+     "name": "Goose Desktop"
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-08-13T07:10:32+00:00"
+  },
+  {
+   "id": "H",
+   "harness_name": "alibaba-cloud-studio",
+   "harness_type": "claude",
+   "status": "suspended",
+   "version": 2,
+   "invocation_surfaces": {
+    "dispatch": {
+     "can_fire_events": false,
+     "can_receive_dispatch": false,
+     "dispatch_availability": 90,
+     "dispatch_cost": 60,
+     "dispatch_max_items": 1,
+     "dispatch_quality": 100,
+     "dispatch_tags": [
+      "loyal-opposition",
+      "alibaba-cloud-studio"
+     ],
+     "event_driven_hooks": false
+    },
+    "envelope_projection": {
+     "activity_envelope_projection_mode": "compact-provider",
+     "compact_result_envelope_mode": "compact-provider",
+     "compact_session_envelope_mode": "compact-provider",
+     "full_transcript_archive_required": false
+    },
+    "headless": {
+     "argv": [
+      "groundtruth-kb/.venv/Scripts/python.exe",
+      "scripts/alibaba_cloud_studio_harness.py",
+      "--prompt",
+      "{{PROMPT}}",
+      "--skill",
+      "bridge-review",
+      "--model",
+      "alibaba-deepseek-v4-pro"
+     ],
+     "max_items": 1
+    }
+   },
+   "capabilities_ref": null,
+   "changed_at": "2026-09-18T06:00:01.718934+00:00"
+  },
+  {
+   "id": "I",
+   "harness_name": "deepseek-sdk",
+   "harness_type": "deepseek-sdk",
+   "status": "registered",
+   "version": 1,
+   "invocation_surfaces": {
+    "manual_dispatch": {
+     "argv": [
+      "infrastructure/deepseek-sdk/runtime-env/Scripts/python.exe",
+      "infrastructure/deepseek-sdk/harness.py",
+      "--root",
+      "{{PROJECT_ROOT}}",
+      "--init",
+      "{{INIT_LINE}}",
+      "--document",
+      "{{DOCUMENT}}",
+      "--version",
+      "{{VERSION}}",
+      "--task-file",
+      "{{TASK_FILE}}",
+      "--report",
+      "{{REPORT}}"
+     ],
+     "can_receive_dispatch": false,
+     "note": "Roles bind to contexts through the init line; the installation carries no role. Activation (registered -> active) follows the manual-dispatch case against the permanent authority (WI-7853)."
+    }
+   },
+   "capabilities_ref": "infrastructure/deepseek-sdk/installed.json",
+   "changed_at": "2026-09-12T03:39:36.146220+00:00"
+  }
+ ]
+}

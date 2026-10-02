@@ -24,6 +24,7 @@ def _cloud_root(tmp_path: Path) -> Path:
     root.mkdir()
     (root / "groundtruth.toml").write_text("[project]\nname='test'\n", encoding="utf-8")
     (root / ".api-harness").mkdir()
+    # c123 (batch design WP2 2.1): no [routing.testcloud.skills] table; the shared loader refuses one.
     (root / ".api-harness" / "routing.toml").write_text(
         "schema_version = 1\n"
         "[models.tc-default]\n"
@@ -35,9 +36,7 @@ def _cloud_root(tmp_path: Path) -> Path:
         'default_model = "tc-default"\n'
         "timeout_seconds = 900\n"
         "session_timeout_seconds = 3600\n"
-        "max_turns = 600\n"
-        "[routing.testcloud.skills]\n"
-        'bridge-review = "tc-default"\n',
+        "max_turns = 600\n",
         encoding="utf-8",
     )
     return root
@@ -142,6 +141,7 @@ def _ollama_root(tmp_path: Path) -> Path:
         (root / guard).parent.mkdir(parents=True, exist_ok=True)
         (root / guard).write_text("print('{}')\n", encoding="utf-8")
     # R6 (ii): the launcher reads the one authored routing source.
+    # c123 (batch design WP2 2.1): no [routing.ollama.skills] table; D's loader refuses one.
     (root / ".harness-baseline-configuration").mkdir(parents=True, exist_ok=True)
     (root / ".harness-baseline-configuration" / "routing.toml").write_text(
         "schema_version = 1\n"
@@ -154,9 +154,7 @@ def _ollama_root(tmp_path: Path) -> Path:
         'default_model = "fixture-model"\n'
         "timeout_seconds = 900\n"
         "session_timeout_seconds = 3600\n"
-        "max_turns = 600\n"
-        "[routing.ollama.skills]\n"
-        'bridge-review = "fixture-model"\n',
+        "max_turns = 600\n",
         encoding="utf-8",
     )
     return root
@@ -164,7 +162,8 @@ def _ollama_root(tmp_path: Path) -> Path:
 
 def _ollama_route(root: Path) -> ollama.ModelRoute:
     config = ollama.load_routing_config(root)
-    return ollama.resolve_model(config, None, skill="bridge-review")
+    # c123 (batch design WP2 2.1): the route D's registration names with --model, not a skill route.
+    return ollama.resolve_model(config, "fixture-model")
 
 
 def test_ollama_harness_malformed_json_arguments_is_recoverable(tmp_path: Path) -> None:

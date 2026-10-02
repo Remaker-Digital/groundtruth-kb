@@ -71,23 +71,36 @@ def emit_pass() -> None:
     print("{}")
 
 
+def _coded_reason(result: Mapping[str, object]) -> str:
+    """The block's reason led by its reason code, once (c123; batch design WP1, B148).
+
+    The code used to stay inside the process: hosts saw the text alone. A reason that already starts with
+    "<code>:" is not prefixed again.
+    """
+    reason = str(result.get("reason") or "")
+    code = result.get("reason_code")
+    if isinstance(code, str) and code and reason and not reason.startswith(f"{code}:"):
+        return f"{code}: {reason}"
+    return reason
+
+
 def emit_effect_gate_result(result: Mapping[str, object], *, diagnostic: bool = False) -> None:
     """Emit the effect checker's existing diagnostic, deny or allow JSON protocol."""
     if diagnostic:
-        print(
-            json.dumps(
-                {
-                    "decision": result.get("decision", "allow"),
-                    "diagnostic": True,
-                    "reason": result.get("reason", ""),
-                    "would_block": result.get("decision") == "block",
-                },
-                sort_keys=True,
-            )
-        )
+        report: dict[str, object] = {
+            "decision": result.get("decision", "allow"),
+            "diagnostic": True,
+            "reason": result.get("reason", ""),
+            "would_block": result.get("decision") == "block",
+        }
+        # c123 (B148): a result that carries a code shows it; a code-less result keeps its exact bytes.
+        code = result.get("reason_code")
+        if isinstance(code, str) and code:
+            report["reason_code"] = code
+        print(json.dumps(report, sort_keys=True))
         return
     if result.get("decision") == "block":
-        reason = result.get("reason") or "BLOCKED (GTKB-IMPLEMENTATION-START-GATE)"
+        reason = _coded_reason(result) or "BLOCKED (GTKB-IMPLEMENTATION-START-GATE)"
         print(
             json.dumps(
                 {

@@ -3,7 +3,7 @@
 
 Wraps :mod:`groundtruth_kb.spec_intake`. A candidate is temporary and grants nothing; confirmation writes one
 specification through the native authority with ``changed_by="prime-builder/spec-intake-skill"``; rejection
-discards the candidate and writes nothing. The persisted deliberation queue is retired (O-7 R24).
+discards the candidate and writes nothing. The persisted deliberation queue is retired.
 """
 
 from __future__ import annotations

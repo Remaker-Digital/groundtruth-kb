@@ -5,11 +5,10 @@ RULE_PATH = REPO_ROOT / ".harness-baseline-configuration" / "rules" / "project-r
 BASELINE_RULE_PATH = REPO_ROOT / ".harness-baseline-configuration" / "rules" / "project-root-boundary.md"
 
 
+# c123 (batch design WP4 4.12, G24): the DCL is the authority; the deliberation that once carried the exception is
+# history, so no Provenance line or DELIB id remains in the section.
 EXCEPTION_CARRIERS = {
-    "External Harness Executable Resolution Exception": (
-        "DCL-PROJECT-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXEC-EXCEPTION-001",
-        "DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION",
-    ),
+    "External Harness Executable Resolution Exception": "DCL-PROJECT-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXEC-EXCEPTION-001",
 }
 
 
@@ -21,11 +20,11 @@ def _exception_section(rule_text: str, heading: str) -> str:
 def test_root_boundary_exceptions_use_dcls_as_authority() -> None:
     rule_text = RULE_PATH.read_text(encoding="utf-8")
 
-    for heading, (carrier, provenance) in EXCEPTION_CARRIERS.items():
+    for heading, carrier in EXCEPTION_CARRIERS.items():
         section = _exception_section(rule_text, heading)
 
         assert f"Authority: `{carrier}`" in section
-        assert f"Provenance: `{provenance}`" in section
+        assert "Provenance:" not in section and "DELIB-" not in section
         assert "Source:" not in section
 
 
@@ -36,10 +35,10 @@ def test_adopter_templates_cite_the_canonical_carrier_pattern() -> None:
     retrieval guidance only; the projected boundary rule is the adopter-facing carrier.
     """
     baseline = BASELINE_RULE_PATH.read_text(encoding="utf-8")
-    for heading, (carrier, provenance) in EXCEPTION_CARRIERS.items():
+    for heading, carrier in EXCEPTION_CARRIERS.items():
         section = _exception_section(baseline, heading)
         assert f"Authority: `{carrier}`" in section
-        assert f"Provenance: `{provenance}`" in section
+        assert "Provenance:" not in section and "DELIB-" not in section
 
 
 def test_retired_sandbox_exception_grants_no_authority() -> None:

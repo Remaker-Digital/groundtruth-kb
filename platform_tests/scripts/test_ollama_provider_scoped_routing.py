@@ -31,7 +31,10 @@ def make_root(tmp_path: Path, routing_text: str) -> Path:
 
 
 def mixed_provider_routing() -> str:
-    """A routing.toml with ollama, ollama (absent provider), and openrouter rows."""
+    """A routing.toml with ollama, ollama (absent provider), and openrouter rows.
+
+    c123 (batch design WP2 2.1): it has no [routing.ollama.skills] table; D's loader refuses one.
+    """
     return f"""
 schema_version = 1
 
@@ -54,9 +57,6 @@ allowed_tools = ["Read", "Write", "Edit", "Grep", "Glob", "Bash"]
 
 [routing.ollama]
 default_model = "ollama-default"
-
-[routing.ollama.skills]
-bridge-review = "ollama-default"
 """
 
 
@@ -98,11 +98,14 @@ def test_openrouter_model_id_not_in_validated_set(tmp_path: Path) -> None:
     assert OLLAMA_LEGACY_MODEL_ID in configured_ids
 
 
-def test_default_and_skill_routes_still_resolve(tmp_path: Path) -> None:
+def test_default_and_named_routes_still_resolve(tmp_path: Path) -> None:
     root = make_root(tmp_path, mixed_provider_routing())
     config = oh.load_routing_config(root, advertised_model_ids=_advertised())
     assert oh.resolve_model(config, None).key == "ollama-default"
-    assert oh.resolve_model(config, None, skill="bridge-review").key == "ollama-default"
+    # c123 (batch design WP2 2.1): a registration names its route with --model; a peer provider's row is not one.
+    assert oh.resolve_model(config, "ollama-no-provider").key == "ollama-no-provider"
+    with pytest.raises(oh.OllamaHarnessError, match="unknown model route: openrouter-one"):
+        oh.resolve_model(config, "openrouter-one")
 
 
 def test_unadvertised_ollama_model_still_raises(tmp_path: Path) -> None:
@@ -110,7 +113,8 @@ def test_unadvertised_ollama_model_still_raises(tmp_path: Path) -> None:
     # if an ollama-provider model is configured but absent from /api/tags, the
     # harness should still fail closed.
     root = make_root(tmp_path, mixed_provider_routing())
-    with pytest.raises(oh.OllamaHarnessError):
+    # c123 (batch design WP2 2.1): the match keeps a refusal for any other reason from passing this test.
+    with pytest.raises(oh.OllamaHarnessError, match="not advertised locally"):
         oh.load_routing_config(root, advertised_model_ids=[OLLAMA_MODEL_ID])  # missing ollama-legacy
 
 

@@ -494,7 +494,12 @@ def test_live_dirty_worktree_count_overrides_startup_model_count() -> None:
     assert "live git status" in dirty[4]
 
 
-def test_deferred_records_without_expiry_surface_release_health_warn(tmp_path) -> None:
+def test_deferred_is_not_a_managed_dashboard_state(tmp_path) -> None:
+    """c123 (batch design WP5, G42): DEFERRED is retired, so deferred records are not a managed dashboard state.
+
+    Deferred records, with and without a resume trigger, produce no finding or blocker about deferral or expiry, while an
+    explicit release-health finding in the same model is still reported, so the test cannot pass vacuously.
+    """
     db_path = tmp_path / "gtkb-dashboard.sqlite"
     model = _sample_model()
     model["dashboard_intelligence"]["release_readiness"] = {"blockers": [], "blocker_count": 0}
@@ -503,29 +508,24 @@ def test_deferred_records_without_expiry_surface_release_health_warn(tmp_path) -
         {"id": "INTAKE-NO-EXPIRY", "status": "deferred"},
         {"id": "INTAKE-BOUNDED", "status": "deferred", "resume_trigger": "after release branch cut"},
     ]
+    model["dashboard_intelligence"]["release_health_findings"] = [
+        {"source": "explicit-check", "message": "an explicit release-health finding", "severity": "yellow"}
+    ]
 
     refresh_database(db_path=db_path, project_root=tmp_path, model=model, history=[])
 
     with sqlite3.connect(db_path) as conn:
-        metrics = {
-            row[0]: (row[1], row[2])
-            for row in conn.execute(
-                """
-                SELECT metric_key, value, status
-                FROM current_metrics
-                WHERE metric_key IN ('release_blockers', 'release_health_findings')
-                """
-            )
-        }
         blockers = [row[0] for row in conn.execute("SELECT blocker FROM release_blockers ORDER BY sort_order")]
 
-    assert metrics == {
-        "release_blockers": (1, "yellow"),
-        "release_health_findings": (1, "yellow"),
-    }
-    assert blockers == [
-        "[deferral-expiry] 1 deferred record(s) lack an expiry, time limit, or resume trigger: INTAKE-NO-EXPIRY"
-    ]
+    assert blockers == ["[explicit-check] an explicit release-health finding"]
+    assert not any("defer" in blocker.lower() or "expir" in blocker.lower() for blocker in blockers)
+
+
+def test_the_readme_teaches_no_deferral_expiry_rule() -> None:
+    """c123 (G42): no README sentence pairs deferral with expiry any more."""
+    readme = (Path(__file__).resolve().parents[2] / "README.md").read_text(encoding="utf-8")
+    for sentence in readme.replace("\n", " ").split(". "):
+        assert not ("defer" in sentence.lower() and "expir" in sentence.lower()), sentence
 
 
 def test_azure_reconciliation_is_explicit_opt_in(monkeypatch, tmp_path) -> None:

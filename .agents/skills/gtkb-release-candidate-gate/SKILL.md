@@ -4,8 +4,6 @@ description: Run the non-deploying Agent Red release-candidate gate before treat
 argument-hint: [--python-only|--frontend-only|--full]
 allowed-tools: Bash, Read, Grep
 license: "Proprietary - Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: release-readiness

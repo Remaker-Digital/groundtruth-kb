@@ -1,11 +1,8 @@
 ---
 name: gtkb-loyal-opposition-report
 description: "Generate a Loyal Opposition report with required evidence structure. Files informational findings as a native ADVISORY."
-argument-hint: "<report-slug>"
-allowed-tools: Bash, Read, Write
+allowed-tools: Bash, Read
 license: "Proprietary - Remaker Digital"
-compatibility:
-  - claude-code >= 1.0
 metadata:
   project: groundtruth-kb
   category: loyal-opposition
@@ -14,8 +11,6 @@ metadata:
 # Loyal Opposition Report Generator
 
 Generate a Loyal Opposition report following the mandatory report quality standard.
-
-**Arguments:** `$ARGUMENTS` = kebab-case slug for the report filename.
 
 ## Report Structure (Required)
 
@@ -54,11 +49,18 @@ interview, classification slot or owner-answer transcript is required.
 
 ## Output
 
-File an informational ADVISORY through the native bridge CLI with complete
-author provenance and no routing envelope or work-item reservation. It grants
-no implementation assignment. Owner-selected follow-up uses a separate NEW
-chain and the normal independent-review workflow. Apply resulting formal or
-domain changes to canonical state; reports and conversation logs are context.
+A reproducible defect becomes a corrective work item. An opportunity or an
+uncertain finding stays a native ADVISORY. The owner selects which item is
+dispatched, and its implementation is a separate NEW chain.
+
+File unmatched work through `gtkb-work-item` into
+`PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and
+name any related project in its description. File an informational ADVISORY
+through the native bridge CLI with complete author provenance and no routing
+envelope or work-item reservation. Neither grants an implementation assignment.
+Owner-selected follow-up uses the normal independent-review workflow. Do not
+save the report as a separate file. Apply resulting formal or domain changes to
+canonical state; reports and conversation logs are context.
 
 ## Severity Levels
 

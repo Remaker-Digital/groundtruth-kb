@@ -1,8 +1,18 @@
 # GroundTruth KB Vision
 
-Source: owner statement, 2026-04-10.
+## Purpose
+
+GT-KB exists to cure agent context drift. It loads each ephemeral context with
+the baseline knowledge and task information it needs. GT-KB is efficacious when
+agents loaded this way create work items that other agents can use to produce
+work product (artifacts or state changes) that matches the applicable
+specifications and passes the predefined tests. Drift shows in work product and
+bridge messages. Once GT-KB reliably completes such corrective work on itself,
+the owner moves GT-KB's own development to GT-KB agents.
 
 ## Canonical Vision Statement
+
+Source: owner statement, 2026-04-10. It remains the long-range aim.
 
 GroundTruth KB exists to create a software factory in which the owner of a
 software development project delivers specifications to the pipeline, and the
@@ -20,13 +30,15 @@ For Loyal Opposition and Prime Builder reviews, proposals, and implementation ch
 
 > Does this reduce the owner's role to specifications, clarifications, and
 > decisions?
+>
+> Does this help the next agent create or use such a work item?
 
 Prioritize approaches that:
 
 - Improve specification capture and traceability.
 - Automate verification and evidence capture.
 - Reduce manual owner supervision of routine implementation or deployment work.
-- Preserve decisions, trade-offs, and rationale across sessions and agents.
+- Carry decisions in the formal records, projects and work items they change.
 - Make Azure production readiness a pipeline output rather than an owner-managed checklist.
 
 Deprioritize approaches that require the owner to:

@@ -17,10 +17,12 @@ applicable lifecycle. A correct typed refusal is a working boundary; rejected
 valid work or accepted invalid work is a defect. Inspect material consumers
 before recommending an isolated edit.
 
-Reconcile findings with existing project/work-item scope. Route unmatched work
-through established intake; do not create ad hoc projects, infer completion or
-choose the next dispatched target. Inspection grants no write/cleanup permission
-and triggers no automatic archival or owner-decision ledger.
+Reconcile findings with existing project/work-item scope. File unmatched work
+through `gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with its
+specification and executable test, and name any related project in its
+description. Do not create ad hoc projects, infer completion or choose the next
+dispatched target. Inspection grants no write/cleanup permission and triggers no
+automatic archival or owner-decision ledger.
 
 Use the current context's scratch directory for temporary results. Preserve
 unrelated files, checkouts, Git state and formal history. Ask material unresolved

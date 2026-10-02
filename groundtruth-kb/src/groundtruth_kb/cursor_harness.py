@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import hashlib
-import json
 import math
 import os
 import re
@@ -20,16 +19,6 @@ from groundtruth_kb.local_env import load_env_local
 
 DEFAULT_TIMEOUT_SECONDS = 600.0
 TIMEOUT_EXIT_CODE = 124
-LOYAL_OPPOSITION_BRIDGE_SKILLS = frozenset({"bridge-review", "verification"})
-# WI-4933: the harness-registry Cursor invocation surfaces pass canonical
-# Loyal Opposition route keys ('bridge-review', 'verification'), but no SKILL.md
-# exists under those names. Resolve them to the real skill directories so
-# headless LO dispatch loads the bridge/verification contracts instead of
-# failing closed or loading a generic review memo contract.
-_SKILL_ROUTE_ALIASES = {
-    "bridge-review": "proposal-review",
-    "verification": "verify",
-}
 _CURSOR_GUI_LAUNCHER_NAMES = {"cursor", "cursor.cmd", "cursor.exe"}
 _STANDALONE_AGENT_NAMES = ("agent", "cursor-agent")
 _STANDALONE_AGENT_EXECUTABLE_NAMES = {
@@ -43,7 +32,8 @@ _STANDALONE_AGENT_EXECUTABLE_NAMES = {
 _WINDOWS_SHELL_WRAPPER_SUFFIXES = {".bat", ".cmd", ".ps1"}
 _CURSOR_AGENT_HELP_TIMEOUT_SECONDS = 10.0
 _CURSOR_AUTH_ENV_KEYS = ("CURSOR_API_KEY",)
-_CURSOR_ADAPTATION_VERSION = "cursor-native-cli-v1"
+# c123 (batch design WP2 2.1): adaptation v2 has no role skill routes; the prompt reaches Cursor Agent as dispatched.
+_CURSOR_ADAPTATION_VERSION = "cursor-native-cli-v2"
 _TIMEOUT_CAPTURE_LIMIT_BYTES = 4000
 _TIMEOUT_CAPTURE_SECRET_PATTERNS = (
     re.compile(r"(?i)\b(api[_-]?key|token|secret|password)\s*[:=]\s*([A-Za-z0-9._~+/=-]{8,})"),
@@ -164,45 +154,6 @@ def _resolve_agent_command() -> list[str]:
     )
 
 
-def _skill_system_prompt(skill: str | None, *, project_root: Path | None = None) -> str | None:
-    if not skill:
-        return None
-    if not re.fullmatch(r"[a-z0-9][a-z0-9-]*", skill):
-        raise CursorHarnessError("invalid skill route")
-    names = ("gtkb-bridge", "gtkb-" + _SKILL_ROUTE_ALIASES[skill]) if skill in _SKILL_ROUTE_ALIASES else (skill,)
-    skills_root = (project_root or Path.cwd()) / ".agents" / "skills"
-    instructions = []
-    for name in names:
-        skill_path = skills_root / name / "SKILL.md"
-        if (
-            skills_root.is_symlink()
-            or skills_root.is_junction()
-            or not skill_path.resolve().is_relative_to(skills_root.absolute())
-        ):
-            raise CursorHarnessError("skill route leaves the shared authored skill directory")
-        try:
-            content = skill_path.read_text(encoding="utf-8")
-            if not content.strip():
-                raise CursorHarnessError(f"empty skill route {name!r}; check the shared authored skill source")
-            instructions.append(content)
-        except (OSError, UnicodeError) as exc:
-            raise CursorHarnessError(
-                f"unknown or unreadable skill route {name!r}; check the shared authored skill source"
-            ) from exc
-    return "\n\n".join(instructions)
-
-
-def _build_prompt(user_prompt: str, skill: str | None, *, project_root: Path | None = None) -> str:
-    system_prompt = _skill_system_prompt(skill, project_root=project_root)
-    prompt = user_prompt
-    if system_prompt:
-        prompt = (
-            "Follow the GT-KB skill contract below, then execute the user task.\n\n"
-            f"{system_prompt}\n\n---\n\n{user_prompt}"
-        )
-    return prompt
-
-
 def _sha256_file(path: Path) -> str:
     try:
         return "sha256:" + hashlib.sha256(path.read_bytes()).hexdigest()
@@ -218,15 +169,10 @@ def cursor_adaptation_metadata(project_root: Path | None = None) -> dict[str, An
         "harness_id": "E",
         "adaptation_label": "cursor-native-cli",
         "adaptation_version": _CURSOR_ADAPTATION_VERSION,
-        "skill_route_aliases": dict(sorted(_SKILL_ROUTE_ALIASES.items())),
         "input_fingerprints": {
             "scripts/cursor_harness.py": _sha256_file(shim_path),
             "groundtruth_kb/cursor_harness.py": _sha256_file(Path(__file__)),
             "groundtruth_kb/local_env.py": _sha256_file(Path(__file__).with_name("local_env.py")),
-            "skill-route-aliases": "sha256:"
-            + hashlib.sha256(
-                json.dumps(_SKILL_ROUTE_ALIASES, sort_keys=True, separators=(",", ":")).encode("utf-8")
-            ).hexdigest(),
         },
         "raw_prompt_included": False,
     }
@@ -256,10 +202,6 @@ def _build_command(
     return command
 
 
-def _requires_bridge_output(skill: str | None) -> bool:
-    return skill in LOYAL_OPPOSITION_BRIDGE_SKILLS
-
-
 # WI-6541: the local envelope-marker prefix tuple was removed with the local
 # head parser. Envelope-marker recognition now lives solely in
 # ``groundtruth_kb.bridge.versioned_files.parse_bridge_header_block``.
@@ -281,8 +223,12 @@ def _cursor_agent_env(*, project_root: Path) -> dict[str, str]:
         value = env_values.get(key, "")
         if value and not env.get(key):
             env[key] = value
-    env.setdefault("GTKB_HARNESS_NAME", "cursor")
-    env.setdefault("GTKB_HARNESS_ID", "E")
+    # c123 (batch design WP4 4.1, G4): the shim names its own harness, also under the name the other launchers export
+    # for author_harness_id attribution. A value inherited from another launcher's process never wins (the API
+    # launchers assign theirs); the model fields below stay operator-overridable defaults.
+    env["GTKB_HARNESS_NAME"] = "cursor"
+    env["GTKB_HARNESS_ID"] = "E"
+    env["GTKB_AUTHOR_HARNESS_ID"] = "E"
     env.setdefault("GTKB_AUTHOR_MODEL", "Composer")
     env.setdefault("GTKB_AUTHOR_MODEL_VERSION", "cursor-agent")
     env.setdefault(
@@ -331,7 +277,6 @@ def _timeout_stdout(exc: subprocess.TimeoutExpired) -> object:
 def _timeout_diagnostic(
     *,
     timeout_seconds: float,
-    skill: str | None,
     output_format: str,
     mode: str | None,
     command: list[str],
@@ -344,7 +289,7 @@ def _timeout_diagnostic(
     return (
         "cursor_harness: Cursor Agent timed out "
         f"after {timeout_seconds:g}s; exit={TIMEOUT_EXIT_CODE}; executable={executable}; "
-        f"skill={skill or '<none>'}; output_format={output_format}; mode={mode or '<default>'}; "
+        f"output_format={output_format}; mode={mode or '<default>'}; "
         f"partial_stdout_bytes={stdout_bytes}; partial_stderr_bytes={stderr_bytes}"
     )
 
@@ -352,10 +297,6 @@ def _timeout_diagnostic(
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Cursor Agent harness shim.")
     parser.add_argument("-p", "--prompt", required=True, help="Prompt to send to Cursor Agent.")
-    parser.add_argument(
-        "--skill",
-        help="Optional skill route key (for example bridge-review or verification).",
-    )
     parser.add_argument(
         "--output-format",
         default="text",
@@ -391,9 +332,9 @@ def main(argv: list[str] | None = None, *, project_root: Path | None = None) -> 
         _load_project_env_local(project_root=project_root)
     effective_output_format, effective_mode = args.output_format, args.mode
     try:
-        prompt = _build_prompt(args.prompt, args.skill, project_root=project_root)
+        # c123 (batch design WP2 2.1): the dispatched prompt, whose first line is the init line, goes as it came.
         command = _build_command(
-            prompt,
+            args.prompt,
             project_root,
             output_format=effective_output_format,
             mode=effective_mode,
@@ -426,7 +367,6 @@ def main(argv: list[str] | None = None, *, project_root: Path | None = None) -> 
         sys.stderr.write(
             _timeout_diagnostic(
                 timeout_seconds=float(args.timeout),
-                skill=args.skill,
                 output_format=effective_output_format,
                 mode=effective_mode,
                 command=command,
@@ -442,10 +382,9 @@ def main(argv: list[str] | None = None, *, project_root: Path | None = None) -> 
         if completed.stdout:
             sys.stdout.write(completed.stdout)
         return completed.returncode
-    if _requires_bridge_output(args.skill) and not (completed.stdout or "").strip():
-        sys.stderr.write(
-            f"cursor_harness: Cursor Agent produced no stdout for Loyal Opposition bridge skill {args.skill!r}\n"
-        )
+    if not (completed.stdout or "").strip():
+        # c123 (batch design WP2 2.1): every run needs output; a role skill no longer marks bridge work.
+        sys.stderr.write("cursor_harness: Cursor Agent produced no stdout\n")
         return 1
     sys.stdout.write(completed.stdout)
     return 0

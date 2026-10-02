@@ -62,9 +62,10 @@ The `GTKB-Home` task runs `home.py start` at logon and every five minutes. `star
 
 1. verifies the installation;
 2. writes the pinned profile manifest;
-3. proves that the composed configuration contains every GT-KB row, with the upstream brand disabled;
-4. starts the server detached with a minimal environment;
-5. returns once the guard, the plugin and the server have all reported ready.
+3. in a fresh state folder, acknowledges upstream's Internal Testing Notice (see State and privacy);
+4. proves that the composed configuration contains every GT-KB row, with the upstream brand disabled;
+5. starts the server detached with a minimal environment;
+6. returns once the guard, the plugin and the server have all reported ready.
 
 Otherwise it stops what it started and fails.
 
@@ -94,7 +95,7 @@ The pages appear in Settings, after General:
 | Page | Contents |
 | --- | --- |
 | GT-KB | `gt status` and the dashboard's links. |
-| GT-KB services | Start and stop for the authority, the dashboard, Ollama and PostgreSQL, with a confirmation before any stop. The Home's own row is shown but has no action. |
+| GT-KB services | Start and stop for the authority, the dashboard, Ollama and PostgreSQL, with a confirmation before any stop. A task or service that another installation registered is shown as status only. The Home's own row is shown but has no action. |
 | GT-KB controls | The live operational controls. A change is previewed as a complete proposed file with its diff, then applied with `gt controls set` only if the live file still has the digest that was previewed. |
 
 Every control is one fixed `gt` command. It runs through the plugin's authenticated `/gtkb` channel, with an environment
@@ -104,13 +105,29 @@ that carries no credential. The controls are the signed-in owner's browser actio
 
 Every Home session runs under `gtkb_home_guard.mjs`:
 
+- One Home, one project. The effect gate judges only the project of the installation the Home belongs to, so a session
+  whose workspace is outside that installation's root is refused at every gated call, reads included, before any gate
+  call. The workspace is resolved through junctions and links first, and one that cannot be resolved is refused. The
+  refusal (`workspace_outside_project_root`) names the workspace, where it resolves when that is somewhere else (or why
+  it cannot be resolved), and the root. Start a new session in a workspace inside the root.
+- The same rule covers the `workdir` a one-shot shell call names (the `pwsh` of the standard, ptc and cordis agent
+  presets), absolute or relative to the workspace: one outside the root, or one that cannot be resolved, is refused, and
+  otherwise the gate judges the command from the resolved workdir, where it runs. A call without a workdir is judged
+  from the session's workspace, and so is every call to the persistent shell, which ignores a workdir.
 - Each effect-bearing tool call (write, edit, the editor's create, replace and insert, shell) passes GT-KB's effect gate
   (`scripts/implementation_start_gate.py`). It runs under that session's own identity and workspace, and the approval
   is bound to the exact arguments.
-- Reads pass.
+- File reads and searches (read, read_image, glob, grep, the editor's view) reach the same gate as reads: it refuses
+  credential material and allows the rest.
+- A call to a shell whose directory persists across calls (the `pwsh` of the shipped `minimal` agent preset) is marked
+  `persistent_shell` for the gate, which refuses a top-level directory change there.
 - Network tools are denied.
 - Unrecognized tools are denied.
 - A gate failure of any kind denies.
+
+The start screen's workspace menu offers the Home's root: at each start the plugin registers it as a workspace, named
+after its folder, so a removed entry returns at the next start. The Windows folder dialog stays; a session in a folder
+it picks outside the root is refused as above.
 
 ## State and privacy
 
@@ -119,10 +136,29 @@ Home state lives outside the repository, in `%LOCALAPPDATA%\GT-KB\home` (or `GTK
 - sessions;
 - the browser-cookie secret;
 - run records;
-- logs;
-- configuration proposals.
+- logs, including the guard log;
+- configuration proposals;
+- `settings.yaml`, the server's user settings (the Models page writes there).
 
 Telemetry is disabled (`DSH_TELEMETRY_DISABLED=1`). The sign-in URL is written only to `run\home-url.txt`.
+
+`home.py start` writes `settings.yaml` only into a state folder that has none, production's included, with one
+setting: the acknowledgement of upstream's Internal Testing Notice (`ui-onboarding.welcomeNoticeVersion`), so the
+notice does not show in a fresh state. An existing `settings.yaml` is never changed. If an upstream release changes the
+notice's version, the notice shows again until it is acknowledged; a pin test names the upstream package to verify
+first.
+
+The guard log, `logs\guard-decisions.jsonl`, has one JSON line per guard decision: each of the guard's own denials
+and each effect-gate verdict. A line holds the time, the tool, the session id, a folder (the session's workspace, or
+for a gate verdict the folder the gate judged the call from, which is a one-shot shell's resolved workdir when the call
+names one), the gate's exit status (null for the guard's own denials), whether the call was allowed, and the refusal
+text. Apart from that folder, the guard writes no call arguments and no environment values; a refusal text can quote
+the part of the call it refused, and a workdir refusal names the workdir. A failed write is ignored, so the log is
+evidence, not a control.
+
+Every installation uses the same default state folder. A run record names the installation whose Home it describes,
+and `home.py start` and `stop` refuse a record of another installation's live Home and leave it and the sign-in URL in
+place. Give a second installation its own folder with `--state` or `GTKB_HOME_STATE`.
 
 ## Changing the pin
 

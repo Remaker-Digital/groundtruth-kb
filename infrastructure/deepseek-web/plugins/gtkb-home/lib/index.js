@@ -10,6 +10,8 @@
 //   These controls are browser actions of the signed-in owner, never model tools.
 // - Registers a loopback control route for GT-KB's Home service: POST /gtkb-home/control/shutdown with the per-start
 //   secret runs the harness's own teardown (the harness has no HTTP shutdown and Windows cannot deliver SIGTERM).
+// - c123 (owner decision C2): registers the Home's root as a workspace, so the start screen's workspace menu offers it
+//   next to the Windows folder dialog.
 import { spawn } from 'node:child_process';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdirSync, readFileSync, rmSync } from 'node:fs';
@@ -144,6 +146,22 @@ function loopback(req) {
   return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1';
 }
 
+// c123 (batch design WP3 3.1(b)): once the workspace registry is up, register the Home's root as a workspace. The
+// registry resolves the path and reuses an existing record; with no title a new record is named after the folder. A
+// failure costs only the menu entry: one stderr line, and the Home still starts.
+function offerRootWorkspace(ctx, root) {
+  const unavailable = (error) => {
+    process.stderr.write(`gtkb-home: the Home's root is not offered as a workspace: ${error instanceof Error ? error.message : String(error)}\n`);
+  };
+  try {
+    ctx.inject(['workspaceRegistry'], function gtkbHomeRootWorkspace(inner) {
+      return Promise.resolve().then(() => inner.workspaceRegistry.create(root)).catch(unavailable);
+    });
+  } catch (error) {
+    unavailable(error);
+  }
+}
+
 export function apply(ctx, config = {}) {
   if (!Array.isArray(config.gtArgv) || config.gtArgv.some((part) => typeof part !== 'string' || part.length === 0)
       || typeof config.gtCwd !== 'string' || config.gtCwd.length === 0) {
@@ -211,5 +229,6 @@ export function apply(ctx, config = {}) {
     }
     return { ok: true, value: plan.shape ? plan.shape(value) : value };
   });
+  offerRootWorkspace(ctx, config.gtCwd);
   process.stderr.write('gtkb-home active\n');
 }

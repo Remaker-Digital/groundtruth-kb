@@ -395,8 +395,8 @@ def test_postgresql_config_carries_the_kernel_contract():
     settings = PostgreSQLConfig()
     assert settings.service == "gtkb"
     assert settings.connect_timeout_seconds == 10
-    assert settings.lock_timeout_ms == 20000
-    assert settings.statement_timeout_ms == 30000
+    assert settings.lock_timeout_ms == 40000
+    assert settings.statement_timeout_ms == 40000
 
 
 def test_postgresql_config_is_frozen_and_holds_no_secrets():
@@ -435,8 +435,8 @@ def test_postgresql_defaults_are_secret_free():
 
     assert cfg.postgresql.service == "gtkb"
     assert cfg.postgresql.connect_timeout_seconds == 10
-    assert cfg.postgresql.lock_timeout_ms == 20000
-    assert cfg.postgresql.statement_timeout_ms == 30000
+    assert cfg.postgresql.lock_timeout_ms == 40000
+    assert cfg.postgresql.statement_timeout_ms == 40000
 
 
 def test_postgresql_toml_and_environment_merge_per_field(tmp_path, monkeypatch):
@@ -598,4 +598,4 @@ def test_disabled_discovery_retains_explicit_configuration_and_layer_precedence(
     from_environment = GTConfig.load(discover=False, project_root=selected)
     assert from_environment.authority_url == "http://127.0.0.1:12"
     assert from_environment.postgresql.service == "environment"
-    assert from_environment.postgresql.lock_timeout_ms == 20000
+    assert from_environment.postgresql.lock_timeout_ms == 40000

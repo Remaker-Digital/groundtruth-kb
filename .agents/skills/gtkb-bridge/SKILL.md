@@ -63,10 +63,23 @@ permission record, owner decision or completed result.
 | VERDICT-REJECTED | A Loyal Opposition context independently corrects the rejected verdict using the current proposal or report phase. |
 
 Prime Builder may reject a noncompliant, PB-addressed GO, NO-GO or NOT-READY
-with VERDICT-REJECTED. WITHDRAWN closes a pre-GO attempt; SUPERSEDED records
-canonical evidence that the scoped subject no longer exists. Neither substitutes
-for implementing live work. BLOCKED is the headless pre-proposal response to a
-parent that is not authorized. ADVISORY carries no execution authority.
+with VERDICT-REJECTED.
+
+VERIFIED, SUPERSEDED, WITHDRAWN, BLOCKED and ADVISORY are non-dispatchable. They
+carry no envelope lines and no `recipient_role`. Authors and next responders are
+in the file-bridge-protocol table. Their effects:
+
+- WITHDRAWN: Prime Builder authors it, before GO only (it is refused after GO).
+  It closes and purges the attempt; the work item stays open.
+- SUPERSEDED: Loyal Opposition authors it, never over another context's live
+  claim. It carries `supersession_source: <current canonical id>` and
+  `residual_work_item: <id or none>`. It closes the attempt and is not
+  verification.
+- BLOCKED: a headless Prime Builder's first item when the parent is not
+  authorized. NEW or WITHDRAWN may follow.
+
+Neither WITHDRAWN nor SUPERSEDED substitutes for implementing live work.
+ADVISORY carries no execution authority.
 
 VERIFIED is completion of independent review of exact bytes. It is not a commit
 or a dispatchable message. Fresh verification after changed bytes or a failed
@@ -98,6 +111,11 @@ provenance remains mandatory. Supply each key once.
 READY uses `bridge_kind: implementation_report`; verdicts use `lo_verdict`.
 The service validates the complete message without composing or repairing it.
 
+`author_harness_id` is attribution, not a role. Use the registered id your
+launcher exported as `GTKB_AUTHOR_HARNESS_ID`, or the id the dispatched task
+names. If neither exists, do not pick one from `gt harness list`. Report the
+gap, and ask the owner when interactive.
+
 Reserve the exact next artifact, using the predecessor version you read:
 
 ```text
@@ -127,6 +145,14 @@ moment of the call. Scratch drafts stay in `scratchpad/<bound-session-id>`.
 This read-only check creates no permission record and does not replace the exact
 fence required by work publication or bridge delivery. If it refuses an effect,
 correct the identified scope, claim or service condition before retrying.
+
+Programs and tests, `python -m pytest` included, run only inside a live claim of
+this context: Prime Builder under its READY claim, Loyal Opposition under its
+verdict claim. Test time counts against the claim window.
+
+Never cite a scratch path or other temporary file in a bridge message or commit.
+Cite repository paths, canonical ids and the observed results in the message
+itself.
 
 ## Implement and report
 

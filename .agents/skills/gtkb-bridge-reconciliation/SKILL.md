@@ -35,17 +35,23 @@ bridge payloads and generated projections are excluded from that commit.
 
 If verified bytes change or a project commit fails, use the canonical
 fresh-verification and finalization recovery route. A fresh eligible context can
-continue from current state. The dispatcher selects that work and authors no
-proposal or verdict. Never turn a related message, umbrella relationship, commit
-mention or inferred permission into a replacement review or completion result.
+continue from current state. Until Dispatcher Next is activated, the owner
+dispatches a fresh Loyal Opposition context for fresh verification. No
+dispatcher or harness authors a verdict. Never turn a related message, umbrella
+relationship, commit mention or inferred permission into a replacement review or
+completion result.
 
 When recorded completion does not cover the described outcome, retain the actual
-delivered work and historical evidence, identify the uncovered scope, and carry
-the correction in the existing appropriate work item. Do not automatically close
-or reopen work by scanning messages. Correct canonical state through its domain
-CLI, then read back the exact affected records. An owner decision changes current
-canonical state and agent direction directly; the interactive session log retains
-the conversation. No permission packet or decision ledger is required.
+delivered work and historical evidence and identify the uncovered scope. A
+committed work item is terminal: never reopen or amend it. File a new corrective
+work item in the intake that names the uncovered scope and cites the committed
+item. The intake is `PROJECT-GTKB-NEW-WORK-INTAKE`. Correct an uncommitted item
+in place; if it is VERIFIED, do that through `gt bridge abandon` and a fresh
+NEW. Do not automatically close or reopen work by scanning messages. Correct
+canonical state through its domain CLI, then read back the exact affected
+records. An owner decision changes current canonical state and agent direction
+directly; the interactive session log retains the conversation. No permission
+packet or decision ledger is required.
 
 Use the current active versions of these formal sources:
 

@@ -1,6 +1,6 @@
 ---
 name: gtkb-projects
-description: Inspect and reconcile GT-KB programs, execution projects, single-parent work membership, formal links and dependencies through the native CLI; apply explicit owner-directed project authorization.
+description: Inspect and reconcile GT-KB programs, execution projects, single-parent work membership, formal links and dependencies through the native CLI; state the owner operations (authorization, membership moves and new execution projects) for the owner to run.
 license: "Proprietary - (c) 2026 Remaker Digital"
 metadata:
   project: groundtruth-kb
@@ -52,10 +52,11 @@ requires `--actor`, `--change-reason` and `--expected-version`. Version 0 assert
 a new record; an amendment names the exact version just read. On a conflict,
 read the current state and reconsider the requested change before retrying.
 Read back the returned canonical result. Attribution is not a permission carrier.
+Agents create programs and work items and amend the descriptive fields of
+existing projects. Creating an execution project is an owner operation.
 
 ```powershell
 gt projects record --id <PROGRAM-ID> --kind program --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
-gt projects record --id <PROJECT-ID> --kind project --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
 gt projects record --id <PROJECT-ID> --fields-file <fields.json> --expected-version <version> --actor <actor> --change-reason "<reason>" --json
 gt backlog record --id <WI-ID> --project-id <PROJECT-ID> --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
 ```
@@ -63,7 +64,6 @@ gt backlog record --id <WI-ID> --project-id <PROJECT-ID> --fields-file <fields.j
 Project fields include `name`, `purpose`, `target_outcome`, `scope_note`, `rank`
 and optional `parent_project_id` naming an active program. Kind is immutable.
 Project authorization and terminal status are not generic fields to amend here.
-New execution projects start authorized except the standing intake project.
 Programs have no authorization value and cannot contain work items.
 
 A new implementation item's fields include `title`, `description`,
@@ -75,33 +75,43 @@ with the Bridge and project-finalization services.
 
 ## Reconcile membership
 
-Moving an open item is one atomic replacement of its current parent:
+Each open item has one current parent. When an item belongs in another project,
+state the move for the owner under Owner operations; agents do not move work
+items. There is no routine detach-to-unparented operation. Unmatched defects
+enter `PROJECT-GTKB-NEW-WORK-INTAKE`, and the owner moves them to an execution
+project.
 
-```powershell
-gt projects move-item --work-item-id <WI-ID> --from-project <CURRENT-PROJECT-ID> --to-project <DESTINATION-PROJECT-ID> --expected-version <membership-version> --membership-order 1 --actor <actor> --change-reason "<reason>" --json
-```
+## Owner operations
 
-Use the membership version from work-item readback, not its work-item or project
-version. Both projects retain their authorization. A commit-terminal member is
-immutable. The move must preserve foreign work and satisfy current work
-dependencies; inspect any refusal before changing the proposed topology.
-There is no routine detach-to-unparented operation. Unmatched defects enter
-`PROJECT-GTKB-NEW-WORK-INTAKE` and are reconciled to an execution project.
-
-## Apply the owner's authorization choice
-
-Only explicit owner direction sets this field. Membership changes, a GO, an
-agent recommendation or a prior decision narrative do not set it implicitly.
+Changing a project's authorization, moving a work item between projects and
+creating an execution project are owner operations. Agent harnesses refuse these
+commands in every context, bound or not. When work needs one, state the needed
+change and the exact command, filled in from current readback; the owner runs it
+in their own terminal. A headless context whose NEW needs an authorization
+change authors BLOCKED instead. Only explicit owner direction sets
+authorization; membership changes, a GO, an agent recommendation or a prior
+decision narrative do not set it.
 
 ```powershell
 gt projects set-authorization <PROJECT-ID> --authorization "not authorized" --expected-version <project-version> --actor <actor> --change-reason "<owner-directed change>" --json
 gt projects set-authorization <PROJECT-ID> --authorization authorized --expected-version <project-version> --actor <actor> --change-reason "<owner-directed change>" --json
+gt projects move-item --work-item-id <WI-ID> --from-project <CURRENT-PROJECT-ID> --to-project <DESTINATION-PROJECT-ID> --expected-version <membership-version> --membership-order 1 --actor <actor> --change-reason "<reason>" --json
+gt projects record --id <PROJECT-ID> --kind project --fields-file <fields.json> --expected-version 0 --actor <actor> --change-reason "<reason>" --json
 ```
 
-This changes the existing project row and returns it. It grants no path scope,
-expiry or per-action permissions, and creates no authorization artifact.
-The intake project remains not authorized. A NEW proposal rechecks its current
-parent; an already initiated chain continues after an authorization change.
+An authorization change rewrites the existing project row and returns it. It
+grants no path scope or per-action permission and creates no authorization
+artifact. The intake project remains not authorized. A NEW proposal rechecks its
+current parent; an already initiated chain continues after an authorization
+change.
+
+A move is one atomic replacement of the item's current parent. It names the
+membership version from work-item readback, not the work-item or project
+version. Both projects keep their authorization. A commit-terminal member is
+immutable. The move must preserve foreign work and satisfy current work
+dependencies; inspect any refusal before changing the proposed topology. A new
+execution project starts authorized; the standing intake project is the
+exception.
 
 ## Reconcile formal sources and prerequisites
 
@@ -139,8 +149,10 @@ uncommitted work, start a fresh proposal/review/implementation attempt on the
 same work item, preserving membership and bytes and inheriting no GO.
 
 Each member is independently verified for its exact path, Git mode and object
-identity. When all members are VERIFIED, use the native project commit workflow
-and normal hooks to commit the complete result once. Exclude Bridge payloads
+identity. When all members are VERIFIED, the complete result is committed once
+through the native project commit workflow and normal hooks. Only the Loyal
+Opposition context whose VERIFIED delivery returns `project_ready_for_commit: true`
+makes the one project commit. Prime Builder never commits. Exclude Bridge payloads
 and generated projections. Related messages, a passing selected test or an
 edited status label cannot establish project completion.
 

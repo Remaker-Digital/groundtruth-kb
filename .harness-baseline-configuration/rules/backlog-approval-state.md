@@ -8,10 +8,10 @@ an implementation, review, priority or permission predicate.
 ## Canonical Authority
 
 The current execution-project row has one field named `authorization`, with
-value `authorized` or `not authorized`. The owner's direction sets work
-ordering through `gt projects set-authorization`; authorization is distinct
-from activation. Programs have no authorization value. The standing intake
-project is permanently `not authorized`.
+value `authorized` or `not authorized`. The owner sets work ordering by running
+`gt projects set-authorization` in their own terminal; agent harnesses refuse
+it. Authorization is distinct from activation. Programs have no authorization
+value. The standing intake project is permanently `not authorized`.
 
 Each work item has exactly one execution-project parent. Owner dispatch is
 sufficient direction for the assigned bridge action. Immediately before a NEW

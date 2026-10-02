@@ -21,9 +21,12 @@ an ADVISORY alone is not a dispatch and does not select a target.
    work. Routine choices need no repeated confirmation or blanket interview.
 4. Apply an owner-directed result through the appropriate formal or domain writer
    and read it back. Conversation logs are context, not a decision ledger.
-5. If implementation is selected, use its exact project and work item, linked
-   requirements, target paths, executable tests and a separate NEW chain. Check
-   project authorization when filing NEW; obtain independent GO before building.
+5. If no work item covers the follow-up, file one. Use `gtkb-work-item`; the
+   item enters `PROJECT-GTKB-NEW-WORK-INTAKE`. Only a dispatched Prime Builder
+   context authors NEW. If implementation is selected, use its exact project and
+   work item, linked requirements, target paths, executable tests and a separate
+   NEW chain. Check project authorization when filing NEW; obtain independent GO
+   before building.
 
 There is no candidate promotion store, mandatory disposition classification,
 AUQ-only receipt, implementation-start packet or deliberation-based permission.

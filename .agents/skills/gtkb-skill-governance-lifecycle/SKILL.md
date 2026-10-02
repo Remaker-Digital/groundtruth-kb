@@ -5,10 +5,12 @@ description: Develop managed skills from neutral source through the current CLI 
 
 # Managed skill lifecycle
 
-The source is .harness-baseline-configuration/skills/<name>/SKILL.md. Helpers
-and references belong beside it or in the existing shared helper directory.
-The projector renders complete instructions into the receiving harness's own
-configuration. A harness never reads or coordinates through a peer.
+The one authored source is `.agents/skills/<name>/SKILL.md`; its helpers and
+references belong beside it. Hosts that discover it read it in place; the others
+get a pointer stub that carries only its frontmatter. Frontmatter edits need
+`gt harness project`; body edits do not. Retiring a skill means deleting its
+directory, and re-projection removes its stubs. A harness never reads or
+coordinates through a peer.
 
 Read the dispatched work item, its single parent project, current formal intent,
 test requirements, dependencies and exact Bridge attempt through the CLI.
@@ -30,7 +32,7 @@ Correct obsolete source instead of adding compatibility aliases.
 Qualification includes all-target derivability, exact projection parity,
 meaningful positive/refusal tests and actual affected-host loading:
 
-    python scripts/harness_projection/project_harness.py --harness <name> --validate
+    gt harness project <harness> --validate
     python scripts/check_harness_parity.py --all --validate
 
 Report exact commands, results and gaps. The agent authors its complete READY

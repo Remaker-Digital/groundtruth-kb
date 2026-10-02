@@ -434,14 +434,21 @@ default_model = "bad"
 
 def test_cli_parser_accepts_required_flags():
     parser = oh.build_arg_parser()
+    # c123 (batch design WP2 2.1): the flags of D's corrected registration; --init replaces the retired --skill.
     args = parser.parse_args(
         [
             "-p",
             "hello",
             "--model",
             "selected-route",
-            "--skill",
-            "bridge-review",
+            "--init",
+            "::init gtkb lo",
+            "--bridge-document",
+            "assigned",
+            "--bridge-version",
+            "2",
+            "--report",
+            "run-report.json",
             "--endpoint",
             "http://x",
             "--max-turns",
@@ -450,12 +457,14 @@ def test_cli_parser_accepts_required_flags():
     )
     assert args.prompt == "hello"
     assert args.model == "selected-route"
-    assert args.skill == "bridge-review"
+    assert args.init == "::init gtkb lo"
+    assert (args.bridge_document, args.bridge_version, args.report) == ("assigned", 2, "run-report.json")
     assert args.endpoint == "http://x"
     assert args.max_turns == 2
+    assert not hasattr(args, "skill")
 
 
-def test_main_threads_skill_and_preserves_generous_runtime_limits(
+def test_main_threads_the_init_binding_and_preserves_generous_runtime_limits(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     root = make_root(tmp_path)
@@ -463,6 +472,17 @@ def test_main_threads_skill_and_preserves_generous_runtime_limits(
     set_ollama_session_timeout(root, 3600)
     set_ollama_max_turns(root, 600)
     captured: dict[str, object] = {}
+    bound: list[tuple[str, str, Path]] = []
+
+    def fake_bind(native_context_id, init_line, project_root, runner=None):
+        # c123 (batch design WP2 2.1): the launcher binds with the --init line it was given, before the loop starts.
+        assert not captured, "D binds before its tool loop"
+        bound.append((native_context_id, init_line, project_root))
+        return {
+            "session_context_id": "bound-context",
+            "role": "loyal-opposition",
+            "native_context_id": native_context_id,
+        }
 
     def fake_run_tool_loop(prompt, model_route, endpoint, max_turns, project_root, **kwargs):
         captured.update(
@@ -477,12 +497,21 @@ def test_main_threads_skill_and_preserves_generous_runtime_limits(
 
     monkeypatch.chdir(root)
     monkeypatch.setattr(oh, "call_ollama_tags", lambda _endpoint, _timeout: [FIXTURE_MODEL_ID])
+    monkeypatch.setattr(oh.base, "bind_native_context", fake_bind)
     monkeypatch.setattr(oh, "run_tool_loop", fake_run_tool_loop)
 
-    assert oh.main(["-p", "review", "--skill", "bridge-review"]) == 0
+    assert oh.main(["-p", "review", "--init", "::init gtkb lo"]) == 0
     assert capsys.readouterr().out.strip() == "done"
-    assert captured["skill"] == "bridge-review"
-    assert captured["system_prompt"].startswith("Shared root instructions.\n")
+    assert "skill" not in captured
+    native_context_id = captured["native_context_id"]
+    assert bound == [(native_context_id, "::init gtkb lo", captured["project_root"])]
+    assert captured["binding"] == {
+        "session_context_id": "bound-context",
+        "role": "loyal-opposition",
+        "native_context_id": native_context_id,
+    }
+    # The prompt is AGENTS.md alone although the root holds the bridge skills.
+    assert captured["system_prompt"] == "Shared root instructions.\n"
     assert captured["max_turns"] == 600
     assert captured["timeout"] == 900
     assert captured["session_timeout"] == 3600
@@ -592,10 +621,11 @@ def test_tool_loop_emits_allowlisted_turn_metadata_to_telemetry(tmp_path: Path):
     assert recorder.stop_reasons == ["final_response"]
 
 
-def test_bridge_review_system_prompt_loads_current_canonical_skills(tmp_path: Path):
+def test_system_message_carries_the_shared_root_without_skill_bodies(tmp_path: Path):
+    """c123 (batch design WP2 2.1): no launch argument loads a role skill; make_root's skill files stay unread."""
     root = make_root(tmp_path)
     calls: list[dict] = []
-    prompt = oh.build_system_prompt("bridge-review", root)
+    prompt = oh.build_system_prompt(root)
 
     def chat(url: str, payload: dict, timeout: float) -> dict:
         calls.append(payload)
@@ -609,40 +639,80 @@ def test_bridge_review_system_prompt_loads_current_canonical_skills(tmp_path: Pa
         root,
         system_prompt=prompt,
         chat_func=chat,
+        native_context_id="native-fixture",
     )
 
     assert text == "done"
     system_message = calls[0]["messages"][0]
     assert system_message["role"] == "system"
-    assert system_message["content"].index("Shared root instructions.") < system_message["content"].index(
-        "gt bridge deliver"
+    identity, root_instructions = system_message["content"].split("\n\n")
+    assert identity.startswith(
+        "Native context identifier: native-fixture. "
+        "Bind only the exact init marker supplied in the task through gt session bind."
     )
+    assert root_instructions == "Shared root instructions.\n"
     assert calls[0]["messages"][1] == {"role": "user", "content": "review bridge item"}
-    assert "Loyal Opposition" in system_message["content"]
-    assert "bridge/INDEX.md" not in system_message["content"]
-    assert "gt context work-item" in system_message["content"]
-    assert "gt bridge deliver" in system_message["content"]
-    assert "The supplied init marker" in system_message["content"]
     assert "PublishBridgeVerdict" not in system_message["content"]
 
 
-def test_system_prompt_includes_root_with_extra_bodies_only_for_lo_bridge_skills(tmp_path: Path):
+def test_system_prompt_is_the_root_instructions_only(tmp_path: Path):
     root = make_root(tmp_path)
 
-    assert oh.build_system_prompt("bridge-review", root) is not None
-    assert oh.build_system_prompt("verification", root) is not None
-    assert oh.build_system_prompt("implementation", root) == "Shared root instructions.\n"
-    assert oh.build_system_prompt(None, root) == "Shared root instructions.\n"
+    assert oh.build_system_prompt(root) == "Shared root instructions.\n"
+    # c123 (batch design WP2 2.1): the retired skill argument is refused, not ignored.
+    with pytest.raises(TypeError):
+        oh.build_system_prompt("bridge-review", root)
 
 
-def test_prompt_requires_native_readback_and_complete_project_finalization(tmp_path: Path):
+def test_bound_bridge_run_states_the_binding_claim_delivery_and_readback(tmp_path: Path):
+    """c123 (batch design WP2 2.1): a bound run's bridge instructions come from the binding and its target."""
     root = make_root(tmp_path)
-    prompt = oh.build_system_prompt("bridge-review", root)
-    assert "Read back the result with `gt bridge show" in prompt
-    assert "gt projects commit" in prompt
-    assert "The CLI prepares the reviewed cohort, commits and confirms" in prompt
-    assert "Project commit establishes activation" in prompt
-    assert "finalization helper" not in prompt
+    systems: list[str] = []
+    checks: list[str] = []
+    binding = {"session_context_id": "bound-context", "role": "loyal-opposition", "native_context_id": "native-fixture"}
+
+    def chat(url: str, payload: dict, timeout: float) -> dict:
+        systems.append(payload["messages"][0]["content"])
+        return {"message": {"content": "delivered"}}
+
+    def runner(command: str, cwd: Path, env: dict, timeout: float) -> subprocess.CompletedProcess:
+        checks.append(command)
+        proof = {
+            "status": "delivered",
+            "document": "assigned",
+            "version": 2,
+            "native_context_id": env["GTKB_NATIVE_CONTEXT_ID"],
+            "author_session_context_id": "bound-context",
+            "bridge_status": "GO",
+        }
+        return subprocess.CompletedProcess(command, 0, stdout=json.dumps(proof), stderr="")
+
+    text = oh.run_tool_loop(
+        "review the assigned item",
+        route(root),
+        "http://ollama.test",
+        1,
+        root,
+        bridge_document="assigned",
+        bridge_version=2,
+        chat_func=chat,
+        command_runner=runner,
+        native_context_id="native-fixture",
+        binding=binding,
+    )
+
+    assert text == "delivered"
+    (system,) = systems
+    assert system.startswith(
+        "Native context identifier: native-fixture. Bound session context: bound-context. "
+        "Immutable role: loyal-opposition."
+    )
+    assert "do not bind it again" in system and "Bind only the exact init marker" not in system
+    assert "Assigned bridge document: assigned. The artifact you deliver must be version 2." in system
+    for instruction in ("gt bridge claim", "gt bridge deliver --content-file", "read the result back"):
+        assert instruction in system
+    assert "gt bridge check-delivery" in system and "final prose is not delivery" in system
+    assert len(checks) == 1 and " bridge check-delivery assigned " in checks[0]
 
 
 def test_default_tool_loop_calls_single_chat_endpoint(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):

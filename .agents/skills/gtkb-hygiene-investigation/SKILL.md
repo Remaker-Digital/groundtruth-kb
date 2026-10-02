@@ -24,9 +24,10 @@ DCL-ARTIFACT-LIFECYCLE-TRIGGERS-001 where applicable.
 
 Group interdependent corrections into a project outcome that completes and
 commits together. Programs order projects; each work item has one project and
-describes a concrete artifact change or action. Check existing work before
-proposing intake. Use established intake for unmatched defects; a report neither
-creates membership nor authorizes work.
+describes a concrete artifact change or action. Check existing work first. File
+unmatched work through `gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with
+its specification and executable test, and name any related project in its
+description. A report neither creates membership nor authorizes work.
 
 Keep temporary evidence in the current context's scratch space. Report bounded
 coverage and uncertainty; do not repeat a census indefinitely to claim that

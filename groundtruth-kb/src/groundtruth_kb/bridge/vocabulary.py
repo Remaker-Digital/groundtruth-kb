@@ -149,6 +149,32 @@ PRIME_ACTIONABLE_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "NOT-READY
 LOYAL_OPPOSITION_ACTIONABLE_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED", "READY", "VERDICT-REJECTED"})
 NON_DISPATCHABLE_STATUSES: frozenset[str] = frozenset({"ADVISORY", "VERIFIED", "WITHDRAWN", "SUPERSEDED", "BLOCKED"})
 
+# Named subsets the native bridge judges by (c123, batch design WP5 G17). Consumers import these; they do not restate
+# status sets (SPEC-BRIDGE-STATUS-PHASE-DISTINCT-001 v2).
+PROPOSAL_STATUSES: frozenset[str] = frozenset({"NEW", "REVISED"})
+# The statuses whose header names a work item.
+WORK_ITEM_HEADER_STATUSES: frozenset[str] = PROPOSAL_STATUSES | {"BLOCKED"}
+# The statuses that act on accepted scope.
+ACCEPTED_SCOPE_STATUSES: frozenset[str] = frozenset({"GO", "READY", "VERIFIED"})
+# The statuses whose claims and deliveries require the work item's dependencies.
+DEPENDENCY_GATED_STATUSES: frozenset[str] = PROPOSAL_STATUSES | ACCEPTED_SCOPE_STATUSES
+# The heads that follow an accepted proposal.
+POST_ACCEPTANCE_STATUSES: frozenset[str] = frozenset({"GO", "READY", "NOT-READY", "VERIFIED"})
+# Canon section 6: no successor may follow these (VERIFIED is followed only by a fresh VERIFIED).
+TERMINAL_STATUSES: frozenset[str] = frozenset({"VERIFIED", "WITHDRAWN", "SUPERSEDED"})
+
+# Message kinds: each canonical status belongs to exactly one group (bridge/taxonomy.py maps the groups to kinds).
+VERDICT_STATUSES: frozenset[str] = frozenset({"GO", "NO-GO", "NOT-READY", "VERIFIED", "SUPERSEDED"})
+REPORT_STATUSES: frozenset[str] = frozenset({"READY"})
+ADVISORY_STATUSES: frozenset[str] = frozenset({"ADVISORY"})
+REVIEW_STATUSES: frozenset[str] = frozenset({"VERDICT-REJECTED"})
+OPERATIONAL_STATUSES: frozenset[str] = frozenset({"BLOCKED", "WITHDRAWN"})
+
+# The two context roles, keyed by the init line's role token (``::init gtkb pb``, ``::init gtkb lo``). Moved here from
+# bridge/native.py in c123 (batch design WP2 2.1) so the harness invocation contract can refuse role values without
+# importing the native bridge, which imports the authority that applies the contract.
+ROLE_NAMES: dict[str, str] = {"pb": "prime-builder", "lo": "loyal-opposition"}
+
 
 def status_alternation(statuses: frozenset[str] | None = None) -> str:
     """Return a regex alternation ordered longest-first.

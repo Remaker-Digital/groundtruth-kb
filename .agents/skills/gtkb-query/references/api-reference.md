@@ -15,7 +15,7 @@ are verified to behave.
   (continue after that record id, same filters), `--search <text>`, `--json`.
 - `<domain> show <ID>` options: `--history`, `--json`. Without `--json` the
   rendering is `<ID> v<version>: <title>`, the body, then `key: value` lines.
-- `<domain> show <ID> --history` (R04) reads `/v1/<domain>/<id>/history` and
+- `<domain> show <ID> --history` reads `/v1/<domain>/<id>/history` and
   returns `current` plus `history` entries (`version`, `changed_at`, `actor`,
   `reason`); text mode appends a `Version History:` block. Present on every
   domain's `show` (spec, tests, backlog, projects, test-plans, test-phases,
@@ -138,7 +138,7 @@ Fields: `canonical_term`, `definition`, `scope`, `authority_level`,
 `lifecycle_status`, `accepted_synonyms`, `discouraged_synonyms`,
 `forbidden_uses`, `source_authority`, `linked_artifacts`, `linked_services`.
 
-## Deliberations (R20–R23, read-only history)
+## Deliberations (read-only history)
 
 ```text
 gt deliberations list --limit 200 --json

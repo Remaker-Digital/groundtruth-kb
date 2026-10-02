@@ -36,6 +36,32 @@ def _decide(tmp_path: Path, command: object, tool_name: str = "Bash") -> dict[st
         ("gt dashboard serve", "gt dashboard serve"),
         ("gt controls set --input proposal.toml --expected-sha256 0000", "gt controls set"),
         ("gt services stop m13-probe-unknown", "gt services stop"),
+        # c123 (owner decision A2): gt home open starts the Home when it is down (it left the read-only list below);
+        # gt db postgres init and import-current administer the authority database directly.
+        ("gt home open", "gt home open"),
+        ("gt db postgres init", "gt db postgres init"),
+        ("gt db postgres import-current --input m.json --actor a --reason r", "gt db postgres import-current"),
+        ("python -m groundtruth_kb db postgres init --upgrade-from 00", "gt db postgres init"),
+        # c123 (owner decision A2): ending a process, whatever the process, and controlling or reaching the PostgreSQL
+        # cluster directly.
+        ("Stop-Process -Name postgres", "Stop-Process"),
+        ("spps -Id 4242", "spps"),
+        ("kill 4242", "kill"),
+        ("kill -9 4242", "kill"),
+        ("taskkill /F /IM postgres.exe", "taskkill"),
+        ("tskill 4242", "tskill"),
+        ("pkill postgres", "pkill"),
+        ("killall node", "killall"),
+        ("wmic process where name='postgres.exe' delete", "wmic process"),
+        ("pg_ctl -D data stop", "pg_ctl stop"),
+        ("pg_ctl start -D data -l log.txt", "pg_ctl start"),
+        ("pg_ctl.exe restart -D data", "pg_ctl.exe restart"),
+        ("postgres -D data", "postgres"),
+        ("initdb -D data", "initdb"),
+        ("pg_resetwal -D data", "pg_resetwal"),
+        ("psql -c 'select 1'", "psql"),
+        ("pg_dump gtkb", "pg_dump"),
+        ("dropdb gtkb", "dropdb"),
     ],
 )
 @pytest.mark.parametrize("tool_name", ["Bash", "Shell"])
@@ -64,6 +90,23 @@ def test_gt_owner_operations_are_refused(tmp_path: Path, command: str, operation
         "bash -c 'echo ok & gt dashboard stop'",
         "cmd /c cmd /c gt services stop authority",
         "cmd /c cmd /c cmd /c cmd /c gt controls set --input p.toml --expected-sha256 00",
+        # c123 (owner decision A2): the new operations through nested shells, chains, launchers, Invoke-Expression,
+        # script blocks, subexpressions and argument lists, and .Kill() or Terminate calls wherever they run.
+        'pwsh -NoProfile -Command "Stop-Process -Name postgres"',
+        'cmd /c "taskkill /F /IM postgres.exe"',
+        "bash -c 'kill 4242'",
+        "Get-Process postgres | Stop-Process",
+        "uv run gt home open",
+        "Start-Process taskkill -ArgumentList '/F','/IM','postgres.exe'",
+        'iex "pg_ctl -D data stop"',
+        "& { psql -c 'select 1' }",
+        'Write-Output "$(gt db postgres init)"',
+        ["pg_ctl", "stop", "-D", "data"],
+        "(Get-Process postgres).Kill()",
+        "$p = Get-Process postgres; $p.Kill()",
+        'Write-Output "$((Get-Process postgres).Kill())"',
+        'pwsh -c "(Get-Process postgres).Kill()"',
+        "Get-CimInstance Win32_Process -Filter \"Name='postgres.exe'\" | Invoke-CimMethod -MethodName Terminate",
     ],
 )
 def test_nested_chained_and_shell_free_owner_operations_are_refused(tmp_path: Path, command: object) -> None:
@@ -142,7 +185,7 @@ def test_raw_changes_to_gtkb_tasks_and_service_are_refused(tmp_path: Path, comma
         "gt services status",
         "gt services status --json",
         "gt home status",
-        "gt home open",
+        # c123 (owner decision A2): "gt home open" left this list; it is refused above.
         "gt controls show",
         "gt controls diff --input proposal.toml",
         "gt bridge show doc --content --json",
@@ -150,6 +193,22 @@ def test_raw_changes_to_gtkb_tasks_and_service_are_refused(tmp_path: Path, comma
         "Get-Service gtkb-postgresql",
         "schtasks /Query /TN GTKB-Home",
         "sc.exe query gtkb-postgresql",
+        # c123 (owner decision A2): reads of process and cluster state, and the shell's own jobs, stay allowed.
+        "gt service status",
+        "gt db postgres status",
+        "pg_ctl status -D data",
+        "pg_isready",
+        "Get-Process postgres",
+        "tasklist",
+        'tasklist /FI "IMAGENAME eq postgres.exe"',
+        "Stop-Job 1",
+        "Remove-Job -Id 1",
+        "kill %1",
+        "kill -9 %1",
+        "kill -l",
+        "psql --version",
+        "pg_dump -V",
+        "wmic process list brief",
     ],
 )
 def test_read_only_forms_stay_allowed(tmp_path: Path, command: str) -> None:

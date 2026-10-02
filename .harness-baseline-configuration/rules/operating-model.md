@@ -42,11 +42,13 @@ authority. Correct conflicting instructions and enforcement at their source.
 
 Project authorization is the owner's `authorized` or `not authorized` field.
 It controls ordering of new work. New execution projects default to authorized;
-the standing hygiene-intake project remains not authorized. Membership and
-formal-link changes preserve authorization unless the owner separately directs
-its change. Programs have no authorization value. Apply an explicit owner choice
-with `gt projects set-authorization`, naming the current project version.
-The native project skill describes the fields and readback.
+the standing intake project, `PROJECT-GTKB-NEW-WORK-INTAKE`, remains not
+authorized. Membership and formal-link changes preserve authorization. Programs
+have no authorization value. The owner applies authorization changes, membership
+moves and new execution projects in their own terminal; agent harnesses refuse
+`gt projects set-authorization`, `gt projects move-item` and a
+`gt projects record` that creates an execution project. The native project skill
+gives the exact commands an agent states for the owner.
 
 Dispatch selects the next agent action. Immediately before a NEW proposal,
 check the current parent project's authorization. A headless refusal returns

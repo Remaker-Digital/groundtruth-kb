@@ -13,12 +13,21 @@ The Home UI's controls call only `gt services`; this module holds the inventory 
 - postgresql  The Windows service gtkb-postgresql. Starting or stopping it usually needs an administrator; a refusal
               is reported, never worked around.
 
+c123 (batch design WP3 3.3): the task and service names are machine-wide, so every row is scoped by the rule the
+registration scripts apply, ignoring case. A task belongs to this installation when its action names this
+installation's launcher, and the PostgreSQL service when its PathName names this installation's data directory. The
+Ollama task names no installation, so it belongs to the installation that owns GTKB-Home. A dashboard that answers is
+this installation's only when this root's launch record exists. A row this installation does not own keeps its
+observed state, offers no start or stop and names its owner, and start and stop refuse it before changing anything.
+home.py is always this root's own; the GTKB-Home task is enabled or disabled only when this installation owns it.
+
 Every mechanism runs a fixed argument vector through an injectable runner, so tests never touch real services.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -73,11 +82,59 @@ def _get_ok(url: str, timeout: float = 5) -> bool:
         return False
 
 
-def _task_state(runner: Runner, task: str) -> str:
-    """Scheduled task state: Ready, Running, Disabled, or missing."""
-    result = _powershell(runner, f"(Get-ScheduledTask -TaskName {_quote(task)} -ErrorAction SilentlyContinue).State")
-    state = (result.stdout or "").strip()
-    return state or "missing"
+def _read_registration(result: subprocess.CompletedProcess[str], key: str) -> tuple[str, str]:
+    """c123 (batch design WP3 3.3): (state, named path text) from one read; no output means missing."""
+    text = (result.stdout or "").strip()
+    if not text:
+        return "missing", ""
+    try:
+        found = json.loads(text)
+    except json.JSONDecodeError:
+        found = None
+    if not isinstance(found, dict):
+        return "unknown", ""
+    return str(found.get("state") or "unknown"), str(found.get(key) or "")
+
+
+def _task(runner: Runner, task: str) -> tuple[str, str]:
+    """c123 (batch design WP3 3.3): a scheduled task's state (Ready, Running, Disabled, or missing) and action text.
+
+    One call reads both. The action text is each action's Execute and Arguments, as the registration scripts read it.
+    """
+    script = (
+        f"$t = Get-ScheduledTask -TaskName {_quote(task)} -ErrorAction SilentlyContinue; "
+        "if ($t) { @{ state = [string]$t.State; "
+        "action = (($t.Actions | ForEach-Object { $_.Execute + ' ' + $_.Arguments }) -join ' ') } "
+        "| ConvertTo-Json -Compress }"
+    )
+    return _read_registration(_powershell(runner, script), "action")
+
+
+def _service(runner: Runner, service: str) -> tuple[str, str]:
+    """c123 (batch design WP3 3.3): a Windows service's state (Running, Stopped, ..., or missing) and PathName."""
+    query = _quote(f"Name = '{service}'")
+    script = (
+        f"$s = Get-CimInstance Win32_Service -Filter {query} -ErrorAction SilentlyContinue; "
+        "if ($s) { @{ state = [string]$s.State; path = [string]$s.PathName } | ConvertTo-Json -Compress }"
+    )
+    return _read_registration(_powershell(runner, script), "path")
+
+
+def _owner(named: str, own: Path) -> str | None:
+    """c123 (batch design WP3 3.3): None when a task or service is this installation's, otherwise who holds it.
+
+    The registration scripts' rule, ignoring case: a task is an installation's when its action names that
+    installation's launcher, and the PostgreSQL service when its PathName names that installation's data directory.
+    The holder is the other registration's action text or PathName, or "" when nothing is registered.
+    """
+    if named and os.path.abspath(own).lower() in named.lower():
+        return None
+    return named
+
+
+def _not_owned(owner: str) -> str:
+    """c123 (batch design WP3 3.3): how the detail of a row this installation does not own ends."""
+    return (f"; registered by another installation: {owner}" if owner else "") + "; status only"
 
 
 def _set_task(runner: Runner, task: str, *, enabled: bool) -> None:
@@ -125,6 +182,41 @@ class Installation:
     def home_script(self) -> Path:
         return self.root / "infrastructure" / "deepseek-web" / "home.py"
 
+    # c123 (batch design WP3 3.3): the paths that this installation's authority task and PostgreSQL service name.
+    @property
+    def authority_launcher(self) -> Path:
+        return self.root / "infrastructure" / "postgresql" / "domain_service_launcher.py"
+
+    @property
+    def postgresql_data(self) -> Path:
+        return self.root / "infrastructure" / "postgresql" / "data"
+
+
+def _require_owned(installation: Installation, runner: Runner, name: str) -> None:
+    """c123 (batch design WP3 3.3): refuse, before anything changes, to start or stop another installation's row."""
+    if name == "authority":
+        registration = f"task {AUTHORITY_TASK}"
+        owner = _owner(_task(runner, AUTHORITY_TASK)[1], installation.authority_launcher)
+    elif name == "ollama":
+        # c123 (batch design WP3 3.3): the Ollama task names only ollama.exe, so Ollama follows GTKB-Home (the
+        # design's owner decision 4).
+        registration = f"task {OLLAMA_TASK} names no installation, and task {HOME_TASK}"
+        owner = _owner(_task(runner, HOME_TASK)[1], installation.home_script)
+    else:
+        registration = f"Windows service {POSTGRESQL_SERVICE}"
+        owner = _owner(_service(runner, POSTGRESQL_SERVICE)[1], installation.postgresql_data)
+    if owner is not None:
+        held = f"is registered by another installation ({owner})" if owner else "is not registered"
+        raise ServiceControlError(f"{registration} {held}; this installation does not start or stop {name}")
+
+
+def _dashboard_launch_record(installation: Installation) -> Path:
+    """c123 (batch design WP3 3.3): this root's dashboard launch record, under the runtime root `gt dashboard` uses."""
+    from groundtruth_kb.dashboard import LAUNCH_RECORD_NAME
+    from groundtruth_kb.dashboard_link import default_dashboard_runtime_root
+
+    return default_dashboard_runtime_root(installation.root) / LAUNCH_RECORD_NAME
+
 
 def _home(installation: Installation, runner: Runner, action: str) -> dict[str, Any]:
     result = runner([str(installation.python), "-B", str(installation.home_script), action], 180)
@@ -143,56 +235,72 @@ def status(installation: Installation, runner: Runner = default_runner, only: st
     for name in selected:
         if name == "authority":
             ready = _get_ok(f"{installation.authority_url.rstrip('/')}/v1/status")
-            task = _task_state(runner, AUTHORITY_TASK)
+            task, action = _task(runner, AUTHORITY_TASK)
+            owner = _owner(action, installation.authority_launcher)
             states.append(
                 ServiceState(
                     name,
                     "running" if ready else "stopped",
-                    f"{installation.authority_url}; task {task}",
-                    can_start=not ready,
-                    can_stop=ready,
+                    f"{installation.authority_url}; task {task}" + ("" if owner is None else _not_owned(owner)),
+                    can_start=owner is None and not ready,
+                    can_stop=owner is None and ready,
                 )
             )
         elif name == "home":
             report = _home(installation, runner, "status")
             running = bool(report.get("running")) and bool(report.get("live"))
-            task = _task_state(runner, HOME_TASK)
+            task, action = _task(runner, HOME_TASK)
             detail = f"127.0.0.1:{report.get('port', 3080)}; task {task}" if running else f"not running; task {task}"
+            # c123 (batch design WP3 3.3): home.py is this root's own, so its actions stay; another installation's
+            # GTKB-Home task is named here, and start and stop leave it alone.
+            owner = _owner(action, installation.home_script)
+            if owner:
+                detail += f"; registered by another installation: {owner}"
             states.append(
                 ServiceState(name, "running" if running else "stopped", detail, can_start=not running, can_stop=running)
             )
         elif name == "dashboard":
             ready = _get_ok(DASHBOARD_HEALTH)
-            states.append(
-                ServiceState(
-                    name, "running" if ready else "stopped", DASHBOARD_HEALTH, can_start=not ready, can_stop=ready
-                )
-            )
+            record = _dashboard_launch_record(installation)
+            # c123 (batch design WP3 3.3): `gt dashboard` acts only on this root's own launch, so a dashboard that
+            # answers without this root's launch record is another installation's.
+            if ready and not record.is_file():
+                state = "unknown"
+                detail = f"{DASHBOARD_HEALTH} answers without this installation's launch record {record}; status only"
+            else:
+                state = "running" if ready else "stopped"
+                detail = DASHBOARD_HEALTH
+            states.append(ServiceState(name, state, detail, can_start=not ready, can_stop=state == "running"))
         elif name == "ollama":
             ready = _get_ok(OLLAMA_VERSION)
-            task = _task_state(runner, OLLAMA_TASK)
+            task, _ = _task(runner, OLLAMA_TASK)
+            # c123 (batch design WP3 3.3): the Ollama task names only ollama.exe, so Ollama is this installation's
+            # only when GTKB-Home is (the design's owner decision 4).
+            owner = _owner(_task(runner, HOME_TASK)[1], installation.home_script)
+            detail = f"127.0.0.1:11434; task {task}"
+            if owner is not None:
+                detail += f"; controlled by the installation that owns task {HOME_TASK}" + _not_owned(owner)
             states.append(
                 ServiceState(
                     name,
                     "running" if ready else "stopped",
-                    f"127.0.0.1:11434; task {task}",
-                    can_start=not ready and task != "missing",
-                    can_stop=ready,
+                    detail,
+                    can_start=owner is None and not ready and task != "missing",
+                    can_stop=owner is None and ready,
                 )
             )
         elif name == "postgresql":
-            result = _powershell(
-                runner, f"(Get-Service -Name {_quote(POSTGRESQL_SERVICE)} -ErrorAction SilentlyContinue).Status"
-            )
-            value = (result.stdout or "").strip()
+            value, path = _service(runner, POSTGRESQL_SERVICE)
             state = {"Running": "running", "Stopped": "stopped"}.get(value, "unknown")
+            owner = _owner(path, installation.postgresql_data)
+            detail = f"Windows service {POSTGRESQL_SERVICE}: {'not registered' if value == 'missing' else value}"
             states.append(
                 ServiceState(
                     name,
                     state,
-                    f"Windows service {POSTGRESQL_SERVICE}: {value or 'not registered'}",
-                    can_start=state == "stopped",
-                    can_stop=state == "running",
+                    detail + ("" if owner is None else _not_owned(owner)),
+                    can_start=owner is None and state == "stopped",
+                    can_stop=owner is None and state == "running",
                 )
             )
         else:
@@ -202,12 +310,14 @@ def status(installation: Installation, runner: Runner = default_runner, only: st
 
 def start(installation: Installation, name: str, runner: Runner = default_runner) -> dict[str, Any]:
     if name == "authority":
+        _require_owned(installation, runner, name)
         _set_task(runner, AUTHORITY_TASK, enabled=True)
         _run_task(runner, AUTHORITY_TASK)
         ready = _wait(lambda: _get_ok(f"{installation.authority_url.rstrip('/')}/v1/status"), READY_SECONDS)
         return {"service": name, "started": ready, "detail": "ready" if ready else "task started; not ready yet"}
     if name == "home":
-        if _task_state(runner, HOME_TASK) not in ("missing",):
+        # c123 (batch design WP3 3.3): the task is resumed only when this installation registered it.
+        if _owner(_task(runner, HOME_TASK)[1], installation.home_script) is None:
             _set_task(runner, HOME_TASK, enabled=True)
         report = _home(installation, runner, "start")
         return {"service": name, "started": bool(report.get("ok")), "detail": report}
@@ -215,11 +325,13 @@ def start(installation: Installation, name: str, runner: Runner = default_runner
         result = runner([str(installation.python), "-m", "groundtruth_kb", "dashboard", "start", "--json"], 300)
         return {"service": name, "started": result.returncode == 0, "detail": (result.stdout or result.stderr)[-800:]}
     if name == "ollama":
+        _require_owned(installation, runner, name)
         _set_task(runner, OLLAMA_TASK, enabled=True)
         _run_task(runner, OLLAMA_TASK)
         ready = _wait(lambda: _get_ok(OLLAMA_VERSION), READY_SECONDS)
         return {"service": name, "started": ready, "detail": "ready" if ready else "task started; not ready yet"}
     if name == "postgresql":
+        _require_owned(installation, runner, name)
         result = _powershell(runner, f"Start-Service -Name {_quote(POSTGRESQL_SERVICE)} -ErrorAction Stop")
         if result.returncode != 0:
             raise ServiceControlError(
@@ -232,13 +344,14 @@ def start(installation: Installation, name: str, runner: Runner = default_runner
 
 def stop(installation: Installation, name: str, runner: Runner = default_runner) -> dict[str, Any]:
     if name == "authority":
+        _require_owned(installation, runner, name)
         _set_task(runner, AUTHORITY_TASK, enabled=False)
-        launcher = str(installation.root / "infrastructure" / "postgresql" / "domain_service_launcher.py")
-        ended = _end_processes(runner, launcher, "--root")
+        ended = _end_processes(runner, str(installation.authority_launcher), "--root")
         stopped = _wait(lambda: not _get_ok(f"{installation.authority_url.rstrip('/')}/v1/status"), 30)
         return {"service": name, "stopped": stopped, "ended_pids": ended, "detail": f"task {AUTHORITY_TASK} disabled"}
     if name == "home":
-        if _task_state(runner, HOME_TASK) not in ("missing",):
+        # c123 (batch design WP3 3.3): the task is paused only when this installation registered it.
+        if _owner(_task(runner, HOME_TASK)[1], installation.home_script) is None:
             _set_task(runner, HOME_TASK, enabled=False)
         report = _home(installation, runner, "stop")
         return {"service": name, "stopped": bool(report.get("ok")), "detail": report}
@@ -246,11 +359,13 @@ def stop(installation: Installation, name: str, runner: Runner = default_runner)
         result = runner([str(installation.python), "-m", "groundtruth_kb", "dashboard", "stop", "--json"], 120)
         return {"service": name, "stopped": result.returncode == 0, "detail": (result.stdout or result.stderr)[-800:]}
     if name == "ollama":
+        _require_owned(installation, runner, name)
         _set_task(runner, OLLAMA_TASK, enabled=False)
         ended = _end_processes(runner, "ollama", "serve")
         stopped = _wait(lambda: not _get_ok(OLLAMA_VERSION), 30)
         return {"service": name, "stopped": stopped, "ended_pids": ended, "detail": f"task {OLLAMA_TASK} disabled"}
     if name == "postgresql":
+        _require_owned(installation, runner, name)
         result = _powershell(runner, f"Stop-Service -Name {_quote(POSTGRESQL_SERVICE)} -ErrorAction Stop")
         if result.returncode != 0:
             raise ServiceControlError(

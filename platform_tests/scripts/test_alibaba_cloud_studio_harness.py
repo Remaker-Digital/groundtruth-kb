@@ -18,7 +18,18 @@ def captured_subprocess_run(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, o
         calls.append(kwargs)
         return subprocess.CompletedProcess(args=[], returncode=0, stdout="{}", stderr="")
 
+    class FakePopen:
+        """c123 (batch design WP2, item 8): the Bash runner starts its command with Popen and a bounded communicate."""
+
+        def __init__(self, args, **kwargs):
+            calls.append(kwargs)
+            self.args, self.returncode, self.pid = args, 0, 0
+
+        def communicate(self, timeout=None):
+            return "", ""
+
     monkeypatch.setattr(base.subprocess, "run", fake_run)
+    monkeypatch.setattr(base.subprocess, "Popen", FakePopen)
     return calls
 
 
@@ -75,6 +86,7 @@ def make_root(tmp_path: Path) -> Path:
     (root / ach.ROUTING_CONFIG_PATH.parent).mkdir(parents=True)
     (root / ach.NATIVE_HOOK_SETTINGS_PATH.parent).mkdir(parents=True, exist_ok=True)
     (root / ach.NATIVE_HOOK_SETTINGS_PATH).write_text('{"hooks": {}}', encoding="utf-8")
+    # c123 (batch design WP2 2.1): no [routing.alibaba-cloud-studio.skills] table; the shared loader refuses one.
     (root / ach.ROUTING_CONFIG_PATH).write_text(
         """
 schema_version = 1
@@ -96,9 +108,6 @@ default_model = "alib-route"
 timeout_seconds = 900
 session_timeout_seconds = 3600
 max_turns = 600
-
-[routing.alibaba-cloud-studio.skills]
-bridge-review = "alib-route"
 
 [routing.openrouter]
 default_model = "openrouter-same-model"
@@ -136,7 +145,24 @@ def test_routing_loads_alibaba_default_and_ignores_same_model_from_other_provide
     assert set(config.models) == {"alib-route"}
     assert selected.model_id == "alibaba-deepseek-v4-pro"
     assert "PublishBridgeVerdict" not in selected.allowed_tools
-    assert ach.resolve_model(config, None, skill="bridge-review") == selected
+    # c123 (batch design WP2 2.1): H's registration names its route with --model; a skill no longer selects one.
+    assert ach.resolve_model(config, "alib-route") == selected
+
+
+def test_routing_refuses_a_retired_skill_table(tmp_path: Path) -> None:
+    """c123 (batch design WP2 2.1): the old [routing.alibaba-cloud-studio.skills] table is refused, not read."""
+    root = make_root(tmp_path)
+    path = root / ach.ROUTING_CONFIG_PATH
+    path.write_text(
+        path.read_text(encoding="utf-8") + '\n[routing.alibaba-cloud-studio.skills]\nbridge-review = "alib-route"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ach.AlibabaCloudStudioHarnessError,
+        match=r"routing\.alibaba-cloud-studio\.skills: routing skill tables are retired; registrations name --model",
+    ):
+        ach.load_routing_config(root)
 
 
 def test_transport_delegates_to_anthropic_messages_with_bearer_auth(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -169,11 +195,14 @@ def test_run_tool_loop_delegates_profile_and_native_hook_runner(
     route = ach.resolve_model(ach.load_routing_config(root), None)
     captured: dict[str, object] = {}
     hook_runner = object()
+    # c123 (batch design WP2 2.1): H forwards the launcher's binding; no skill reaches the shared loop.
+    binding = {"session_context_id": "bound-context", "role": "loyal-opposition", "native_context_id": "native-1"}
 
     def fake_run_tool_loop(*args, **kwargs):
         captured["profile"] = args[6]
         captured["native_hook_runner"] = kwargs["native_hook_runner"]
-        captured["skill"] = kwargs["skill"]
+        captured["binding"] = kwargs["binding"]
+        captured["skill_forwarded"] = "skill" in kwargs
         return "done"
 
     monkeypatch.setattr(base, "run_tool_loop", fake_run_tool_loop)
@@ -186,15 +215,16 @@ def test_run_tool_loop_delegates_profile_and_native_hook_runner(
             "fixture-token",
             1,
             root,
-            skill="bridge-review",
             native_hook_runner=hook_runner,
+            binding=binding,
         )
         == "done"
     )
     assert captured == {
         "profile": ach._ALIBABA_PROFILE,
         "native_hook_runner": hook_runner,
-        "skill": "bridge-review",
+        "binding": binding,
+        "skill_forwarded": False,
     }
 
 

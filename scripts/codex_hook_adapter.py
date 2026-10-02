@@ -79,7 +79,14 @@ def _payload(data, event):
             raise ValueError("Missing native tool_name")
         if not isinstance(data.get("tool_input"), dict):
             raise ValueError("Missing native tool_input")
-    return {**data, "project_root": str(ROOT), "hook_event_name": event}
+    payload = {**data, "project_root": str(ROOT), "hook_event_name": event}
+    tool_input = data.get("tool_input")
+    if event in {"PreToolUse", "PostToolUse"} and isinstance(tool_input, dict) and "patch" not in tool_input:
+        command = tool_input.get("command")
+        if isinstance(command, str) and "*** Begin Patch" in command:
+            # c123 (batch design WP2, G38): Codex puts apply_patch text in the command; the canonical key is patch.
+            payload["tool_input"] = {**tool_input, "patch": command}
+    return payload
 
 
 def _response(data, event):

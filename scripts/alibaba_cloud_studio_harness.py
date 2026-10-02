@@ -15,6 +15,7 @@ import sys
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
+from uuid import uuid4
 
 try:
     import cloud_harness_base as base
@@ -41,7 +42,6 @@ ensure_utf8_output_streams = base.ensure_utf8_output_streams
 DEFAULT_TIMEOUT_SECONDS = base.DEFAULT_TIMEOUT_SECONDS
 DEFAULT_SESSION_TIMEOUT_SECONDS = base.DEFAULT_SESSION_TIMEOUT_SECONDS
 DEFAULT_MAX_TURNS = base.DEFAULT_MAX_TURNS
-LOYAL_OPPOSITION_BRIDGE_SKILLS = base.LOYAL_OPPOSITION_BRIDGE_SKILLS
 CANONICAL_TOOLS = base.CANONICAL_TOOLS
 
 DEFAULT_ENDPOINT = "https://dashscope.aliyuncs.com/apps/anthropic"
@@ -170,7 +170,6 @@ def run_tool_loop(
     max_turns: int,
     project_root: Path,
     *,
-    skill: str | None = None,
     bridge_document: str | None = None,
     bridge_version: int | None = None,
     system_prompt: str | None = None,
@@ -180,7 +179,12 @@ def run_tool_loop(
     command_runner: CommandRunner | None = None,
     timeout: float = DEFAULT_TIMEOUT_SECONDS,
     session_timeout: float = DEFAULT_SESSION_TIMEOUT_SECONDS,
+    telemetry: Any | None = None,
+    guard_log: base.GuardDecisionLog | None = None,
+    native_context_id: str | None = None,
+    binding: Mapping[str, Any] | None = None,
 ) -> str:
+    """H's tool loop (c123, batch design WP2: it forwards the run report, the guard log, the context id and the bind)."""
     return base.run_tool_loop(
         prompt,
         model_route,
@@ -189,7 +193,6 @@ def run_tool_loop(
         max_turns,
         project_root,
         _ALIBABA_PROFILE,
-        skill=skill,
         bridge_document=bridge_document,
         bridge_version=bridge_version,
         system_prompt=system_prompt,
@@ -199,11 +202,15 @@ def run_tool_loop(
         command_runner=command_runner,
         timeout=timeout,
         session_timeout=session_timeout,
+        telemetry=telemetry,
+        guard_log=guard_log,
+        native_context_id=native_context_id,
+        binding=binding,
     )
 
 
-def build_system_prompt(skill: str | None, project_root: Path) -> str:
-    """Load shared root instructions and the selected skill without assigning a role."""
+def build_system_prompt(project_root: Path) -> str:
+    """Load the shared root instructions; a role is never loaded from a launch argument (c123, WP2 2.1)."""
     root_source = project_root / "AGENTS.md"
     if not root_source.resolve().is_relative_to(project_root.resolve()):
         raise AlibabaCloudStudioHarnessError("Shared root instructions resolve outside the project root")
@@ -213,19 +220,7 @@ def build_system_prompt(skill: str | None, project_root: Path) -> str:
         raise AlibabaCloudStudioHarnessError("Shared root instructions are unavailable: AGENTS.md") from exc
     if not root_instructions.strip():
         raise AlibabaCloudStudioHarnessError("Shared root instructions are unavailable: empty AGENTS.md")
-    if skill not in LOYAL_OPPOSITION_BRIDGE_SKILLS:
-        return root_instructions
-    selected = "gtkb-proposal-review" if skill == "bridge-review" else "gtkb-verify"
-    sources = [project_root / ".agents" / "skills" / name / "SKILL.md" for name in ("gtkb-bridge", selected)]
-    try:
-        instructions = [path.read_text(encoding="utf-8") for path in sources]
-    except (OSError, UnicodeError) as exc:
-        raise AlibabaCloudStudioHarnessError("Current canonical bridge skill instructions are unavailable") from exc
-    if any(not text.strip() for text in instructions):
-        raise AlibabaCloudStudioHarnessError(
-            "Current canonical bridge skill instructions are unavailable: empty source"
-        )
-    return "\n\n".join([root_instructions, *instructions])
+    return root_instructions
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
@@ -236,7 +231,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
         default=DEFAULT_MODEL_ROUTE,
         help="Routing model key from .harness-baseline-configuration/routing.toml.",
     )
-    parser.add_argument("--skill", help="Skill or task route key from .harness-baseline-configuration/routing.toml.")
+    parser.add_argument(
+        "--init", help="The exact init line; the launcher binds the context with it before the first provider call."
+    )
     parser.add_argument("--max-turns", type=int, default=DEFAULT_MAX_TURNS, help="Maximum tool loop turns.")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS, help="HTTP/guard/subprocess timeout.")
     parser.add_argument(
@@ -247,6 +244,8 @@ def build_arg_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--bridge-document", help="Assigned canonical bridge document.")
     parser.add_argument("--bridge-version", type=int, help="Exact successor version this task must deliver.")
+    parser.add_argument("--report", help="Write the run report (JSON) to this path.")
+    parser.add_argument("--guard-log", help="Append the guard decisions (JSONL) to this path; else GTKB_GUARD_LOG.")
     return parser
 
 
@@ -259,11 +258,47 @@ def _load_env_local() -> None:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """Run one H launch (c123, batch design WP2 items 9 and 10: guard log, report, exit codes).
+
+    Exit codes: 0 final answer; 3 bridge delivery incomplete; 4 the --init bind failed (c123, WP2 2.1, no provider
+    call made); 5 interrupted; 1 every other failure.
+    """
     ensure_utf8_output_streams()
+    base.install_break_handler()
     raw_argv = list(sys.argv[1:] if argv is None else argv)
     args = build_arg_parser().parse_args(raw_argv)
     project_root = resolve_project_root(Path.cwd())
+    native_context_id = str(uuid4())
+    guard_log = base.GuardDecisionLog(base.guard_log_path(args.guard_log), native_context_id)
+    report = base.RunReport(
+        harness="alibaba_cloud_studio",
+        native_context_id=native_context_id,
+        route_key=args.model,
+        requested_model=None,
+        endpoint=os.environ.get(ENDPOINT_ENV),
+        guard_log=guard_log,
+    )
+    exit_code, error = 1, None
+    try:
+        exit_code, error = _run(args, raw_argv, project_root, native_context_id, guard_log, report)
+    except KeyboardInterrupt:
+        print("alibaba_cloud_studio_harness: interrupted", file=sys.stderr)
+        exit_code, error = base.EXIT_INTERRUPTED, "interrupted"
+        if report.data["stop_reason"] is None:
+            report.finish("interrupted")
+    finally:
+        report.write(Path(args.report) if args.report else None, exit_code=exit_code, error=error)
+    return exit_code
 
+
+def _run(
+    args: argparse.Namespace,
+    raw_argv: list[str],
+    project_root: Path,
+    native_context_id: str,
+    guard_log: base.GuardDecisionLog,
+    report: base.RunReport,
+) -> tuple[int, str | None]:
     try:
         _load_env_local()
     except ImportError:
@@ -271,16 +306,20 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     api_key = os.environ.get(API_KEY_ENV)
     if not api_key:
-        print(f"alibaba_cloud_studio_harness: {API_KEY_ENV} environment variable is not set.", file=sys.stderr)
-        return 1
+        message = f"alibaba_cloud_studio_harness: {API_KEY_ENV} environment variable is not set."
+        print(message, file=sys.stderr)
+        return 1, message
     endpoint = os.environ.get(ENDPOINT_ENV)
     if not endpoint:
-        print(f"alibaba_cloud_studio_harness: {ENDPOINT_ENV} environment variable is not set.", file=sys.stderr)
-        return 1
+        message = f"alibaba_cloud_studio_harness: {ENDPOINT_ENV} environment variable is not set."
+        print(message, file=sys.stderr)
+        return 1, message
 
     try:
         config = load_routing_config(project_root)
-        model_route = resolve_model(config, args.model, skill=args.skill)
+        model_route = resolve_model(config, args.model)
+        report.data["route_key"] = model_route.key
+        report.data["requested_model"] = model_route.model_id
         operation_timeout, session_timeout, max_turns = resolve_runtime_limits(
             config,
             raw_argv,
@@ -288,6 +327,14 @@ def main(argv: Sequence[str] | None = None) -> int:
             cli_session_timeout=args.session_timeout,
             cli_max_turns=args.max_turns,
         )
+        system_prompt = build_system_prompt(project_root)
+        print(f"alibaba_cloud_studio_harness: native_context_id={native_context_id}", file=sys.stderr)
+        base.check_launch_inputs(project_root, _ALIBABA_PROFILE, args.bridge_document, args.bridge_version)
+        try:
+            binding = base.bind_for_run(args.init, native_context_id, project_root, report)
+        except base.NativeBindFailed as exc:
+            print(f"alibaba_cloud_studio_harness: {exc}", file=sys.stderr)
+            return base.EXIT_BIND_FAILED, str(exc)
         text = run_tool_loop(
             args.prompt,
             model_route,
@@ -295,18 +342,22 @@ def main(argv: Sequence[str] | None = None) -> int:
             api_key,
             max_turns,
             project_root,
-            skill=args.skill,
             bridge_document=args.bridge_document,
             bridge_version=args.bridge_version,
-            system_prompt=build_system_prompt(args.skill, project_root),
+            system_prompt=system_prompt,
             timeout=operation_timeout,
             session_timeout=session_timeout,
+            telemetry=report,
+            guard_log=guard_log,
+            native_context_id=native_context_id,
+            binding=binding,
         )
     except AlibabaCloudStudioHarnessError as exc:
         print(f"alibaba_cloud_studio_harness: {exc}", file=sys.stderr)
-        return 1
+        incomplete = isinstance(exc, base.CloudHarnessIncomplete)
+        return (base.EXIT_DELIVERY_INCOMPLETE if incomplete else 1), str(exc)
     print(text)
-    return 0
+    return 0, None
 
 
 if __name__ == "__main__":

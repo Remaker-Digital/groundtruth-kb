@@ -103,7 +103,9 @@ the new version. The writer appends native change history; assertion evaluation
 does not amend the specification or record an implementation verdict.
 
 Map each implementation gap to its existing project, work item and executable
-test, or use the current work-intake route where new work is required. Preserve
+test. File unmatched work through `gtkb-work-item` into
+`PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and
+name any related project in its description. Preserve
 single-project membership and current test-plan relationships. Specification
 authoring alone neither creates implementation work nor starts it. Do not
 invent a project, force every test into a hard-coded plan, or substitute a

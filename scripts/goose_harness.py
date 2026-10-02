@@ -43,6 +43,7 @@ GOOSE_CLI = "goose"
 # configuration tree and no silent fallback when the file is absent.
 FLOOR_CONFIG_RELATIVE_PATH = Path(".harness-baseline-configuration") / "goose-execution-floor.toml"
 PROFILES_RELATIVE_PATH = Path("scripts") / "harness_projection" / "profiles.toml"
+ROUTING_RELATIVE_PATH = Path(".harness-baseline-configuration") / "routing.toml"
 
 
 class GooseHarnessError(RuntimeError):
@@ -78,8 +79,10 @@ def resolve_project_root(start: Path | None = None) -> Path:
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Run the GT-KB Goose harness shim (Alibaba DeepSeek V4 Pro).")
     parser.add_argument("-p", "--prompt", required=True, help="User prompt to send to Goose.")
-    parser.add_argument("--model", help="Model identifier passed directly to Goose.")
-    parser.add_argument("--skill", help="Task key selecting this shim's additional system instructions.")
+    parser.add_argument(
+        "--model",
+        help="Routing model key from .harness-baseline-configuration/routing.toml; its model_id reaches goose run.",
+    )
     parser.add_argument(
         "--max-turns",
         type=int,
@@ -106,33 +109,25 @@ def build_arg_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def build_system_prompt(skill: str | None) -> str | None:
-    """Build additional system instructions for the given skill."""
-    if not skill:
-        return None
+def resolve_goose_model(project_root: Path, route_key: str) -> str:
+    """The model_id Goose receives for a registered route key (c123; batch design WP2 2.2).
 
-    skill_prompts = {
-        "bridge-review": (
-            "You are acting as Loyal Opposition for GT-KB bridge review. "
-            "Your task is to review bridge proposals and file GO/NO-GO/VERIFIED verdicts. "
-            "Follow the file-bridge-protocol.md: read the proposal, evaluate it, "
-            "run verification, and write a verdict file in bridge/ with the appropriate status token. "
-            "Be thorough, evidence-based, and fail-closed when uncertain."
-        ),
-        "verification": (
-            "You are acting as Loyal Opposition for GT-KB verification. "
-            "Your task is to verify implementation reports against their proposals. "
-            "Run pytest, ruff, and other verification commands. "
-            "File VERIFIED or NO-GO verdicts with evidence."
-        ),
-        "implementation": (
-            "You are acting as Prime Builder for GT-KB implementation. "
-            "Your task is to implement approved proposals. "
-            "Follow the bridge GO conditions, write implementation reports, "
-            "and run verification before filing."
-        ),
-    }
-    return skill_prompts.get(skill)
+    The key must name a [models.<key>] row of routing.toml whose provider is goose; any other key fails closed, as the
+    API launchers' resolve_model does, so a free-text name never reaches ``goose run --model``. The role-specific
+    system prompts this shim used to inject are gone (WP2 2.1): a role comes only from the context's binding.
+    """
+    try:
+        routing = tomllib.loads((project_root / ROUTING_RELATIVE_PATH).read_text(encoding="utf-8"))
+    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raise GooseHarnessError(f"routing config is unreadable: {exc}") from exc
+    models = routing.get("models")
+    row = models.get(route_key) if isinstance(models, dict) else None
+    if not isinstance(row, dict) or row.get("provider") != "goose":
+        raise GooseHarnessError(f"unknown model route: {route_key}")
+    model_id = row.get("model_id")
+    if not isinstance(model_id, str) or not model_id:
+        raise GooseHarnessError(f"models.{route_key}.model_id must be a non-empty string")
+    return model_id
 
 
 def _load_floor_config(project_root: Path) -> ExecutionFloorConfig:
@@ -185,6 +180,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         floor_config = _load_floor_config(project_root)
         # Observer B74: refuse a session whose hooks could not run, before any model call.
         require_hook_interpreter(project_root, child_environment())
+        # c123 (batch design WP2 2.2): a registered --model is a routing key; Goose receives its model_id.
+        model_id = resolve_goose_model(project_root, args.model) if args.model else None
     except GooseHarnessError as exc:
         print(f"goose_harness: {exc}", file=sys.stderr)
         return 1
@@ -192,7 +189,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     # WI-5831: Export live model configuration before spawning the child.
     # This ensures the child environment carries the spawn model identity
     # for provenance-guard comparison.
-    export_model_configuration(args.model or "")
+    export_model_configuration(model_id or "")
 
     goose_cli = _find_goose_cli()
 
@@ -210,14 +207,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         args.prompt,
     ]
 
-    # Inject skill-specific system instructions
-    system_prompt = build_system_prompt(args.skill)
-    if system_prompt:
-        cmd.extend(["--system", system_prompt])
-
-    # Override model if specified
-    if args.model:
-        cmd.extend(["--model", args.model])
+    # Override model if specified (the routing row's model_id; no role-specific system prompt is injected).
+    if model_id:
+        cmd.extend(["--model", model_id])
 
     # WI-5831: Record the spawn window start for run-window sweep and
     # provenance-guard time-bounding.

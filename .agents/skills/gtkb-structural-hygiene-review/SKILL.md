@@ -7,13 +7,7 @@ metadata:
   references:
     - ../gtkb-work-item/references/taxonomy.md
   license: "Proprietary - (c) 2026 Remaker Digital"
-  activity-envelope: deliberation, specification
 ---
-# Activity Envelope Requirement
-
-This is an **activity-envelope-only** skill. Use it only after the current worker has opened the respective activity-envelope(s) (e.g., 'ops', 'deliberation', or 'build') specified earlier in this document. If a request for this skill arrives outside `::open <activity-envelope>`, do not act on this skill request and inform the user that this skill is only availablewithin the specified activity envelope.
-
-
 # Structural Hygiene Review
 
 ## Goal
@@ -29,7 +23,8 @@ Read the smallest relevant set:
 
 - `.harness-baseline-configuration/rules/canonical-terminology.md`
 - `.harness-baseline-configuration/rules/operating-model.md`
-- current MemBase source-of-truth tables/views for the concept under review
+- current canonical records for the concept under review, read through the `gt`
+  readers
 - relevant docs, tests, scripts, generated artifacts, and archive paths
 
 ## Workflow
@@ -52,20 +47,14 @@ Read the smallest relevant set:
    - `P1`: active-looking obsolete artifact likely to mislead agents
    - `P2`: terminology drift across docs/schema/API/tests
    - `P3`: clutter or weak naming that reduces intuitiveness
-6. Correct safe issues:
-   - migrate state to canonical sources
-   - archive historical artifacts under clearly labeled archive/history paths
-   - replace active-looking files with generated views or pointers
-   - update references and tests
-   - add guards against old names or live dependencies
-7. Verify with searches, source-of-truth queries, resolver/doctor tests, and
-   focused regression tests.
-8. Record a concise hygiene report when the review changes project behavior or
-   finds unresolved risks.
+6. Report findings as corrective work items or ADVISORY; correct only under a
+   dispatched work item and its chain. File unmatched work through
+   `gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification
+   and executable test, and name any related project in its description.
 
 ## Correction Rules
 
-- Preserve history, but move it out of active-looking locations.
+- Remove obsolete material at its source.
 - Generated files must say they are generated.
 - Compatibility files must not be mutation surfaces.
 - Prefer canonical glossary terms in APIs, schema, docs, and CLI.

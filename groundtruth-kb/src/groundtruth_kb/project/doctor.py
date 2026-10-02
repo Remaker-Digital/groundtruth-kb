@@ -50,81 +50,6 @@ _ACTIVE_LEGACY_ROOT_SURFACES = (
     Path(".claude") / "settings.json",
     Path(".codex") / "hooks.json",
 )
-_TAFE_SCHEMA_REQUIRED_COLUMNS: dict[str, set[str]] = {
-    "flow_definitions": {
-        "id",
-        "version",
-        "flow_type",
-        "title",
-        "status",
-        "lifecycle_status",
-        "stage_sequence",
-        "required_roles_by_stage",
-        "auq_gate_positions",
-        "never_self_review_stages",
-        "deterministic_carve_outs",
-        "workspace_isolation",
-        "source_spec_ids",
-        "changed_by",
-        "changed_at",
-        "change_reason",
-    },
-    "flow_instances": {
-        "id",
-        "version",
-        "flow_definition_id",
-        "flow_definition_version",
-        "flow_type",
-        "subject_type",
-        "subject_id",
-        "status",
-        "current_stage_instance_id",
-        "metadata",
-        "changed_by",
-        "changed_at",
-        "change_reason",
-    },
-    "stage_instances": {
-        "id",
-        "version",
-        "flow_instance_id",
-        "stage_id",
-        "stage_index",
-        "required_role",
-        "status",
-        "claim_status",
-        "claimed_by_harness_id",
-        "claimed_by_session_id",
-        "metadata",
-        "changed_by",
-        "changed_at",
-        "change_reason",
-    },
-    "flow_events": {
-        "id",
-        "flow_instance_id",
-        "stage_instance_id",
-        "event_type",
-        "event_at",
-        "event_payload",
-        "changed_by",
-        "changed_at",
-        "change_reason",
-    },
-    "flow_artifacts": {
-        "id",
-        "flow_instance_id",
-        "stage_instance_id",
-        "artifact_type",
-        "artifact_ref",
-        "relationship",
-        "status",
-        "metadata",
-        "changed_by",
-        "changed_at",
-        "change_reason",
-    },
-}
 
 
 def _coerce_string_list(value: Any) -> list[str]:
@@ -1081,11 +1006,9 @@ def _provider_routing(target: Path, provider: str) -> tuple[ToolCheck, tuple[str
         or selected["default_model"] not in models
     ):
         findings.append("default_model does not resolve to a provider model")
-    elif isinstance(selected.get("skills", {}), dict):
-        if any(key not in models for key in selected.get("skills", {}).values()):
-            findings.append("skill route does not resolve to a provider model")
-    else:
-        findings.append("skill routes must be a table")
+    elif "skills" in selected:
+        # c123 (batch design WP2 2.1): a role skill no longer selects a model; the launchers refuse such a table.
+        findings.append("routing skill tables are retired; registrations name --model")
     if findings:
         return ToolCheck(name=name, required=False, found=True, status="fail", message="; ".join(findings)), ()
     return ToolCheck(

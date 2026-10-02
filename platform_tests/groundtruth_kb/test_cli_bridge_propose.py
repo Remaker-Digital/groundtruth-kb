@@ -324,7 +324,7 @@ def test_documented_proposal_header_delivers_through_actual_cli(bridge, tmp_path
         head = 2
     root = Path(__file__).resolve().parents[2]
     # D15: the one skills source; the baseline directory holds rules and hooks only.
-    skill = (root / ".agents/skills/gtkb-propose/SKILL.md").read_text(encoding="utf-8")
+    skill = (root / ".agents/skills/gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
     example = re.search(r"## Authored header example\n.*?```text\n(.*?)```", skill, re.S)
     assert example is not None
     with socket.socket() as socket_probe:

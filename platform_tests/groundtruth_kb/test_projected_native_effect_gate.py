@@ -27,7 +27,9 @@ from platform_tests.groundtruth_kb.native_fixtures import native as native
 from scripts.check_harness_parity import _commands, _load_projector, _references_script, _registration_events
 
 ROOT = Path(__file__).resolve().parents[2]
-pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
+# Per-test limit from measurement (c123's timer table, owner decision 2026-10-02): the slowest test took 56.4 s
+# on the host as it is and 83.5 s under saturation; Rule R 123.6 s, rounded up to 10 s.
+pytestmark = [pytest.mark.integration, pytest.mark.timeout(130)]
 RETIRED_LO_GATE_PATHS = (
     ".harness-baseline-configuration/hooks/lo-file-safety-gate.py",
     "config/governance/lo-file-safety.toml",
@@ -91,6 +93,8 @@ def test_declared_gate_checks_live_checkout_scope_and_preserves_foreign_work(har
         "antigravity_hook_adapter.py",
         "codex_hook_adapter.py",
         "goose_hook_adapter.py",
+        # c123 (batch design WP2 2.4): the projected Claude settings run every hook through this adapter.
+        "claude_hook_adapter.py",
         "lo_file_safety_payloads.py",
     ):
         shutil.copyfile(ROOT / "scripts" / name, scripts / name)

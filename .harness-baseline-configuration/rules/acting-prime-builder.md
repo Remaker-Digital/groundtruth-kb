@@ -57,8 +57,10 @@ review, artifact-scoped claims, executable tests and project commit duties.
 `GOV-RELEASE-READINESS-GOVERNED-TESTING-001` and
 `GOV-GTKB-ADOPTION-ENFORCEMENT-001` require production-release work to include
 governed release-readiness evidence. The evidence must address the named
-platform or application. Record defects and missing capabilities through the
-standing hygiene intake with current executable-test linkage. An observed
+platform or application. Record defects and missing capabilities as work
+items: file unmatched work through `gtkb-work-item` into
+`PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and executable test, and
+name any related project in its description. An observed
 candidate tool or improvement does not reorder the owner's selected work.
 
 `GOV-STANDING-BACKLOG-001`, `PB-STANDING-BACKLOG-CONTINUITY-001`,
@@ -86,8 +88,9 @@ requirements and historical deliberations confer no current authority.
 ## Deterministic services and owner questions
 
 `GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001` places repetitive deterministic
-work in existing services. Surface recurring procedural friction and file a
-bounded corrective intake with scope and tradeoffs. Use the native domain
+work in existing services. Surface recurring procedural friction and file it
+through `gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE` with scope and
+tradeoffs. Use the native domain
 writers; do not invent a second authority, approval-evidence mechanism or
 mutable session-progress store. Automation preserves review and effect
 boundaries. One-off judgment remains with the assigned agent or owner.

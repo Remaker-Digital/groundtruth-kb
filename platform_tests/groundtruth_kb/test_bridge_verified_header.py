@@ -5,6 +5,9 @@ header, where the parser does not read it; its deliveries were refused reviewed_
 where the map belongs until the launcher's turn limit ended the cell. PB1 delivered with its native context id as
 author_harness_id and was told only that a harnesses record does not exist. Both refusals keep their codes; their
 messages now name the header line and the field, and the two verifier skills state that the map is a header line.
+
+c123 (batch design WP4 4.1): the harness refusal names where the id comes from, the launcher's GTKB_AUTHOR_HARNESS_ID
+or the dispatched task, and no longer points to gt harness list, which AGENTS.md says not to pick an id from.
 """
 
 from __future__ import annotations
@@ -95,7 +98,9 @@ def test_an_unknown_author_harness_names_the_field_and_the_same_claim_then_deliv
     assert error["code"] == "not_found", error
     details = {key: error["details"].get(key) for key in ("domain", "id", "field")}
     assert details == {"domain": "harnesses", "id": "pb1", "field": "author_harness_id"}, error
-    assert "author_harness_id" in error["message"] and "gt harness list" in error["message"], error
+    # c123 (batch design WP4 4.1): the launcher's export or the dispatched task names the id; gt harness list does not.
+    assert "author_harness_id" in error["message"] and "GTKB_AUTHOR_HARNESS_ID" in error["message"], error
+    assert "dispatched task" in error["message"] and "gt harness list" not in error["message"], error
     delivered = client.post(
         "/v1/bridge/chain/deliver", json={**fence, "content": authored(contexts["pb1"], "chain", 1, "NEW")}
     )

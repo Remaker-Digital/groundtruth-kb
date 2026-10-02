@@ -41,7 +41,11 @@ export function apply(ctx) {
         payload = { tool_name: 'Write', tool_input: { file_path: input.arguments?.path } };
       }
     } else if (input.name === 'pwsh') {
-      payload = { tool_name: 'Bash', tool_input: { command: input.arguments?.command } };
+      // c123 (owner decision A6): the sdk-minimal profile mounts this tool from
+      // @deepseek-ai/dsh-tool-pwsh-persistent, whose shell keeps its working
+      // directory across calls, while this guard reports a fixed cwd. The mark
+      // tells the gate, which then refuses a top-level change of directory.
+      payload = { tool_name: 'Bash', tool_input: { command: input.arguments?.command }, persistent_shell: true };
     } else {
       return 'GT-KB guard: unsupported native tool';
     }

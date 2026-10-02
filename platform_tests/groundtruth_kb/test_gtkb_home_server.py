@@ -261,6 +261,8 @@ def test_the_server_environment_is_minimal_and_carries_no_secret(tmp_path, monke
     assert env["DSH_HOME"] == env["GTKB_HOME_STATE"] == str(tmp_path)
     assert env["DSH_TELEMETRY_DISABLED"] == "1" and env["DSH_PERMISSION_MODE"] == "workspace-write"
     assert env["GTKB_GUARD_GATE"].endswith(str(Path("scripts") / "implementation_start_gate.py"))
+    # c123 (batch design WP3 3.2): the guard's decision log, in the state folder's logs under the SDK's file name.
+    assert env["GTKB_GUARD_LOG"] == str(tmp_path / "logs" / "guard-decisions.jsonl")
     assert env["GT_PROJECT_ROOT"] == env["GTKB_HOME_ROOT"] == str(home.ROOT)
 
 
@@ -291,6 +293,83 @@ def test_the_profile_manifest_is_always_the_pinned_one(tmp_path):
     manifest.write_text("{}", encoding="utf-8")
     home.write_profile_manifest(tmp_path, release)
     assert json.loads(manifest.read_text(encoding="utf-8"))["dsh"]["profile"]["patchReload"] == "startup"
+
+
+# c123 (owner decision C3): the acknowledgement a fresh Home state is seeded with, in the namespace and field the
+# upstream onboarding copy reads.
+ACKNOWLEDGEMENT = b'ui-onboarding:\n  welcomeNoticeVersion: "2026-08-13.1"\n'
+
+
+def test_a_fresh_home_state_acknowledges_the_internal_testing_notice(tmp_path):
+    """c123 (owner decision C3): a fresh state gets settings.yaml with only the acknowledgement of upstream's Internal
+    Testing Notice, so the notice does not show; the version reads back as a string."""
+    home = _module("home")
+    settings = home.seed_onboarding_acknowledgement(tmp_path / "state")
+    assert settings == tmp_path / "state" / "settings.yaml"
+    assert settings.read_bytes() == ACKNOWLEDGEMENT
+    assert yaml.safe_load(settings.read_text(encoding="utf-8")) == {
+        "ui-onboarding": {"welcomeNoticeVersion": "2026-08-13.1"}
+    }
+
+
+@pytest.mark.parametrize(
+    "existing",
+    [
+        b"# the owner's own settings\nllm-pi-ai:\n  providers: {}\n"
+        b"ui-onboarding:\n  welcomeNoticeVersion: 2026-01-01.1\n",
+        b"llm-pi-ai:\n  providers: {}\n",
+    ],
+    ids=["comment-and-another-section", "without-ui-onboarding"],
+)
+def test_an_existing_settings_file_is_never_changed(tmp_path, existing):
+    """c123 (owner decision C3): the owner's settings document stays byte-identical, whatever it holds."""
+    home = _module("home")
+    settings = tmp_path / "settings.yaml"
+    settings.write_bytes(existing)
+    assert home.seed_onboarding_acknowledgement(tmp_path) == settings
+    assert settings.read_bytes() == existing
+
+
+def test_start_seeds_the_acknowledgement_before_it_launches(tmp_path, monkeypatch):
+    """c123 (owner decision C3): start() seeds a fresh state before it launches the server. The installation, Node, the
+    composition proof and the credential are stubs, and the launch itself fails."""
+    home = _module("home")
+    state = tmp_path / "state"
+    monkeypatch.setattr(home, "verify_installation", lambda: {"profile_manifest": {}})
+    monkeypatch.setattr(home, "node_executable", lambda: "node")
+    monkeypatch.setattr(home, "prove_composition", lambda node, env: None)
+    monkeypatch.setattr(home, "credential", lambda: {})
+    seen_at_launch = []
+
+    def popen(*args, **kwargs):
+        seen_at_launch.append((state / "settings.yaml").read_bytes())
+        raise OSError("fixture: the server is not launched")
+
+    monkeypatch.setattr(home.subprocess, "Popen", popen)
+    with pytest.raises(OSError, match="fixture: the server is not launched"):
+        home.start(state)
+    assert seen_at_launch == [ACKNOWLEDGEMENT]
+
+
+# c123 (owner decision C3): WELCOME_NOTICE_VERSION was read from the pinned upstream onboarding copy,
+# @deepseek-ai/dsh-client-ui-settings-models 0.1.2-rc.1, lib/client.js ("ui-onboarding", "welcomeNoticeVersion",
+# "2026-08-13.1"). This pins that package, so a version or content change fails here, before release.
+VERIFIED_NOTICE_PACKAGE = {
+    "entry": "node_modules/@deepseek-ai/dsh-client-ui-settings-models",
+    "version": "0.1.2-rc.1",
+    "integrity": "sha512-r4ErsBy1NE9QWqZmFyxoBFQhCc+pymmc62PFN7PBxFAX85JRJ3asWwjZPpgXW+y7AkqNWy1JVJqlLdf7W5pCIA==",
+}
+
+
+def test_the_notice_acknowledgement_is_pinned_to_the_verified_upstream_onboarding_copy():
+    home = _module("home")
+    lock = json.loads((WEB / "package-lock.json").read_text(encoding="utf-8"))
+    entry = lock["packages"][VERIFIED_NOTICE_PACKAGE["entry"]]
+    assert (entry["version"], entry["integrity"]) == (
+        VERIFIED_NOTICE_PACKAGE["version"],
+        VERIFIED_NOTICE_PACKAGE["integrity"],
+    ), "verify WELCOME_NOTICE_VERSION in the upstream onboarding copy, then update home.py"
+    assert home.WELCOME_NOTICE_VERSION == "2026-08-13.1"
 
 
 DUMP = """- id: agent-default-model
@@ -381,3 +460,82 @@ def test_without_a_run_record_nothing_is_stopped_and_no_url_is_given(tmp_path, c
         "ok": False,
         "error": "The Home server is not running; start it with: gt home start",
     }
+
+
+def test_the_run_record_names_its_root_and_its_guard_log(tmp_path, monkeypatch):
+    """c123 (batch design WP3 3.2, 3.3): start records the installation's root and the guard log it gave the server,
+    and status reports that log. The server is a stub that reports ready; nothing is installed or started."""
+    home = _module("home")
+    state = tmp_path / "state"
+    guard_log = str(state / "logs" / "guard-decisions.jsonl")
+    identity = {"exe": "C:\\nodejs\\node.exe", "cmd": "fixture", "created": "2026-10-01T00:00:00.0000000Z"}
+    monkeypatch.setattr(home, "verify_installation", lambda: {"profile_manifest": {}})
+    monkeypatch.setattr(home, "node_executable", lambda: "node")
+    monkeypatch.setattr(home, "prove_composition", lambda node, env: None)
+    monkeypatch.setattr(home, "credential", lambda: {})
+    monkeypatch.setattr(home, "process_identity", lambda pid: identity)
+    monkeypatch.setattr(home.time, "sleep", lambda seconds: None)
+    launched = []
+
+    class Server:
+        pid = 4242
+
+        def poll(self):
+            return None
+
+    def popen(command, *, env, stdout, stderr, **options):
+        launched.append(env["GTKB_GUARD_LOG"])
+        stdout.write(b"http://127.0.0.1:3080/?token=fixture-not-a-token\n")
+        stderr.write(("\n".join(home.ACTIVATION_LINES) + "\n").encode("utf-8"))
+        return Server()
+
+    monkeypatch.setattr(home.subprocess, "Popen", popen)
+    assert home.start(state)["started"] is True
+    record = json.loads((state / "run" / "home-run.json").read_text(encoding="utf-8"))
+    assert launched == [guard_log] and record["guard_log"] == guard_log
+    assert record["root"] == str(home.ROOT)
+    monkeypatch.setattr(home, "ours", lambda found: False)
+    assert home.status(state)["guard_log"] == guard_log
+
+
+def test_a_live_home_of_another_root_keeps_its_run_record_and_url_file(tmp_path, monkeypatch):
+    """c123 (batch design WP3 3.3): every installation shares the default state folder, so stop and start refuse the
+    run record of another root's live Home before anything else, and the record and the URL file stay. A record from
+    before records named their root is another root's while its live process runs another tree's launcher."""
+    home = _module("home")
+    state = tmp_path / "state"
+    other = tmp_path / "GT-KB"
+    (state / "run").mkdir(parents=True)
+    url_file = state / "run" / "home-url.txt"
+    url_file.write_text("http://127.0.0.1:3080/?token=fixture-not-a-token\n", encoding="utf-8")
+    record_path = state / "run" / "home-run.json"
+    record = {
+        "pid": 4242,
+        "created": "2026-09-30T18:09:24.0000000Z",
+        "root": str(other),
+        "port": 3080,
+        "control": "fixture-not-a-secret",
+        "url_file": str(url_file),
+        "log_file": str(state / "logs" / "home-20260930T180924.log"),
+        "credential_supplied": True,
+    }
+    launcher = other / "infrastructure" / "deepseek-web" / "node_modules" / "@deepseek-ai" / "dsh" / "lib" / "bin.js"
+    live = {"exe": "C:\\nodejs\\node.exe", "cmd": f'node "{launcher}" --profile gtkb', "created": record["created"]}
+    monkeypatch.setattr(home, "process_identity", lambda pid: live if pid == record["pid"] else None)
+
+    def nothing_else():
+        raise AssertionError("the refusal comes before anything is verified, written or started")
+
+    monkeypatch.setattr(home, "verify_installation", nothing_else)
+    legacy = {key: value for key, value in record.items() if key != "root"}
+    for written, owner in ((record, str(other)), (legacy, "another installation")):
+        record_path.write_text(json.dumps(written), encoding="utf-8")
+        kept = (record_path.read_bytes(), url_file.read_bytes())
+        for action in (home.stop, home.start):
+            with pytest.raises(home.HomeError, match="belongs to the live Home of") as refused:
+                action(state)
+            assert owner in str(refused.value) and str(home.ROOT) in str(refused.value)
+            assert (record_path.read_bytes(), url_file.read_bytes()) == kept
+    monkeypatch.setattr(home, "process_identity", lambda pid: None)
+    assert home.stop(state) == {"stopped": False, "reason": "the recorded process is not running"}
+    assert not record_path.exists() and url_file.exists(), "once that Home has ended, stop clears its stale record"

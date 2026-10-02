@@ -146,6 +146,16 @@ leftover_paths = [
   ".claude/hooks/advisory-router-scan.py",
 ]
 leftover_trees = [".claude/gtkb-hooks"]
+# c123 (batch design WP2 2.4): every hook command runs through the Claude hook adapter. Claude Code treats a hook
+# that exits nonzero other than 2, cannot start, prints output it cannot read or reaches its timeout as a
+# non-blocking error and runs the tool; the adapter answers each of those with Claude Code's blocking exit 2.
+stdin_adapter = "scripts/claude_hook_adapter.py"
+# c123 (batch design WP2 2.4): the adapter refuses a target that has not answered this many seconds before the hook's
+# registered timeout, so its refusal lands before Claude Code cancels the hook (a cancelled hook renders no decision).
+adapter_deadline_margin_seconds = 2
+# c123 (batch design WP2 2.4): Claude Code's documented default timeout for a command hook, registered for a hook the
+# manifest gives no timeout, so the adapter's deadline always sits below the timeout Claude Code applies.
+hook_timeout_default_seconds = 600
 [harnesses.claude.hook_events]
 pre_tool_use = "PreToolUse"
 post_tool_use = "PostToolUse"
@@ -158,6 +168,12 @@ file_write = "Write|Edit|MultiEdit|NotebookEdit|Delete|Move|Copy"
 shell_exec = "Bash|PowerShell"
 read_access = "Read|Grep|Glob"
 all = ""
+[harnesses.claude.native_settings]
+# c123 (owner decision B5): keys the projected .claude/settings.json carries beside its hooks. Claude Code's
+# auto-memory is off in GT-KB checkouts (its own documented project setting). The projection never carries a
+# permissions key: interactive sessions keep Claude Code's prompts, and the dispatched registration sets its
+# permission mode on its own command line (owner decision B1).
+autoMemoryEnabled = false
 
 # Remaining harnesses are declared as placeholders so the roster lives HERE
 # (not in the baseline). Their surface details land with their own projector

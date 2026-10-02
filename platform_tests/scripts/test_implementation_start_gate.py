@@ -351,7 +351,8 @@ def test_read_only_shell_command_is_allowed_without_authorization(
 @pytest.mark.parametrize(
     "command",
     [
-        "python -m pytest platform_tests/scripts/test_sample.py -q",
+        # c123 (owner decision A1): "python -m pytest platform_tests/scripts/test_sample.py -q" left this list; a test
+        # run is a program run (test_pytest_is_a_program_run_that_needs_a_claim below).
         "git status --short",
         'rg -n "hello" scripts/sample.py',
     ],
@@ -365,6 +366,26 @@ def test_structurally_single_read_only_commands_remain_allowed(command: str, tmp
 
     assert gate._is_safe_command(command) is True
     assert gate.gate_decision(payload) == {}
+
+
+def test_pytest_is_a_program_run_that_needs_a_claim(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """c123 (owner decision A1): python -m pytest left the safe prefixes. An unbound context is refused before any CLI
+    call; a bound one runs the tests only after gt bridge check-program confirms a live claim."""
+    command = "python -m pytest platform_tests/scripts/test_sample.py -q"
+    payload = {"cwd": str(tmp_path), "tool_name": "Bash", "tool_input": {"command": command}}
+    assert gate._is_safe_command(command) is False
+    monkeypatch.setattr(gate.subprocess, "run", lambda *_a, **_k: pytest.fail("CLI must not run"))
+    assert gate.gate_decision(payload)["reason_code"] == "invalid_native_context"
+    calls = []
+
+    def run(argv, **_kwargs):
+        calls.append(argv)
+        answer = {"status": "current", "scope": "program", "claims": 1}
+        return subprocess.CompletedProcess(argv, 0, json.dumps(answer), "")
+
+    monkeypatch.setattr(gate.subprocess, "run", run)
+    assert gate.gate_decision({**payload, "session_id": "native"}) == {}
+    assert [argv[4] for argv in calls] == ["check-program"]
 
 
 @pytest.mark.parametrize(
@@ -810,3 +831,52 @@ def test_change7_drops_argument_position_false_positives(command: str, rationale
     was carrying a write verb inside a flag value.
     """
     assert not gate._has_mutating_signal(command), rationale
+
+
+# c123 (batch design WP1, item 7): the native CLI prints click's "Error: <code>: <message>", and the DeepSeek runtime
+# renders every denial as "Error: <reason>", so hosts saw "Error: Error: <code>: ...". The gate keeps the native code
+# and drops click's prefix; with B148 each host shows only its own prefix.
+CLI_CLAIM_REFUSAL = "Error: implementation_claim_required: Tool work edits require a live implementation-report claim\n"
+
+
+def _refusing(stderr: str):
+    def run(argv, **_kwargs):
+        return subprocess.CompletedProcess(argv, 1, "", stderr)
+
+    return run
+
+
+def _native_decision(tmp_path, monkeypatch, stderr: str) -> dict:
+    monkeypatch.setenv("GTKB_NATIVE_CONTEXT_ID", "current-context")
+    monkeypatch.setattr(gate.subprocess, "run", _refusing(stderr))
+    payload = {"cwd": str(tmp_path), "tool_name": "Write", "tool_input": {"file_path": "notes.txt", "content": "x"}}
+    return gate.gate_decision(payload)
+
+
+def test_a_native_refusal_keeps_its_own_code_without_clicks_prefix(tmp_path, monkeypatch):
+    result = _native_decision(tmp_path, monkeypatch, CLI_CLAIM_REFUSAL)
+    assert result["reason_code"] == "implementation_claim_required"
+    assert result["reason"] == "Tool work edits require a live implementation-report claim (targets: notes.txt)"
+
+
+def test_a_native_refusals_detail_lines_are_kept(tmp_path, monkeypatch):
+    stderr = "Error: effect_outside_claim: The path is outside the claim\nclaim: WI-1 at fence 4\n"
+    result = _native_decision(tmp_path, monkeypatch, stderr)
+    assert result["reason_code"] == "effect_outside_claim"
+    assert result["reason"] == "The path is outside the claim (targets: notes.txt)\nclaim: WI-1 at fence 4"
+
+
+@pytest.mark.parametrize("stderr", ["claim_expired", "", "Error: the authority is busy"])
+def test_a_native_refusal_without_a_code_keeps_the_generic_code(tmp_path, monkeypatch, stderr):
+    result = _native_decision(tmp_path, monkeypatch, stderr)
+    assert result["reason_code"] == "native_effect_refused"
+    assert "Error" not in result["reason"] and "(targets: notes.txt)" in result["reason"]
+
+
+def test_the_host_sees_one_code_and_no_error_prefix(tmp_path, monkeypatch, capsys):
+    from groundtruth_kb.governance.output import emit_effect_gate_result
+
+    emit_effect_gate_result(_native_decision(tmp_path, monkeypatch, CLI_CLAIM_REFUSAL))
+    reason = json.loads(capsys.readouterr().out)["hookSpecificOutput"]["permissionDecisionReason"]
+    assert reason.startswith("implementation_claim_required: Tool work edits")
+    assert reason.count("implementation_claim_required") == 1 and "Error" not in reason

@@ -10,7 +10,7 @@ This skill implements direct requirement intake for ``groundtruth_kb.spec_intake
 a temporary candidate, one explicit confirmation into a canonical specification,
 or a discard with a reason. It pairs confirm-before-mutate ergonomics with
 audit attribution (``changed_by = "prime-builder/spec-intake-skill"``) on the
-one record it writes. The persisted deliberation queue is retired (O-7 R24).
+one record it writes. The persisted deliberation queue is retired.
 
 # /gtkb-spec-intake
 

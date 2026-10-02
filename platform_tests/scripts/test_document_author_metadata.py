@@ -50,6 +50,13 @@ def _run_hook(hook: Path, payload: dict[str, object]) -> subprocess.CompletedPro
     )
 
 
+def _deny_reason(result: subprocess.CompletedProcess[str]) -> str:
+    """The gate's structured deny (c123, batch design WP2 G39: exit 0 with permissionDecision deny, as every gate)."""
+    decision = json.loads(result.stdout)["hookSpecificOutput"]
+    assert decision["permissionDecision"] == "deny"
+    return decision["permissionDecisionReason"]
+
+
 def test_complete_author_metadata_is_valid() -> None:
     result = validate_author_metadata(_metadata_content())
 
@@ -153,8 +160,8 @@ def test_hook_blocks_new_governed_write_without_metadata() -> None:
 
     result = _run_hook(CLAUDE_HOOK, payload)
 
-    assert result.returncode == 2
-    assert json.loads(result.stdout)["decision"] == "block"
+    assert result.returncode == 0
+    assert "bridge/document-author-provenance-test-new.md" in _deny_reason(result)
 
 
 def test_hook_allows_new_governed_write_with_metadata() -> None:
@@ -184,8 +191,8 @@ def test_hook_blocks_add_file_patch_without_metadata() -> None:
 
     result = _run_hook(CLAUDE_HOOK, payload)
 
-    assert result.returncode == 2
-    assert "docs/new-contract.md" in json.loads(result.stdout)["reason"]
+    assert result.returncode == 0
+    assert "docs/new-contract.md" in _deny_reason(result)
 
 
 def _codex_apply_patch_payload(path: str) -> dict[str, object]:
@@ -203,15 +210,15 @@ def test_baseline_gate_blocks_codex_add_file_patch_without_metadata() -> None:
     no patch text and allowed the governed document (fail-open on the native Codex path)."""
     result = _run_hook(BASELINE_HOOK, _codex_apply_patch_payload("docs/new-codex-contract.md"))
 
-    assert result.returncode == 2
-    assert "docs/new-codex-contract.md" in json.loads(result.stdout)["reason"]
+    assert result.returncode == 0
+    assert "docs/new-codex-contract.md" in _deny_reason(result)
 
 
 def test_codex_authored_gate_blocks_add_file_patch_without_metadata() -> None:
     result = _run_hook(CODEX_HOOK, _codex_apply_patch_payload("docs/new-codex-contract.md"))
 
-    assert result.returncode == 2
-    assert "docs/new-codex-contract.md" in json.loads(result.stdout)["reason"]
+    assert result.returncode == 0
+    assert "docs/new-codex-contract.md" in _deny_reason(result)
 
 
 def test_codex_apply_patch_registration_present() -> None:
@@ -294,12 +301,11 @@ def test_real_hook_ignores_document_waiver(tmp_path: Path, with_metadata: bool) 
 
     result = _run_hook(BASELINE_HOOK, payload)
 
-    assert result.returncode == (0 if with_metadata else 2), result.stderr
-    reply = json.loads(result.stdout)
+    assert result.returncode == 0, result.stderr
     if with_metadata:
-        assert reply == {}
+        assert json.loads(result.stdout) == {}
     else:
-        assert reply["decision"] == "block"
-        assert "docs/new.md" in reply["reason"]
-        assert "Use document_author_provenance_waiver" not in reply["reason"]
+        reason = _deny_reason(result)
+        assert "docs/new.md" in reason
+        assert "Use document_author_provenance_waiver" not in reason
     assert not (tmp_path / "docs/new.md").exists()

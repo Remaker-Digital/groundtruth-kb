@@ -25,6 +25,11 @@ author_harness_id, author_session_context_id and author_model. Omit ::init,
 ::open and recipient_role. Deliver the complete content under that exact claim
 and read it back with `gt bridge show`.
 
+`author_harness_id` is attribution, not a role. Use the registered id your
+launcher exported as `GTKB_AUTHOR_HARNESS_ID`, or the id the dispatched task
+names. If neither exists, do not pick one from `gt harness list`. Report the
+gap, and ask the owner when interactive.
+
 Do not add a pending Classification Slot, owner-answer transcript or permission
 packet. A later advisory revision needs a fresh artifact claim. Do not modify
 another author's content. ADVISORY permits only ADVISORY as its successor.

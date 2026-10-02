@@ -127,6 +127,22 @@ def test_missing_package_emits_explicit_denial_without_echoing_payload(entry, tm
             True,
             '{"decision": "block", "diagnostic": true, "reason": "bound \\u03c0", "would_block": true}\n',
         ),
+        # c123 (batch design WP1, B148): the reason code reaches the host, once, in both fields; diagnostic mode carries it.
+        (
+            {"decision": "block", "reason_code": "unknown_effect_targets", "reason": "x"},
+            False,
+            '{"hookSpecificOutput": {"additionalContext": "unknown_effect_targets: x", "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "unknown_effect_targets: x"}}\n',
+        ),
+        (
+            {"decision": "block", "reason_code": "unknown_effect_targets", "reason": "x"},
+            True,
+            '{"decision": "block", "diagnostic": true, "reason": "x", "reason_code": "unknown_effect_targets", "would_block": true}\n',
+        ),
+        (
+            {"decision": "block", "reason_code": "unknown_effect_targets", "reason": "unknown_effect_targets: x"},
+            False,
+            '{"hookSpecificOutput": {"additionalContext": "unknown_effect_targets: x", "hookEventName": "PreToolUse", "permissionDecision": "deny", "permissionDecisionReason": "unknown_effect_targets: x"}}\n',
+        ),
         (
             {"decision": "block", "reason": ""},
             False,

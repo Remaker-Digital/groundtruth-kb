@@ -44,6 +44,7 @@ def _installation(tmp_path):
     scripts.mkdir()
     for name in ("cursor_harness.py", "verify_cursor_dispatch.py"):
         shutil.copyfile(REPO_ROOT / "scripts" / name, scripts / name)
+    # c123 (batch design WP2 2.1): the selected root keeps its own skills; neither the shim nor readiness reads them.
     for name in ("bridge", "proposal-review", "verify"):
         path = selected / ".agents" / "skills" / ("gtkb-" + name) / "SKILL.md"
         path.parent.mkdir(parents=True)
@@ -95,8 +96,7 @@ from groundtruth_kb import cursor_harness
 agent=sys.argv[2]
 cursor_harness._resolve_agent_command=lambda:[sys.executable,agent]
 script=sys.argv[1];mode=sys.argv[3]
-sys.argv=[script,'--prompt','portable owner task','--skill','bridge-review',
-          '--mode',mode,'--output-format','json','--timeout','5']
+sys.argv=[script,'--prompt','portable owner task','--mode',mode,'--output-format','json','--timeout','5']
 runpy.run_path(script,run_name='__main__')
 """,
         [selected / "scripts/cursor_harness.py", agent, mode],
@@ -107,9 +107,8 @@ runpy.run_path(script,run_name='__main__')
     assert Path(report["cwd"]) == selected
     assert Path(report["workspace"]) == selected
     assert report["mode"] == mode and report["format"] == "json"
-    assert report["prompt"].endswith("portable owner task")
-    assert "Selected own instruction bridge" in report["prompt"]
-    assert "Selected own instruction proposal-review" in report["prompt"]
+    # c123 (batch design WP2 2.1): no --skill, and the prompt reaches the agent without the selected root's skill text.
+    assert report["prompt"] == "portable owner task"
     assert report["key"] == "synthetic-selected-value"
     assert not (selected / "scripts/_env.py").exists()
 
@@ -123,8 +122,12 @@ def test_doctor_uses_packaged_probe_selected_http_record_and_real_auth_child(aut
         "harness_name": "cursor",
         "harness_type": "cursor",
         "status": "active",
+        # c123 (batch design WP2 2.1): the corrected E row; c121's --skill bridge-review now fails the argv check.
         "invocation_surfaces": {
-            "headless": {"argv": ["python", "scripts/cursor_harness.py", "--skill", "bridge-review"]}
+            "dispatch": {"dispatch_tags": []},
+            "headless": {
+                "argv": ["groundtruth-kb/.venv/Scripts/python.exe", "scripts/cursor_harness.py", "-p", "{{PROMPT}}"]
+            },
         },
     }
 

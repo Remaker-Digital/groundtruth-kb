@@ -11,8 +11,8 @@ managed, scaffolded, upgraded, or governed by GT-KB.
 - GT-KB demo/application files MUST be within `E:\GT-KB\applications\`.
 - **EXCEPTION:** `groundtruth-kb/examples/` (adopter fixtures) are exempt from the `applications/` mandate.
 - Agent Red is the reference adopter application for GT-KB. Its application files
-  live at `E:\GT-KB\applications\Agent_Red\` per the root harness instruction file section
-  Mandatory Project Root Boundary, governed by the isolation contract at
+  live at `E:\GT-KB\applications\Agent_Red\` under this rule and are governed by
+  the isolation contract at
   `applications/Agent_Red/.gtkb-app-isolation.json`. The hosted form deploys
   from a lifecycle-independent repository at
   `https://github.com/mike-remakerdigital/agent-red`. Unqualified GT-KB tooling references
@@ -39,8 +39,8 @@ managed, scaffolded, upgraded, or governed by GT-KB.
   out-of-root Agent Red repository or CI artifacts are external surfaces that
   must be explicitly scoped when used as evidence.
 - When a live path is unknown, fail closed and request or derive an in-root path.
-- Any proposal, review, implementation, or test that depends on a path outside
-  the allowed roots is a NO-GO until revised to be root-contained.
+- A proposal that depends on a path outside the allowed roots is a NO-GO until
+  revised. An implementation or test that does is NOT-READY until corrected.
 - Any migration of application code must move toward
   `E:\GT-KB\applications\<application-name>\`; new application files must not be
   added outside `E:\GT-KB\applications\`.
@@ -56,9 +56,9 @@ Formal GT-KB artifacts, implementation reports, verification verdicts, tests,
 doctor checks, bridge evidence, governed decisions, release evidence, and
 dependency closure must not read from or depend on harness-local scratchpads as
 authority. Project-relevant information originating in a scratchpad must be
-promoted into governed in-root artifacts such as MemBase, the Deliberation
-Archive, specifications, ADR/DCL/GOV records, bridge files, source, tests, or
-approved reports before it is cited, verified, or used as a dependency.
+promoted into governed in-root artifacts before it is cited, verified, or used
+as a dependency: formal records, projects and work items written through the
+native writers, plus source and tests.
 
 This boundary does not forbid harness scratchpads from existing as runtime
 byproducts or operational notes. It forbids treating them as GT-KB authority.
@@ -85,7 +85,7 @@ is retained as history only and is not an authority carrier.
 ## SQLite Snapshot Output (retired exception)
 
 The `gt db snapshot` command, its scheduled task and the doctor's snapshot
-freshness and output-allowlist checks are retired (O-7 R22), and with them the
+freshness and output-allowlist checks are retired, and with them the
 former DB-Snapshot Output Exception (`DCL-PROJECT-ROOT-BOUNDARY-DB-SNAPSHOT-OUTPUT-EXCEPTION-001`,
 retired). A SQLite snapshot is neither a health criterion nor a production
 fallback. The only remaining snapshot use is the explicit offline migration
@@ -129,5 +129,3 @@ created, read as a live dependency, updated, verified, or required from outside
 that root.
 
 Authority: `DCL-PROJECT-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXEC-EXCEPTION-001`.
-
-Provenance: `DELIB-S366-ROOT-BOUNDARY-EXTERNAL-HARNESS-EXCEPTION` (owner S366 AUQ).

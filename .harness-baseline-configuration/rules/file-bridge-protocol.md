@@ -1,14 +1,15 @@
 # Bridge protocol and project completion
 
-Bridge messages carry the next assigned task. Current specifications, projects,
-work items, tests and completion state come from the authoritative database
-through the CLI. A bridge message is not a durable specification, owner decision
-record, permission record or evidence that a Git commit exists.
+Bridge messages carry the next assigned task. Current project, work-item and
+bridge state is read through the native CLI; current specifications, tests and
+completion state come from the authoritative database through the CLI. A bridge
+message is not a durable specification, owner decision record, permission
+record or evidence that a Git commit exists.
 
 Use the canonical `gtkb-bridge` skill for command details, `gtkb-proposal-review`
-for proposals and `gtkb-verify` for implementation reports. Load each skill from
-this harness's own generated configuration. Do not load a peer harness's rules,
-settings, helpers or session state.
+for proposals and `gtkb-verify` for implementation reports. Load these skills
+from `.agents/skills`. A host stub only points there. Do not load a peer
+harness's rules, settings, helpers or session state.
 
 ## Context and assigned work
 
@@ -69,6 +70,11 @@ Author each metadata key exactly once: `bridge_kind`, Document, Version, Date,
 context for authored session attribution. A native runtime identifier is not
 that canonical binding.
 
+`author_harness_id` is attribution, not a role. Use the registered id your
+launcher exported as `GTKB_AUTHOR_HARNESS_ID`, or the id the dispatched task
+names. If neither exists, do not pick one from `gt harness list`. Report the
+gap, and ask the owner when interactive.
+
 NEW, REVISED and BLOCKED identify Project and Work Item with plain canonical
 metadata lines. Other lifecycle messages inherit the exact claimed relationship;
 if they repeat those identifiers, the values must match. An unscoped ADVISORY
@@ -86,6 +92,10 @@ Read back the result. The service validates and stores authored content without
 filling provenance, rewriting headers, allocating a different authored version,
 appending disclosures or changing the message body. Correct a refused message
 from current facts and retry through the CLI. Do not write raw bridge storage.
+
+Never cite a scratch path or other temporary file in a bridge message or commit.
+Cite repository paths, canonical ids and the observed results in the message
+itself.
 
 ## Canonical bridge kinds
 

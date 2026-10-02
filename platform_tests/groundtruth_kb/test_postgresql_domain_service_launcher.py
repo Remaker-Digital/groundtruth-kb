@@ -261,8 +261,8 @@ def test_inherited_postgres_overrides_cannot_redirect_the_operator_config_servic
     assert selected.service == "gtkb_authority"
     assert (selected.connect_timeout_seconds, selected.lock_timeout_ms, selected.statement_timeout_ms) == (
         10,
-        20000,
-        30000,
+        40000,
+        40000,
     )
 
 

@@ -43,9 +43,10 @@ paths and tag frequencies are observations, not conformance or taxonomy
 decisions. A paginated observation is not an atomic corpus snapshot.
 
 Report findings with their current source and bounded evidence. Apply an
-assigned correction through its canonical writer and follow the existing
-defect-intake process for remaining work. This review does not create a
-second audit database, DOC receipt, permission history, lifecycle status or
+assigned correction through its canonical writer. File unmatched work through
+`gtkb-work-item` into `PROJECT-GTKB-NEW-WORK-INTAKE`, with its specification and
+executable test, and name any related project in its description. This review
+does not create a second audit database, DOC receipt, permission history, lifecycle status or
 automatic commit. Any canonical amendment or independent verdict remains a
 separate act under its actual role and scope.
 
