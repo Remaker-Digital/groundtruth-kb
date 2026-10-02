@@ -119,7 +119,7 @@ gt dashboard install
 gt dashboard start
 ```
 
-Open `http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard`.
+Open `http://127.0.0.1:8767/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard`.
 If enterprise policy requires a managed Grafana install, install Grafana and
 the SQLite datasource plugin through the approved channel and pass
 `--grafana-home` to `gt dashboard install` or `gt dashboard start`.

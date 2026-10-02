@@ -21,6 +21,7 @@ from urllib.parse import parse_qs, urlparse
 from groundtruth_kb import dashboard_control_plane as registry
 from groundtruth_kb.config import GTConfig
 from groundtruth_kb.dashboard import initialize_dashboard, resolve_dashboard_paths
+from groundtruth_kb.dashboard_link import DEFAULT_GRAFANA_PORT
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ class RefreshState:
         config: GTConfig | None = None,
         runtime_root: Path | None = None,
         config_path: Path | None = None,
-        grafana_port: int = 3000,
+        grafana_port: int = DEFAULT_GRAFANA_PORT,
         refresh_port: int = DEFAULT_PORT,
     ) -> None:
         self.config = config or GTConfig(project_root=project_root)
@@ -406,7 +407,7 @@ def run_service(
     interval_minutes: int = DEFAULT_INTERVAL_MINUTES,
     *,
     config_path: Path | None = None,
-    grafana_port: int = 3000,
+    grafana_port: int = DEFAULT_GRAFANA_PORT,
 ) -> None:
     """Serve only the installed display and fixed control operations for this root."""
     host = _loopback_host(host)
@@ -448,7 +449,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--host", default=DEFAULT_HOST, help="Numeric IPv4 loopback bind address (default: 127.0.0.1).")
     parser.add_argument("--port", type=int, default=int(os.getenv("GTKB_DASHBOARD_REFRESH_PORT", DEFAULT_PORT)))
     parser.add_argument("--interval-minutes", type=int, default=_interval_seconds() // 60)
-    parser.add_argument("--grafana-port", type=int, default=3000)
+    parser.add_argument("--grafana-port", type=int, default=DEFAULT_GRAFANA_PORT)
     args = parser.parse_args(argv)
     try:
         args.host = _loopback_host(args.host)

@@ -174,7 +174,7 @@ def _record(paths, members, job="fixture-job"):
     record = {
         "job": job,
         "members": members,
-        "grafana_port": 3000,
+        "grafana_port": 8767,
         "refresh_port": 8766,
         "interval_seconds": 3600,
         "config_path": str(paths.project_root / "groundtruth.toml"),

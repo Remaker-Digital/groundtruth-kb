@@ -995,7 +995,7 @@ def dashboard_install(
 @click.option("--db-path", type=click.Path(path_type=Path))
 @click.option("--runtime-root", type=click.Path(path_type=Path))
 @click.option("--grafana-home", type=click.Path(path_type=Path))
-@click.option("--grafana-port", type=click.IntRange(1, 65535), default=3000, show_default=True)
+@click.option("--grafana-port", type=click.IntRange(1, 65535), default=8767, show_default=True)
 @click.option("--refresh-port", type=click.IntRange(1, 65535), default=8766, show_default=True)
 @click.option("--interval-minutes", type=click.IntRange(min=1), default=60, show_default=True)
 @click.option("--json", "json_output", is_flag=True)
@@ -1050,7 +1050,7 @@ def dashboard_stop(ctx: click.Context, runtime_root: Path | None, json_output: b
 @click.option("--db-path", type=click.Path(path_type=Path))
 @click.option("--runtime-root", type=click.Path(path_type=Path))
 @click.option("--port", type=click.IntRange(1, 65535), default=8766, show_default=True)
-@click.option("--grafana-port", type=click.IntRange(1, 65535), default=3000, show_default=True)
+@click.option("--grafana-port", type=click.IntRange(1, 65535), default=8767, show_default=True)
 @click.option("--interval-minutes", type=click.IntRange(min=1), default=60, show_default=True)
 @click.pass_context
 def dashboard_serve(

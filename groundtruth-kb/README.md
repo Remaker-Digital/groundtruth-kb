@@ -195,7 +195,7 @@ gt --config E:\GT-KB\groundtruth.toml dashboard init
 gt dashboard install
 gt dashboard start
 # Landing page: http://127.0.0.1:8766/
-# Grafana: http://127.0.0.1:3000/d/groundtruth-kb-dashboard/gt-kb-operations-dashboard
+# Grafana: http://127.0.0.1:8767/d/groundtruth-kb-dashboard/gt-kb-operations-dashboard
 gt dashboard refresh --json
 gt dashboard stop
 ```

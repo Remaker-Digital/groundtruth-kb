@@ -301,7 +301,7 @@ def test_dashboard_component_states_the_configured_link_without_contact(native_a
     payload = json.loads(result.output)
     component = payload["components"][0]
     link = grafana_dashboard_url()
-    assert link == "http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard"
+    assert link == "http://127.0.0.1:8767/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard"
     assert component["status"] == "PASS" and payload["overall_status"] == "PASS"
     assert component["detail"] == f"{link} (not contacted)"
     runtime_root = native_application.host.resolve() / ".groundtruth" / "dashboard"

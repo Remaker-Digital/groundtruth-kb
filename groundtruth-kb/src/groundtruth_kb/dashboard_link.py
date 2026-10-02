@@ -13,7 +13,7 @@ from pathlib import Path
 LOOPBACK_HOST = "127.0.0.1"
 GRAFANA_DASHBOARD_UID = "groundtruth-kb-dashboard"
 GRAFANA_DASHBOARD_SLUG = "groundtruth-kb-dashboard"
-DEFAULT_GRAFANA_PORT = 3000
+DEFAULT_GRAFANA_PORT = 8767  # beside the refresh service's 8766; 3000 is left to other local developer tools
 DEFAULT_REFRESH_PORT = 8766
 DASHBOARD_RUNTIME_RELATIVE_PATH = Path(".groundtruth") / "dashboard"
 

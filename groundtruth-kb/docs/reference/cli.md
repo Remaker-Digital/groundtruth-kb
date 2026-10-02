@@ -64,7 +64,7 @@ An unavailable authority yields `UNKNOWN` components with the client's
 recorded cause and exit 0; it is never replaced by a local quick-check.
 
 The `dashboard` component states the link `gt dashboard start` derives
-(`http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard`
+(`http://127.0.0.1:8767/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard`
 with the launch's default ports) and marks it `(not contacted)`: neither
 Grafana, the refresh service nor the authority is requested for it, so
 reading it creates no session binding, infers no role and selects no work
@@ -349,13 +349,13 @@ Start the dashboard refresh service and Grafana, returning only after the
 readiness checks pass.
 
 ```
-gt dashboard start [--db-path <path>] [--runtime-root <path>] [--grafana-home <path>] [--grafana-port 3000] [--refresh-port 8766] [--interval-minutes 60] [--json]
+gt dashboard start [--db-path <path>] [--runtime-root <path>] [--grafana-home <path>] [--grafana-port 8767] [--refresh-port 8766] [--interval-minutes 60] [--json]
 ```
 
 Default dashboard URL:
 
 ```
-http://127.0.0.1:3000/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard
+http://127.0.0.1:8767/d/groundtruth-kb-dashboard/groundtruth-kb-dashboard
 ```
 
 On Windows both launches run inside one named kill-on-close job object for the
@@ -412,7 +412,7 @@ gt dashboard serve [--db-path <path>] [--runtime-root <path>] [--port <n>] [--gr
 | `--db-path` | path | resolved from config | Derived dashboard database |
 | `--runtime-root` | path | resolved from config | Runtime directory holding the installed display |
 | `--port` | integer (1-65535) | `8766` | Loopback port of the refresh service |
-| `--grafana-port` | integer (1-65535) | `3000` | Grafana port the display links to |
+| `--grafana-port` | integer (1-65535) | `8767` | Grafana port the display links to |
 | `--interval-minutes` | integer >= 1 | `60` | Minutes between scheduled refreshes |
 
 The service binds `127.0.0.1` only and has no `--json` option because it does

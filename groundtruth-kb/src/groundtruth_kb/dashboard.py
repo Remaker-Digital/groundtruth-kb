@@ -206,7 +206,7 @@ SETUP_STEPS = [
         "instruction": "Start the local refresh service and Grafana without a container runtime.",
         "command": "gt dashboard start",
         "link_label": "Local Grafana",
-        "link_url": "http://127.0.0.1:3000/",
+        "link_url": f"http://127.0.0.1:{DEFAULT_GRAFANA_PORT}/",
     },
     {
         "section": "Launch",
@@ -2604,7 +2604,7 @@ def refresh_dashboard_db(paths: DashboardPaths, config: GTConfig, *, probe_live:
 
 
 def write_grafana_assets(
-    paths: DashboardPaths, config: GTConfig, *, grafana_port: int = 3000, refresh_port: int = 8766
+    paths: DashboardPaths, config: GTConfig, *, grafana_port: int = DEFAULT_GRAFANA_PORT, refresh_port: int = 8766
 ) -> None:
     """Derive Grafana assets from installed sources, independently of source checkout files."""
     from groundtruth_kb.dashboard_grafana import build_dashboard
@@ -2653,8 +2653,9 @@ def write_grafana_assets(
         json.dumps(dashboard, indent=2, allow_nan=False) + "\n", encoding="utf-8"
     )
     sources = get_templates_dir() / "dashboard"
+    template = (sources / "index.html").read_text(encoding="utf-8")
     (paths.runtime_root / "index.html").write_text(
-        (sources / "index.html").read_text(encoding="utf-8").replace("127.0.0.1:3000", f"127.0.0.1:{grafana_port}"),
+        template.replace(f"127.0.0.1:{DEFAULT_GRAFANA_PORT}", f"127.0.0.1:{grafana_port}"),
         encoding="utf-8",
     )
     alerting = paths.provisioning_dir / "alerting"
@@ -2667,7 +2668,7 @@ def initialize_dashboard(
     paths: DashboardPaths,
     config: GTConfig,
     *,
-    grafana_port: int = 3000,
+    grafana_port: int = DEFAULT_GRAFANA_PORT,
     refresh_port: int = 8766,
     schema_only: bool = False,
     probe_live: bool = False,
