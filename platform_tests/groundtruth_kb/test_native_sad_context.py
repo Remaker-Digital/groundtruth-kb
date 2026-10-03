@@ -259,6 +259,50 @@ def test_missing_sad_formal_reference_names_canonical_recovery_without_an_altern
     )
 
 
+def test_context_prose_adjectives_do_not_invent_formals_while_real_ids_remain_bound(context_service):
+    service, root, rows, _, _ = context_service
+    rows["PB-CANON-001"] = {"id": "PB-CANON-001", "version": 4, "status": "active"}
+    rows["SPEC-INTAKE-ed82d6"] = {"id": "SPEC-INTAKE-ed82d6", "version": 4, "status": "active"}
+    expected = copy.deepcopy(rows)
+    _sources(
+        root,
+        {
+            "2.1": (
+                "PB-addressed and SPEC-derived describe the procedure. "
+                "PB-CANON-001 and SPEC-INTAKE-ed82d6 is active at row version 4."
+            )
+        },
+    )
+    result = service.task_context("WI-1", recipient_role="pb", activity="build", project_root=root)
+    assert {row["id"] for row in result["authored_formal_references"]} == {
+        "PB-CANON-001",
+        "SPEC-INTAKE-ed82d6",
+    }
+    assert "PB-addressed" in result["message_context"]["text"]
+    assert "SPEC-derived" in result["message_context"]["text"]
+    assert rows == expected
+
+
+@pytest.mark.parametrize("formal_id", ["PB-MISSING-001", "SPEC-INTAKE-missing123"])
+def test_genuine_context_reference_still_refuses_when_missing(context_service, formal_id):
+    service, root, _, _, _ = context_service
+    _sources(root, {"2.1": f"Applicable source {formal_id}; PB-addressed ordinary prose."})
+    with pytest.raises(PostgresKernelError) as caught:
+        service.task_context("WI-1", recipient_role="pb", activity="build", project_root=root)
+    assert caught.value.code == "context_source_unavailable"
+    assert caught.value.details["id"] == formal_id
+
+
+def test_genuine_pb_current_version_claim_still_refuses_when_stale(context_service):
+    service, root, rows, _, _ = context_service
+    rows["PB-CANON-001"] = {"id": "PB-CANON-001", "version": 4, "status": "active"}
+    _sources(root, {"2.1": "PB-CANON-001 is active at row version 3; PB-addressed ordinary prose."})
+    with pytest.raises(PostgresKernelError) as caught:
+        service.task_context("WI-1", recipient_role="pb", activity="build", project_root=root)
+    assert caught.value.code == "stale_context_source"
+    assert caught.value.details["id"] == "PB-CANON-001"
+
+
 def test_transport_uses_configured_root_and_literal_selectors(context_service, monkeypatch):
     service, root, _, _, _ = context_service
     captured = []

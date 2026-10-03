@@ -838,9 +838,9 @@ _CONTEXT_BASELINE_PATHS = (
     ".harness-baseline-configuration/rules/session-bootstrap.md",
     ".harness-baseline-configuration/rules/operating-model.md",
 )
-_CONTEXT_FORMAL_ID = re.compile(r"\b(?:ADR|DCL|GOV|PB|REQ|SPEC)-[A-Za-z0-9][A-Za-z0-9_.:-]*")
+_CONTEXT_FORMAL_ID = re.compile(r"\b(?:ADR|DCL|GOV|PB|REQ|SPEC)-[A-Z0-9][A-Za-z0-9_.:-]*")
 _CONTEXT_ROW_VERSION = re.compile(
-    r"(?P<id>(?:ADR|DCL|GOV|PB|REQ|SPEC)-[A-Za-z0-9][A-Za-z0-9_.:-]*) "
+    r"(?P<id>(?:ADR|DCL|GOV|PB|REQ|SPEC)-[A-Z0-9][A-Za-z0-9_.:-]*) "
     r"(?:is )?active at row version (?P<version>[0-9]+)"
 )
 
