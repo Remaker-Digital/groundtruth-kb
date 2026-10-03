@@ -9,8 +9,10 @@ Use this skill for assigned READY reports, report-phase verdict corrections, or
 fresh verification selected from canonical state after changed reviewed bytes
 or a failed project commit. The exact supplied init marker and immutable context
 binding establish the Loyal Opposition role; a skill or harness does not. Review
-must be independent of the implementing context. Use `gtkb-bridge` for claims,
-headers, delivery and recovery; use `gtkb-proposal-review` for NEW or REVISED.
+must be independent of the implementing context and use a different actual model
+from the current READY report producer before VERIFIED, including fresh verification.
+Use `gtkb-bridge` for model-selection evidence, claims, headers, delivery and
+recovery; use `gtkb-proposal-review` for NEW or REVISED.
 
 VERIFIED records review of exact work product. Project commit follows only when
 all members are independently VERIFIED. The commit establishes activation and
@@ -105,10 +107,13 @@ Release any unfinished claim; a successor reconstructs state through the CLI.
 
 If other project members still need verification, leave this reviewed work
 uncommitted. Do not create a per-work-item commit or a second completion record.
-Only the Loyal Opposition context whose VERIFIED delivery returns
-`project_ready_for_commit: true` makes the one project commit. Prime Builder
-never commits. When canonical state reports every member VERIFIED and instructs
-finalization, that context reads the current project version and uses
+The Loyal Opposition context whose VERIFIED delivery returns
+`project_ready_for_commit: true` ordinarily makes the one project commit. A
+dispatched fresh independent Loyal Opposition context may recover finalization
+from current canonical and Git facts; the original context is not required. Prime
+Builder never commits. When canonical state reports every member VERIFIED and
+instructs finalization, the selected Loyal Opposition context reads the current
+project version and uses
 `gt projects commit` as documented in `gtkb-bridge`. The authored commit message
 cites every retiring `(WI-NNNN)`. Normal hooks run on the complete reviewed work
 product. Bridge payloads, generated projections and unrelated changes remain

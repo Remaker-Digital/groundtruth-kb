@@ -5,7 +5,7 @@ description: Add, rename or retire neutral GT-KB skills and qualify their determ
 
 # Skill rollout
 
-The one authored source is `.agents/skills/<name>/SKILL.md`, with its helpers
+The one authored source is `.harness-baseline-configuration/skills/<name>/SKILL.md`, with its helpers
 and references beside it. The name is a lowercase slug matching the directory;
 YAML frontmatter contains a nonempty name and description. Keep instructions
 neutral, use declared harness tokens for local paths, and retain links to

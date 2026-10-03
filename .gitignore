@@ -307,11 +307,9 @@ stripe
 /.codex/
 /.cursor/
 /.goose/
-# A declared extra projection root (owner ruling D52, 2026-09-24): Goose discovers
-# project plugins only at .agents/plugins/<name>/, so its GT-KB hook plugin renders
-# there. The pre-commit hook already refuses every .agents/ postimage outside
-# .agents/skills/, so this rule and that refusal agree.
-/.agents/plugins/gtkb/
+# Every .agents path is generated. Native Skill discovery and the Goose plugin
+# are derived views; authored Skills and helpers live only in the baseline.
+/.agents/
 # Operator installation records: per-machine state written by the DeepSeek SDK and
 # GT-KB Home installers (their package trees are ignored or self-ignored).
 /infrastructure/deepseek-sdk/installed.json

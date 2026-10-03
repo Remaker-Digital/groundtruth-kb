@@ -14,7 +14,7 @@ import pytest
 from scripts.harness_projection import project_harness as projector
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-SKILL_ROOT = PROJECT_ROOT / ".agents/skills/gtkb-session-wrap"
+SKILL_ROOT = PROJECT_ROOT / ".harness-baseline-configuration/skills/gtkb-session-wrap"
 SKILL = SKILL_ROOT / "SKILL.md"
 PROFILES = projector.load_profiles()["harnesses"]
 
@@ -55,14 +55,16 @@ def test_projector_points_to_authored_wrap_and_companion_resources(harness: str)
     assert plan.writes and not plan.gaps, plan.gaps
     for skill in ("gtkb-session-wrap", "gtkb-session-wrap-scan"):
         outputs = {path: text for path, text in plan.writes.items() if f"/{skill}/" in path}
-        if PROFILES[harness]["skills_discovery"] == "agents_skills":
-            assert outputs == {}
-        else:
-            path = PROFILES[harness]["skills_stub_dir"] + f"/{skill}/SKILL.md"
-            assert set(outputs) == {path}
-            assert f".agents/skills/{skill}/SKILL.md" in outputs[path]
-            authored = (SKILL_ROOT.parent / skill / "SKILL.md").read_text(encoding="utf-8")
-            assert authored.split("---", 2)[2].strip() not in outputs[path]
+        stub_dir = (
+            ".agents/skills"
+            if PROFILES[harness]["skills_discovery"] == "agents_skills"
+            else PROFILES[harness]["skills_stub_dir"]
+        )
+        path = stub_dir + f"/{skill}/SKILL.md"
+        assert set(outputs) == {path}
+        assert f".harness-baseline-configuration/skills/{skill}/SKILL.md" in outputs[path]
+        authored = (SKILL_ROOT.parent / skill / "SKILL.md").read_text(encoding="utf-8")
+        assert authored.split("---", 2)[2].strip() not in outputs[path]
 
 
 def test_handoff_template_is_gtkb_specific_and_self_contained() -> None:

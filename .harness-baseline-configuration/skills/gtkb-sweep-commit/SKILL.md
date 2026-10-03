@@ -17,13 +17,16 @@ Preserve every unrelated staged and unstaged byte. Report unfinished projects
 and foreign changes; a cleanup request does not make them verified. Do not select
 new implementation work or change membership merely to produce a clean tree.
 
-Only the Loyal Opposition context whose VERIFIED delivery returns
-`project_ready_for_commit: true` makes the one project commit. Prime Builder
-never commits. Use this skill only on that result, never for a cleanup request.
-Use that context's actual immutable native context binding. When all project
-members are VERIFIED, the native service checks the complete current reviewed
-artifact set, including Git modes and object identities, before the normal Git
-hooks run.
+The Loyal Opposition context whose VERIFIED delivery returns
+`project_ready_for_commit: true` normally makes the one project commit. A fresh
+independent Loyal Opposition context may recover finalization from current
+canonical reviews and the actual Git fact through the same native service;
+original-context affinity is not required. Prime Builder never commits. Use
+this skill only for that complete-project result or its lawful recovery, never
+for a cleanup request. Use the acting context's actual immutable native context
+binding. When all project members are VERIFIED, the native service checks the
+complete current reviewed artifact set, including Git modes and object identities,
+before the normal Git hooks run.
 
 1. Read current state with `gt projects show <PROJECT-ID> --json`,
    `gt backlog show <WI-ID> --json`, and the relevant `gt bridge show <document>`.

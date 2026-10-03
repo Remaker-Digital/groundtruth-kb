@@ -8,10 +8,10 @@ from pathlib import Path
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 SCANNED_TARGETS = (
-    ".agents/skills/gtkb-bridge-propose/SKILL.md",
-    ".agents/skills/gtkb-bridge/SKILL.md",
-    ".agents/skills/gtkb-lo-hygiene-assessment/SKILL.md",
-    ".agents/skills/gtkb-projects/SKILL.md",
+    ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md",
+    ".harness-baseline-configuration/skills/gtkb-bridge/SKILL.md",
+    ".harness-baseline-configuration/skills/gtkb-lo-hygiene-assessment/SKILL.md",
+    ".harness-baseline-configuration/skills/gtkb-projects/SKILL.md",
     ".harness-baseline-configuration/rules/backlog-approval-state.md",
     ".harness-baseline-configuration/rules/operating-model.md",
     "config/governance/neutral-source-inventory.toml",

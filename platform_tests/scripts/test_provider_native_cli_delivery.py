@@ -110,7 +110,7 @@ def test_prompt_is_the_shared_root_alone_beside_the_canonical_bridge_skills(prov
     monkeypatch.setenv("GTKB_INHERITED_SESSION_ID", "parent-context")
     (tmp_path / "AGENTS.md").write_text("Shared root instructions.\n", encoding="utf-8")
     for name in BRIDGE_SKILLS:
-        relative = Path(".agents") / "skills" / name / "SKILL.md"
+        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
         target = tmp_path / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((ROOT / relative).read_bytes())
@@ -128,7 +128,7 @@ def test_prompt_is_the_shared_root_alone_beside_the_canonical_bridge_skills(prov
 def test_prompt_loading_takes_no_skill_and_assigns_no_context(provider, tmp_path):
     (tmp_path / "AGENTS.md").write_text("Shared root instructions.", encoding="utf-8")
     for name in ("gtkb-bridge", "gtkb-proposal-review"):
-        target = tmp_path / ".agents" / "skills" / name / "SKILL.md"
+        target = tmp_path / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("Current source.", encoding="utf-8")
     prompt = provider.build_system_prompt(tmp_path)
@@ -142,7 +142,7 @@ def test_prompt_loading_takes_no_skill_and_assigns_no_context(provider, tmp_path
 def test_prompt_rereads_shared_root_without_assigning_runtime_identity(provider, tmp_path, monkeypatch):
     monkeypatch.setenv("GTKB_NATIVE_CONTEXT_ID", "parent-context")
     for name in BRIDGE_SKILLS:
-        target = tmp_path / ".agents" / "skills" / name / "SKILL.md"
+        target = tmp_path / ".harness-baseline-configuration" / "skills" / name / "SKILL.md"
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_text("Selected skill body.", encoding="utf-8")
     source = tmp_path / "AGENTS.md"

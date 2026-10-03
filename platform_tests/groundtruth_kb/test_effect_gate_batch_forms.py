@@ -165,18 +165,30 @@ def test_a_magic_pathspec_from_inside_a_checkout_stays_in_that_checkout(project,
 
 
 # ---- item 4: the owner table and python's valued options -------------------------------------------------------------
+# Wired ordinary controllers now require bounded-ops selectors; authority serve
+# remains owner-only. These missing-selector commands must still refuse locally.
 @pytest.mark.parametrize(
-    "command",
+    "command,reason_code",
     [
-        "gt service serve",
-        "gt dashboard install",
-        "python -X utf8 -m groundtruth_kb services stop",
-        "python -W ignore -m groundtruth_kb dashboard install",
-        "& { gt service serve }",
+        pytest.param("gt service serve", "owner_operation_only", id="gt service serve"),
+        pytest.param("gt dashboard install", "operation_selector_required", id="gt dashboard install"),
+        pytest.param(
+            "python -X utf8 -m groundtruth_kb services stop",
+            "operation_selector_required",
+            id="python -X utf8 -m groundtruth_kb services stop",
+        ),
+        pytest.param(
+            "python -W ignore -m groundtruth_kb dashboard install",
+            "operation_selector_required",
+            id="python -W ignore -m groundtruth_kb dashboard install",
+        ),
+        pytest.param("& { gt service serve }", "owner_operation_only", id="& { gt service serve }"),
     ],
 )
-def test_service_operations_are_owner_operations(project, native, command) -> None:
-    assert _decide(project, command)["reason_code"] == "owner_operation_only"
+def test_service_operations_are_owner_operations(project, native, command, reason_code) -> None:
+    result = _decide(project, command)
+    assert result["decision"] == "block" and result["reason_code"] == reason_code, result
+    assert native.calls == []
 
 
 @pytest.mark.parametrize(

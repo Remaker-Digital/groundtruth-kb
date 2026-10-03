@@ -25,9 +25,9 @@ the minimum a host's limitation requires - registrations and pointers, never
 copies):
     skills    pointer stubs under <skills_stub_dir> when skills_discovery =
               "pointer_stubs" (the source frontmatter block verbatim, the stamp,
-              one pointer line to .agents/skills/<name>/SKILL.md and an adapter
-              block hashing the frontmatter only); nothing when
-              "agents_skills" (the host reads .agents/skills in place)
+              one pointer line to the baseline skill and an adapter block hashing
+              the frontmatter only); the identical shared .agents/skills
+              pointer catalog when "agents_skills" is selected
     hooks     the harness-native hook registration rendered from the baseline
               hooks/manifest.toml only; the scripts run in place from
               .harness-baseline-configuration/hooks and every command ends
@@ -85,10 +85,10 @@ class ProjectionError(RuntimeError):
 
 
 BASELINE_ROOT_NAME = ".harness-baseline-configuration"
-# D15 (as amended by R3, D34): the one skills source lives outside the baseline
-# directory and hook scripts run in place from the baseline. Both are read from
-# profiles.toml [baseline] by name and pinned to these constants (fail closed).
-SKILLS_ROOT_NAME = ".agents/skills"
+# Shared bodies, helpers and references are authored only in the baseline.
+# Native discovery reads a generated pointer catalog, never another source tree.
+SKILLS_ROOT_NAME = ".harness-baseline-configuration/skills"
+AGENTS_SKILLS_OUTPUT_ROOT = ".agents/skills"
 HOOKS_ROOT_NAME = ".harness-baseline-configuration/hooks"
 SKILLS_DISCOVERY_MODES = frozenset({"agents_skills", "pointer_stubs"})
 
@@ -399,10 +399,14 @@ def _is_bytecode_leftover(rel: str) -> bool:
 def extra_output_roots(profile: dict) -> list[str]:
     """Owned roots a profile declares besides config_dir (D52: a host's documented discovery path).
 
-    validate_profile() fails closed on any invalid declaration, so this returns the raw declared list.
+    validate_profile() fails closed on invalid declarations. Native discovery additionally uses the fixed
+    shared pointer catalog; it is derived output and no profile-specific configuration root.
     """
     roots = profile.get("extra_output_roots") or []
-    return [str(root) for root in roots] if isinstance(roots, list) else []
+    outputs = [str(root) for root in roots] if isinstance(roots, list) else []
+    if profile.get("skills_discovery") == "agents_skills":
+        outputs.append(AGENTS_SKILLS_OUTPUT_ROOT)
+    return outputs
 
 
 def owned_roots(profile: dict) -> list[str]:
@@ -412,7 +416,7 @@ def owned_roots(profile: dict) -> list[str]:
 
 
 def owning_root(rel: str, profile: dict) -> str | None:
-    """The owned root a manifest path lies under, or None when it lies outside every owned root."""
+    """The generated root a manifest path lies under, or None when outside every declared scope."""
     return next((root for root in owned_roots(profile) if rel.startswith(root + "/")), None)
 
 
@@ -926,7 +930,7 @@ def render_hooks_registration(
 
 
 STUB_POINTER_LINE = (
-    "Read and follow `{target}` - this stub only registers the skill `{name}` for the {harness} host; "
+    "Read and follow `{target}` - this stub only registers the skill `{name}` for {harness}; "
     "the skill body, helpers and references live there.\n"
 )
 
@@ -936,12 +940,13 @@ def render_stub(profile: dict, name: str, block: str, stamp_text: str) -> str:
 
     The adapter block hashes the frontmatter block only, so the stub, its digest and
     --check are insensitive to body-only edits of the source skill. Under
-    --application the pointer target is ``../../.agents/skills/<name>/SKILL.md``
+    --application the pointer target is ``../../.harness-baseline-configuration/skills/<name>/SKILL.md``
     (R12) while the canonical-source line stays host-relative.
     """
     source_rel = f"{SKILLS_ROOT_NAME}/{name}/SKILL.md"
     rel_out = f"{profile['skills_stub_dir']}/{name}/SKILL.md"
-    body = STUB_POINTER_LINE.format(target=runtime_relative(source_rel), name=name, harness=profile["name"])
+    host = "native Skill discovery" if profile["skills_discovery"] == "agents_skills" else f"the {profile['name']} host"
+    body = STUB_POINTER_LINE.format(target=runtime_relative(source_rel), name=name, harness=host)
     text = apply_stamp(rel_out, block + body, stamp_text)
     return text + "\n<!--\n" + adapter_metadata_block(profile["name"], source_rel, block) + "-->\n"
 
@@ -1033,8 +1038,12 @@ def classify_write(rel: str, profile: dict) -> str | None:
         return "registration"
     if "config_toml" in profile and rel == f"{config_dir}/config.toml":
         return "registration"
-    stub_dir = profile.get("skills_stub_dir")
-    if profile.get("skills_discovery") == "pointer_stubs" and stub_dir and rel.startswith(f"{stub_dir}/"):
+    stub_dir = (
+        AGENTS_SKILLS_OUTPUT_ROOT
+        if profile.get("skills_discovery") == "agents_skills"
+        else profile.get("skills_stub_dir")
+    )
+    if stub_dir and rel.startswith(f"{stub_dir}/"):
         parts = rel[len(stub_dir) + 1 :].split("/")
         if len(parts) == 2 and parts[0] and parts[1] == "SKILL.md":
             return "pointer"
@@ -1073,7 +1082,7 @@ def _roots_overlap(first: str, second: str) -> bool:
 
 
 def _validate_output_roots(profile: dict, plan: Plan) -> None:
-    """Fail closed unless every owned root is contained and exclusive, and the registration lies in one (D52).
+    """Fail closed on undeclared or overlapping profile roots; only the fixed native Skill catalog is shared.
 
     A declared extra root is a plain relative directory that overlaps neither the neutral baseline, the one skills
     source, Git metadata, nor any registered harness's config directory or declared roots (its own included).
@@ -1082,7 +1091,7 @@ def _validate_output_roots(profile: dict, plan: Plan) -> None:
     if declared is not None and (not isinstance(declared, list) or not all(isinstance(root, str) for root in declared)):
         plan.gaps.append(f"invalid_extra_output_roots: {profile['name']}: must be a list of relative directory paths")
         return
-    protected = [BASELINE_ROOT_NAME, SKILLS_ROOT_NAME, ".git"]
+    protected = [BASELINE_ROOT_NAME, SKILLS_ROOT_NAME, AGENTS_SKILLS_OUTPUT_ROOT, ".git"]
     for name, other in (load_profiles().get("harnesses") or {}).items():
         other = other or {}
         if other.get("config_dir"):
@@ -1157,9 +1166,14 @@ def build_plan(harness: str) -> Plan:
     if plan.gaps:
         return plan
 
-    # Skills: pointer stubs or nothing (D15); rules: never projected, read on
-    # demand from the baseline; hooks: registration only, rendered below.
-    if profile["skills_discovery"] == "pointer_stubs":
+    # Every discovery route registers pointers to the one authored baseline.
+    # Native-discovery profiles share identical catalog bytes and existing
+    # derivation bookkeeping; provider/model choices add no configuration root.
+    if profile["skills_discovery"] == "agents_skills":
+        shared_profile = {**profile, "name": "agents_skills", "skills_stub_dir": AGENTS_SKILLS_OUTPUT_ROOT}
+        shared_stamp = profiles["stamp"]["text"].format(baseline_root=baseline_cfg["root"], harness="<native-profile>")
+        render_skill_stubs(shared_profile, skills_root, shared_stamp, plan)
+    else:
         render_skill_stubs(profile, skills_root, stamp_text, plan)
     render_pointer_files(profile, plan)
 
@@ -1227,7 +1241,7 @@ def build_plan(harness: str) -> Plan:
     plan.writes[manifest_rel] = (
         json.dumps(
             {
-                "_comment": "Ownership manifest - paths produced by the GT-KB projection engine for this harness. Files inside projector-owned subtrees but absent from this list are unmanaged (candidates for cleanup or projector-gap review).",
+                "_comment": "Derivation manifest - paths produced by the GT-KB projection engine for this harness. Native-discovery profiles share identical .agents/skills pointer output; these paths grant no exclusive configuration ownership. Unlisted files are unmanaged and must be preserved for classification.",
                 "harness": harness,
                 "baseline_root": baseline_cfg["root"],
                 "engine": "scripts/harness_projection/project_harness.py",

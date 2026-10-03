@@ -161,7 +161,7 @@ def test_live_inventory_covers_the_neutral_baseline_domain() -> None:
     zero on a correct tree while a zero file count would mean the domain was silently skipped.
     """
     assert (_ROOT / ".harness-baseline-configuration").is_dir()
-    assert (_ROOT / ".agents/skills").is_dir()
+    assert (_ROOT / ".harness-baseline-configuration/skills").is_dir()
 
     coverage = inventory.domain_coverage(_ROOT)
     report = inventory.build_report(inventory.scan(_ROOT))
@@ -184,7 +184,7 @@ def test_live_inventory_is_read_only_for_source(tmp_path: Path) -> None:
 
 
 def test_shared_skill_is_a_consumer_not_a_projector_exemption():
-    source = ".agents/skills/example/SKILL.md"
+    source = ".harness-baseline-configuration/skills/example/SKILL.md"
     target = ".claude/skills/example/helpers/retired.py"
     assert (
         inventory.classify_reference(source_path=source, line="python " + target, target=target)
@@ -193,7 +193,7 @@ def test_shared_skill_is_a_consumer_not_a_projector_exemption():
 
 
 def test_shared_skill_source_is_counted_and_timer_inventory_is_never_read(tmp_path, monkeypatch):
-    _write(tmp_path, ".agents/skills/example/SKILL.md", "python .claude/hooks/retired.py")
+    _write(tmp_path, ".harness-baseline-configuration/skills/example/SKILL.md", "python .claude/hooks/retired.py")
     excluded = "config/governance/timer-inventory.toml"
     _write(tmp_path, excluded, "excluded fixture")
     original = Path.read_text

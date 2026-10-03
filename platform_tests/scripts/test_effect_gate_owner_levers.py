@@ -1,8 +1,9 @@
 """The owner's levers over project authorization are refused to every agent context (c123, owner decision E1).
 
 GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001: a project's authorization is the owner's ordering choice. Three CLI
-commands act as authorization: gt projects set-authorization; gt projects move-item, which can carry intake work into an
-authorized project; and gt projects record when it creates an execution project, which starts authorized. The service
+commands are owner levers: gt projects set-authorization; gt projects move-item; and gt projects record when it creates
+an execution project, which starts authorized. Existing-item backlog amendments with an explicit parent can repair
+membership and use that same membership lever. The service
 does not authenticate its callers, so the effect gate is where an agent harness is stopped. Owner decision 2026-10-01
 05:32 (E1, answer B, owner-only): the gate refuses all three in every harness context, bound or not, wherever they appear
 in a command, like the owner operations; the owner runs them in their own terminal. Program creation, amendments of
@@ -56,6 +57,18 @@ LEVERS = [
     ("python -m groundtruth_kb " + SET_AUTHORIZATION.removeprefix("gt "), "gt projects set-authorization"),
     ("py -3 -B -m groundtruth_kb " + MOVE_ITEM.removeprefix("gt "), "gt projects move-item"),
     (r"E:\GT-KB\groundtruth-kb\.venv\Scripts\gt.exe " + MOVE_ITEM.removeprefix("gt "), "gt projects move-item"),
+    (
+        "gt backlog record WI-OLD --project-id PROJECT-X --expected-version 3 " + RECORD,
+        "gt backlog record (membership reconciliation)",
+    ),
+    (
+        "gt backlog record WI-OLD --project-id=PROJECT-X --expected-version=$version " + RECORD,
+        "gt backlog record (membership reconciliation)",
+    ),
+    (
+        "gt backlog record WI-OLD --project-id PROJECT-X --expected-version 0 --expected-version 3 " + RECORD,
+        "gt backlog record (membership reconciliation)",
+    ),
 ]
 
 
@@ -135,6 +148,7 @@ def test_a_lever_chained_with_a_git_effect_gets_the_git_rule_first(tmp_path: Pat
         "gt projects dependencies record --id DEP-NEW --expected-version 0 " + RECORD,
         "gt projects formal-links record --id LINK-NEW --expected-version 0 " + RECORD,
         "gt backlog record --id WI-NEW --project-id PROJECT-GTKB-NEW-WORK-INTAKE --expected-version 0 " + RECORD,
+        "gt backlog record WI-OLD --expected-version 3 " + RECORD,
         "gt projects prepare-commit PROJECT-X --native-context-id ctx --expected-version 3",
         "Write-Output 'gt projects move-item is the owner''s'",
     ],

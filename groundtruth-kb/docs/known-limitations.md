@@ -7,7 +7,7 @@ of their named revisions; they are not current repair instructions or authority.
 ## 1. Shared harness sources and bounded upgrade coverage
 
 Harness instructions now come from authored root `AGENTS.md`, shared
-`.agents/skills` and baseline rules/hooks/routing. Copied per-host rules, hooks
+`.harness-baseline-configuration/skills` and baseline rules/hooks/routing. Copied per-host rules, hooks
 and skill bodies are obsolete. Use the current native checks and projector
 rather than old daemon-count or manual settings-copy repair instructions.
 

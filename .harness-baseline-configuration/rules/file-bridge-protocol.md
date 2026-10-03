@@ -8,7 +8,7 @@ record or evidence that a Git commit exists.
 
 Use the canonical `gtkb-bridge` skill for command details, `gtkb-proposal-review`
 for proposals and `gtkb-verify` for implementation reports. Load these skills
-from `.agents/skills`. A host stub only points there. Do not load a peer
+from `.harness-baseline-configuration/skills`. A host stub only points there. Do not load a peer
 harness's rules, settings, helpers or session state.
 
 ## Context and assigned work
@@ -90,8 +90,11 @@ Save the complete UTF-8 message in this context's scratch directory and use
 `gt bridge deliver` with the document, native context, fence and content file.
 Read back the result. The service validates and stores authored content without
 filling provenance, rewriting headers, allocating a different authored version,
-appending disclosures or changing the message body. Correct a refused message
-from current facts and retry through the CLI. Do not write raw bridge storage.
+appending disclosures or changing the message body. Correct invalid authored
+content from current facts and retry through the CLI. A refusal of a lawful
+filing is a platform defect: follow the corrective-intake instructions in root
+AGENTS.md. If that route is blocked, report the exact refusal and required
+recovery without publishing a local bridge file or changing raw bridge storage.
 
 Never cite a scratch path or other temporary file in a bridge message or commit.
 Cite repository paths, canonical ids and the observed results in the message

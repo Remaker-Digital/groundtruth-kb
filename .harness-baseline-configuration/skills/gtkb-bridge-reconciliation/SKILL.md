@@ -24,9 +24,10 @@ review and integrated work product.
 
 The database holds current scope, parent membership, review and completion facts.
 A related bridge reference, a work-item mention, a message count or a historical
-VERIFIED label does not establish completion. During the file-bridge transition,
-numbered messages support delivery and inspection; they do not replace canonical
-work state. After terminal cleanup, recovery must not require their payloads.
+VERIFIED label does not establish completion. Load operative messages through the
+native CLI. Local numbered files are historical material; they supply no current
+delivery, claim, lifecycle or recovery route. After terminal cleanup, recovery
+must not require message payloads.
 
 Independent VERIFIED records review of the exact scope and work product. It does
 not assert that a commit exists. The project completes through one commit of its
@@ -43,15 +44,21 @@ completion result.
 
 When recorded completion does not cover the described outcome, retain the actual
 delivered work and historical evidence and identify the uncovered scope. A
-committed work item is terminal: never reopen or amend it. File a new corrective
-work item in the intake that names the uncovered scope and cites the committed
-item. The intake is `PROJECT-GTKB-NEW-WORK-INTAKE`. Correct an uncommitted item
-in place; if it is VERIFIED, do that through `gt bridge abandon` and a fresh
-NEW. Do not automatically close or reopen work by scanning messages. Correct
-canonical state through its domain CLI, then read back the exact affected
-records. An owner decision changes current canonical state and agent direction
-directly; the interactive session log retains the conversation. No permission
-packet or decision ledger is required.
+genuinely committed terminal work item cannot be reopened or amended. File new
+forward correction in `PROJECT-GTKB-NEW-WORK-INTAKE` for a defect in committed
+work. For owner-assigned correction of an uncommitted historical completion,
+use the existing work-item domain writer with the current version and inspected
+final disposition. Preserve stage, scope and unrelated fields. Preserve a valid
+sole parent; reconcile an erroneous parent only through the supported atomic
+route and the owner's selected destination. Read back the affected current rows.
+
+A reviewed live attempt uses its fresh-verification and finalization recovery
+route. A VERIFIED review or imported resolution label alone is no instruction to
+abandon it. Abandon an irreparable attempt only through canonical attempt state,
+then begin a fresh NEW from current facts without inheriting its GO or claim.
+Do not close or reopen work by scanning messages. Owner direction changes current
+canonical state and agent direction directly; the interactive session log retains
+the conversation. No permission packet or decision ledger is required.
 
 Use the current active versions of these formal sources:
 

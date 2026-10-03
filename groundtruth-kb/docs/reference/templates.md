@@ -7,7 +7,7 @@ are validated by the native initializer; inspect its dry-run before application.
 
 ## Shared harness material
 
-Root `AGENTS.md` is authored once. `.agents/skills` holds the shared skills;
+Root `AGENTS.md` is authored once. `.harness-baseline-configuration/skills` holds the shared skills;
 `.harness-baseline-configuration/rules`, `hooks` and `routing.toml` hold the
 focused rules, hook implementations and API routing. Host settings and pointer
 stubs are derived by the declared projection profile. See

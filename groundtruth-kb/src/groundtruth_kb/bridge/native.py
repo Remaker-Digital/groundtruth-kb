@@ -14,13 +14,14 @@ import stat
 import subprocess
 import unicodedata
 from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, overload
 from uuid import uuid4
 
 from psycopg import sql
 from psycopg.types.json import Jsonb
-from pydantic import Field
+from pydantic import Field, ValidationError
 
 from groundtruth_kb.bridge.taxonomy import BRIDGE_KIND_BY_STATUS
 from groundtruth_kb.bridge.vocabulary import (
@@ -43,7 +44,6 @@ from groundtruth_kb.governance.credential_patterns import BASH_EXTRAS, CREDENTIA
 from groundtruth_kb.isolation.registry_check import ApplicationRegistryError, resolve_project_repository
 from groundtruth_kb.native_authority import (
     Identifier,
-    Mutation,
     Request,
     Text,
     _current_parent,
@@ -56,7 +56,6 @@ from groundtruth_kb.native_authority import (
     _work_evidence,
     _work_formal_roots,
     _work_formal_sources,
-    _write,
 )
 from groundtruth_kb.postgres_kernel import PostgresKernel, PostgresKernelError, PostgresTransaction, parse_json_bytes
 from groundtruth_kb.session.worktree import (
@@ -95,9 +94,164 @@ class FenceRequest(SessionRequest):
     fence: int = Field(ge=1)
 
 
+OrdinaryOperation = Literal[
+    "services.start",
+    "services.stop",
+    "services.start-all",
+    "services.stop-all",
+    "home.start",
+    "home.stop",
+    "home.open",
+    "home.open.start-services",
+    "dashboard.start",
+    "dashboard.stop",
+    "dashboard.serve",
+    "dashboard.install",
+    "controls.set",
+    "services.shortcut",
+]
+OrdinaryEffect = Literal[
+    "service.start",
+    "service.stop",
+    "task.enable",
+    "task.disable",
+    "task.start",
+    "process.start",
+    "process.stop",
+    "control.set",
+    "control.restore",
+    "browser.open",
+    "shortcut.create",
+    "shortcut.remove",
+    "installation.publish",
+    "installation.remove",
+]
+ORDINARY_SERVICES = {"authority", "home", "dashboard", "ollama", "postgresql"}
+AGGREGATE_OPERATIONS = {"services.start-all", "services.stop-all", "home.open.start-services"}
+
+
+class OperationalEffect(Request):
+    target: Text
+    effect: OrdinaryEffect
+    value: bool | int | Decimal | str | None = None
+
+
+class OperationalRequest(Request):
+    operation: OrdinaryOperation
+    targets: list[Text] = Field(min_length=1, max_length=256)
+    # An initial scope inspection carries no invented host effect. Controllers
+    # separately submit every actual effect at its mutation boundary.
+    effects: list[OperationalEffect] = Field(default_factory=list, max_length=256)
+
+
+class OperationalPreconditions(Request):
+    installation_root: Text
+    config_path: Text
+    controller_paths: dict[Text, Text] = Field(min_length=1)
+    states: dict[Text, Literal["running", "stopped", "any"]] = Field(default_factory=dict)
+
+
+class OperationalVerification(Request):
+    states: dict[Text, Literal["running", "stopped"]] = Field(default_factory=dict)
+    task_enabled: dict[Text, bool] = Field(default_factory=dict)
+    control_values: dict[Text, bool | int | Decimal | str] = Field(default_factory=dict)
+    browser_origin: Literal["http://127.0.0.1:3080/"] | None = None
+    shortcut_target: Text | None = None
+    shortcut_arguments: list[Text] = Field(default_factory=list)
+    shortcut_working_directory: Text | None = None
+    installation: Literal["pinned_grafana_sqlite"] | None = None
+
+
+class OperationalContainment(Request):
+    installation_only: bool
+    managed_processes_only: bool
+
+
+class OperationalRollback(Request):
+    restore_initial_state: bool
+    only_invocation_changes: bool
+
+
+class OperationalBound(Request):
+    operation: OrdinaryOperation
+    targets: list[Text] = Field(min_length=1, max_length=256)
+    preconditions: OperationalPreconditions
+    permitted_effects: list[OperationalEffect] = Field(min_length=1, max_length=256)
+    expiry: Text
+    verification: OperationalVerification
+    containment: OperationalContainment
+    rollback: OperationalRollback
+
+
+def _operational_path(value: str) -> Path:
+    path = Path(value)
+    if not path.is_absolute() or any(part.casefold() in {"..", ".git"} for part in path.parts):
+        _error("operation_bound_invalid", "Operational paths must be exact absolute paths outside Git metadata")
+    if any(ord(char) < 32 for char in value) or any(char in value for char in "*?[]"):
+        _error("operation_bound_invalid", "Operational paths cannot contain wildcards or control characters")
+    return path.resolve()
+
+
+def _operational_target(target: str, *, aggregate_selector: bool = False) -> None:
+    if target.startswith("service:") and target[8:] in ORDINARY_SERVICES:
+        return
+    if aggregate_selector and target == "service:all":
+        return
+    if target == "browser:home" or re.fullmatch(r"control:[a-z][a-z0-9_.-]*", target):
+        return
+    if target.startswith("shortcut:") and _operational_path(target[9:]).suffix.lower() == ".lnk":
+        return
+    _error("operation_bound_invalid", "The operation names an unsupported or nonliteral target", target=target)
+
+
+def _operational_effect(effect: OperationalEffect, *, aggregate_selector: bool = False) -> tuple[Any, ...]:
+    _operational_target(effect.target, aggregate_selector=aggregate_selector)
+    service = effect.target[8:] if effect.target.startswith("service:") else None
+    compatible = (
+        effect.effect in {"service.start", "service.stop"}
+        and service is not None
+        or effect.effect in {"task.enable", "task.disable", "task.start"}
+        and service in {"authority", "home", "ollama"}
+        or effect.effect in {"process.start", "process.stop"}
+        and service in {"authority", "home", "dashboard", "ollama"}
+        or effect.effect == "control.set"
+        and effect.target.startswith("control:")
+        and effect.value is not None
+        or effect.effect == "control.restore"
+        and effect.target.startswith("control:")
+        or effect.effect == "browser.open"
+        and effect.target == "browser:home"
+        or effect.effect in {"shortcut.create", "shortcut.remove"}
+        and effect.target.startswith("shortcut:")
+        or effect.effect in {"installation.publish", "installation.remove"}
+        and service == "dashboard"
+    )
+    if not compatible or (effect.effect != "control.set" and effect.value is not None):
+        _error("operation_bound_invalid", "An effect does not match its supported target")
+    value_kind = "number" if type(effect.value) in {int, Decimal} else type(effect.value).__name__
+    return effect.target, effect.effect, value_kind, effect.value
+
+
+def _operational_semantics(value: Any) -> Any:
+    """Compare normalized bounds without treating booleans as numeric values."""
+    if isinstance(value, dict):
+        return tuple((key, _operational_semantics(item)) for key, item in sorted(value.items()))
+    if isinstance(value, list):
+        return tuple(_operational_semantics(item) for item in value)
+    kind = "number" if type(value) in {int, Decimal} else type(value).__name__
+    return kind, value
+
+
 class EffectCheckRequest(SessionRequest):
     cwd: Text
-    paths: list[Text] = Field(min_length=1, max_length=256)
+    paths: list[Text] = Field(default_factory=list, max_length=256)
+    activity: Literal["ops", "deliberation", "build", "test", "spec", "project"] | None = None
+    document: Identifier | None = None
+    fence: int | None = Field(default=None, ge=1)
+    installation_root: Text | None = None
+    config_path: Text | None = None
+    observed_controller_paths: dict[Text, Text] = Field(default_factory=dict)
+    operations: list[OperationalRequest] = Field(default_factory=list, max_length=256)
 
 
 class ProgramCheckRequest(SessionRequest):
@@ -167,6 +321,7 @@ def _paths(value: Any, label: str, *, error_code: str = "invalid_bridge_header")
                     "scratchpad",
                     ".worktrees",
                     ".agent",
+                    ".agents",
                     ".antigravity",
                     ".api-harness",
                     ".claude",
@@ -175,11 +330,6 @@ def _paths(value: Any, label: str, *, error_code: str = "invalid_bridge_header")
                     ".goose",
                 }
                 for part in parts.parts
-            )
-            or any(
-                part.casefold() == ".agents"
-                and (index != 0 or len(parts.parts) < 3 or parts.parts[1].casefold() != "skills")
-                for index, part in enumerate(parts.parts)
             )
             or parts.parts[0].casefold() == "bridge"
             or any(
@@ -596,7 +746,7 @@ class NativeBridgeService:
                 "formal_sources": "gt spec show <record-id> --json",
                 "assigned_work": "gt context work-item <owner-selected-work-item-id> --json",
                 "bridge": "gt bridge show <received-document-id> --json",
-                "baseline": "Read applicable authored rules under .harness-baseline-configuration/rules and skills under .agents/skills",
+                "baseline": "Read applicable authored rules under .harness-baseline-configuration/rules and skills under .harness-baseline-configuration/skills",
             },
         }
 
@@ -631,6 +781,49 @@ class NativeBridgeService:
         allowed = PRIME_AUTHORED_STATUSES if binding["role"] == "prime-builder" else LOYAL_OPPOSITION_AUTHORED_STATUSES
         if status not in allowed:
             _error("wrong_author_role", "The immutable context role cannot author this status")
+
+    @staticmethod
+    def _require_different_review_model(
+        tx: PostgresTransaction, attempt: dict[str, Any], status: str, reviewer_model: str
+    ) -> None:
+        """Compare current authored provenance, not authenticated executing-model identity.
+
+        A correction or re-verification may follow another verdict. Its producer
+        is the current proposal/report context, not the latest message's author.
+        Disposable content is read only while the attempt remains active.
+        """
+        producer_context = attempt["proposal_context_id" if status == "GO" else "report_context_id"]
+        producer_statuses = sorted(PROPOSAL_STATUSES) if status == "GO" else ["READY"]
+        tx.cursor.execute(
+            sql.SQL(
+                "SELECT content FROM {}.bridge_items WHERE attempt_id=%s "
+                "AND author_session_context_id=%s AND status=ANY(%s) "
+                "AND version<=%s ORDER BY version DESC LIMIT 1"
+            ).format(sql.Identifier(tx.schema)),
+            (attempt["id"], producer_context, producer_statuses, attempt["head_version"]),
+        )
+        row = tx.cursor.fetchone()
+        if row is None:
+            _error(
+                "review_model_provenance_missing",
+                "The current producer message's model provenance is unavailable; inspect the active attempt",
+                document=attempt["id"],
+                producer_context_id=producer_context,
+                producer_statuses=producer_statuses,
+            )
+        producer = parse_authored_message(row["content"])
+        producer_model = producer["metadata"]["author_model"]
+        if producer_model.strip().casefold() == reviewer_model.strip().casefold():
+            _error(
+                "different_model_review_required",
+                "GO and VERIFIED require a different reviewing model from the current proposal/report producer; "
+                "the owner or dispatcher selects that model, and the author reports its actual identity",
+                document=attempt["id"],
+                review_status=status,
+                producer_context_id=producer_context,
+                producer_model=producer_model,
+                reviewer_model=reviewer_model,
+            )
 
     @staticmethod
     def _scope(tx: PostgresTransaction, attempt: dict[str, Any], *, lock: bool = False) -> None:
@@ -736,14 +929,20 @@ class NativeBridgeService:
                 "project_commit" if parent != project_id or project["status"] == "verified" else "independent_review"
             )
             reason, changed_paths = None, []
-            if predecessor["resolution_status"] != "verified":
-                reason = "predecessor_not_verified"
-            elif required == "project_commit":
+            if required == "project_commit":
                 commit = _project_commit(tx, parent)
-                if project["status"] != "verified" or not commit:
+                if predecessor["resolution_status"] != "verified":
+                    reason = "predecessor_not_verified"
+                elif project["status"] != "verified" or not commit:
                     reason = "predecessor_project_not_committed"
                 elif predecessor["completion_evidence"] != "git:" + commit:
                     reason = "predecessor_terminal_commit_mismatch"
+            elif predecessor["resolution_status"] != "open":
+                reason = (
+                    "predecessor_review_missing"
+                    if predecessor["resolution_status"] == "verified"
+                    else "predecessor_not_verified"
+                )
             else:
                 tx.cursor.execute(
                     sql.SQL("SELECT * FROM {}.bridge_attempts WHERE work_item_id=%s AND disposition='active'").format(
@@ -1001,15 +1200,316 @@ class NativeBridgeService:
                 else [],
             }
 
+    def _operational_bound(self, bound: OperationalBound) -> tuple[dict[str, Any], datetime | None]:
+        """Validate existing formal constraint values, without observations or another store."""
+        targets = set(bound.targets)
+        if len(targets) != len(bound.targets):
+            _error("operation_bound_invalid", "A bound cannot repeat targets")
+        for target in targets:
+            _operational_target(target)
+        services = {target for target in targets if target.startswith("service:")}
+        if bound.operation in AGGREGATE_OPERATIONS:
+            expected = services | ({"browser:home"} if bound.operation == "home.open.start-services" else set())
+            if not services or targets != expected:
+                _error("operation_bound_invalid", "An aggregate names its exact service set and applicable Home origin")
+        elif bound.operation.startswith("services.") and bound.operation != "services.shortcut":
+            if targets != services:
+                _error("operation_bound_invalid", "A named service operation has only named service targets")
+        elif bound.operation.startswith("home."):
+            allowed = {"service:home", "browser:home"} if bound.operation == "home.open" else {"service:home"}
+            if targets != allowed:
+                _error("operation_bound_invalid", "A Home operation names the Home controller")
+        elif bound.operation.startswith("dashboard."):
+            if targets != {"service:dashboard"}:
+                _error("operation_bound_invalid", "A dashboard operation names only the dashboard")
+        elif bound.operation == "controls.set":
+            if not all(target.startswith("control:") for target in targets):
+                _error("operation_bound_invalid", "A controls setter names exact canonical control keys")
+        elif not all(target.startswith("shortcut:") for target in targets):
+            _error("operation_bound_invalid", "Shortcut creation names exact shortcut paths")
+        preconditions = bound.preconditions
+        if _operational_path(preconditions.installation_root) != self.project_root.resolve():
+            _error("operation_bound_invalid", "The bound belongs to another GT-KB installation")
+        _operational_path(preconditions.config_path)
+        if set(preconditions.controller_paths) != targets or not set(preconditions.states) <= services:
+            _error("operation_bound_invalid", "Every bound target needs its exact installed controller path")
+        for path in preconditions.controller_paths.values():
+            _operational_path(path)
+        if bound.operation == "dashboard.install":
+            destination = self.project_root.resolve() / ".groundtruth" / "tools" / "grafana"
+            if (
+                _operational_path(preconditions.controller_paths["service:dashboard"]) != destination
+                or preconditions.states
+            ):
+                _error(
+                    "operation_bound_invalid",
+                    "Installation names the exact standard destination, without service-state mutation",
+                )
+            allowed = {"installation.publish", "installation.remove", "process.start", "process.stop"}
+            if {effect.effect for effect in bound.permitted_effects} != allowed:
+                _error(
+                    "operation_bound_invalid",
+                    "Installation covers its owned staging/publication, captured inverse and temporary processes",
+                )
+        elif any(
+            effect.effect in {"installation.publish", "installation.remove"} for effect in bound.permitted_effects
+        ):
+            _error("operation_bound_invalid", "Installation effects belong only to dashboard.install")
+        permitted = [_operational_effect(effect) for effect in bound.permitted_effects]
+        if len(set(permitted)) != len(permitted) or any(effect[0] not in targets for effect in permitted):
+            _error("operation_bound_invalid", "Permitted effects must name distinct bound targets")
+        verification = bound.verification
+        if (
+            set(verification.states) != (set() if bound.operation == "dashboard.install" else services)
+            or not set(verification.task_enabled) <= services & {"service:authority", "service:home", "service:ollama"}
+            or not {"control:" + key for key in verification.control_values} <= targets
+        ):
+            _error("operation_bound_invalid", "Verification cannot name targets outside the bound")
+        if not any(
+            (
+                verification.states,
+                verification.task_enabled,
+                verification.control_values,
+                verification.browser_origin,
+                verification.shortcut_target,
+                verification.installation,
+            )
+        ):
+            _error("operation_bound_invalid", "The bound requires a concrete result-verification predicate")
+        if bound.operation == "dashboard.install":
+            if (
+                verification.installation != "pinned_grafana_sqlite"
+                or verification.task_enabled
+                or verification.control_values
+                or verification.browser_origin is not None
+                or verification.shortcut_target is not None
+                or verification.shortcut_arguments
+                or verification.shortcut_working_directory is not None
+            ):
+                _error(
+                    "operation_bound_invalid",
+                    "Installation verifies the pinned Grafana/SQLite bytes and stopped temporary processes",
+                )
+        elif verification.installation is not None:
+            _error("operation_bound_invalid", "The installation predicate belongs only to dashboard.install")
+        if "browser:home" in targets and verification.browser_origin is None:
+            _error("operation_bound_invalid", "Browser verification names the exact Home origin")
+        controls = {target for target in targets if target.startswith("control:")}
+        if {"control:" + key for key in verification.control_values} != controls:
+            _error("operation_bound_invalid", "Every changed control has its exact value-readback predicate")
+        if any(target.startswith("shortcut:") for target in targets) and not verification.shortcut_target:
+            _error("operation_bound_invalid", "Shortcut verification names its installed route")
+        if verification.shortcut_target:
+            if not _operational_path(verification.shortcut_target).is_relative_to(self.project_root.resolve()):
+                _error("operation_bound_invalid", "The shortcut reaches only this installation's executable route")
+            if not verification.shortcut_arguments or not verification.shortcut_working_directory:
+                _error("operation_bound_invalid", "Shortcut verification includes arguments and working directory")
+            if _operational_path(verification.shortcut_working_directory) != self.project_root.resolve():
+                _error("operation_bound_invalid", "The shortcut uses this installation's working directory")
+        if not all(
+            (
+                bound.containment.installation_only,
+                bound.containment.managed_processes_only,
+                bound.rollback.restore_initial_state,
+                bound.rollback.only_invocation_changes,
+            )
+        ):
+            _error("operation_bound_invalid", "Containment and rollback preserve this invocation's exact installation")
+        normalized = bound.model_dump(exclude_none=True)
+        # Compare equivalent path spellings as the same installed identity.
+        # This normalization is returned only by the current read, never stored.
+        normalized["preconditions"]["installation_root"] = os.path.normcase(
+            str(_operational_path(preconditions.installation_root))
+        )
+        normalized["preconditions"]["config_path"] = os.path.normcase(str(_operational_path(preconditions.config_path)))
+        normalized["preconditions"]["controller_paths"] = {
+            target: os.path.normcase(str(_operational_path(path)))
+            for target, path in preconditions.controller_paths.items()
+        }
+        for field in ("shortcut_target", "shortcut_working_directory"):
+            if normalized["verification"].get(field):
+                normalized["verification"][field] = os.path.normcase(
+                    str(_operational_path(normalized["verification"][field]))
+                )
+        normalized["targets"] = sorted(targets)
+        normalized["permitted_effects"] = [
+            effect.model_dump(exclude_none=True) for effect in sorted(bound.permitted_effects, key=_operational_effect)
+        ]
+        if bound.expiry == "claim":
+            return normalized, None
+        try:
+            expiry = datetime.fromisoformat(bound.expiry.replace("Z", "+00:00"))
+        except ValueError:
+            _error("operation_bound_invalid", "Bound expiry must be an explicit UTC timestamp")
+        if expiry.tzinfo is None or expiry.utcoffset() != UTC.utcoffset(expiry):
+            _error("operation_bound_invalid", "Bound expiry must be an explicit UTC timestamp")
+        return normalized, expiry
+
+    def _check_operational_effects(self, request: EffectCheckRequest) -> dict[str, Any]:
+        if request.activity != "ops":
+            _error(
+                "operation_activity_required", "An ordinary agent operation requires explicit transient ops activity"
+            )
+        if request.document is None or request.fence is None:
+            _error("operation_selector_required", "An ordinary agent operation names its exact document and fence")
+        if request.installation_root is None or request.config_path is None:
+            _error("operation_installation_required", "Supply the actual selected installation root and config path")
+        with self.kernel.transaction() as tx:
+            binding, attempt, claim = self._fenced(
+                tx, request.document, FenceRequest(native_context_id=request.native_context_id, fence=request.fence)
+            )
+            if binding["subject"] != "gtkb" or binding["role"] != "prime-builder":
+                _error("operation_role_required", "Only the GT-KB Prime Builder performs ordinary agent operations")
+            if not attempt["work_item_id"] or claim["intended_status"] != "READY":
+                _error("implementation_claim_required", "Operational work requires the assigned work's READY claim")
+            for target in request.observed_controller_paths:
+                _operational_target(target)
+            self._claim_readiness(tx, attempt, claim["intended_status"], lock=True)
+            work = _required(tx, "work_items", attempt["work_item_id"], lock=True)
+            sources = _work_formal_sources(
+                tx, work, attempt["project_id"], additional_ids=list(attempt["spec_versions"]), lock=True
+            )
+            tx.cursor.execute("SELECT clock_timestamp() AS now")
+            now = tx.cursor.fetchone()["now"]
+            bounds: dict[str, tuple[dict[str, Any], datetime | None, list[dict[str, Any]]]] = {}
+            for source in sources:
+                constraints = source.get("constraints")
+                if not isinstance(constraints, dict) or "ordinary_operations" not in constraints:
+                    continue
+                grants = constraints["ordinary_operations"]
+                if not isinstance(grants, dict):
+                    _error("operation_bound_invalid", "Ordinary bounds are keyed by the existing assigned work-item id")
+                if work["id"] not in grants:
+                    continue
+                entries = grants[work["id"]]
+                if not isinstance(entries, list) or not entries:
+                    _error("operation_bound_invalid", "An assigned work's ordinary bounds are a nonempty list")
+                for entry in entries:
+                    try:
+                        bound_model = OperationalBound.model_validate(entry)
+                    except ValidationError:
+                        _error(
+                            "operation_bound_invalid", "An applicable bound must provide the typed eight-field contract"
+                        )
+                    normalized, expiry = self._operational_bound(bound_model)
+                    identity = {"id": source["id"], "version": source["version"]}
+                    previous = bounds.get(bound_model.operation)
+                    if previous and _operational_semantics(previous[0]) != _operational_semantics(normalized):
+                        _error("operation_bound_conflict", "Applicable exact bounds disagree for the same operation")
+                    if previous:
+                        previous[2].append(identity)
+                    else:
+                        bounds[bound_model.operation] = (normalized, expiry, [identity])
+            checked = []
+            deadline = claim["expires_at"]
+            for operation in request.operations:
+                found = bounds.get(operation.operation)
+                if not found:
+                    _error(
+                        "operation_bound_required", "No applicable exact bound covers this assigned work's operation"
+                    )
+                bound, expiry, identities = found
+                if expiry is not None and expiry <= now:
+                    _error("operation_bound_expired", "The canonical operational bound has expired")
+                if expiry is not None:
+                    deadline = min(deadline, expiry)
+                preconditions = bound["preconditions"]
+                selected_root = _operational_path(request.installation_root)
+                if selected_root != _operational_path(preconditions["installation_root"]) or _operational_path(
+                    request.config_path
+                ) != _operational_path(preconditions["config_path"]):
+                    _error(
+                        "operation_installation_mismatch",
+                        "The selected installation/config differs from the exact bound",
+                    )
+                for target, path in preconditions["controller_paths"].items():
+                    observed = request.observed_controller_paths.get(target)
+                    if observed is None or _operational_path(observed) != _operational_path(path):
+                        _error(
+                            "operation_controller_mismatch",
+                            "A freshly observed controller identity differs from the exact bound",
+                            target=target,
+                        )
+                targets = list(operation.targets)
+                if len(set(targets)) != len(targets):
+                    _error("operation_target_mismatch", "An operation cannot repeat target selectors")
+                selector = "service:all" in targets
+                if selector and operation.operation not in AGGREGATE_OPERATIONS:
+                    _error("operation_target_mismatch", "service:all is only an explicit aggregate selector")
+                services = sorted(target for target in bound["targets"] if target.startswith("service:"))
+                expanded = [target for target in targets if target != "service:all"] + (services if selector else [])
+                for target in targets:
+                    _operational_target(target, aggregate_selector=selector)
+                if (
+                    not set(expanded) <= set(bound["targets"])
+                    or len(set(expanded)) != len(expanded)
+                    or operation.operation in AGGREGATE_OPERATIONS
+                    and set(expanded) != set(bound["targets"])
+                ):
+                    _error(
+                        "operation_target_mismatch",
+                        "Every actual target must match the exact declared aggregate or scope",
+                    )
+                effects = []
+                for effect in operation.effects:
+                    _operational_effect(effect, aggregate_selector=selector)
+                    effect_targets = services if effect.target == "service:all" and selector else [effect.target]
+                    for target in effect_targets:
+                        if target not in expanded:
+                            _error("operation_effect_mismatch", "An effect names an undeclared operation target")
+                        effects.append(OperationalEffect(target=target, effect=effect.effect, value=effect.value))
+                permitted = {
+                    _operational_effect(OperationalEffect.model_validate(effect))
+                    for effect in bound["permitted_effects"]
+                }
+                actual = [_operational_effect(effect) for effect in effects]
+                if len(set(actual)) != len(actual) or not set(actual) <= permitted:
+                    _error("operation_effect_mismatch", "Every constituent effect must be explicitly covered")
+                checked.append(
+                    {
+                        "operation": operation.operation,
+                        "targets": sorted(expanded),
+                        "effects": [effect.model_dump(exclude_none=True) for effect in effects],
+                        "bound": bound,
+                        "formal_sources": identities,
+                    }
+                )
+            tx.cursor.execute("SELECT clock_timestamp() AS now")
+            now = tx.cursor.fetchone()["now"]
+            if deadline <= now:
+                _error("operation_bound_expired", "The effective operation deadline expired during validation")
+            return {
+                "status": "current",
+                "scope": "operation",
+                "document": request.document,
+                "fence": request.fence,
+                "observed_at": now.isoformat(),
+                "deadline": deadline.isoformat(),
+                "operations": checked,
+            }
+
     def check_effects(self, request: EffectCheckRequest) -> dict[str, Any]:
         """Check concrete tool targets against current claims without retaining observations.
 
         This is a pre-tool check, not a transferable permission. Publication
         still rechecks the exact fence and current scope at its effect boundary.
         """
+        if (request.document is None) != (request.fence is None):
+            _error("operation_selector_required", "Document and fence selectors are paired")
+        if not request.paths and not request.operations:
+            _error("invalid_effect_request", "An effect check requires concrete file targets or ordinary operations")
         cwd = Path(request.cwd)
         if not cwd.is_absolute() or not cwd.is_dir():
             _error("invalid_effect_path", "The tool working directory must be an existing absolute directory")
+        if request.operations:
+            operation_result = self._check_operational_effects(request)
+            if request.paths:
+                operation_result["files"] = self.check_effects(
+                    EffectCheckRequest(
+                        native_context_id=request.native_context_id, cwd=request.cwd, paths=request.paths
+                    )
+                )
+            return operation_result
         paths = []
         for value in request.paths:
             path = Path(value)
@@ -1535,6 +2035,7 @@ class NativeBridgeService:
                     or attempt["proposal_context_id"] == binding["session_context_id"]
                 ):
                     _error("independent_review_required", "GO requires an independently authored current proposal")
+                self._require_different_review_model(tx, attempt, status, metadata["author_model"])
                 updates["go_context_id"] = binding["session_context_id"]
             if status == "READY":
                 if not attempt["go_context_id"]:
@@ -1544,6 +2045,7 @@ class NativeBridgeService:
             if status == "VERIFIED":
                 if not attempt["report_context_id"] or attempt["report_context_id"] == binding["session_context_id"]:
                     _error("independent_review_required", "Verification requires an independently authored report")
+                self._require_different_review_model(tx, attempt, status, metadata["author_model"])
                 try:
                     reviewed = parse_json_bytes(metadata.get("verified_artifacts", "").encode("utf-8"))
                 except PostgresKernelError:
@@ -1558,24 +2060,8 @@ class NativeBridgeService:
                         "The submitted reviewed artifact map differs from actual current bytes",
                     )
                 updates.update(verified_artifacts=Jsonb(actual), finalization_failure=None)
-                result = _write(
-                    tx,
-                    "work_items",
-                    work["id"],
-                    {"resolution_status": "verified"},
-                    Mutation(
-                        expected_version=work["version"],
-                        actor=binding["session_context_id"],
-                        reason="Independent bridge verification of the current "
-                        "artifact bytes; project commit remains separate",
-                    ),
-                )
-                updates["work_item_version"] = result["version"]
-                members = _related(tx, "project_work_item_memberships", project_id=project["id"], status="active")
-                ready_to_commit = bool(members) and all(
-                    _required(tx, "work_items", member["work_item_id"])["resolution_status"] == "verified"
-                    for member in members
-                )
+                # Review is an attempt fact. Resolution remains open until
+                # the complete project Git commit is actually confirmed.
             if status == "WITHDRAWN":
                 if attempt["go_context_id"]:
                     _error("cannot_withdraw_after_go", "An implemented attempt cannot be withdrawn")
@@ -1600,6 +2086,61 @@ class NativeBridgeService:
                     _required(tx, "work_items", residual)
                 updates["disposition"] = "superseded"
             self._publish(tx, document, request, message, binding, claim, updates)
+            if status == "VERIFIED":
+                members = _related(tx, "project_work_item_memberships", project_id=project["id"], status="active")
+                member_ids = [member["work_item_id"] for member in members]
+                tx.cursor.execute(
+                    sql.SQL(
+                        "SELECT * FROM {}.bridge_attempts WHERE work_item_id=ANY(%s) AND disposition='active'"
+                    ).format(sql.Identifier(tx.schema)),
+                    (member_ids,),
+                )
+                reviews = tx.cursor.fetchall()
+                ready_to_commit = (
+                    bool(member_ids)
+                    and len(reviews) == len(member_ids)
+                    and {review["work_item_id"] for review in reviews} == set(member_ids)
+                    and all(
+                        review["head_status"] == "VERIFIED"
+                        and review["verified_artifacts"]
+                        and not review["finalization_failure"]
+                        for review in reviews
+                    )
+                )
+                if ready_to_commit:
+                    ready_to_commit = all(
+                        _project_dependency_readiness(tx, project["id"], gate)["ready"]
+                        for gate in ("readiness", "closure")
+                    )
+                if ready_to_commit:
+                    tx.cursor.execute(
+                        sql.SQL(
+                            "SELECT 1 FROM {}.work_intent_claims c JOIN {}.bridge_attempts a ON a.id=c.attempt_id "
+                            "WHERE a.project_id=%s AND c.expires_at>clock_timestamp() LIMIT 1"
+                        ).format(sql.Identifier(tx.schema), sql.Identifier(tx.schema)),
+                        (project["id"],),
+                    )
+                    ready_to_commit = tx.cursor.fetchone() is None
+                if ready_to_commit:
+                    for review in reviews:
+                        if _required(tx, "work_items", review["work_item_id"])["resolution_status"] != "open":
+                            ready_to_commit = False
+                            break
+                        try:
+                            self._scope(tx, review)
+                            actual_review = self._snapshot(
+                                sorted(review["verified_artifacts"]),
+                                root=self.work_root(project["id"], create=False, tx=tx),
+                            )
+                        except PostgresKernelError:
+                            # A stale sibling cannot make this lawful verdict
+                            # instruct project commitment. Finalization supplies
+                            # the exact recovery reason through its existing path.
+                            ready_to_commit = False
+                            break
+                        if actual_review != review["verified_artifacts"]:
+                            ready_to_commit = False
+                            break
             if updates.get("disposition") in {"withdrawn", "superseded"}:
                 self._purge(tx, document)
             return {
@@ -1899,17 +2440,8 @@ class NativeBridgeService:
                         "git_reconciliation_required",
                         "Preserve possible integrated work and reconcile its Git result before restarting",
                     )
-                _write(
-                    tx,
-                    "work_items",
-                    work["id"],
-                    {"resolution_status": "open"},
-                    Mutation(
-                        expected_version=work["version"],
-                        actor=binding["session_context_id"],
-                        reason="Restart uncommitted work after changed or unprovable formal intent",
-                    ),
-                )
+                # Review did not mark uncommitted work complete. Abandoning its
+                # invalidated attempt preserves the already-open domain row.
             tx.cursor.execute(
                 sql.SQL("UPDATE {}.bridge_attempts SET disposition='abandoned' WHERE id=%s").format(
                     sql.Identifier(tx.schema)

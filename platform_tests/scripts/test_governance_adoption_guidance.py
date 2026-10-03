@@ -74,6 +74,8 @@ def test_standing_priorities_cite_artifact_oriented_governance() -> None:
 
 
 def test_release_candidate_gate_skill_documents_the_gate_script() -> None:
-    skill = (REPO_ROOT / ".agents/skills/gtkb-release-candidate-gate/SKILL.md").read_text(encoding="utf-8")
+    skill = (REPO_ROOT / ".harness-baseline-configuration/skills/gtkb-release-candidate-gate/SKILL.md").read_text(
+        encoding="utf-8"
+    )
     assert "scripts/release_candidate_gate.py" in skill
     assert "--skip-frontend" in skill and "--include-frontend" in skill

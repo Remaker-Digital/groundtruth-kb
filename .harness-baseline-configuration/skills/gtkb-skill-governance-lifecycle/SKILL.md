@@ -5,7 +5,7 @@ description: Develop managed skills from neutral source through the current CLI 
 
 # Managed skill lifecycle
 
-The one authored source is `.agents/skills/<name>/SKILL.md`; its helpers and
+The one authored source is `.harness-baseline-configuration/skills/<name>/SKILL.md`; its helpers and
 references belong beside it. Hosts that discover it read it in place; the others
 get a pointer stub that carries only its frontmatter. Frontmatter edits need
 `gt harness project`; body edits do not. Retiring a skill means deleting its

@@ -68,14 +68,16 @@ def test_scan_includes_root_governance_files(tmp_path: Path) -> None:
 
 
 def test_scan_includes_claude_skills(tmp_path: Path) -> None:
-    """`.agents/skills/` is in SCAN_ROOTS per WRAPUP -011 §4."""
+    """`.harness-baseline-configuration/skills/` is in SCAN_ROOTS per WRAPUP -011 §4."""
     project = _make_fake_project(tmp_path)
-    skill_dir = project / ".agents" / "skills" / "fake-skill"
+    skill_dir = project / ".harness-baseline-configuration" / "skills" / "fake-skill"
     skill_dir.mkdir(parents=True)
     (skill_dir / "SKILL.md").write_text(f"# Skill\n{OLD_ROOT_TOKEN}\n")
     findings = w1.check_hardcoded_old_project_root(project)
     paths = [f["path"] for f in findings]
-    assert any("skills" in p for p in paths), f".agents/skills/ should be in SCAN_ROOTS; got {paths}"
+    assert any("skills" in p for p in paths), (
+        f".harness-baseline-configuration/skills/ should be in SCAN_ROOTS; got {paths}"
+    )
 
 
 def test_scan_clean_when_no_old_root_references(tmp_path: Path) -> None:

@@ -8,6 +8,7 @@ skips.  Every test uses and permanently removes a unique PostgreSQL schema.
 
 from __future__ import annotations
 
+import configparser
 import json
 import os
 import subprocess
@@ -1103,14 +1104,26 @@ class TestPublicSchemaCommentInitialization:
     STOCK_PUBLIC_COMMENT = "standard public schema"
 
     @pytest.fixture
-    def disposable_database(self, monkeypatch: pytest.MonkeyPatch) -> Iterator[tuple[str, str]]:
+    def disposable_database(self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Iterator[tuple[str, str]]:
         service = _required_service()
         database_name = f"gtkb_wi7690_{uuid.uuid4().hex}"
         created = False
+        monkeypatch.delenv("PGOPTIONS", raising=False)
         # Maintenance connections pin dbname explicitly: CREATE/DROP DATABASE cannot run from a
         # session whose own connection has the target database open, and PGDATABASE is redirected
         # to the disposable database for the duration of the test.
         with psycopg.connect(service=service, dbname=_MAINTENANCE_DATABASE, autocommit=True) as connection:
+            # Preserve service-file, default-service and other supported libpq routes.
+            # Effective parameters omit the password; retain it only in this test's environment.
+            parameters = connection.info.get_parameters()
+            parameters.pop("service", None)
+            parameters["dbname"] = database_name
+            service_password = connection.info.password
+            selected_service = configparser.ConfigParser(interpolation=None)
+            selected_service[service] = parameters
+            case_service_file = tmp_path / "pg_service.conf"
+            with case_service_file.open("w", encoding="utf-8") as definition:
+                selected_service.write(definition, space_around_delimiters=False)
             existing = connection.execute("SELECT 1 FROM pg_database WHERE datname=%s", (database_name,)).fetchone()
             if existing is not None:
                 pytest.fail("refusing to adopt a pre-existing database; the unique name collided")
@@ -1119,12 +1132,15 @@ class TestPublicSchemaCommentInitialization:
         try:
             # Cleanup protection begins immediately after successful creation.
             monkeypatch.setenv("GT_POSTGRES_SERVICE", service)
+            monkeypatch.setenv("PGSERVICEFILE", str(case_service_file))
+            if service_password:
+                monkeypatch.setenv("PGPASSWORD", service_password)
             monkeypatch.setenv("PGDATABASE", database_name)
-            monkeypatch.delenv("PGOPTIONS", raising=False)
-            with psycopg.connect(service=service, dbname=database_name, autocommit=True) as connection:
+            # Match PostgresKernel._connect: no dbname override may conceal wrong targeting.
+            with psycopg.connect(service=service, autocommit=True) as connection:
                 selected = connection.execute("SELECT current_database(), current_schema()").fetchone()
                 if selected[0] != database_name:
-                    pytest.fail("the libpq service overrides PGDATABASE; refusing an unisolated run")
+                    pytest.fail("the service-only CLI connection must select the exact disposable database")
                 if selected[1] != "public":
                     pytest.fail("a freshly created database must select the public schema")
                 comment = connection.execute(

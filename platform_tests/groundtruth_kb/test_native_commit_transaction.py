@@ -57,7 +57,7 @@ fi
         "--native-context-id",
         "lo3",
         "--expected-version",
-        "1",
+        str(client.get("/v1/projects/PROJECT-1").json()["project"]["version"]),
         "--message-file",
         str(message),
         "--json",

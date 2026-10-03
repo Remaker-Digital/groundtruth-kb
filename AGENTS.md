@@ -31,7 +31,7 @@ or coordinate through another harness's configuration or runtime state.
 ## Perform the current phase
 
 Read applicable rules on demand from `.harness-baseline-configuration/rules`.
-Use the role-appropriate bridge skill in `.agents/skills`:
+Use the role-appropriate bridge skill in `.harness-baseline-configuration/skills`:
 `gtkb-bridge-propose`, `gtkb-proposal-review`, `gtkb-bridge`, or `gtkb-verify`.
 The owner dispatches work until Dispatcher Next is qualified and activated.
 Only agents author proposals and verdicts; the harness transports them.
@@ -56,9 +56,10 @@ Prime Builder authors NEW, REVISED, READY, VERDICT-REJECTED, WITHDRAWN and
 BLOCKED. Loyal Opposition authors GO, NO-GO, NOT-READY, VERIFIED and SUPERSEDED.
 Either role authors ADVISORY.
 Review evidence identifies Git mode and object identity. The final project commit
-contains its complete independently verified work product. Only the Loyal
-Opposition context whose VERIFIED delivery returns `project_ready_for_commit: true`
-makes the one project commit. Prime Builder never commits. Keep bridge payloads
+contains its complete independently verified work product. The Loyal Opposition context whose VERIFIED delivery returns
+`project_ready_for_commit: true` normally makes the one project commit; a fresh
+independent Loyal Opposition context may recover finalization through the native
+service from current canonical reviews and the actual Git fact. Prime Builder never commits. Keep bridge payloads
 and generated projections out of that commit.
 
 For changed formal intent after VERIFIED before commit, use the native restart

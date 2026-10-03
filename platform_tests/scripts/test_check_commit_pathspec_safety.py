@@ -2,7 +2,7 @@
 
 M15 stage 1 (owner ruling D15 as amended by R3; D34 R1 option B, R4): the root
 ``AGENTS.md`` (the moved baseline instruction file), the declared root pointers
-``CLAUDE.md`` / ``.goosehints`` and the skills source ``.agents/skills/**`` are
+``CLAUDE.md`` / ``.goosehints`` and the skills source ``.harness-baseline-configuration/skills/**`` are
 tracked authored sources outside the projector's output, so their postimages commit;
 their bytes are pinned by the acceptance checker (``declared_pointer_drift``), not by
 this refusal. ``GEMINI.md`` and ``.cursorrules`` stay refused until an M13 Q0 shows a
@@ -61,7 +61,7 @@ def inspect_unchanged(repo):
         "src/module.py",
         ".harness-baseline-configuration/rules/topic.md",
         ".harness-baseline-configuration/hooks/gate.py",
-        ".agents/skills/gtkb-verify/SKILL.md",
+        ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md",
         "AGENTS.md",
         "CLAUDE.md",
         ".goosehints",
@@ -87,6 +87,8 @@ def test_real_product_index_passes_without_permission_evidence(repo, name):
         "GEMINI.md",
         "gemini.md",
         ".cursorrules",
+        ".agents/skills/gtkb-verify/SKILL.md",
+        ".agents/skills/gtkb-verify/helpers/x.py",
         ".agents/rules/topic.md",
         ".agents/hooks/gate.py",
         ".agents/AGENTS.md",
@@ -130,14 +132,23 @@ def test_root_pointer_postimages_pass_and_agent_pointer_is_refused(repo):
     """R1 option B: the tracked root carriers commit; the rendered in-config-dir pointer never does."""
     assert not {"agents.md", "claude.md", ".goosehints"} & checker.GENERATED_ROOT_FILES
     assert {"gemini.md", ".cursorrules"} <= checker.GENERATED_ROOT_FILES
-    assert ".agent" in checker.RUNTIME_COMPONENTS and ".agents" not in checker.RUNTIME_COMPONENTS
+    assert {".agent", ".agents"} <= checker.RUNTIME_COMPONENTS
     stage(repo, "AGENTS.md", "# GT-KB session instructions\n")
     stage(repo, "CLAUDE.md", "@AGENTS.md\n")
     stage(repo, ".goosehints", "Follow ./AGENTS.md (GT-KB session instructions).\n")
-    stage(repo, ".agents/skills/gtkb-verify/SKILL.md", "---\nname: gtkb-verify\ndescription: Verify.\n---\n")
+    stage(
+        repo,
+        ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md",
+        "---\nname: gtkb-verify\ndescription: Verify.\n---\n",
+    )
     result = inspect_unchanged(repo)
     assert result["status"] == "pass"
-    assert result["product"] == [".agents/skills/gtkb-verify/SKILL.md", ".goosehints", "AGENTS.md", "CLAUDE.md"]
+    assert result["product"] == [
+        ".goosehints",
+        ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md",
+        "AGENTS.md",
+        "CLAUDE.md",
+    ]
     stage(repo, ".agent/rules/gtkb-pointer.md", "Follow ./AGENTS.md.\n")
     result = inspect_unchanged(repo)
     assert result["status"] == "fail"
@@ -145,14 +156,26 @@ def test_root_pointer_postimages_pass_and_agent_pointer_is_refused(repo):
 
 
 def test_forward_deletion_and_product_rename_remain_possible(repo):
-    for name in ["bridge/old.md", ".codex/old.json", ".gtkb-index-old/index", "src/old.txt"]:
+    for name in [
+        "bridge/old.md",
+        ".codex/old.json",
+        ".agents/skills/old/SKILL.md",
+        ".gtkb-index-old/index",
+        "src/old.txt",
+    ]:
         stage(repo, name)
     git(repo, "commit", "-qm", "preimage")
-    git(repo, "rm", "--", "bridge/old.md", ".codex/old.json", ".gtkb-index-old/index")
+    git(repo, "rm", "--", "bridge/old.md", ".codex/old.json", ".agents/skills/old/SKILL.md", ".gtkb-index-old/index")
     git(repo, "mv", "src/old.txt", "src/new.txt")
     result = inspect_unchanged(repo)
     assert result["status"] == "pass"
-    assert set(result["removals"]) == {"bridge/old.md", ".codex/old.json", ".gtkb-index-old/index", "src/old.txt"}
+    assert set(result["removals"]) == {
+        "bridge/old.md",
+        ".codex/old.json",
+        ".agents/skills/old/SKILL.md",
+        ".gtkb-index-old/index",
+        "src/old.txt",
+    }
     assert result["product"] == ["src/new.txt"]
 
 

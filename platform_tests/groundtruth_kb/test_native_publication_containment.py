@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
@@ -102,6 +102,7 @@ def test_publication_refuses_redirected_path_components_without_link_privileges(
 def test_verdict_cannot_reuse_another_attempt_claim_or_predecessor(bridge):
     _, client, contexts, _ = bridge
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     held = {}
     for document, work in [("first-verdict", "WI-1"), ("second-verdict", "WI-2")]:
         deliver(client, contexts, document, "pb1", 1, "NEW", work_item_id=work)

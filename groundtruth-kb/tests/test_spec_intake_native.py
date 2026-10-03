@@ -174,7 +174,10 @@ def test_credential_shaped_text_is_named_at_capture_and_refused_at_confirmation(
 
 
 def test_skill_helper_delegates_with_skill_attribution(native_app_authority, tmp_path) -> None:
-    helper_path = Path(__file__).resolve().parents[2] / ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py"
+    helper_path = (
+        Path(__file__).resolve().parents[2]
+        / ".harness-baseline-configuration/skills/gtkb-spec-intake/helpers/spec_intake.py"
+    )
     spec = importlib.util.spec_from_file_location("gtkb_test_native_spec_intake_helper", helper_path)
     assert spec is not None and spec.loader is not None
     helper = importlib.util.module_from_spec(spec)

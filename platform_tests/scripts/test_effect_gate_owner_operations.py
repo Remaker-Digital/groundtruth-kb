@@ -1,13 +1,13 @@
-"""Owner decision D61 (observer B90): GT-KB's owner operations are refused in every harness context.
+"""Bare ordinary controller commands require selectors; raw owner operations stay refused.
 
-Starting and stopping GT-KB's services, Home and dashboard, and replacing its operational controls, are neither file nor
-Git effects, so the gate passed them for any agent shell before D61. These cases pin the refusal, its reach through
-nested and chained shell commands and shell-free argument vectors, and the read-only forms that stay allowed. The gate
-classifies command text only; no service, task or control is touched here.
+Ordinary services, Home, dashboard and control commands are blocked without complete explicit operation selectors.
+These cases pin that diagnostic through nested and chained shells and shell-free argument vectors. Raw process,
+PostgreSQL, task and service administration remains owner-only. Successful bounded-operation coverage is separate.
+The gate classifies command text only; no service, task or control is touched here.
 
-c115 adds the single `&` as a command separator (cmd's separator, the background operator of bash and PowerShell 7),
-nesting to the inspection cap, and the rule's own fail-closed refusal of commands it cannot inspect (observer B102), so
-the refusal does not depend on the Git rule running first. Redirections such as `2>&1` stay what they are.
+The single `&` remains a command separator (cmd's separator and the background operator of bash and PowerShell 7).
+Nesting past the inspection cap and commands the gate cannot inspect remain fail-closed owner-only refusals, independent
+of the Git rule. Redirections such as `2>&1` and read-only forms retain their existing behavior.
 """
 
 from __future__ import annotations
@@ -69,9 +69,24 @@ def test_gt_owner_operations_are_refused(tmp_path: Path, command: str, operation
     result = _decide(tmp_path, command, tool_name)
 
     assert result["decision"] == "block"
-    assert result["reason_code"] == "owner_operation_only"
-    assert str(result["reason"]).startswith(operation)
-    assert "GT-KB Home" in str(result["reason"])
+    ordinary_operations = {
+        "gt services stop",
+        "gt services start",
+        "gt home stop",
+        "gt home start",
+        "gt dashboard stop",
+        "gt dashboard serve",
+        "gt controls set",
+        "gt home open",
+    }
+    if operation in ordinary_operations:
+        assert result["reason_code"] == "operation_selector_required"
+        for selector in ("--activity ops", "--native-context-id", "--document", "--fence"):
+            assert selector in str(result["reason"])
+    else:
+        assert result["reason_code"] == "owner_operation_only"
+        assert str(result["reason"]).startswith(operation)
+        assert "GT-KB Home" in str(result["reason"])
 
 
 @pytest.mark.parametrize(
@@ -113,7 +128,28 @@ def test_nested_chained_and_shell_free_owner_operations_are_refused(tmp_path: Pa
     result = _decide(tmp_path, command)
 
     assert result["decision"] == "block"
-    assert result["reason_code"] == "owner_operation_only"
+    ordinary_commands = (
+        'pwsh -NoProfile -Command "gt services stop authority"',
+        'cmd /c "gt.exe controls set --input p.toml --expected-sha256 00"',
+        'bash -c "gt home stop"',
+        "& gt.exe services stop authority",
+        "Write-Output ok; gt services stop authority",
+        "gt services status | Out-String; gt dashboard stop",
+        ["gt", "services", "stop", "authority"],
+        "echo ok & gt services stop authority",
+        'cmd /c "echo ok & gt services stop authority"',
+        "cmd /c echo ok & gt home stop",
+        "bash -c 'echo ok & gt dashboard stop'",
+        "cmd /c cmd /c gt services stop authority",
+        "cmd /c cmd /c cmd /c cmd /c gt controls set --input p.toml --expected-sha256 00",
+        "uv run gt home open",
+    )
+    if command in ordinary_commands:
+        assert result["reason_code"] == "operation_selector_required"
+        for selector in ("--activity ops", "--native-context-id", "--document", "--fence"):
+            assert selector in str(result["reason"])
+    else:
+        assert result["reason_code"] == "owner_operation_only"
 
 
 @pytest.mark.parametrize(

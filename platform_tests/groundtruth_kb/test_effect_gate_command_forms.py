@@ -160,10 +160,13 @@ OWNER_OPERATIONS_INSIDE = [
 ]
 
 
+# Every command here invokes a wired ordinary controller without its explicit
+# bounded-ops selectors. The shell wrapper must not hide that local refusal.
 @pytest.mark.parametrize("command", OWNER_OPERATIONS_INSIDE)
 def test_an_owner_operation_in_any_command_the_line_runs_is_refused(tmp_path, native, command):
     result = _decide(tmp_path, command)
-    assert result["reason_code"] == "owner_operation_only", result
+    assert result["decision"] == "block", result
+    assert result["reason_code"] == "operation_selector_required", result
     assert native.calls == []
 
 

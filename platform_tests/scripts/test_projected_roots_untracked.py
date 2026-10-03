@@ -12,7 +12,7 @@ therefore carries no projections: ``gt harness project <profile>`` runs for ever
 after a checkout or install.
 
 M15 stage 1 (owner ruling D15 as amended by R3; D34): the baseline instruction file moved
-to the tracked root ``AGENTS.md`` and the skills tree to ``.agents/skills`` (the one skills
+to the tracked root ``AGENTS.md`` and the skills tree is inside ``.harness-baseline-configuration/skills`` (the one authored
 source, tracked, never ignored); ``CLAUDE.md`` and ``.goosehints`` are tracked pointer
 files declared in ``profiles.toml [root_pointers]``. The baseline keeps rules/, hooks/ and
 routing.toml. The TEST-12566 binding text still describes the pre-move counts; its refresh
@@ -29,10 +29,10 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[2]
-PROJECTOR_ROOTS = (".agent", ".claude", ".codex", ".cursor", ".goose", ".api-harness")
+PROJECTOR_ROOTS = (".agents", ".agent", ".claude", ".codex", ".cursor", ".goose", ".api-harness")
 PROFILES = ROOT / "scripts/harness_projection/profiles.toml"
 BASELINE = ".harness-baseline-configuration"
-SKILLS_ROOT = ".agents/skills"
+SKILLS_ROOT = ".harness-baseline-configuration/skills"
 ROOT_CARRIERS = ("AGENTS.md", "CLAUDE.md", ".goosehints")
 # The tracked baseline after the D15 move: rules (29 since c123 retired standing-priorities.md,
 # template-decision-memo.md and the Loyal Opposition knowledge base index, owner decision D1 of 2026-10-01) + hooks
@@ -42,7 +42,7 @@ ROOT_CARRIERS = ("AGENTS.md", "CLAUDE.md", ".goosehints")
 # TEST-12566 to this.
 TRACKED_BASELINE_SHAPE = {"rules": 29, "hooks": 11}
 TRACKED_BASELINE_SINGLETONS = ("routing.toml", "goose-execution-floor.toml")
-TRACKED_BASELINE_FILES = 42
+TRACKED_BASELINE_FILES = 83
 
 
 def _git(*args: str) -> subprocess.CompletedProcess[str]:
@@ -90,31 +90,33 @@ def _ignore_matches(paths: list[str]) -> dict[str, tuple[str, str] | None]:
 def test_profiles_render_only_under_the_ignored_roots() -> None:
     dirs = _profile_dirs()
     assert len(dirs) == 8, sorted(dirs)
-    assert {config_dir.split("/")[0] for config_dir in dirs.values()} == set(PROJECTOR_ROOTS)
+    profiles = tomllib.loads(PROFILES.read_text(encoding="utf-8"))["harnesses"]
+    native_catalog_roots = {".agents" for name in dirs if profiles[name].get("skills_discovery") == "agents_skills"}
+    assert {config_dir.split("/")[0] for config_dir in dirs.values()} | native_catalog_roots == set(PROJECTOR_ROOTS)
 
 
 @pytest.mark.parametrize("root", PROJECTOR_ROOTS)
 def test_projector_root_is_ignored_by_one_anchored_rule_at_the_repository_root(root: str) -> None:
     samples = [f"{root}/.projection-manifest.json", f"{root}/nested/rendered.md", f"{root}/settings.local.json"]
     for path, match in _ignore_matches(samples).items():
-        assert match == (".gitignore", f"/{root}/"), (path, match)
+        assert match == (".gitignore", "/.agents/" if root.startswith(".agents/") else f"/{root}/"), (path, match)
 
 
 def test_extra_output_roots_are_ignored_by_one_anchored_rule() -> None:
     """D52: Goose discovers its hook plugin only under ``.agents/plugins/gtkb/``; that generated root is ignored by its
-    own anchored rule, so the tracked skills source beside it (``.agents/skills``) stays unignored."""
+    own anchored parent rule; authored baseline Skills remain unignored."""
     extra = {name: roots for name, roots in _extra_output_roots().items() if roots}
     assert extra == {"goose": [".agents/plugins/gtkb"]}
     for root in extra["goose"]:
         samples = [f"{root}/plugin.json", f"{root}/hooks/hooks.json"]
         for path, match in _ignore_matches(samples).items():
-            assert match == (".gitignore", f"/{root}/"), (path, match)
+            assert match == (".gitignore", "/.agents/" if root.startswith(".agents/") else f"/{root}/"), (path, match)
 
 
 def test_every_declared_projection_path_is_ignored() -> None:
     extra = _extra_output_roots()
     for name, config_dir in _profile_dirs().items():
-        owned = tuple(f"{root}/" for root in (config_dir, *extra[name]))
+        owned = tuple(f"{root}/" for root in (config_dir, *extra[name], ".agents/skills"))
         manifest = ROOT / config_dir / ".projection-manifest.json"
         paths = [f"{config_dir}/.projection-manifest.json"]
         if manifest.is_file():
@@ -164,11 +166,12 @@ def _stageable(*pathspecs: str) -> set[str]:
 
 def test_tracked_source_shape_after_the_d15_move() -> None:
     """D15 (R1 option B, R15): the baseline tracks rules, hooks and routing only; the skills source is
-    ``.agents/skills``; the instruction file is the root ``AGENTS.md``; the root pointers are tracked."""
+    ``.harness-baseline-configuration/skills``; root instruction and pointer files remain tracked."""
     # The frozen authored cohort includes new shared hook/rule sources before the gated commit.
-    baseline = _tracked(BASELINE) | _stageable(f"{BASELINE}/hooks", f"{BASELINE}/rules")
+    baseline = _tracked(BASELINE) | _stageable(BASELINE)
     assert f"{BASELINE}/AGENTS.md" not in baseline, "the instruction file moved to the root (R1 option B)"
-    assert not [path for path in baseline if path.startswith(f"{BASELINE}/skills/")], "the skills tree moved"
+    skills = {path for path in baseline if path.startswith(f"{SKILLS_ROOT}/")}
+    assert len(skills) == 41, sorted(skills)
     shape = {
         kind: sorted(path for path in baseline if path.startswith(f"{BASELINE}/{kind}/"))
         for kind in TRACKED_BASELINE_SHAPE
@@ -177,6 +180,7 @@ def test_tracked_source_shape_after_the_d15_move() -> None:
     assert baseline == {
         *shape["rules"],
         *shape["hooks"],
+        *skills,
         *(f"{BASELINE}/{name}" for name in TRACKED_BASELINE_SINGLETONS),
     }, sorted(baseline)
     assert len(baseline) == TRACKED_BASELINE_FILES
@@ -197,9 +201,9 @@ def test_tracked_source_shape_after_the_d15_move() -> None:
 
 
 def test_skills_source_is_outside_every_projector_root_and_never_ignored() -> None:
-    assert ".agents" not in PROJECTOR_ROOTS
+    assert ".agents" in PROJECTOR_ROOTS
     assert not any(config_dir.split("/")[0] == ".agents" for config_dir in _profile_dirs().values())
-    samples = [f"{SKILLS_ROOT}/x/SKILL.md", f"{SKILLS_ROOT}/x/helpers/run.py", SKILLS_ROOT, ".agents"]
+    samples = [f"{SKILLS_ROOT}/x/SKILL.md", f"{SKILLS_ROOT}/x/helpers/run.py", SKILLS_ROOT]
     assert _ignore_matches(samples) == dict.fromkeys(samples)
 
 
@@ -215,7 +219,7 @@ def test_pathspec_check_refuses_the_same_roots() -> None:
     from scripts.check_commit_pathspec_safety import NONPRODUCT_PREFIXES, RUNTIME_COMPONENTS
 
     assert set(PROJECTOR_ROOTS) <= RUNTIME_COMPONENTS
-    assert ".agents" not in RUNTIME_COMPONENTS, "the skills source is work product (D15)"
+    assert ".agents" in RUNTIME_COMPONENTS, "native discovery pointers are derived output"
     assert ".groundtruth/derived" in NONPRODUCT_PREFIXES
 
 

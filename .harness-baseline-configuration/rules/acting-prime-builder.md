@@ -48,8 +48,10 @@ contract under `GOV-ARTIFACT-AUTHORITY-HIERARCHY-001`.
 The writer validates typed fields and expected versions and records the changed
 row and its history atomically. Attribution does not grant permission. Current
 requirement status is distinct from implementation verification. Reconcile a
-stale write with current facts. Project relationships use their native route
-and preserve project authorization. These operations retain independent
+stale write with current facts. Project relationships use their native route.
+An actual active-member-set change atomically deauthorizes affected execution
+projects; no-op, failed or stale changes and formal-link changes preserve
+authorization. Only the owner lever reauthorizes a project. These operations retain independent
 review, artifact-scoped claims, executable tests and project commit duties.
 
 ## Release, adoption and backlog

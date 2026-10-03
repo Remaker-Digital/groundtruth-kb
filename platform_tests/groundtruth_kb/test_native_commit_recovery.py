@@ -144,7 +144,7 @@ def test_killed_authority_after_git_commit_recovers_once_in_a_fresh_context(comm
                     "--native-context-id",
                     "lo3",
                     "--expected-version",
-                    "1",
+                    str(client.get("/v1/projects/PROJECT-1").json()["project"]["version"]),
                     "--message-file",
                     str(message),
                     "--json",
@@ -174,7 +174,13 @@ def test_killed_authority_after_git_commit_recovers_once_in_a_fresh_context(comm
             assert bound["status"] == "init_requested"
             fresh_path = main / ".worktrees" / bound["binding"]["session_context_id"]
             assert not fresh_path.exists()
-            arguments = ["PROJECT-1", "--native-context-id", "fresh-recovery", "--expected-version", "1"]
+            arguments = [
+                "PROJECT-1",
+                "--native-context-id",
+                "fresh-recovery",
+                "--expected-version",
+                str(client.get("/v1/projects/PROJECT-1").json()["project"]["version"]),
+            ]
             prepared = cli("projects", "prepare-commit", *arguments, "--json")
             assert prepared["status"] == "ready_to_confirm", prepared
             assert prepared["commit_id"] == candidate

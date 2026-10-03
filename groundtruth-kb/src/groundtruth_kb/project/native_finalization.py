@@ -19,7 +19,7 @@ from typing import Annotated, Any, Literal
 from psycopg import sql
 from pydantic import Field
 
-from groundtruth_kb.bridge.native import NativeBridgeService, SessionRequest
+from groundtruth_kb.bridge.native import NativeBridgeService, SessionRequest, _paths
 from groundtruth_kb.native_authority import (
     Mutation,
     Text,
@@ -129,10 +129,10 @@ class NativeProjectFinalization:
         attempts, work_items, artifacts = [], [], {}
         for member in sorted(members, key=lambda item: item["work_item_id"]):
             work = _required(tx, "work_items", member["work_item_id"], lock=True)
-            if work["resolution_status"] != "verified":
+            if work["resolution_status"] != "open":
                 _error(
-                    "project_not_fully_verified",
-                    "Every current project member must be VERIFIED",
+                    "project_member_not_open",
+                    "Uncommitted members remain open until the complete project commit is confirmed",
                     work_item_id=work["id"],
                 )
             tx.cursor.execute(
@@ -144,8 +144,8 @@ class NativeProjectFinalization:
             rows = tx.cursor.fetchall()
             if len(rows) != 1 or rows[0]["head_status"] != "VERIFIED" or not rows[0]["verified_artifacts"]:
                 _error(
-                    "review_state_missing",
-                    "The member lacks canonical verification of exact artifacts",
+                    "project_not_fully_verified",
+                    "Every current member requires canonical independent verification of exact artifacts",
                     work_item_id=work["id"],
                 )
             attempt = dict(rows[0])
@@ -158,10 +158,11 @@ class NativeProjectFinalization:
             for path, blob in attempt["verified_artifacts"].items():
                 if path.casefold().split("/")[0] == "bridge":
                     _error("bridge_payload_in_cohort", "Bridge payloads cannot enter a project work-product commit")
-                # This union enumerates the complete project scope. It is usable
-                # as commit evidence only after every member's own review has
-                # been compared with the current bytes below.
+                # This union enumerates the complete project scope. Commit proof
+                # must also compare every member's own review with the candidate
+                # or, before a new commit, with the current working bytes.
                 artifacts[path] = blob
+            _paths(list(attempt["verified_artifacts"]), "Artifact snapshot targets", error_code="scope_changed")
             attempts.append(attempt)
             work_items.append(work)
         tx.cursor.execute(
@@ -255,14 +256,18 @@ class NativeProjectFinalization:
         works, attempts, artifacts = self._cohort(tx, project)
         source = self.bridge.work_root(project_id, tx=tx)
         parent = self._head(root=repository)
-        actual = self.bridge._snapshot(sorted(artifacts), root=source)
-        changed_reviews = self._request_changed_reviews(tx, attempts, actual)
-        if changed_reviews:
-            return changed_reviews
-        failures = [attempt["work_item_id"] for attempt in attempts if attempt["finalization_failure"]]
-        if failures:
-            return {"status": "fresh_verification_required", "work_item_ids": failures}
-        existing = self._existing_commit(request, binding, works, artifacts, root=repository)
+        existing = self._existing_commit(request, binding, works, artifacts, attempts, root=repository)
+        # Git may already contain the reviewed product while its canonical
+        # acknowledgement was lost. Later working bytes are separate work and
+        # must neither block that fact nor acquire its review.
+        if existing is None or existing["commit_id"] != parent:
+            actual = self.bridge._snapshot(sorted(artifacts), root=source)
+            changed_reviews = self._request_changed_reviews(tx, attempts, actual)
+            if changed_reviews:
+                return changed_reviews
+            failures = [attempt["work_item_id"] for attempt in attempts if attempt["finalization_failure"]]
+            if failures:
+                return {"status": "fresh_verification_required", "work_item_ids": failures}
         if existing:
             return {
                 "status": "ready_to_confirm",
@@ -415,6 +420,7 @@ class NativeProjectFinalization:
         binding: dict[str, Any],
         works: Sequence[dict[str, Any]],
         artifacts: dict[str, dict[str, str] | None],
+        attempts: Sequence[dict[str, Any]],
         *,
         root: Path,
     ) -> dict[str, str] | None:
@@ -441,6 +447,18 @@ class NativeProjectFinalization:
             )
             try:
                 self._verify_commit(current, binding, works, artifacts, root=root)
+                after = self._tree(commit_id, root=root)
+                stale = [
+                    attempt["work_item_id"]
+                    for attempt in attempts
+                    if any(after.get(path) != blob for path, blob in attempt["verified_artifacts"].items())
+                ]
+                if stale:
+                    _error(
+                        "unreviewed_commit_bytes",
+                        "The candidate must match every current member's exact reviewed bytes",
+                        work_item_ids=stale,
+                    )
             except PostgresKernelError as error:
                 _error(
                     "existing_commit_needs_reconciliation",
@@ -515,16 +533,29 @@ class NativeProjectFinalization:
                 return {"status": "already_confirmed", "project_id": project_id, "commit_id": request.commit_id}
             _error("terminal_commit_mismatch", "The terminal project names another Git commit")
         works, attempts, artifacts = self._cohort(tx, project)
-        if any(attempt["finalization_failure"] for attempt in attempts):
-            _error("fresh_verification_required", "Fresh independent verification must finish before confirmation")
-        actual = self.bridge._snapshot(sorted(artifacts), root=self.bridge.work_root(project_id, tx=tx))
-        changed_reviews = self._request_changed_reviews(tx, attempts, actual)
-        if changed_reviews:
-            return changed_reviews
-        try:
-            self._verify_commit(request, binding, works, artifacts, root=repository)
-        except PostgresKernelError as error:
-            return self._request_verification(tx, attempts, "commit_not_confirmed", error.to_json_dict())
+        if self._head(root=repository) == request.commit_id:
+            # Reconcile a unique, fully reviewed integrated Git fact first.
+            # Current scope/claims still passed _cohort; no working tree is reset.
+            existing = self._existing_commit(request, binding, works, artifacts, attempts, root=repository)
+            if existing is None or existing != {
+                "commit_id": request.commit_id,
+                "expected_parent": request.expected_parent,
+            }:
+                _error(
+                    "existing_commit_needs_reconciliation",
+                    "The requested commit and parent must identify the one reviewed integrated Git fact",
+                )
+        else:
+            if any(attempt["finalization_failure"] for attempt in attempts):
+                _error("fresh_verification_required", "Fresh independent verification must finish before confirmation")
+            actual = self.bridge._snapshot(sorted(artifacts), root=self.bridge.work_root(project_id, tx=tx))
+            changed_reviews = self._request_changed_reviews(tx, attempts, actual)
+            if changed_reviews:
+                return changed_reviews
+            try:
+                self._verify_commit(request, binding, works, artifacts, root=repository)
+            except PostgresKernelError as error:
+                return self._request_verification(tx, attempts, "commit_not_confirmed", error.to_json_dict())
         if links:
             _error("conflicting_commit_fact", "An active project already has a canonical activation commit link")
         try:
@@ -571,7 +602,7 @@ class NativeProjectFinalization:
                 tx,
                 "work_items",
                 work["id"],
-                {"completion_evidence": "git:" + request.commit_id},
+                {"resolution_status": "verified", "completion_evidence": "git:" + request.commit_id},
                 Mutation(expected_version=work["version"], actor=actor, reason=reason),
             )
             tx.cursor.execute(
@@ -641,7 +672,7 @@ class NativeProjectFinalization:
                     self._commit_callbacks.pop(project_id, None)
                     binding, project, repository = self._project(tx, project_id, request)
                     works, attempts, artifacts = self._cohort(tx, project)
-                    existing = self._existing_commit(request, binding, works, artifacts, root=repository)
+                    existing = self._existing_commit(request, binding, works, artifacts, attempts, root=repository)
                     if existing:
                         # Git may already have committed when later checkout/index
                         # housekeeping failed. Preserve that index and confirm once.

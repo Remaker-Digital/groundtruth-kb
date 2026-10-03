@@ -323,8 +323,8 @@ def test_documented_proposal_header_delivers_through_actual_cli(bridge, tmp_path
         deliver(client, contexts, document, "lo1", 2, "NO-GO")
         head = 2
     root = Path(__file__).resolve().parents[2]
-    # D15: the one skills source; the baseline directory holds rules and hooks only.
-    skill = (root / ".agents/skills/gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
+    # The one authored skills source is inside the universal baseline.
+    skill = (root / ".harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
     example = re.search(r"## Authored header example\n.*?```text\n(.*?)```", skill, re.S)
     assert example is not None
     with socket.socket() as socket_probe:

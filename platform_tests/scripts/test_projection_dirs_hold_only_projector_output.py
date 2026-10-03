@@ -173,7 +173,7 @@ def test_scope_boundary_other_runtime_state_is_untouched() -> None:
 
 @pytest.mark.parametrize("harness,config_dir", _rostered_harnesses())
 def test_empty_root_reprojection_reconstructs_exact_owned_files(tmp_path, monkeypatch, harness, config_dir):
-    for relative in (".harness-baseline-configuration", ".agents/skills"):
+    for relative in (".harness-baseline-configuration",):
         shutil.copytree(
             PROJECT_ROOT / relative, tmp_path / relative, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
         )

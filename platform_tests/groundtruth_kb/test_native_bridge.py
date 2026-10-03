@@ -18,9 +18,15 @@ from groundtruth_kb.bridge.native import BindSession, NativeBridgeService, parse
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
-from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, link_project_formal, put, work_fields
+from platform_tests.groundtruth_kb.native_fixtures import (
+    _serve_authority,
+    history_count,
+    link_project_formal,
+    put,
+    work_fields,
+)
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
@@ -630,7 +636,30 @@ def test_fresh_context_chain_preserves_bytes_consumes_claims_and_verifies(bridge
     artifacts = client.get("/v1/bridge/chain/artifacts").json()
     verified, _ = deliver(client, contexts, "chain", "lo2", 4, "VERIFIED", verified_artifacts=json.dumps(artifacts))
     assert verified.json()["project_ready_for_commit"] is True
-    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "verified"
+    reviewed_work = client.get("/v1/work-items/WI-1").json()
+    assert reviewed_work["work_item"]["resolution_status"] == "open"
+    before_history = history_count(service)
+    amended = put(
+        client,
+        "work-items",
+        "WI-1",
+        {"title": "Changed after review"},
+        expected_version=reviewed_work["work_item"]["version"],
+    )
+    assert amended.status_code == 422 and amended.json()["error"]["code"] == "work_item_frozen"
+    moved = client.post(
+        "/v1/work-items/WI-1/move",
+        json={
+            "expected_version": reviewed_work["membership"]["version"],
+            "actor": "qualification",
+            "reason": "Refuse a reviewed membership change",
+            "source_project_id": "PROJECT-1",
+            "destination_project_id": "PROJECT-2",
+        },
+    )
+    assert moved.status_code == 422 and moved.json()["error"]["code"] == "work_item_frozen"
+    assert client.get("/v1/work-items/WI-1").json() == reviewed_work
+    assert history_count(service) == before_history
     assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "active"
     assert client.get("/v1/bridge/queue", params={"role": "lo"}).json()["eligible"] == []
     with service.kernel.transaction(read_only=True) as tx:
@@ -1229,6 +1258,7 @@ def test_authored_linkage_cannot_redirect_the_claimed_work(bridge, status, field
 def test_canonical_work_item_identifiers_preserve_membership_and_exact_authored_bytes(bridge, work_item_id):
     _, client, contexts, _ = bridge
     assert put(client, "work-items", work_item_id, work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     document = "canonical-identifier"
     original = authored(contexts["pb1"], document, 1, "NEW", **{"Work Item": work_item_id})
     assert parse_authored_message(original)["metadata"]["work_item"] == work_item_id
@@ -1252,6 +1282,7 @@ def test_proposal_rejects_missing_current_parent_for_every_identifier(bridge, wo
     service, client, contexts, _ = bridge
     if work_item_id != "WI-1":
         assert put(client, "work-items", work_item_id, work_fields(), project_id="PROJECT-1").status_code == 200
+        authorize_project(client)
     document = "missing-parent"
     reserved = None
     if boundary == "delivery":
@@ -1363,7 +1394,10 @@ def test_authorization_checked_at_new_delivery_but_does_not_cancel_chain(bridge)
         ).status_code
         == 200
     )
-    authorize("not authorized")
+    assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert client.get("/v1/projects/PROJECT-1").json()["project"]["authorization"] == "not authorized"
+    refused = claim(client, "fresh-member", "pb3", 0, "NEW", work_item_id="WI-2")
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "project_not_authorized"
     assert len(client.get("/v1/bridge/queue", params={"role": "lo"}).json()["eligible"]) == 1
     deliver(client, contexts, "chain", "lo1", 2, "GO")
     deliver(client, contexts, "chain", "pb2", 3, "READY")
@@ -1530,6 +1564,7 @@ def test_headless_blocked_superseded_and_unscoped_advisory(bridge):
 def test_overlapping_effect_claims_and_source_change_require_fresh_work(bridge):
     _, client, contexts, _ = bridge
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     for document, work in (("first", "WI-1"), ("second", "WI-2")):
         deliver(client, contexts, document, "pb1", 1, "NEW", work_item_id=work)
         deliver(client, contexts, document, "lo1", 2, "GO", work_item_id=work)
@@ -1590,6 +1625,7 @@ def test_effect_claim_arbitration_includes_test_artifacts(bridge, scope):
         put(client, "work-items", "WI-2", work_fields(source_test_id="TEST-2"), project_id="PROJECT-1").status_code
         == 200
     )
+    authorize_project(client)
     targets = ["second.py"]
     tests = [second_test]
     if scope == "shared_test":
@@ -1643,6 +1679,7 @@ def test_effect_claim_arbitration_includes_test_artifacts(bridge, scope):
 def test_simultaneous_test_artifact_claims_leave_one_live_reservation(bridge, monkeypatch):
     service, client, contexts, _ = bridge
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     for document, work, path in (("first", "WI-1", "code.py"), ("second", "WI-2", "second.py")):
         deliver(client, contexts, document, "pb1", 1, "NEW", work_item_id=work, target_paths=json.dumps([path]))
         deliver(client, contexts, document, "lo1", 2, "GO", work_item_id=work)
@@ -1953,6 +1990,7 @@ def test_material_formal_change_after_verified_restarts_same_uncommitted_work(br
     current = client.get("/v1/work-items/WI-1/context").json()
     assert current["work_item"]["id"] == "WI-1" and current["membership"] == before["membership"]
     assert current["work_item"]["resolution_status"] == "open"
+    assert current["work_item"] == before["work_item"]
     assert (root / "code.py").read_bytes() == original + b"# ordinary byte change\n"
     deliver(
         client,
@@ -1973,7 +2011,7 @@ def test_material_formal_change_after_verified_restarts_same_uncommitted_work(br
     deliver(client, contexts, "new-intent", "pb4", 3, "READY")
     fresh = client.get("/v1/bridge/new-intent/artifacts").json()
     deliver(client, contexts, "new-intent", "lo4", 4, "VERIFIED", verified_artifacts=json.dumps(fresh))
-    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "verified"
+    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "open"
 
 
 @pytest.mark.parametrize("context", ["pb1", "lo1"])
@@ -2047,3 +2085,131 @@ def test_advisory_follow_up_uses_fresh_chain_and_new_time_authorization(bridge):
     assert client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json() == before
     queued = client.get("/v1/bridge/queue", params={"role": "lo"}).json()
     assert [row["id"] for row in queued["eligible"]] == ["separate-implementation"]
+
+
+def test_predecessor_review_label_requires_lawful_abandonment_one_correction_and_fresh_review(bridge):
+    service, client, contexts, root = bridge
+    document = "predecessor-reviewed"
+    deliver(client, contexts, document, "pb1", 1, "NEW")
+    deliver(client, contexts, document, "lo1", 2, "GO")
+    deliver(client, contexts, document, "pb2", 3, "READY")
+    artifacts = client.get(f"/v1/bridge/{document}/artifacts").json()
+    deliver(client, contexts, document, "lo2", 4, "VERIFIED", verified_artifacts=json.dumps(artifacts))
+
+    # Seed exactly the predecessor writer's review postimage in this disposable
+    # fixture: verified domain label plus the matching attempt scope version,
+    # without a Git completion fact. No production writer bypass is introduced.
+    with service.kernel.transaction() as tx:
+        work = tx.get("work_items", {"id": "WI-1"}, lock=True)
+        state = dict(work)
+        state.update(
+            resolution_status="verified",
+            changed_by="qualification",
+            changed_at=datetime.now(UTC).isoformat(),
+            change_reason="Imported predecessor independent-review postimage",
+        )
+        seeded = tx.mutate(
+            table="work_items",
+            identity={"id": "WI-1"},
+            expected_version=work["version"],
+            new_state=state,
+            actor="qualification",
+            reason=state["change_reason"],
+        )["record"]
+        tx.cursor.execute(
+            sql.SQL("UPDATE {}.bridge_attempts SET work_item_version=%s WHERE id=%s").format(sql.Identifier(tx.schema)),
+            (seeded["version"], document),
+        )
+        assert not tx.list(
+            "project_artifact_links",
+            filters={
+                "project_id": "PROJECT-1",
+                "artifact_type": "git_commit",
+                "relationship": "activation",
+                "status": "active",
+            },
+        )
+    before = client.get("/v1/work-items/WI-1").json()
+    attempt = client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json()
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
+    original_bytes = {name: (root / name).read_bytes() for name in ("code.py", "tests/test_effect.py")}
+    assert before["work_item"]["resolution_status"] == "verified" and not before["work_item"]["completion_evidence"]
+    assert attempt["attempt"]["work_item_version"] == before["work_item"]["version"]
+    assert attempt["attempt"]["head_status"] == "VERIFIED" and attempt["attempt"]["disposition"] == "active"
+    assert not attempt["attempt"]["terminal_commit"]
+    request = {
+        "native_context_id": "lo3",
+        "expected_version": 4,
+        "reason": "Reconcile changed predecessor formal intent",
+    }
+    correction = {
+        "expected_version": before["work_item"]["version"],
+        "actor": "qualification",
+        "reason": "Inspected predecessor review is uncommitted; return its false completion label to open",
+        "fields": {"resolution_status": "open"},
+    }
+    before_history = history_count(service)
+    refused = client.put("/v1/work-items/WI-1", json=correction)
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "attempt_active"
+    refused = client.post(f"/v1/bridge/{document}/abandon", json=request)
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "attempt_still_valid"
+    assert client.get("/v1/work-items/WI-1").json() == before
+    assert client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json() == attempt
+    assert history_count(service) == before_history
+
+    changed = put(
+        client,
+        "specifications",
+        "SPEC-1",
+        {"description": "Corrected required result after predecessor review"},
+        expected_version=1,
+    )
+    assert changed.status_code == 200, changed.text
+    assert client.post(f"/v1/bridge/{document}/abandon", json=request).status_code == 200
+    abandoned = client.get(f"/v1/bridge/{document}/show", params={"include_content": True}).json()
+    assert abandoned["attempt"]["disposition"] == "abandoned" and "messages" not in abandoned
+    assert abandoned["attempt"]["verified_artifacts"] is None and abandoned["attempt"]["go_context_id"] is None
+    assert client.get("/v1/work-items/WI-1").json() == before
+    assert claim(client, "fresh-predecessor-intent", "pb3", 0, "NEW").json()["error"]["code"] == "work_not_open"
+
+    correction_history = history_count(service)
+    corrected = client.put("/v1/work-items/WI-1", json=correction)
+    assert corrected.status_code == 200, corrected.text
+    current = corrected.json()
+    assert current["work_item"]["resolution_status"] == "open"
+    assert current["work_item"]["version"] == before["work_item"]["version"] + 1
+    assert current["memberships"] == before["memberships"] and current["membership"] == before["membership"]
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == project
+    assert history_count(service) == correction_history + 1
+    assert not current["work_item"]["completion_evidence"]
+    assert {name: (root / name).read_bytes() for name in original_bytes} == original_bytes
+
+    fresh_document = "fresh-predecessor-intent"
+    deliver(
+        client,
+        contexts,
+        fresh_document,
+        "pb3",
+        1,
+        "NEW",
+        work_item_version=current["work_item"]["version"],
+        spec_versions=json.dumps({"SPEC-1": 2}),
+    )
+    fresh_attempt = client.get(f"/v1/bridge/{fresh_document}/show").json()["attempt"]
+    assert fresh_attempt["go_context_id"] is None and fresh_attempt["verified_artifacts"] is None
+    refused = claim(client, fresh_document, "pb2", 1, "READY")
+    assert refused.status_code == 422 and refused.json()["error"]["code"] == "invalid_transition"
+    deliver(client, contexts, fresh_document, "lo3", 2, "GO")
+    for name in ("pb4", "lo4"):
+        contexts[name] = client.post(
+            "/v1/sessions/bind",
+            json={"native_context_id": name, "init_command": f"::init gtkb {name[:2]}"},
+        ).json()["binding"]
+    deliver(client, contexts, fresh_document, "pb4", 3, "READY")
+    reviewed = client.get(f"/v1/bridge/{fresh_document}/artifacts").json()
+    delivered, _ = deliver(
+        client, contexts, fresh_document, "lo4", 4, "VERIFIED", verified_artifacts=json.dumps(reviewed)
+    )
+    assert delivered.json()["project_ready_for_commit"] is True
+    assert client.get("/v1/work-items/WI-1").json()["work_item"] == current["work_item"]
+    assert client.get(f"/v1/bridge/{fresh_document}/show").json()["attempt"]["verified_artifacts"] == reviewed

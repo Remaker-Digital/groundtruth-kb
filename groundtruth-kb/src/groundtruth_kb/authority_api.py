@@ -442,7 +442,7 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
 
     @app.put("/v1/work-items/{record_id}")
     def amend_work_item(record_id: Identifier, request: WorkItemMutation) -> Response:
-        return _result(service.amend_work_item(record_id, request))
+        return _result(service.amend_work_item(record_id, request, project_root=bridge.project_root))
 
     @app.post("/v1/work-items/{record_id}/move")
     def move(record_id: Identifier, request: MembershipMove) -> Response:
@@ -453,8 +453,26 @@ def create_authority_app(service: AuthorityService, *, project_root: Path | None
         return _result(service.retire_work_item(record_id, request))
 
     @app.get("/v1/work-items/{record_id}/context")
-    def context(record_id: Identifier) -> Response:
-        return _result(service.task_context(record_id, predecessor_readiness=bridge._dependency_readiness))
+    def context(
+        record_id: Identifier,
+        request: Request,
+        recipient_role: str | None = None,
+        activity: str | None = None,
+        critical_sections: Annotated[str | None, Query(max_length=2048)] = None,
+        critical_specs: Annotated[str | None, Query(max_length=8192)] = None,
+    ) -> Response:
+        _query_fields(request, {"recipient_role", "activity", "critical_sections", "critical_specs"})
+        return _result(
+            service.task_context(
+                record_id,
+                predecessor_readiness=bridge._dependency_readiness,
+                recipient_role=recipient_role,
+                activity=activity,
+                critical_sections=critical_sections.split(",") if critical_sections is not None else None,
+                critical_specs=critical_specs.split(",") if critical_specs is not None else None,
+                project_root=bridge.project_root,
+            )
+        )
 
     @app.get("/v1/work-items/{record_id}/readiness")
     def work_item_readiness(record_id: Identifier) -> Response:

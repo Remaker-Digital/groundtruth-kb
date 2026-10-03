@@ -8,8 +8,9 @@ description: Independently review an assigned GT-KB NEW or REVISED implementatio
 Use this skill for explicitly assigned proposal review. The supplied init marker
 and immutable context binding establish the role; the skill, provider and model
 do not. Formal review requires a Loyal Opposition context independent of the
-proposal's author. Use `gtkb-bridge` for binding, exact claims, complete authored
-headers, delivery and recovery. An ordinary design discussion produces analysis,
+proposal's author and a different actual model from the current NEW or REVISED
+producer before GO. Use `gtkb-bridge` for model-selection evidence, binding, exact
+claims, complete authored headers, delivery and recovery. An ordinary design discussion produces analysis,
 not an implementation verdict or an owner decision record.
 
 ## Establish the review inputs

@@ -207,7 +207,7 @@ def check_authority_hierarchy(specs: list[dict[str, Any]], rules: list[Rule]) ->
 
 
 def check_status_drift(specs: list[dict[str, Any]], rules: list[Rule]) -> list[Finding]:
-    """Find child specs verified before their parent authority changed."""
+    """Find candidates whose caller-asserted implementation marker predates a parent change."""
     by_id = {_spec_id(spec): spec for spec in specs if _spec_id(spec)}
     findings: list[Finding] = []
     for rule in rules:

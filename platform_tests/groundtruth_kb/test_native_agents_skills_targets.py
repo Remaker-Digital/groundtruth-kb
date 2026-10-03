@@ -1,10 +1,8 @@
-"""c123 (batch design WP5, G36): native targets under .agents/skills are accepted, every other .agents path refused.
+"""Authored baseline Skill targets are accepted; all generated .agents targets are refused.
 
-GOV-HARNESS-NEUTRAL-BASELINE-001 v2 and ADR-RULE-PROJECTION-FLOW-INVERSION-001 v3 name .agents/skills the single
-authored shared skills tree. The native bridge's path rule (``_paths`` in bridge/native.py, applied to proposal headers,
-stored scope, effect paths and artifact snapshots) refuses every .agents path except a file under the root-level
-.agents/skills folder. The commit checker states the same rule; the cases below follow its table
-(platform_tests/scripts/test_check_commit_pathspec_safety.py). Until c123 only the refusals were tested.
+The native proposal, stored-scope and effect-path rules share the commit checker's
+work-product boundary. Helpers and bodies belong to the universal baseline; the
+.agents/skills native catalog contains only generated discovery pointers.
 """
 
 from __future__ import annotations
@@ -24,11 +22,14 @@ from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
 ACCEPTED = [
+    ".harness-baseline-configuration/skills/gtkb-verify/SKILL.md",
+    ".harness-baseline-configuration/skills/gtkb-verify/helpers/x.py",
+    ".harness-baseline-configuration/skills/new-skill/SKILL.md",
+]
+REFUSED = [
     ".agents/skills/gtkb-verify/SKILL.md",
     ".agents/skills/gtkb-verify/helpers/x.py",
     ".agents/skills/new-skill/SKILL.md",
-]
-REFUSED = [
     ".agents/skills",
     ".agents/hooks/gate.py",
     ".agents/rules/topic.md",

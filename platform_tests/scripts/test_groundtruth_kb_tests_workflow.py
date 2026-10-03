@@ -26,7 +26,7 @@ def test_groundtruth_kb_tests_workflow_triggers_on_platform_paths() -> None:
     for event in ("pull_request", "push"):
         paths = on_block[event]["paths"]
         assert "groundtruth-kb/**" in paths
-        assert ".agents/skills/**" in paths
+        assert ".harness-baseline-configuration/skills/**" in paths
         assert ".github/ISSUE_TEMPLATE/**" in paths
         assert ".github/pull_request_template.md" in paths
         assert ".github/workflows/groundtruth-kb-tests.yml" in paths

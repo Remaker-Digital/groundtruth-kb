@@ -77,7 +77,7 @@ ACTIVE_SURFACE_CLASSES: tuple[tuple[str, tuple[str, ...]], ...] = (
         (".claude/skills/**/*.md", ".goose/skills/**/*.md", ".cursor/skills/**/*.md", ".agent/skills/**/*.md"),
     ),
     ("hook", (".harness-baseline-configuration/hooks/*.py",)),
-    ("skill", (".agents/skills/**/SKILL.md",)),
+    ("skill", (".harness-baseline-configuration/skills/**/SKILL.md",)),
     ("rule", (".harness-baseline-configuration/rules/*.md",)),
     ("manifest", ("config/registry/*.toml", "groundtruth-kb/templates/managed-artifacts.toml")),
     ("scaffold", ("groundtruth-kb/templates/rules/*.md", "groundtruth-kb/templates/project/*.md")),

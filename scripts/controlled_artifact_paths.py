@@ -90,7 +90,7 @@ PROTECTED_PREFIXES = (
     "tests/",
     ".harness-baseline-configuration/hooks/",
     ".harness-baseline-configuration/rules/",
-    ".agents/skills/",
+    ".harness-baseline-configuration/skills/",
     "config/",
     ".github/",
 )

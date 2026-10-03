@@ -8,7 +8,7 @@ activity and exact task. Do not infer a role from a host's name or registry tags
 
 Use the supported native project initializer for the selected registered host
 root and application. Inspect its dry-run and read back current project state.
-Root `AGENTS.md`, `.agents/skills`, and baseline rules/hooks/routing provide one
+Root `AGENTS.md`, `.harness-baseline-configuration/skills`, and baseline rules/hooks/routing provide one
 shared instruction source. Project only the selected profile's registrations,
 pointers and ownership bookkeeping. Do not copy hook scripts, rules or skill
 bodies into a host directory. See [Harness projection](../reference/harness-projection.md).

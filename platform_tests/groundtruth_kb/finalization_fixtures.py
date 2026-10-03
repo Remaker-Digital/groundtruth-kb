@@ -20,7 +20,7 @@ import uvicorn
 from click.testing import CliRunner
 from groundtruth_kb.cli import main
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
 
 
@@ -87,17 +87,19 @@ def verify(client, contexts, root, number, path, **proposal_fields):
     )
     assert ready.status_code == 200, ready.text
     artifacts = client.get(f"/v1/bridge/{document}/artifacts").json()
-    deliver(
+    verified, _ = deliver(
         client, contexts, document, "lo2", 4, "VERIFIED", work_item_id=work, verified_artifacts=json.dumps(artifacts)
     )
+    return verified.json()
 
 
 def post(client, action, **body):
+    if "expected_version" not in body:
+        body["expected_version"] = client.get("/v1/projects/PROJECT-1").json()["project"]["version"]
     return client.post(
         f"/v1/projects/PROJECT-1/{action}",
         json={
             "native_context_id": "lo3",
-            "expected_version": 1,
             **body,
         },
     )
@@ -110,6 +112,7 @@ def two_members(bridge):
         put(client, "work-items", "WI-2", work_fields(title="Second artifact"), project_id="PROJECT-1").status_code
         == 200
     )
+    authorize_project(client)
     verify(client, contexts, root, 1, "code.py")
     assert post(client, "prepare-commit").json()["error"]["code"] == "project_not_fully_verified"
     verify(client, contexts, root, 2, "second.py")
@@ -187,6 +190,9 @@ def commit_environment(bridge, tmp_path, monkeypatch, request):
 
 
 def invoke(config, message):
+    shown = CliRunner().invoke(main, ["--config", str(config), "projects", "show", "PROJECT-1", "--json"])
+    assert shown.exit_code == 0, shown.output
+    version = json.loads(shown.output)["project"]["version"]
     return CliRunner().invoke(
         main,
         [
@@ -198,7 +204,7 @@ def invoke(config, message):
             "--native-context-id",
             "lo3",
             "--expected-version",
-            "1",
+            str(version),
             "--message-file",
             str(message),
             "--json",

@@ -13,7 +13,7 @@ from groundtruth_kb.native_authority import DependencyMutation
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver, ready_checkout
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim, deliver, ready_checkout
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
 from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration, post, verify
 from platform_tests.groundtruth_kb.native_fixtures import history_count, project, put, seed, work_fields
@@ -217,6 +217,7 @@ def test_dependency_added_after_new_claim_blocks_delivery_without_consuming_it(b
     reserved = claim(client, "new-chain", "pb1", 0, "NEW").json()
     add(client)
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     refused = claim(client, "other-chain", "pb2", 0, "NEW", work_item_id="WI-2")
     assert refused.json()["error"]["code"] == "project_dependencies_unsatisfied"
     with service.kernel.transaction(read_only=True) as tx:

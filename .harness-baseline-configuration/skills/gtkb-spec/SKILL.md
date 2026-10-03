@@ -87,6 +87,14 @@ checks complement executable behavioral tests and independent review; they do
 not prove that code is invoked, an operation succeeds or a requirement is fully
 satisfied.
 
+`implementation_verified_at: true` is a caller assertion admitted when a linked
+executable TEST belongs to an active plan phase; the service stamps its own
+clock. It neither executes that test nor checks a dated PASS. The resulting marker
+is not independent review, full requirement acceptance or committed delivery.
+Use the actual applicable test results and reviewed Git product for those claims;
+`gt assert` reports only what its selected assertions establish. Do not add a
+receipt, result store or separate approval step to make the marker authoritative.
+
 ## Write and read back
 
 ```text

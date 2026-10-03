@@ -25,19 +25,18 @@ def snapshot():
 def test_every_neutral_source_has_unambiguous_active_coverage(snapshot):
     paths = [p for p in BASELINE.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
     assert paths
-    shared = PROJECT_ROOT / ".agents/skills"
-    skill_paths = [p for p in shared.rglob("*") if p.is_file() and "__pycache__" not in p.parts]
-    assert skill_paths
-    paths += skill_paths + [PROJECT_ROOT / name for name in ("AGENTS.md", "CLAUDE.md", ".goosehints")]
+    paths += [PROJECT_ROOT / name for name in ("AGENTS.md", "CLAUDE.md", ".goosehints")]
     for path in paths:
         assert path.is_file(), path
         record = snapshot.resolver.resolve(path.relative_to(PROJECT_ROOT))
         assert record is not None, path
         assert record.lifecycle == "active", path
         assert record.authority_spec_id == "GOV-HARNESS-NEUTRAL-BASELINE-001", path
-        assert record.storage_path.startswith(
-            (".harness-baseline-configuration/", ".agents/skills/")
-        ) or record.storage_path in {"AGENTS.md", "CLAUDE.md", ".goosehints"}, path
+        assert record.storage_path.startswith((".harness-baseline-configuration/",)) or record.storage_path in {
+            "AGENTS.md",
+            "CLAUDE.md",
+            ".goosehints",
+        }, path
 
 
 def test_schema_and_registry_self_coverage(snapshot):
@@ -71,12 +70,25 @@ def test_all_engine_outputs_have_unambiguous_non_authoritative_coverage(snapshot
         assert record.lifecycle == "generated", path
         profile = project_harness.load_profiles()["harnesses"][harness]
         stub_dir = profile.get("skills_stub_dir", "") + "/"
-        if profile["skills_discovery"] == "pointer_stubs" and path.startswith(stub_dir):
+        native_catalog = profile["skills_discovery"] == "agents_skills" and path.startswith(".agents/skills/")
+        if native_catalog:
+            assert record.coverage_mode == "recursive" and record.storage_path == ".agents/skills/", path
+        elif profile["skills_discovery"] == "pointer_stubs" and path.startswith(stub_dir):
             assert record.coverage_mode == "recursive" and record.storage_path == stub_dir, path
         else:
             assert record.coverage_mode == "exact" and record.storage_path == path, path
         assert record.authority_spec_id == "GOV-HARNESS-NEUTRAL-BASELINE-001", path
-        assert record.mutation_api.startswith(f"gt harness project {harness};"), path
+        if native_catalog:
+            native_commands = {
+                f"gt harness project {name}"
+                for name, member in project_harness.load_profiles()["harnesses"].items()
+                if member["skills_discovery"] == "agents_skills"
+            }
+            commands = record.mutation_api.split("; ")
+            assert set(commands[:-1]) == native_commands and len(commands[:-1]) == len(native_commands), path
+            assert commands[-1].startswith("source .harness-baseline-configuration/skills "), path
+        else:
+            assert record.mutation_api.startswith(f"gt harness project {harness};"), path
         assert ".harness-baseline-configuration" in record.mutation_api, path
         assert record.versioning_policy == "regenerated_from_source", path
         assert record.backup_policy == "regenerable_from_source", path
@@ -101,7 +113,7 @@ def test_target_configuration_is_never_registered_as_active_authority(snapshot):
         | {profile["config_dir"] + "/" for profile in project_harness.load_profiles()["harnesses"].values()}
     )
     for record in snapshot.records:
-        if record.storage_path.startswith(roots) and not record.storage_path.startswith(".agents/skills/"):
+        if record.storage_path.startswith(roots):
             assert record.lifecycle != "active", record.storage_path
 
 

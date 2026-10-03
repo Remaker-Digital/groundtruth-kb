@@ -15,10 +15,10 @@ schema_version = 1
 
 [baseline]
 root = ".harness-baseline-configuration"
-# The one skills source (D15: the tree moved out of the baseline directory).
-# Hosts that discover this directory natively read it; the others receive
-# pointer stubs (skills_discovery below).
-skills_root = ".agents/skills"
+# The sole authored skills tree includes bodies, helpers and references.
+# Every host receives pointer stubs; agents_skills selects the shared native
+# discovery catalog .agents/skills, and pointer_stubs selects a host-local tree.
+skills_root = ".harness-baseline-configuration/skills"
 # Hook scripts run in place from the baseline; registrations name this path.
 hooks_root = ".harness-baseline-configuration/hooks"
 hook_manifest = "hooks/manifest.toml"
@@ -182,8 +182,8 @@ autoMemoryEnabled = false
 config_dir = ".codex"
 project_dir_var = "CODEX_PROJECT_DIR"
 # Owner ruling R14 (a): Codex discovers .agents/skills natively (2026-09-10
-# observation, interim pin; M13 Q0.1 records the version string). No stub
-# tree is rendered. Fallback if Q0.4 fails for the pinned version:
+# observation, interim pin; M13 Q0.1 records the version string). This mode
+# derives the neutral shared pointer catalog there. Fallback if Q0.4 fails:
 #   skills_discovery = "pointer_stubs"
 #   skills_stub_dir = ".codex/skills"
 skills_discovery = "agents_skills"
@@ -214,6 +214,13 @@ leftover_paths = [
   ".codex/hooks/implementation-start-gate.py",
   ".codex/commands/registry.json",
   ".codex/plugins/gtkb/hooks/hooks.json",
+  ".agents/skills/gtkb-promote/references/validation-rules.md",
+  ".agents/skills/gtkb-query/references/api-reference.md",
+  ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+  ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+  ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+  ".agents/skills/gtkb-spec/references/assertion-format.md",
+  ".agents/skills/gtkb-work-item/references/taxonomy.md"
 ]
 [harnesses.codex.hook_events]
 pre_tool_use = "PreToolUse"
@@ -296,8 +303,8 @@ shell_exec = "run_command"
 read_access = "view_file|list_dir|find_by_name|grep_search"
 all = ""
 # Each provider has an independent generated configuration. GT-KB is the
-# runtime for these three profiles: the launchers read .agents/skills and the
-# baseline hooks directly (skills_discovery = "agents_skills", no stub tree).
+# runtime for these three profiles: the launchers discover generated .agents/skills
+# pointers to the sole baseline Skills source and read baseline hooks directly.
 [harnesses.ollama]
 config_dir = ".api-harness/ollama"
 project_dir_var = "GTKB_PROJECT_ROOT"
@@ -305,6 +312,17 @@ skills_discovery = "agents_skills"
 # Routing is read directly from the baseline; settings.json is the native hook registration.
 hooks_projection = "settings_json"
 hooks_json_path = ".api-harness/ollama/settings.json"
+
+# Exact former authored resource files; never sweep unrelated discovery output.
+leftover_paths = [
+  ".agents/skills/gtkb-promote/references/validation-rules.md",
+  ".agents/skills/gtkb-query/references/api-reference.md",
+  ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+  ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+  ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+  ".agents/skills/gtkb-spec/references/assertion-format.md",
+  ".agents/skills/gtkb-work-item/references/taxonomy.md"
+]
 
 [harnesses.ollama.hook_events]
 pre_tool_use = "PreToolUse"
@@ -451,6 +469,13 @@ leftover_paths = [
   ".api-harness/skills/gtkb-verify/helpers/write_verdict.py",
   ".api-harness/skills/gtkb-work-item/SKILL.md",
   ".api-harness/skills/gtkb-work-item/references/taxonomy.md",
+  ".agents/skills/gtkb-promote/references/validation-rules.md",
+  ".agents/skills/gtkb-query/references/api-reference.md",
+  ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+  ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+  ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+  ".agents/skills/gtkb-spec/references/assertion-format.md",
+  ".agents/skills/gtkb-work-item/references/taxonomy.md"
 ]
 [harnesses.openrouter.hook_events]
 pre_tool_use = "PreToolUse"
@@ -471,6 +496,17 @@ project_dir_var = "GTKB_PROJECT_ROOT"
 skills_discovery = "agents_skills"
 hooks_projection = "settings_json"
 hooks_json_path = ".api-harness/alibaba-cloud-studio/settings.json"
+
+# Exact former authored resource files; never sweep unrelated discovery output.
+leftover_paths = [
+  ".agents/skills/gtkb-promote/references/validation-rules.md",
+  ".agents/skills/gtkb-query/references/api-reference.md",
+  ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+  ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+  ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+  ".agents/skills/gtkb-spec/references/assertion-format.md",
+  ".agents/skills/gtkb-work-item/references/taxonomy.md"
+]
 
 [harnesses.alibaba-cloud-studio.hook_events]
 pre_tool_use = "PreToolUse"

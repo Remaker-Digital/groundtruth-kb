@@ -22,7 +22,7 @@ def tree(tmp_path):
         target.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(ROOT / rel, target)
     base = tmp_path / parity.BASELINE
-    # D15: the one skills source lives beside the baseline; the projector fails closed without it. The root
+    # The sole authored skills source is inside the baseline; its native catalog is generated. The root
     # AGENTS.md and the declared [root_pointers] files are tracked authored sources the checker pins (R1 option B).
     skills = tmp_path / parity.SKILLS_ROOT
     (skills / "inspect-work").mkdir(parents=True)
@@ -77,7 +77,7 @@ def test_codex_derivation_has_no_peer_configuration_dependency(monkeypatch):
 def test_codex_current_projection_passes_without_role_or_identity_files(tree):
     result = report(tree)
     assert result["status"] == "pass", result
-    # The tree holds the baseline, the one skills source, the three root carriers, the projector and the projection.
+    # The tree holds the baseline, generated native catalog, three root carriers, projector and host projection.
     assert {p.name for p in tree.iterdir()} == {
         "scripts",
         parity.BASELINE,

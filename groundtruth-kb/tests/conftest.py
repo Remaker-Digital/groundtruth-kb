@@ -80,7 +80,8 @@ def native_app_authority(tmp_path, monkeypatch, request):
         address, port, database = connection.execute(
             "SELECT inet_server_addr()::text, inet_server_port(), current_database()"
         ).fetchone()
-        assert address in {"127.0.0.1", "127.0.0.1/32"} and port == 55434 and database == "postgres"
+        expected_port = int(os.environ.get("GTKB_TEST_POSTGRES_PORT", "55434"))
+        assert address in {"127.0.0.1", "127.0.0.1/32"} and port == expected_port and database == "postgres"
         connection.execute(sql.SQL("CREATE SCHEMA {}").format(sql.Identifier(schema)))
 
     def drop_schema():
@@ -177,12 +178,6 @@ class NativeApplicationHost:
             checkout / ".harness-baseline-configuration",
             self.host / ".harness-baseline-configuration",
             ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.lock"),
-        )
-        # D15: the one skills source lives beside the baseline; the projector fails closed without it.
-        shutil.copytree(
-            checkout / ".agents/skills",
-            self.host / ".agents/skills",
-            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
         )
         shutil.copytree(
             checkout / "scripts/harness_projection",

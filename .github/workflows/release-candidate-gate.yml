@@ -20,7 +20,7 @@ on:
       - 'memory/**'
       - 'bridge/**'
       - '.harness-baseline-configuration/hooks/**'
-      - '.agents/skills/**'
+      - '.harness-baseline-configuration/skills/**'
       # WI-5640 / D15: the hook scripts run in place from the baseline hooks directory
       # above; config/hooks/ stays covered so CI re-triggers on changes in either home.
       - 'config/hooks/**'
@@ -40,7 +40,7 @@ on:
       - 'memory/**'
       - 'bridge/**'
       - '.harness-baseline-configuration/hooks/**'
-      - '.agents/skills/**'
+      - '.harness-baseline-configuration/skills/**'
       # WI-5640 / D15: baseline hooks directory above; config/hooks/ stays covered.
       - 'config/hooks/**'
   workflow_dispatch:

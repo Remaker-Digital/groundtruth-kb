@@ -46,7 +46,7 @@ def _installation(tmp_path):
         shutil.copyfile(REPO_ROOT / "scripts" / name, scripts / name)
     # c123 (batch design WP2 2.1): the selected root keeps its own skills; neither the shim nor readiness reads them.
     for name in ("bridge", "proposal-review", "verify"):
-        path = selected / ".agents" / "skills" / ("gtkb-" + name) / "SKILL.md"
+        path = selected / ".harness-baseline-configuration" / "skills" / ("gtkb-" + name) / "SKILL.md"
         path.parent.mkdir(parents=True)
         path.write_text("Selected own instruction " + name, encoding="utf-8")
     (selected / ".env.local").write_text("CURSOR_API_KEY=synthetic-selected-value\n", encoding="utf-8")

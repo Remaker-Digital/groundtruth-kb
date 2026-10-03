@@ -27,7 +27,7 @@ import re
 import subprocess
 from pathlib import Path
 
-HELPER_ROOTS = (".agents/skills/",)
+HELPER_ROOTS = (".harness-baseline-configuration/skills/",)
 SCRATCH_NAME_PATTERN = re.compile(
     r"(^|/)(?:"
     r"draft-[^/]+\.md|"

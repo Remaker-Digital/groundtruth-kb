@@ -9,7 +9,7 @@ import pytest
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
 from platform_tests.groundtruth_kb.finalization_fixtures import (
     base,
@@ -124,6 +124,7 @@ def test_related_verified_messages_cannot_complete_an_unreviewed_member(bridge):
         put(client, "work-items", "WI-2", work_fields(title="Full remaining scope"), project_id="PROJECT-1").status_code
         == 200
     )
+    authorize_project(client)
     verify(client, contexts, root, 1, "code.py")
     before = client.get("/v1/work-items/WI-2").json()
     assert before["work_item"]["resolution_status"] == "open"
@@ -155,6 +156,9 @@ def test_project_terminal_state_requires_one_complete_real_commit(bridge):
     ready = post(client, "prepare-commit").json()
     assert ready["status"] == "ready_to_commit" and ready["expected_parent"] == parent
     assert ready["required_citations"] == ["(WI-1)", "(WI-2)"]
+    for number in (1, 2):
+        work = client.get(f"/v1/work-items/WI-{number}").json()["work_item"]
+        assert work["resolution_status"] == "open" and not work["completion_evidence"]
     main = integration(root)
     (main / "foreign.txt").write_text("Preserve unrelated bytes\n", encoding="utf-8")
     (main / "foreign_tracked.txt").write_text("Unrelated staged bytes\n", encoding="utf-8")
@@ -172,6 +176,7 @@ def test_project_terminal_state_requires_one_complete_real_commit(bridge):
     assert {(row["work_item_id"], row["status"]) for row in memberships} == {("WI-1", "active"), ("WI-2", "active")}
     for number in (1, 2):
         work = client.get(f"/v1/work-items/WI-{number}").json()["work_item"]
+        assert work["resolution_status"] == "verified"
         assert work["completion_evidence"] == "git:" + commit
         state = client.get(f"/v1/bridge/chain-{number}/show", params={"include_content": True}).json()
         assert state["attempt"]["disposition"] == "committed"
@@ -199,7 +204,7 @@ def test_changed_reviewed_bytes_requeue_only_the_affected_member(bridge):
     }
     queue = client.get("/v1/bridge/queue", params={"role": "lo"}).json()["eligible"]
     assert [row["work_item_id"] for row in queue] == ["WI-1"]
-    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "verified"
+    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "open"
     artifacts = client.get("/v1/bridge/chain-1/artifacts").json()
     deliver(client, contexts, "chain-1", "lo3", 5, "VERIFIED", verified_artifacts=json.dumps(artifacts))
     assert post(client, "prepare-commit").json()["status"] == "ready_to_commit"
@@ -326,10 +331,13 @@ def test_successive_changes_to_one_artifact_request_only_stale_reviews(bridge, o
         ).status_code
         == 200
     )
+    authorize_project(client)
     parent = base(integration(root))
     first, second = order
-    verify(client, contexts, root, first, "code.py")
-    verify(client, contexts, root, second, "code.py")
+    first_verdict = verify(client, contexts, root, first, "code.py")
+    assert first_verdict["project_ready_for_commit"] is False
+    last_verdict = verify(client, contexts, root, second, "code.py")
+    assert last_verdict["project_ready_for_commit"] is False
     # Confirmation must also catch stale per-member reviews before consulting
     # an offered candidate; a union map must not overwrite a member's evidence.
     blocked = post(client, "confirm-commit", commit_id="f" * 40, expected_parent=parent)
@@ -348,7 +356,7 @@ def test_successive_changes_to_one_artifact_request_only_stale_reviews(bridge, o
         state = client.get(f"/v1/bridge/chain-{number}/show", params={"include_content": True}).json()
         assert state["attempt"]["head_version"] == 4
         assert bool(state["attempt"]["finalization_failure"]) == (number == first)
-        assert client.get(f"/v1/work-items/WI-{number}").json()["work_item"]["resolution_status"] == "verified"
+        assert client.get(f"/v1/work-items/WI-{number}").json()["work_item"]["resolution_status"] == "open"
     assert base(integration(root)) == parent
     artifacts = client.get(f"/v1/bridge/chain-{first}/artifacts").json()
     deliver(
@@ -368,3 +376,63 @@ def test_successive_changes_to_one_artifact_request_only_stale_reviews(bridge, o
     confirmed = post(client, "confirm-commit", commit_id=commit, expected_parent=parent)
     assert confirmed.status_code == 200 and confirmed.json()["status"] == "confirmed", confirmed.text
     assert (integration(root) / "code.py").read_text() == f"result = {second + 1}\n"
+
+
+@pytest.mark.parametrize("action", ["confirm-commit", "commit"])
+def test_integrated_reviewed_commit_reconciles_before_later_working_byte_drift(bridge, action):
+    client, _, root, parent = two_members(bridge)
+    ready = post(client, "prepare-commit").json()
+    commit = commit_product(Path(ready["checkout"]["path"]))
+    main = integration(root)
+    git(main, "merge", "--ff-only", commit)
+    assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "active"
+
+    # Git completed A, but canonical acknowledgement was lost and failure was
+    # recorded. Later working/staged B is unrelated to confirming that fact.
+    failed = post(client, "commit-failed", reason="commit_not_confirmed", evidence="Lost database acknowledgement")
+    assert failed.status_code == 200, failed.text
+    pending = {
+        number: client.get(f"/v1/bridge/chain-{number}/show", params={"include_content": True}).json()
+        for number in (1, 2)
+    }
+    (root / "code.py").write_text("later_work = 4\n", encoding="utf-8")
+    (main / "code.py").write_text("later_staged_work = 5\n", encoding="utf-8")
+    git(main, "add", "--", "code.py")
+    (main / "code.py").write_text("later_unstaged_work = 6\n", encoding="utf-8")
+    source_bytes = (root / "code.py").read_bytes()
+    integration_bytes = (main / "code.py").read_bytes()
+    integration_index = git(main, "ls-files", "--stage").stdout
+    context = "fresh-confirmation-with-later-work"
+    bound = client.post("/v1/sessions/bind", json={"native_context_id": context, "init_command": "::init gtkb lo"})
+    assert bound.status_code == 200, bound.text
+
+    prepared = post(client, "prepare-commit", native_context_id=context)
+    assert prepared.status_code == 200, prepared.text
+    assert prepared.json()["status"] == "ready_to_confirm"
+    assert prepared.json()["commit_id"] == commit and prepared.json()["expected_parent"] == parent
+    for number in (1, 2):
+        # No new byte-change failure or verdict may displace retained review A.
+        assert client.get(f"/v1/bridge/chain-{number}/show", params={"include_content": True}).json() == pending[number]
+    body = (
+        {"commit_id": commit, "expected_parent": parent}
+        if action == "confirm-commit"
+        else {"message": "Recover the complete reviewed project (WI-1) (WI-2)"}
+    )
+    response = post(client, action, native_context_id=context, **body)
+    assert response.status_code == 200, response.text
+    assert response.json()["status"] == "confirmed" and response.json()["commit_id"] == commit
+    assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "verified"
+    for number in (1, 2):
+        work = client.get(f"/v1/work-items/WI-{number}").json()["work_item"]
+        assert work["resolution_status"] == "verified" and work["completion_evidence"] == "git:" + commit
+        state = client.get(f"/v1/bridge/chain-{number}/show", params={"include_content": True}).json()
+        assert state["attempt"]["head_version"] == 4
+        assert state["attempt"]["disposition"] == "committed" and state["attempt"]["terminal_commit"] == commit
+        assert state["attempt"]["verified_artifacts"] is None and "messages" not in state
+    assert client.get("/v1/bridge/queue", params={"role": "lo"}).json()["eligible"] == []
+    assert base(main) == commit and git(main, "rev-list", "--count", parent + "..HEAD").stdout.strip() == "1"
+    assert (root / "code.py").read_bytes() == source_bytes
+    assert (main / "code.py").read_bytes() == integration_bytes
+    assert git(main, "ls-files", "--stage").stdout == integration_index
+    assert git(main, "show", ":code.py").stdout == "later_staged_work = 5\n"
+    assert post(client, "prepare-commit", native_context_id=context).json()["status"] == "already_confirmed"

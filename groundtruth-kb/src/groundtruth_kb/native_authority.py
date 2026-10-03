@@ -7,10 +7,17 @@ its resulting current-state/history changes commit together.
 
 from __future__ import annotations
 
+import hashlib
+import io
+import os
 import re
+import subprocess
+import tomllib
+import xml.etree.ElementTree as ET
+import zipfile
 from collections.abc import Callable
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Annotated, Any, Literal, NoReturn
 from uuid import uuid4
 
@@ -27,6 +34,7 @@ from groundtruth_kb.postgres_kernel import (
     PostgresKernel,
     PostgresKernelError,
     PostgresTransaction,
+    canonical_json_bytes,
     dependency_shape,
     validate_project_dependencies,
     validate_work_item_dependencies,
@@ -227,6 +235,9 @@ class WorkItemFields(Request):
     implementation_order: int | None = None
     depends_on_work_items: list[Identifier] | None = None
     status_detail: str | None = None
+    resolution_status: Literal["open", "verified", "retired"] | None = None
+    # Existing storage column: exact historical Git evidence or an explicit inspected false-completion clear.
+    completion_evidence: str | None = None
 
 
 class WorkItemMutation(Mutation):
@@ -476,12 +487,17 @@ def _open_dependants(tx: PostgresTransaction, work_item_id: str) -> list[str]:
 
 
 def _active_attempts(
-    tx: PostgresTransaction, *, work_item_id: str | None = None, project_id: str | None = None
+    tx: PostgresTransaction,
+    *,
+    work_item_id: str | None = None,
+    project_id: str | None = None,
+    reviewed_only: bool = False,
 ) -> list[str]:
     """Identifiers of the active bridge attempts on one work item or on one project, in code-point id order.
 
     The bridge's own predicate (``disposition='active'``). A VERIFIED member keeps its attempt active until
     the project commit, so an active attempt marks reviewed-but-uncommitted work as well as work in progress.
+    Ordinary planning/membership mutations filter to reviewed heads, whose work remains frozen.
     """
     named = {
         column: value
@@ -494,7 +510,8 @@ def _active_attempts(
     tx.cursor.execute(
         sql.SQL("SELECT id FROM {}.bridge_attempts WHERE {}=%s AND disposition='active'").format(
             sql.Identifier(tx.schema), sql.Identifier(column)
-        ),
+        )
+        + (sql.SQL(" AND head_status='VERIFIED'") if reviewed_only else sql.SQL("")),
         (value,),
     )
     return sorted(row["id"] for row in tx.cursor.fetchall())
@@ -643,6 +660,444 @@ def _write(
     if not isinstance(record, dict):
         _error("mutation_readback_mismatch", "Native mutation did not return a current record")
     return record
+
+
+def _historical_git(root: Path, *arguments: str) -> bytes:
+    """Bounded, read-only Git evidence in the registered repository, without ambient Git redirection."""
+    try:
+        result = subprocess.run(
+            ["git", "--no-optional-locks", "--literal-pathspecs", "-C", str(root), *arguments],
+            env={key: value for key, value in os.environ.items() if not key.upper().startswith("GIT_")},
+            capture_output=True,
+            timeout=15,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        raise PostgresKernelError(
+            "historical_git_unavailable", "The historical Git object could not be inspected"
+        ) from error
+    if result.returncode:
+        if result.returncode == 1 and arguments[:2] == ("merge-base", "--is-ancestor"):
+            _error(
+                "historical_git_not_current",
+                "The exact historical commit is not an ancestor of the registered repository's current HEAD",
+            )
+        _error(
+            "historical_git_unavailable",
+            "The historical Git object could not be inspected in its registered repository",
+        )
+    return result.stdout
+
+
+def _historical_product_path(path: str, *, historical_skills: bool = False) -> bool:
+    """Ignore coordination carriers and generated output when establishing a physical product change."""
+    parts = PurePosixPath(path).parts
+    if not parts or parts[0].casefold() in {"bridge", "memory", ".groundtruth"}:
+        return False
+    ignored = {
+        ".git",
+        ".gtkb-state",
+        "harness-state",
+        "scratchpad",
+        ".worktrees",
+        ".agent",
+        ".antigravity",
+        ".api-harness",
+        ".claude",
+        ".codex",
+        ".cursor",
+        ".goose",
+    }
+    if any(part.casefold() in ignored for part in parts):
+        return False
+    return not any(
+        part.casefold() == ".agents"
+        and not (historical_skills and index == 0 and len(parts) >= 3 and parts[1].casefold() == "skills")
+        for index, part in enumerate(parts)
+    )
+
+
+def _confirm_historical_commit(project_root: Path | None, project: dict[str, Any], evidence: str) -> str:
+    """Confirm physical Git facts; these checks do not prove completion of the work item's semantic scope.
+
+    The caller's substantive inspected acceptance and remaining scope belong in the ordinary mutation reason/history.
+    A commit citation or a changed product file alone is not proof that the complete intended behavior was delivered.
+    """
+    match = re.fullmatch(r"git:([0-9a-f]{40}(?:[0-9a-f]{24})?)", evidence)
+    if match is None:
+        _error("invalid_completion_evidence", "Historical completion requires git:<exact full lowercase commit ID>")
+    if project_root is None:
+        _error("repository_host_required", "Historical Git inspection requires the authority service's configured host")
+    reference = project.get("repository_ref")
+    if project["kind"] != "project" or reference is None:
+        _error("project_repository_required", "Establish the historical work item's explicit execution repository")
+    try:
+        repository = resolve_project_repository(project_root, reference)
+    except ApplicationRegistryError as error:
+        raise PostgresKernelError("invalid_repository_ref", str(error)) from error
+    commit = match.group(1)
+    try:
+        observed = (
+            _historical_git(repository, "rev-parse", "--verify", "--end-of-options", commit + "^{commit}")
+            .decode("ascii")
+            .strip()
+        )
+        if observed != commit:
+            _error("historical_commit_mismatch", "The inspected object is not the exact supplied commit")
+        # Object survival after a rewrite is not activation. A legitimate forward change retains this ancestry.
+        _historical_git(repository, "merge-base", "--is-ancestor", commit, "HEAD")
+        parents = _historical_git(repository, "show", "-s", "--format=%P", commit).decode("ascii").split()
+        # A merge's first-parent difference is what that merge introduced to its integration history.
+        arguments = ("diff-tree", "--no-commit-id", "-r", "--name-only", "-z")
+        changes = (
+            _historical_git(repository, *arguments, parents[0], commit)
+            if parents
+            else _historical_git(repository, *arguments, "--root", commit)
+        )
+        changed_paths = changes.decode("utf-8").split("\0")
+    except UnicodeError as error:
+        raise PostgresKernelError(
+            "historical_git_unavailable", "Historical Git evidence has an unreadable identity or path"
+        ) from error
+    product_change = any(path and _historical_product_path(path) for path in changed_paths)
+    if not product_change and any(path.startswith(".agents/skills/") for path in changed_paths):
+        # A real former source commit remains product evidence. Current generated
+        # catalog bytes do not: inspect the exact commit's tracked declaration,
+        # never a current compatibility alias or an assumed historical cutoff.
+        declaration = "scripts/harness_projection/profiles.toml"
+        if _historical_git(repository, "ls-tree", "-z", commit, "--", declaration):
+            try:
+                historical_profiles = tomllib.loads(
+                    _historical_git(repository, "show", commit + ":" + declaration).decode("utf-8")
+                )
+            except (UnicodeError, tomllib.TOMLDecodeError) as error:
+                raise PostgresKernelError(
+                    "historical_git_unavailable", "The exact historical Skills source declaration is unreadable"
+                ) from error
+            declared_baseline = historical_profiles.get("baseline")
+            authored_skills = (
+                isinstance(declared_baseline, dict) and declared_baseline.get("skills_root") == ".agents/skills"
+            )
+            product_change = authored_skills and any(
+                path and _historical_product_path(path, historical_skills=True) for path in changed_paths
+            )
+    if not product_change:
+        _error(
+            "historical_product_change_required",
+            "The exact commit has no substantive changed product outside coordination carriers",
+        )
+    return "git:" + commit
+
+
+_CONTEXT_SAD_SECTIONS = {
+    "1.1": "Platform purpose",
+    "1.2": "Intended outcomes and evidence",
+    "1.3": "Architectural invariants",
+    "1.4": "Component responsibilities",
+    "1.5": "Correction and successor sequence",
+    "2.1": "Current authority and historical rationale",
+    "2.2": "Source roles and precedence",
+    "2.3": "Component and source map",
+    "2.4": "Project authorization and membership",
+    "2.5": "Owner choices in current records",
+    "3.1": "Architecture reference role",
+    "3.2": "Planned context composition",
+    "3.3": "Semantic closure review",
+    "4.1": "Separate implementation and review contexts",
+    "4.2": "Independent test selection",
+    "4.3": "Verification and project finalization",
+    "5.1": "Authored headers and routing",
+    "5.2": "Twelve status lifecycle",
+    "6.1": "Immutable native session binding",
+    "6.2": "Transient activity and bounded operations",
+    "6.3": "Ephemeral scratch space",
+    "7.1": "Planned coordination responsibilities",
+    "7.2": "Intended selection order",
+    "7.3": "Exact artifact claims and planned recovery",
+    "8.1": "Claimed target scope",
+    "8.2": "Exact edits and encoding",
+    "8.3": "Native CLI command families",
+    "9.1": "Supported assertions",
+    "9.2": "Distinct evidence levels",
+    "9.3": "Release and document checks",
+    "10.1": "Role neutral registration",
+    "10.2": "Measured resource behavior",
+    "11.1": "Migration history and source refresh",
+    "11.2": "Defect status and required work",
+}
+_CONTEXT_SHARED_SECTIONS = {"2.1", "2.2", "3.1", "4.1", "5.1", "5.2", "6.1"}
+_CONTEXT_ACTIVITY_SECTIONS = {
+    "build": {"8.1", "8.2"},
+    "test": {"4.2", "4.3", "9.1", "9.2"},
+    "spec": {"2.1", "2.2", "8.2"},
+    "deliberation": {"2.5"},
+    "project": {"2.4", "4.3"},
+    "ops": {"6.2", "8.3"},
+}
+_CONTEXT_BASELINE_PATHS = (
+    ".harness-baseline-configuration/rules/session-bootstrap.md",
+    ".harness-baseline-configuration/rules/operating-model.md",
+)
+_CONTEXT_FORMAL_ID = re.compile(r"\b(?:ADR|DCL|GOV|PB|REQ|SPEC)-[A-Za-z0-9][A-Za-z0-9_.:-]*")
+_CONTEXT_ROW_VERSION = re.compile(
+    r"(?P<id>(?:ADR|DCL|GOV|PB|REQ|SPEC)-[A-Za-z0-9][A-Za-z0-9_.:-]*) "
+    r"(?:is )?active at row version (?P<version>[0-9]+)"
+)
+
+
+def _context_selection(
+    record_id: str,
+    recipient_role: str | None,
+    activity: str | None,
+    critical_sections: list[str] | None,
+    critical_specs: list[str] | None,
+) -> dict[str, Any] | None:
+    """Explicit successor selectors, never a role binding or an effect grant."""
+    sections, specs = critical_sections or [], critical_specs or []
+    if recipient_role is None and activity is None and not sections and not specs:
+        return None
+    missing = [
+        name
+        for name, value in (("work_item", record_id), ("recipient_role", recipient_role), ("activity", activity))
+        if not value
+    ]
+    if missing:
+        _error(
+            "context_inputs_required",
+            "Supply the explicit successor context inputs",
+            missing=missing,
+            recovery_route="gt context work-item <WI-ID> --recipient-role <pb|lo> --activity <activity>",
+        )
+    if recipient_role not in {"pb", "lo"} or activity not in _CONTEXT_ACTIVITY_SECTIONS:
+        _error(
+            "invalid_context_selector",
+            "Use a supported literal receiving role and activity",
+            recipient_role=recipient_role,
+            activity=activity,
+            supported_roles=["pb", "lo"],
+            supported_activities=sorted(_CONTEXT_ACTIVITY_SECTIONS),
+        )
+    for name, values in (("critical_sections", sections), ("critical_specs", specs)):
+        if any(not isinstance(value, str) for value in values) or len(values) > 32 or len(values) != len(set(values)):
+            _error("invalid_context_selector", "Selections must be unique and contain at most 32 values", selector=name)
+    unknown = sorted(set(sections) - _CONTEXT_SAD_SECTIONS.keys())
+    invalid = [
+        value
+        for value in specs
+        if not isinstance(value, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,255}", value)
+    ]
+    if unknown or invalid:
+        _error(
+            "invalid_context_selector",
+            "Select literal SAD section IDs and canonical formal IDs",
+            unsupported_sections=unknown,
+            invalid_formal_ids=invalid,
+            supported_sections=sorted(_CONTEXT_SAD_SECTIONS),
+        )
+    selected = _CONTEXT_SHARED_SECTIONS | _CONTEXT_ACTIVITY_SECTIONS[activity] | set(sections)
+    if recipient_role == "lo":
+        selected |= {"4.2", "4.3"}
+    return {
+        "recipient_role": recipient_role,
+        "activity": activity,
+        "sections": sorted(selected, key=lambda key: tuple(map(int, key.split(".")))),
+        "critical_sections": sorted(sections),
+        "critical_specs": sorted(specs),
+    }
+
+
+def _context_file(root: Path, relative: str, limit: int) -> bytes:
+    """Read only the named authored source in the configured service root."""
+    path = root / relative
+    try:
+        if path.resolve(strict=True) != path or not path.is_file():
+            raise ValueError("The selected source is redirected or not a regular file")
+        with path.open("rb") as stream:
+            data = stream.read(limit + 1)
+        if len(data) > limit:
+            raise ValueError(f"The selected source exceeds {limit} bytes")
+        return data
+    except (OSError, ValueError) as error:
+        _error(
+            "context_source_unavailable",
+            "Reconcile the named authored context source",
+            path=relative,
+            reason=str(error),
+            recovery_route="Correct the named source in the authority service's configured project root",
+        )
+
+
+def _context_authored_sources(root: Path, selection: dict[str, Any]) -> dict[str, Any]:
+    """Bounded excerpts from the existing SAD; no graph compiler or source store."""
+    relative = "GT-KB_System_Architecture_Document_Target_EndState.docx"
+    data = _context_file(root, relative, 2_097_152)
+    namespace = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            entries = [entry for entry in archive.infolist() if entry.filename == "word/document.xml"]
+            if len(entries) != 1 or entries[0].file_size > 2_097_152:
+                raise ValueError("The SAD requires one bounded word/document.xml")
+            document = ET.fromstring(archive.read(entries[0]))
+        body = document.find(f"{{{namespace}}}body")
+        if body is None:
+            raise ValueError("The SAD has no Word document body")
+        paragraphs = []
+
+        def text_of(paragraph: ET.Element) -> str:
+            return "".join(
+                node.text or ""
+                if node.tag == f"{{{namespace}}}t"
+                else "\n"
+                if node.tag in {f"{{{namespace}}}br", f"{{{namespace}}}cr"}
+                else "\t"
+                if node.tag == f"{{{namespace}}}tab"
+                else ""
+                for node in paragraph.iter()
+            )
+
+        for block in body:
+            if block.tag == f"{{{namespace}}}p":
+                paragraphs.append(text_of(block))
+            elif block.tag == f"{{{namespace}}}tbl":
+                for row in block.findall(f"{{{namespace}}}tr"):
+                    cells = [
+                        " / ".join(
+                            text_of(paragraph).replace("\n", " / ") for paragraph in cell.iter(f"{{{namespace}}}p")
+                        )
+                        for cell in row.findall(f"{{{namespace}}}tc")
+                    ]
+                    paragraphs.append("| " + " | ".join(cells) + " |")
+    except (
+        OSError,
+        ValueError,
+        RuntimeError,
+        NotImplementedError,
+        EOFError,
+        zipfile.BadZipFile,
+        ET.ParseError,
+    ) as error:
+        _error(
+            "context_source_unavailable",
+            "The existing SAD cannot be read as bounded Word XML",
+            path=relative,
+            reason=str(error),
+            recovery_route="Correct the existing SAD source; no alternate document is selected",
+        )
+    boundaries: list[tuple[int, str, str]] = []
+    for index, paragraph in enumerate(paragraphs):
+        match = re.fullmatch(r"([1-9][0-9]*)\s+([1-9][0-9]*)\s+(.+)", paragraph.strip())
+        if match:
+            boundaries.append((index, f"{match[1]}.{match[2]}", match[3]))
+    sections = []
+    for key in selection["sections"]:
+        matches = [boundary for boundary in boundaries if boundary[1] == key]
+        if len(matches) != 1 or matches[0][2] != _CONTEXT_SAD_SECTIONS[key]:
+            _error(
+                "context_section_unavailable",
+                "A selected named SAD boundary is missing, duplicated or renamed",
+                path=relative,
+                section=key,
+                expected_title=_CONTEXT_SAD_SECTIONS[key],
+                matches=len(matches),
+                recovery_route="Correct the named boundary in the existing SAD; no full-document fallback is selected",
+            )
+        start = matches[0][0]
+        end = next((boundary[0] for boundary in boundaries if boundary[0] > start), len(paragraphs))
+        sections.append({"id": key, "title": matches[0][2], "content": "\n".join(paragraphs[start:end]).strip()})
+    baseline = []
+    for path in _CONTEXT_BASELINE_PATHS:
+        raw = _context_file(root, path, 65_536)
+        try:
+            content = raw.decode("utf-8-sig")
+        except UnicodeError:
+            _error(
+                "context_source_unavailable",
+                "The named authored baseline is not UTF-8",
+                path=path,
+                recovery_route="Correct the named authored baseline in the configured project root",
+            )
+        baseline.append({"path": path, "sha256": hashlib.sha256(raw).hexdigest(), "content": content})
+    text = "\n".join([*(section["content"] for section in sections), *(source["content"] for source in baseline)])
+    declared_versions: dict[str, int] = {}
+    for match in _CONTEXT_ROW_VERSION.finditer(text):
+        key, version = match["id"], int(match["version"])
+        if key in declared_versions and declared_versions[key] != version:
+            _error(
+                "conflicting_context_source",
+                "Selected authored sources disagree on a current formal row version",
+                id=key,
+                versions=sorted({version, declared_versions[key]}),
+                recovery_route=(
+                    f"gt spec show {key} --json; correct the conflicting current-version claims "
+                    "in the named authored context sources"
+                ),
+            )
+        declared_versions[key] = version
+    return {
+        "sad": {"path": relative, "sha256": hashlib.sha256(data).hexdigest(), "sections": sections},
+        "baseline": baseline,
+        "formal_ids": sorted({match.rstrip(".:") for match in _CONTEXT_FORMAL_ID.findall(text)}),
+        "declared_versions": declared_versions,
+    }
+
+
+def _context_message(context: dict[str, Any], selection: dict[str, Any], authored: dict[str, Any]) -> dict[str, Any]:
+    """Informative inline body text; each excerpt is quoted against envelope parsing."""
+    formals = {
+        formal["id"]: formal for formal in [*context.get("authored_formal_references", []), *context["specifications"]]
+    }
+    for key, version in authored["declared_versions"].items():
+        if key not in formals or formals[key]["version"] != version or formals[key].get("status") != "active":
+            _error(
+                "stale_context_source",
+                "A selected authored source claims a stale current formal row version",
+                id=key,
+                declared_version=version,
+                current_version=formals.get(key, {}).get("version"),
+                current_status=formals.get(key, {}).get("status"),
+                recovery_route=(
+                    f"gt spec show {key} --json; correct that current-version claim "
+                    "in the named authored context source"
+                ),
+            )
+    lines = [
+        (
+            f"Informative context for successor {selection['recipient_role']}/{selection['activity']}, "
+            f"work {context['work_item']['id']}."
+        ),
+        (
+            "This selection is a message-context floor, not complete applicability, a new test result, "
+            "an effect grant or a recall certificate."
+        ),
+        (
+            "The recipient independently investigates current requirements and re-reads canonical facts "
+            "before protected effects."
+        ),
+        "Canonical facts below share one read snapshot; authored SAD/baseline bytes were read separately.",
+        (
+            "Inactive authored-source references are historical information, "
+            "never applicable normative sources or permission."
+        ),
+        "Current linked work, project, test, prerequisites and formal facts:",
+        "> " + canonical_json_bytes(context).decode("utf-8").strip(),
+        f"Informative SAD source: {authored['sad']['path']} sha256={authored['sad']['sha256']}",
+    ]
+    for section in authored["sad"]["sections"]:
+        lines.append(f"SAD section {section['id']}: {section['title']}")
+        lines.extend("> " + line for line in section["content"].splitlines())
+    for baseline in authored["baseline"]:
+        lines.append(f"Authored baseline: {baseline['path']} sha256={baseline['sha256']}")
+        lines.extend("> " + line for line in baseline["content"].splitlines())
+    return {
+        "recipient_role": selection["recipient_role"],
+        "activity": selection["activity"],
+        "selected_sections": selection["sections"],
+        "sender_critical_sections": selection["critical_sections"],
+        "sender_critical_specs": selection["critical_specs"],
+        "sad": authored["sad"],
+        "baseline": authored["baseline"],
+        "text": "\n".join(lines) + "\n",
+    }
 
 
 class AuthorityService:
@@ -1186,16 +1641,236 @@ class AuthorityService:
         with self.kernel.transaction(read_only=True) as tx:
             return _project_dependency_readiness(tx, project_id, gate)
 
-    def amend_work_item(self, record_id: str, request: WorkItemMutation) -> dict[str, Any]:
+    def _reconcile_work_item_resolution(
+        self,
+        tx: PostgresTransaction,
+        current: dict[str, Any],
+        request: WorkItemMutation,
+        *,
+        project_root: Path | None = None,
+    ) -> dict[str, Any]:
+        """Correct imported resolution through the existing writer, without reopening committed work.
+
+        The caller supplies the owner's inspected final disposition. Missing canonical commit facts
+        never establish that historical physical work was uncommitted; Git-shaped evidence requires
+        inspection instead. This branch does not move an ordinary valid single-parent work item.
+        """
+        if current["version"] != request.expected_version:
+            _error("cas_conflict", "Read the current work item before correcting its resolution", id=current["id"])
+        target = request.fields.resolution_status
+        supplied_evidence = "completion_evidence" in request.fields.model_fields_set
+        clear_rejected_evidence = (
+            supplied_evidence
+            and target == "open"
+            and current["resolution_status"] in {"verified", "implemented", "resolved"}
+            and request.fields.completion_evidence == ""
+        )
+        if supplied_evidence and (
+            not clear_rejected_evidence
+            and (
+                target != "verified"
+                or current["resolution_status"] not in {"verified", "implemented", "resolved"}
+                or request.fields.completion_evidence is None
+            )
+        ):
+            _error(
+                "invalid_completion_evidence",
+                "Historical correction accepts exact completion evidence to verified "
+                "or an explicit empty clear to open",
+            )
+        if target == current["resolution_status"] and not supplied_evidence:
+            if request.project_id and _current_parent(tx, current["id"])["project_id"] != request.project_id:
+                _error("membership_move_required", "Use the atomic membership move operation")
+            return {"work_item": current, **_membership_facts(tx, current)}
+        if current["resolution_status"] == "open":
+            _error(
+                "work_item_frozen",
+                "Ordinary work cannot set verified; project commit confirms it. Use the retirement route for retired",
+            )
+        legacy = {
+            "implemented": "verified",
+            "resolved": "verified",
+            "not yet implemented": "open",
+            "not_yet_implemented": "open",
+            "wont_fix": "retired",
+            "not_a_defect": "retired",
+            "deferred": "retired",
+            "drop": "retired",
+        }
+        false_completion = current["resolution_status"] in {"verified", "implemented", "resolved"} and target == "open"
+        if (
+            legacy.get(current["resolution_status"]) != target
+            and not false_completion
+            and not (current["resolution_status"] == target == "verified" and supplied_evidence)
+        ):
+            _error("work_item_frozen", "The requested postimage is not a lawful legacy resolution correction")
+        if target != "open" and request.project_id:
+            _error("membership_move_required", "Status-only normalization preserves recorded memberships")
+        memberships = _related(tx, "project_work_item_memberships", work_item_id=current["id"])
+        active = [member for member in memberships if member["status"] == "active"]
+        parents = {member["project_id"] for member in active}
+        project_ids = parents | ({request.project_id} if request.project_id else set())
+        projects = {project_id: _required(tx, "projects", project_id, lock=True) for project_id in sorted(project_ids)}
+        tx.cursor.execute(
+            sql.SQL(
+                "SELECT id,disposition,terminal_commit FROM {}.bridge_attempts WHERE work_item_id=%s FOR UPDATE"
+            ).format(sql.Identifier(tx.schema)),
+            (current["id"],),
+        )
+        attempts = tx.cursor.fetchall()
+        live = [attempt["id"] for attempt in attempts if attempt["disposition"] == "active"]
+        if live:
+            _error(
+                "attempt_active",
+                "Conclude or reconcile the active attempt before correcting resolution",
+                attempt_ids=live,
+            )
+        terminal = [
+            attempt for attempt in attempts if attempt["disposition"] == "committed" or attempt["terminal_commit"]
+        ]
+        commits = {attempt["terminal_commit"] for attempt in terminal if attempt["terminal_commit"]}
+        for parent in sorted(parents):
+            links = _related(
+                tx,
+                "project_artifact_links",
+                project_id=parent,
+                artifact_type="git_commit",
+                relationship="activation",
+                status="active",
+            )
+            terminal.extend(links)
+            commits.update(link["artifact_ref"] for link in links)
+        if terminal and target != "verified":
+            _error(
+                "work_item_frozen",
+                "Canonical committed terminal facts cannot be reopened or re-homed",
+                id=current["id"],
+            )
+        evidence = current.get("completion_evidence") or ""
+        if target == "verified":
+            evidence = request.fields.completion_evidence if supplied_evidence else evidence
+            if not isinstance(evidence, str):
+                _error("invalid_completion_evidence", "Historical completion requires exact Git evidence")
+            if terminal and (not commits or commits != {evidence.removeprefix("git:")}):
+                _error(
+                    "terminal_commit_mismatch",
+                    "Historical correction cannot conflict with existing canonical terminal commit facts",
+                    id=current["id"],
+                )
+            if len(active) != 1:
+                _error(
+                    "invalid_membership",
+                    "Historical completion requires one established execution project",
+                    work_item_id=current["id"],
+                )
+            evidence = _confirm_historical_commit(project_root, projects[active[0]["project_id"]], evidence)
+        elif not clear_rejected_evidence and (
+            re.search(r"\bgit:", evidence, re.IGNORECASE)
+            or re.fullmatch(r"[0-9a-fA-F]{7,64}", evidence.strip())
+            or re.search(r"\bcommit(?:ted)?(?:\s+as)?[:=\s]+[0-9a-fA-F]{7,64}\b", evidence, re.IGNORECASE)
+        ):
+            _error(
+                "git_reconciliation_required",
+                "Inspect the historical Git-shaped completion evidence; missing canonical facts do not prove no commit",
+                id=current["id"],
+            )
+        if target == "open":
+            sole = projects[active[0]["project_id"]] if len(active) == 1 else None
+            if sole is not None and sole["kind"] == "project" and sole["status"] == "active":
+                if request.project_id and request.project_id != sole["id"]:
+                    _error(
+                        "membership_move_required",
+                        "Return under the current parent, then use the atomic move operation",
+                    )
+                destination = sole
+            elif request.project_id:
+                destination = _execution_project(tx, request.project_id)
+            else:
+                _error(
+                    "project_required",
+                    "Choose one active execution project for missing, multiple or closed parents",
+                )
+            changed_parents = parents ^ {destination["id"]}
+            for member in sorted(active, key=lambda item: item["id"]):
+                if member["project_id"] != destination["id"]:
+                    _write(
+                        tx,
+                        "project_work_item_memberships",
+                        member["id"],
+                        {"status": "removed"},
+                        Mutation(expected_version=member["version"], actor=request.actor, reason=request.reason),
+                    )
+            existing = next((member for member in memberships if member["project_id"] == destination["id"]), None)
+            if existing is None or existing["status"] != "active":
+                _write(
+                    tx,
+                    "project_work_item_memberships",
+                    existing["id"] if existing else f"PWM-{uuid4().hex}",
+                    {
+                        "project_id": destination["id"],
+                        "work_item_id": current["id"],
+                        "status": "active",
+                        "membership_order": (
+                            existing["membership_order"] if existing else current.get("implementation_order")
+                        ),
+                        "source": "domain_service",
+                    },
+                    Mutation(
+                        expected_version=existing["version"] if existing else 0,
+                        actor=request.actor,
+                        reason=request.reason,
+                    ),
+                )
+            for project_id in sorted(changed_parents):
+                project = projects[project_id]
+                if project["kind"] == "project" and project["authorization"] != "not authorized":
+                    _write(
+                        tx,
+                        "projects",
+                        project_id,
+                        {"authorization": "not authorized"},
+                        Mutation(expected_version=project["version"], actor=request.actor, reason=request.reason),
+                    )
+        fields: dict[str, Any] = {"resolution_status": target}
+        if target == "verified":
+            fields["completion_evidence"] = evidence
+            if all(current.get(key) == value for key, value in fields.items()) and (
+                current.get("changed_by") == request.actor and current.get("change_reason") == request.reason
+            ):
+                return {"work_item": current, **_membership_facts(tx, current)}
+        elif clear_rejected_evidence:
+            # The caller records substantive scope inspection in the existing reason. Physical Git checks alone
+            # cannot prove full semantic completion. Native history retains the rejected text in its prior state;
+            # an omitted evidence field preserves it, and all terminal/attempt/membership guards above still apply.
+            fields["completion_evidence"] = ""
+        row = _write(tx, "work_items", current["id"], fields, request)
+        return {"work_item": row, **_membership_facts(tx, row)}
+
+    def amend_work_item(
+        self, record_id: str, request: WorkItemMutation, *, project_root: Path | None = None
+    ) -> dict[str, Any]:
         fields = request.fields.model_dump(exclude_unset=True)
         with self.kernel.transaction() as tx:
             current = tx.get("work_items", {"id": record_id}, lock=True)
+            if "resolution_status" in fields:
+                if fields["resolution_status"] is None:
+                    _error("invalid_request", "Resolution status cannot be null")
+                if current:
+                    if set(fields) - {"resolution_status", "completion_evidence"}:
+                        _error("invalid_request", "Resolution correction cannot also amend ordinary work fields")
+                    return self._reconcile_work_item_resolution(tx, current, request, project_root=project_root)
+                if fields["resolution_status"] != "open":
+                    _error("work_item_frozen", "New work starts open; only confirmed project commit sets verified")
+            if "completion_evidence" in fields:
+                _error("invalid_completion_evidence", "Ordinary work cannot author terminal completion evidence")
             if current:
                 membership = _current_parent(tx, record_id)
                 project = _execution_project(tx, membership["project_id"])
                 if request.project_id and request.project_id != project["id"]:
                     _error("membership_move_required", "Use the atomic membership move operation")
-                if current["resolution_status"] != "open":
+                if current["resolution_status"] != "open" or _active_attempts(
+                    tx, work_item_id=record_id, reviewed_only=True
+                ):
                     _error("work_item_frozen", "Reviewed or closed work cannot be amended through ordinary intake")
             else:
                 if not request.project_id:
@@ -1232,6 +1907,18 @@ class AuthorityService:
                     },
                     Mutation(expected_version=0, actor=request.actor, reason=request.reason),
                 )
+                if project["authorization"] != "not authorized":
+                    _write(
+                        tx,
+                        "projects",
+                        project["id"],
+                        {"authorization": "not authorized"},
+                        Mutation(
+                            expected_version=project["version"],
+                            actor=request.actor,
+                            reason=request.reason,
+                        ),
+                    )
             return {"work_item": row, **_membership_facts(tx, row)}
 
     @staticmethod
@@ -1248,13 +1935,15 @@ class AuthorityService:
     def move_work_item(self, record_id: str, request: MembershipMove) -> dict[str, Any]:
         with self.kernel.transaction() as tx:
             row = _required(tx, "work_items", record_id, lock=True)
-            if row["resolution_status"] != "open":
+            if row["resolution_status"] != "open" or _active_attempts(tx, work_item_id=record_id, reviewed_only=True):
                 _error("work_item_frozen", "Reviewed or closed membership requires reconciliation")
             current = _current_parent(tx, record_id)
             if current["project_id"] != request.source_project_id or current["version"] != request.expected_version:
                 _error("cas_conflict", "Read the current membership before moving work")
-            for project_id in sorted({request.source_project_id, request.destination_project_id}):
+            projects = [
                 _execution_project(tx, project_id)
+                for project_id in sorted({request.source_project_id, request.destination_project_id})
+            ]
             if request.source_project_id == request.destination_project_id:
                 _error("invalid_membership", "A move requires two distinct projects")
             _write(tx, "project_work_item_memberships", current["id"], {"status": "removed"}, request)
@@ -1279,6 +1968,19 @@ class AuthorityService:
                     reason=request.reason,
                 ),
             )
+            for project in projects:
+                if project["authorization"] != "not authorized":
+                    _write(
+                        tx,
+                        "projects",
+                        project["id"],
+                        {"authorization": "not authorized"},
+                        Mutation(
+                            expected_version=project["version"],
+                            actor=request.actor,
+                            reason=request.reason,
+                        ),
+                    )
             return {"work_item_id": record_id, "membership": updated}
 
     def retire_work_item(self, record_id: str, request: WorkItemRetirement) -> dict[str, Any]:
@@ -1290,7 +1992,7 @@ class AuthorityService:
         membership describes the current parent, including for closed work, and siblings are never retired
         collectively (GOV-WORK-ITEM-TERMINAL-STATE-001). Already-terminal work is refused rather than
         re-closed; open dependants are refused rather than re-pointed; an active bridge attempt is refused
-        because its later VERIFIED delivery would overwrite the terminal label. Retirement is not
+        because its later project finalization would conflict with retirement. Retirement is not
         implementation verification (GOV-STANDING-BACKLOG-001). The response is the work-item read shape.
         """
         with self.kernel.transaction() as tx:
@@ -1337,14 +2039,60 @@ class AuthorityService:
         record_id: str,
         *,
         predecessor_readiness: Callable[[PostgresTransaction, str], dict[str, Any]] | None = None,
+        recipient_role: str | None = None,
+        activity: str | None = None,
+        critical_sections: list[str] | None = None,
+        critical_specs: list[str] | None = None,
+        project_root: Path | None = None,
     ) -> dict[str, Any]:
         """Load linked current facts without another context's memory or state."""
+        selection = _context_selection(record_id, recipient_role, activity, critical_sections, critical_specs)
+        authored: dict[str, Any] = {}
+        if selection is not None:
+            if project_root is None:
+                _error(
+                    "context_source_unavailable",
+                    "Composition requires the service's configured project root",
+                    recovery_route="Configure the existing authority service's project root",
+                )
+            authored = _context_authored_sources(project_root, selection)
         with self.kernel.transaction(read_only=True) as tx:
             work = _required(tx, "work_items", record_id)
             membership = _current_parent(tx, record_id)
             project = _required(tx, "projects", membership["project_id"])
             program = _required(tx, "projects", project["parent_project_id"]) if project["parent_project_id"] else None
-            formals = _work_formal_sources(tx, work, project["id"])
+            authored_references = []
+            if selection:
+                for key in authored["formal_ids"]:
+                    source = tx.get("specifications", {"id": key})
+                    if source is None:
+                        _error(
+                            "context_source_unavailable",
+                            "A selected authored context formal reference is missing",
+                            id=key,
+                            recovery_route=(
+                                f"gt spec show {key} --json; correct the reference in the named SAD or baseline source"
+                            ),
+                        )
+                    if source.get("status") not in {"active", "retired", "superseded"}:
+                        _error(
+                            "context_source_unavailable",
+                            "A selected authored context formal reference has malformed lifecycle state",
+                            id=key,
+                            recovery_route=f"gt spec show {key} --json",
+                        )
+                    authored_references.append(source)
+            additional = (
+                sorted(
+                    set(
+                        selection["critical_specs"]
+                        + [row["id"] for row in authored_references if row["status"] == "active"]
+                    )
+                )
+                if selection
+                else None
+            )
+            formals = _work_formal_sources(tx, work, project["id"], additional_ids=additional)
             stale = [formal["id"] for formal in formals if formal["status"] != "active"]
             if stale:
                 _error(
@@ -1362,7 +2110,7 @@ class AuthorityService:
                     id=test["id"],
                     recovery_route=f"gt context work-item {record_id}",
                 )
-            return {
+            result = {
                 "work_item": work,
                 "membership": membership,
                 "project": project,
@@ -1380,3 +2128,7 @@ class AuthorityService:
                     tx, "project_dependencies", dependent_project_id=project["id"], status="active"
                 ),
             }
+            if selection is not None:
+                result["authored_formal_references"] = authored_references
+                result["message_context"] = _context_message(result, selection, authored)
+            return result

@@ -38,6 +38,7 @@ RUNTIME_COMPONENTS = frozenset(
         "scratchpad",
         ".worktrees",
         ".agent",
+        ".agents",
         ".antigravity",
         ".api-harness",
         ".claude",
@@ -136,11 +137,6 @@ def inspect_staged(root: Path) -> dict:
             identity in GENERATED_ROOT_FILES
             or any(part.casefold() in RUNTIME_COMPONENTS for part in parts.parts)
             or any(part.casefold().startswith(".gtkb-index-") for part in parts.parts)
-            or any(
-                part.casefold() == ".agents"
-                and (index != 0 or len(parts.parts) < 3 or parts.parts[1].casefold() != "skills")
-                for index, part in enumerate(parts.parts)
-            )
             or any(identity == prefix or identity.startswith(prefix + "/") for prefix in NONPRODUCT_PREFIXES)
             or identity in {"groundtruth.db", "groundtruth.db-wal", "groundtruth.db-shm"}
         ):

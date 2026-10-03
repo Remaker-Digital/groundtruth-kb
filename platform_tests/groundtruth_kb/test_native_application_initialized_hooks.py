@@ -34,7 +34,7 @@ from groundtruth_kb.authority_client import AuthorityClient
 from groundtruth_kb.postgres_kernel import TABLE_SPECS
 from groundtruth_kb.project.native_finalization import NativeProjectFinalization
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put, seed, work_fields
 
@@ -118,12 +118,6 @@ def _stage_baseline(host: Path) -> None:
         ROOT / ".harness-baseline-configuration",
         host / ".harness-baseline-configuration",
         ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.lock"),
-    )
-    # D15: the one skills source lives beside the baseline; the projector fails closed without it.
-    shutil.copytree(
-        ROOT / ".agents/skills",
-        host / ".agents/skills",
-        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
     shutil.copytree(
         ROOT / "scripts/harness_projection",
@@ -242,6 +236,7 @@ def hosted(native, tmp_path, request, monkeypatch):
             _git(root, "commit", "-qm", "Initialized application preimage")
             response = put(http, "work-items", work_id, work_fields(title=name + " effect"), project_id=project_id)
             assert response.status_code == 200, response.text
+            authorize_project(_test_client, project_id)
             contexts = {}
             for label in ("pb1", "lo1", "pb2", "lo2", "lo3"):
                 binding = client.request(
@@ -522,7 +517,7 @@ def test_installed_reference_transaction_hook_performs_the_commit_callback(hoste
         "--native-context-id",
         app["contexts"]["lo3"]["native_context_id"],
         "--expected-version",
-        "1",
+        str(client.request("GET", f"/v1/projects/{app['project']}")["project"]["version"]),
         "--message-file",
         str(body),
         "--json",
@@ -561,7 +556,7 @@ def test_missing_installed_hook_refuses_before_any_head_advances(hosted, tmp_pat
         "--native-context-id",
         app["contexts"]["lo3"]["native_context_id"],
         "--expected-version",
-        "1",
+        str(client.request("GET", f"/v1/projects/{app['project']}")["project"]["version"]),
         "--message-file",
         str(body),
         "--json",

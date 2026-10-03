@@ -33,6 +33,7 @@ from groundtruth_kb.postgres_kernel import (
 )
 from psycopg import sql
 
+from platform_tests.groundtruth_kb.bridge_fixtures import authorize_project
 from platform_tests.groundtruth_kb.native_fixtures import history_count, link_project_formal, put, seed, work_fields
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
@@ -338,36 +339,57 @@ def test_atomic_membership_and_program_semantics(native):
     assert bad.status_code == 422
     assert bad.json()["error"]["code"] == "program_cannot_contain_work"
     assert client.get("/v1/work-items/WI-1").status_code == 404
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
+    creation_history = history_count(service)
     result = put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1")
     assert result.status_code == 200, result.text
+    deauthorized = client.get("/v1/projects/PROJECT-1").json()["project"]
+    assert deauthorized["authorization"] == "not authorized"
+    assert deauthorized["version"] == project["version"] + 1
+    assert history_count(service) == creation_history + 3
     initial = result.json()["membership"]
+    authorize_project(client)
     request = {
         "expected_version": initial["version"],
         "source_project_id": "PROJECT-1",
         "destination_project_id": "PROJECT-GTKB-NEW-WORK-INTAKE",
         "actor": "another-context",
-        "reason": "Move work without changing authorization",
+        "reason": "Reconcile membership and deauthorize affected projects",
         "membership_order": 20,
     }
     before = history_count(service)
+    projects_before = {
+        name: client.get(f"/v1/projects/{name}").json()["project"]
+        for name in ("PROJECT-1", "PROJECT-GTKB-NEW-WORK-INTAKE")
+    }
+    same_parent = client.post("/v1/work-items/WI-1/move", json={**request, "destination_project_id": "PROJECT-1"})
+    assert same_parent.status_code == 422 and same_parent.json()["error"]["code"] == "invalid_membership"
+    assert history_count(service) == before
+    assert client.get("/v1/work-items/WI-1").json()["membership"] == initial
     # The source removal is already written in the transaction when destination
     # normalization rejects this out-of-range order. Both changes must roll back.
     invalid_order = client.post("/v1/work-items/WI-1/move", json={**request, "membership_order": 2**63})
     assert invalid_order.status_code == 422
     assert history_count(service) == before
     assert client.get("/v1/work-items/WI-1").json()["membership"] == initial
+    assert {name: client.get(f"/v1/projects/{name}").json()["project"] for name in projects_before} == projects_before
     result = client.post("/v1/work-items/WI-1/move", json=request)
     assert result.status_code == 200, result.text
-    assert history_count(service) == before + 2
+    assert history_count(service) == before + 3
     current = result.json()["membership"]
-    assert client.get("/v1/projects/PROJECT-1").json()["project"]["authorization"] == "authorized"
+    source = client.get("/v1/projects/PROJECT-1").json()["project"]
+    assert source["authorization"] == "not authorized"
+    assert source["version"] == projects_before["PROJECT-1"]["version"] + 1
     assert (
-        client.get("/v1/projects/PROJECT-GTKB-NEW-WORK-INTAKE").json()["project"]["authorization"] == "not authorized"
+        client.get("/v1/projects/PROJECT-GTKB-NEW-WORK-INTAKE").json()["project"]
+        == projects_before["PROJECT-GTKB-NEW-WORK-INTAKE"]
     )
     # A stale replay produces no membership or history mutation.
     stale = client.post("/v1/work-items/WI-1/move", json=request)
     assert stale.status_code == 409
-    assert history_count(service) == before + 2
+    assert history_count(service) == before + 3
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == source
+    before_back = history_count(service)
     request.update(
         source_project_id=request["destination_project_id"],
         destination_project_id="PROJECT-1",
@@ -377,16 +399,24 @@ def test_atomic_membership_and_program_semantics(native):
     assert back.status_code == 200, back.text
     assert back.json()["membership"]["id"] == initial["id"]
     assert back.json()["membership"]["version"] == 3
+    assert history_count(service) == before_back + 2
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == source
+    assert (
+        client.get("/v1/projects/PROJECT-GTKB-NEW-WORK-INTAKE").json()["project"]
+        == projects_before["PROJECT-GTKB-NEW-WORK-INTAKE"]
+    )
 
 
 def test_failed_domain_change_leaves_no_partial_work_or_history(native):
     service, client, _, _ = native
     seed(client)
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
     before = history_count(service)
     missing = put(client, "work-items", "WI-INVALID", work_fields(title=None), project_id="PROJECT-1")
     assert missing.status_code == 422
     assert history_count(service) == before
     assert client.get("/v1/work-items/WI-INVALID").status_code == 404
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == project
     result = put(
         client,
         "tests",
@@ -407,6 +437,7 @@ def test_failed_domain_change_leaves_no_partial_work_or_history(native):
     assert refused.status_code == 422
     assert refused.json()["error"]["code"] == "test_phase_required"
     assert history_count(service) == before
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == project
     # The current record remains byte-for-byte unchanged after a stale amendment.
     before_record = client.get("/v1/specifications/SPEC-1").content
     refusal = put(client, "specifications", "SPEC-1", {"title": "stale"})
@@ -417,6 +448,8 @@ def test_failed_domain_change_leaves_no_partial_work_or_history(native):
 def test_concurrent_creation_and_dependency_write_skew(native):
     service, client, _, _ = native
     seed(client)
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
+    before = history_count(service)
     request = WorkItemMutation(
         expected_version=0, actor="worker", reason="New work", project_id="PROJECT-1", fields=work_fields()
     )
@@ -431,7 +464,12 @@ def test_concurrent_creation_and_dependency_write_skew(native):
         outcomes = list(workers.map(lambda _: create(), range(2)))
     assert sum(isinstance(value, dict) for value in outcomes) == 1
     assert any(value in ("cas_conflict", "retryable_conflict") for value in outcomes if isinstance(value, str))
+    current = client.get("/v1/projects/PROJECT-1").json()["project"]
+    assert current["authorization"] == "not authorized" and current["version"] == project["version"] + 1
+    assert history_count(service) == before + 3
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == current
+    assert history_count(service) == before + 5
 
     def depend(pair):
         own, other = pair
@@ -854,7 +892,7 @@ def test_specification_writer_rejects_noncanonical_status_without_partial_state(
 
 def _check_specification_authoring_cli(cli, client, service, tmp_path):
     """Execute the baseline examples through real CLI/HTTP and check their limits."""
-    guide = Path(__file__).resolve().parents[2] / ".agents/skills/gtkb-spec"
+    guide = Path(__file__).resolve().parents[2] / ".harness-baseline-configuration/skills/gtkb-spec"
 
     def example(path):
         text = path.read_text(encoding="utf-8")
@@ -1152,6 +1190,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
     service, client, _, service_name = native
     seed(client)
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True, capture_output=True)
     (tmp_path / "tests").mkdir()
     (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
@@ -1522,6 +1561,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                 ).status_code
                 == 200
             )
+            authorize_project(client, "PROJECT-DEPENDENT")
             work_readiness = cli("backlog", "readiness", "WI-DEPENDENT", "--json")
             assert work_readiness.returncode == 0, work_readiness.stderr
             assert json.loads(work_readiness.stdout)["ready"] is False
@@ -1615,7 +1655,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                     "author_identity": "qualified-agent",
                     "author_harness_id": "HARNESS-CLI",
                     "author_session_context_id": session_id,
-                    "author_model": "qualification",
+                    "author_model": "qualification-" + role,
                     "Project": "PROJECT-1",
                     "Work Item": "WI-1",
                 }
@@ -1725,7 +1765,7 @@ def test_separate_ordinary_cli_processes_use_http_and_never_sqlite(native, tmp_p
                 "--native-context-id",
                 context,
                 "--expected-version",
-                "1",
+                str(client.get("/v1/projects/PROJECT-1").json()["project"]["version"]),
                 "--message-file",
                 str(message),
                 "--json",

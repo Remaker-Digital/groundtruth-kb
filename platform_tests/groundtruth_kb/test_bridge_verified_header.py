@@ -109,6 +109,10 @@ def test_an_unknown_author_harness_names_the_field_and_the_same_claim_then_deliv
 
 @pytest.mark.parametrize("skill", ["gtkb-verify", "gtkb-bridge"])
 def test_both_verifier_skills_say_the_map_is_one_header_line(skill):
-    text = " ".join((PROJECT_ROOT / ".agents/skills" / skill / "SKILL.md").read_text(encoding="utf-8").split())
+    text = " ".join(
+        (PROJECT_ROOT / ".harness-baseline-configuration/skills" / skill / "SKILL.md")
+        .read_text(encoding="utf-8")
+        .split()
+    )
     assert "header line" in text and "verified_artifacts: {" in text, skill
     assert "the service reads the map nowhere else" in text, skill

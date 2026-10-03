@@ -68,7 +68,7 @@ gt project doctor             # health checks across the platform
 | Component | What it is |
 | --- | --- |
 | **Native authority** | PostgreSQL-backed domain services for current formal records, projects, work items and tests. Use the ordinary CLI and typed services for reads, amendments and exact readback; no SQLite or copied-document authority fallback. |
-| **Shared instructions** | Authored root `AGENTS.md`, one `.agents/skills` tree, and baseline rules/hooks/routing. Host projections contain declared registrations, pointers and ownership bookkeeping. See [Harness projection](groundtruth-kb/docs/reference/harness-projection.md). |
+| **Shared instructions** | Authored root `AGENTS.md`, one `.harness-baseline-configuration/skills` tree, and baseline rules/hooks/routing. Host projections contain declared registrations, pointers and ownership bookkeeping. See [Harness projection](groundtruth-kb/docs/reference/harness-projection.md). |
 | **Bridge and contexts** | Native agent-authored next-artifact exchange with immutable native context binding and independent review. The owner dispatches until Dispatcher Next is independently qualified and activated. See [Bridge protocol](.harness-baseline-configuration/rules/file-bridge-protocol.md). |
 | **`gt` CLI** | Native work/context, formal, project, bridge and operational command surfaces. Query current help and the exact selected records before an effect. |
 | **Dashboard** | Derived operational and work views. Assess current readiness from canonical readback and the actual installed consumer; a historical feature inventory is not health evidence. |

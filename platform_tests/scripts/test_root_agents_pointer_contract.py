@@ -9,8 +9,8 @@ tracked pointer files whose exact bytes are declared once in
 the one acceptance test on the landed root file (rev2 finding 7): harness-neutral
 (ADR-RULE-PROJECTION-FLOW-INVERSION-001 paragraph 5, GOV-HARNESS-NEUTRAL-BASELINE-001
 paragraph 3 - no vendor directory enumerated, the neutral derived-output sentence
-kept), no embedded checkout path, no neutral token, ``.agents`` not described as
-generated, rules read on demand from the baseline and skills from ``.agents/skills``.
+kept), no embedded checkout path, no neutral token, all named harness output remains derived, and rules and authored Skills are read
+from the universal baseline.
 Content reconciliation of the former 62 KB root text is task 15.9; the sentences
 asserted here are the ones stage 1 landed.
 """
@@ -31,7 +31,7 @@ ROOT = Path(__file__).resolve().parents[2]
 PROFILES = ROOT / "scripts/harness_projection/profiles.toml"
 INSTRUCTIONS = "AGENTS.md"
 BASELINE = ".harness-baseline-configuration"
-SKILLS_ROOT = ".agents/skills"
+SKILLS_ROOT = ".harness-baseline-configuration/skills"
 # R1 option B (D34): the exact pointer bytes. profiles.toml [root_pointers] declares
 # the same bytes so the checker and this test share one declaration, and a profile
 # edit cannot silently redefine the ruling.
@@ -44,7 +44,7 @@ ROOT_POINTERS = {
 ROOT_CARRIERS = (INSTRUCTIONS, *ROOT_POINTERS)
 NEUTRAL_SENTENCE = "named harness configuration directories are derived output"
 RULES_SENTENCE = "Read applicable rules on demand from `.harness-baseline-configuration/rules`."
-SKILLS_SENTENCE = "Use the role-appropriate bridge skill in `.agents/skills`:"
+SKILLS_SENTENCE = "Use the role-appropriate bridge skill in `.harness-baseline-configuration/skills`:"
 VENDOR_ROOTS = (".claude", ".codex", ".cursor", ".goose", ".agent", ".api-harness")
 DRIVE_LETTER = re.compile(r"\b[A-Za-z]:[\\/]")
 NEUTRAL_TOKEN = re.compile(r"\{\{[A-Z_]+\}\}")
@@ -92,10 +92,10 @@ def test_root_agents_md_has_no_neutral_tokens() -> None:
     assert NEUTRAL_TOKEN.findall(_instructions()) == [], "the root file is read in place; nothing substitutes tokens"
 
 
-def test_root_agents_md_does_not_name_agents_as_generated() -> None:
+def test_root_agents_md_has_no_authored_agents_source() -> None:
     text = _instructions()
     assert not [line for line in text.splitlines() if re.fullmatch(r"- `\.agents`\s*", line)]
-    assert "`.agents`" not in text, ".agents holds the one skills source (D15); it is authored, not derived"
+    assert "`.agents/skills`" not in text, "authored Skill guidance must name the universal baseline"
 
 
 def test_root_agents_md_keeps_the_neutral_derived_output_sentence() -> None:
@@ -120,8 +120,7 @@ def test_root_agents_md_names_the_rules_and_skills_sources() -> None:
     text = _instructions()
     assert RULES_SENTENCE in text
     assert SKILLS_SENTENCE in text
-    assert "baseline's skills directory" not in text, "the pre-move wording names a directory that holds no skills"
-    assert f"{BASELINE}/skills" not in text
+    assert f"{BASELINE}/skills" in text
 
 
 def test_root_pointers_carry_exactly_the_declared_bytes() -> None:
@@ -132,7 +131,7 @@ def test_root_pointers_carry_exactly_the_declared_bytes() -> None:
 
 
 def test_no_second_instruction_carrier() -> None:
-    for name in (f"{BASELINE}/AGENTS.md", f"{BASELINE}/skills", "GEMINI.md", ".cursorrules"):
+    for name in (f"{BASELINE}/AGENTS.md", "GEMINI.md", ".cursorrules"):
         assert not (ROOT / name).exists(), name
 
 

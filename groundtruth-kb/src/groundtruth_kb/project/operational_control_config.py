@@ -14,7 +14,7 @@ import stat
 import sys
 import tempfile
 import tomllib
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from decimal import Decimal, InvalidOperation
@@ -637,7 +637,40 @@ def _writer_lock(lock_path: Path) -> Iterator[None]:
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
 
 
-def set_operational_controls(project_root: Path, proposed: bytes, *, expected_sha256: str) -> dict[str, Any]:
+def _value_only_control_changes(before: bytes, proposed: bytes) -> None:
+    """An ordinary operation changes existing values and preserves all other catalog bytes."""
+    import tomlkit
+
+    current = tomlkit.parse(before.decode("utf-8"))
+    replacement = tomlkit.parse(proposed.decode("utf-8"))
+    current_data = tomllib.loads(before.decode("utf-8"), parse_float=Decimal)
+    replacement_data = tomllib.loads(proposed.decode("utf-8"), parse_float=Decimal)
+    current_rows = current_data.pop("controls")
+    replacement_rows = replacement_data.pop("controls")
+    if current_data != replacement_data or len(current_rows) != len(replacement_rows):
+        _fail("operation_value_scope_required", "Ordinary controls.set preserves schema, keys and invariants")
+    changed = False
+    for old, new, table, proposed_table in zip(
+        current_rows, replacement_rows, current["controls"], replacement["controls"], strict=True
+    ):
+        old_value, new_value = old.pop("value"), new.pop("value")
+        if old != new:
+            _fail("operation_value_scope_required", "Ordinary controls.set preserves every control's metadata")
+        if old_value != new_value:
+            table["value"] = proposed_table["value"]
+            changed = True
+    if not changed or tomlkit.dumps(current).encode("utf-8") != proposed:
+        _fail("operation_value_scope_required", "Ordinary controls.set changes only existing value items")
+
+
+def set_operational_controls(
+    project_root: Path,
+    proposed: bytes,
+    *,
+    expected_sha256: str,
+    before_effect: Callable[[OperationalControlCatalog, OperationalControlCatalog, str], None] | None = None,
+    verify_result: Callable[[OperationalControlCatalog, str], None] | None = None,
+) -> dict[str, Any]:
     """Validate the entire replacement, compare current bytes and replace once.
 
     Direct owner edits need not take the cooperative mutex. A second read catches
@@ -660,24 +693,72 @@ def set_operational_controls(project_root: Path, proposed: bytes, *, expected_sh
         if removed:
             _fail("consumer_contract", "Replacement removes required controls for a currently configured consumer")
         changed = before != proposed
+        if changed and before_effect is not None:
+            if not any(
+                current.definitions[key].value != after.definitions.get(key, current.definitions[key]).value
+                for key in current.definitions
+            ):
+                _fail("operation_value_scope_required", "An ordinary update must change an existing numeric value")
+            _value_only_control_changes(before, proposed)
         if changed:
-            temporary: Path | None = None
+
+            def replace_once(
+                previous: bytes,
+                replacement: bytes,
+                old: OperationalControlCatalog,
+                new: OperationalControlCatalog,
+                phase: str,
+            ) -> None:
+                temporary: Path | None = None
+                try:
+                    with tempfile.NamedTemporaryFile(
+                        dir=path.parent, prefix=".control-update-", delete=False
+                    ) as stream:
+                        temporary = Path(stream.name)
+                        stream.write(replacement)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    if _read(_safe_path(project_root)) != previous:
+                        _fail("generation_conflict", "control artifact changed during validation")
+                    if before_effect is not None:
+                        before_effect(old, new, phase)
+                        if _read(_safe_path(project_root)) != previous:
+                            _fail("generation_conflict", "control artifact changed during the effect check")
+                    os.replace(temporary, path)
+                    temporary = None
+                except OSError as exc:
+                    _fail("replace_failed", f"control replacement failed ({type(exc).__name__}); inspect current state")
+                finally:
+                    if temporary is not None:
+                        temporary.unlink(missing_ok=True)
+
+            replaced = False
             try:
-                with tempfile.NamedTemporaryFile(dir=path.parent, prefix=".control-update-", delete=False) as stream:
-                    temporary = Path(stream.name)
-                    stream.write(proposed)
-                    stream.flush()
-                    os.fsync(stream.fileno())
-                if _read(_safe_path(project_root)) != before:
-                    _fail("generation_conflict", "control artifact changed during validation")
-                os.replace(temporary, path)
-                temporary = None
-            except OSError as exc:
-                _fail("replace_failed", f"control replacement failed ({type(exc).__name__}); inspect current state")
-            finally:
-                if temporary is not None:
-                    temporary.unlink(missing_ok=True)
-        if _read(_safe_path(project_root)) != proposed:
+                replace_once(before, proposed, current, after, "forward")
+                replaced = True
+                observed = _read(_safe_path(project_root))
+                if observed != proposed:
+                    _fail("readback_conflict", "control artifact differs after replacement; inspect current state")
+                if verify_result is not None:
+                    verify_result(validate_operational_control_bytes(observed, source_reference=str(path)), "forward")
+            except Exception as failure:  # intentional-catch: compensate only our confirmed replacement
+                if before_effect is None or not replaced:
+                    raise
+                try:
+                    if _read(_safe_path(project_root)) != proposed:
+                        _fail("generation_conflict", "Compensation refuses a catalog changed by another writer")
+                    replace_once(proposed, before, after, current, "rollback")
+                    restored = _read(_safe_path(project_root))
+                    if restored != before:
+                        _fail("readback_conflict", "Compensation did not restore this invocation's preimage")
+                    if verify_result is not None:
+                        verify_result(
+                            validate_operational_control_bytes(restored, source_reference=str(path)), "rollback"
+                        )
+                except Exception as rollback_failure:  # intentional-catch: report refused compensation as typed failure
+                    _fail("operation_rollback_failed", f"{failure}; compensation refused or failed: {rollback_failure}")
+                _fail("operation_compensated", f"{failure}; this invocation's captured catalog preimage was restored")
+        elif _read(_safe_path(project_root)) != proposed:
             _fail("readback_conflict", "control artifact differs after replacement; inspect current state")
     return {
         "changed": changed,

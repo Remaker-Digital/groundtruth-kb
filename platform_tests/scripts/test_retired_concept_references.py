@@ -47,7 +47,7 @@ WRITE_ENV = "GTKB_RETIRED_REFERENCE_BASELINE_WRITE"
 
 SURFACES = (
     ".harness-baseline-configuration",
-    ".agents/skills",
+    ".harness-baseline-configuration/skills",
     "scripts",
     "groundtruth-kb/src",
     "groundtruth-kb/templates",
@@ -272,10 +272,10 @@ def test_purged_tokens_keep_a_zero_allowance(tmp_path: Path) -> None:
 
 
 def test_skill_move_keeps_authored_guidance_in_the_ratchet_subject(tmp_path):
-    path = tmp_path / ".agents/skills/example/SKILL.md"
+    path = tmp_path / ".harness-baseline-configuration/skills/example/SKILL.md"
     path.parent.mkdir(parents=True)
     path.write_text("Current guidance names PAUTH", encoding="utf-8")
-    assert scan(tmp_path)[".agents/skills/example/SKILL.md"]["PAUTH"] == 1
+    assert scan(tmp_path)[".harness-baseline-configuration/skills/example/SKILL.md"]["PAUTH"] == 1
 
 
 def test_timer_inventory_is_excluded_before_any_content_read(tmp_path, monkeypatch):

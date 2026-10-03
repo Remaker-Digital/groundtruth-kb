@@ -16,13 +16,13 @@ import subprocess
 import sys
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import Any, NoReturn, cast
 
 import click
 
 from groundtruth_kb import __version__
 from groundtruth_kb._logging import configure_cli_logging
-from groundtruth_kb.cli_authority import service_group
+from groundtruth_kb.cli_authority import _operation_options, service_group
 from groundtruth_kb.config import GTConfig, GTConfigError
 from groundtruth_kb.project.registry_control_plane import (
     RegistryControlPlaneError,
@@ -1198,7 +1198,12 @@ def _control_proposal(path: Path) -> bytes:
 
 
 def _controls_call(
-    ctx: click.Context, operation: str, input_path: Path | None, expected_sha256: str | None
+    ctx: click.Context,
+    operation: str,
+    input_path: Path | None,
+    expected_sha256: str | None,
+    *,
+    operation_options: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     from groundtruth_kb.project.operational_control_config import (
         OperationalControlConfigError,
@@ -1227,9 +1232,205 @@ def _controls_call(
             return diff_operational_controls(root, proposed)
         if expected_sha256 is None:
             raise click.ClickException("The currently observed artifact SHA-256 is required")
-        return set_operational_controls(root, proposed, expected_sha256=expected_sha256)
+        callbacks = _bounded_control_callbacks(ctx, root, operation_options or {})
+        return set_operational_controls(
+            root,
+            proposed,
+            expected_sha256=expected_sha256,
+            before_effect=callbacks.before_effect if callbacks else None,
+            verify_result=callbacks.verify_result if callbacks else None,
+        )
     except (GTConfigError, OperationalControlConfigError, OSError) as exc:
         raise click.ClickException(str(exc)) from exc
+
+
+class _BoundedControlEffects:
+    """Current native checks and captured observations for this one catalog update."""
+
+    def __init__(self, ctx: click.Context, root: Path, options: dict[str, Any]) -> None:
+        self.ctx, self.root, self.options = ctx, root.resolve(), options
+        from groundtruth_kb.config import _find_config
+
+        selected = (ctx.find_root().obj or {}).get("config") or _find_config()
+        self.config_path = str((Path(selected) if selected else self.root / "groundtruth.toml").resolve())
+        self.catalog_path = str(self.root / "config" / "governance" / "operational-controls.toml")
+        self.initial: dict[str, Any] | None = None
+        self.desired: dict[str, Any] | None = None
+        self.changed: set[str] | None = None
+        self.bound: dict[str, Any] | None = None
+        self.deadline: float | None = None
+
+    @staticmethod
+    def _same_number(left: Any, right: Any) -> bool:
+        from decimal import Decimal
+
+        return type(left) in {int, Decimal} and type(right) in {int, Decimal} and left == right
+
+    @staticmethod
+    def _effect_key(effect: dict[str, Any]) -> tuple[Any, ...]:
+        from decimal import Decimal
+
+        value = effect.get("value")
+        kind = "number" if type(value) in {int, Decimal} else type(value).__name__
+        return effect.get("target"), effect.get("effect"), kind, value
+
+    def before_effect(self, current: Any, replacement: Any, phase: str) -> None:
+        import time
+        from datetime import UTC, datetime
+
+        from groundtruth_kb.cli_authority import _call
+        from groundtruth_kb.project.operational_control_config import OperationalControlConfigError
+
+        def refuse(detail: str) -> NoReturn:
+            raise OperationalControlConfigError("operation_bound_mismatch", detail)
+
+        if phase not in {"forward", "rollback"}:
+            refuse("The control writer supplied an unsupported phase")
+        changed = {
+            key for key in current.definitions if current.definitions[key].value != replacement.definitions[key].value
+        }
+        if not changed:
+            refuse("An ordinary update must change an existing numeric control value")
+        if phase == "forward":
+            if self.initial is not None:
+                refuse("An invocation cannot apply a second forward catalog replacement")
+            self.initial = {key: item.value for key, item in current.definitions.items()}
+            self.desired = {key: item.value for key, item in replacement.definitions.items()}
+            self.changed = changed
+        elif self.initial is None or changed != self.changed:
+            refuse("Compensation differs from this invocation's captured value changes")
+        targets = ["control:" + key for key in sorted(changed)]
+        effects = [
+            {"target": "control:" + key, "effect": "control.set", "value": replacement.definitions[key].value}
+            if phase == "forward"
+            else {"target": "control:" + key, "effect": "control.restore"}
+            for key in sorted(changed)
+        ]
+        observation = {"control:" + key: self.catalog_path for key in current.definitions}
+        started = time.monotonic()
+        answer = _call(
+            self.ctx,
+            "POST",
+            "/v1/bridge/check-effects",
+            body={
+                "native_context_id": self.options["native_context_id"],
+                "activity": "ops",
+                "document": self.options["document"],
+                "fence": self.options["fence"],
+                "cwd": str(self.root),
+                "installation_root": str(self.root),
+                "config_path": self.config_path,
+                "observed_controller_paths": observation,
+                "operations": [{"operation": "controls.set", "targets": targets, "effects": effects}],
+            },
+        )
+        try:
+            if (
+                answer["status"] != "current"
+                or answer["scope"] != "operation"
+                or answer["document"] != self.options["document"]
+                or answer["fence"] != self.options["fence"]
+                or len(answer["operations"]) != 1
+            ):
+                refuse("The current check does not match this invocation's selectors")
+            checked = answer["operations"][0]
+            if (
+                checked["operation"] != "controls.set"
+                or set(checked["targets"]) != set(targets)
+                or {self._effect_key(effect) for effect in checked["effects"]}
+                != {self._effect_key(effect) for effect in effects}
+            ):
+                refuse("The current check does not cover every actual value effect")
+            observed_at, deadline = (datetime.fromisoformat(answer[key]) for key in ("observed_at", "deadline"))
+            if any(
+                value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value) for value in (observed_at, deadline)
+            ):
+                refuse("The operation check must use UTC deadlines")
+            due = started + (deadline - observed_at).total_seconds()
+            self.deadline = min(self.deadline, due) if self.deadline is not None else due
+            if time.monotonic() >= self.deadline:
+                refuse("The existing operation deadline expired")
+            bound = checked["bound"]
+            bound_targets = set(bound["targets"])
+            preconditions = bound["preconditions"]
+            if (
+                bound["operation"] != "controls.set"
+                or not set(targets) <= bound_targets
+                or any(target not in observation for target in bound_targets)
+                or Path(preconditions["installation_root"]).resolve() != self.root
+                or Path(preconditions["config_path"]).resolve() != Path(self.config_path)
+                or preconditions.get("states")
+                or set(preconditions["controller_paths"]) != bound_targets
+                or any(
+                    Path(preconditions["controller_paths"][target]).resolve() != Path(self.catalog_path)
+                    for target in bound_targets
+                )
+            ):
+                refuse("The bound differs from the actual installation/config/catalog")
+            # Forward captures desired together with initial; accepted rollback retains that same capture.
+            verification = bound["verification"]
+            values = verification["control_values"]
+            if (
+                set(values) != {target[8:] for target in bound_targets}
+                or any(
+                    not self._same_number(value, cast(dict[str, Any], self.desired)[key])
+                    for key, value in values.items()
+                )
+                or any(value for key, value in verification.items() if key != "control_values")
+            ):
+                refuse("The bound's readback predicates do not describe the exact resulting control values")
+            if any(
+                not any(
+                    effect["target"] == target and effect["effect"] == "control.restore"
+                    for effect in bound["permitted_effects"]
+                )
+                for target in targets
+            ):
+                refuse("The bound must permit restoration of every changed value")
+            if bound["containment"] != {"installation_only": True, "managed_processes_only": True} or bound[
+                "rollback"
+            ] != {"restore_initial_state": True, "only_invocation_changes": True}:
+                refuse("The bound does not describe supported containment and captured-state rollback")
+            if time.monotonic() >= self.deadline:
+                refuse("The existing operation deadline expired")
+            self.bound = bound
+        except (AttributeError, KeyError, TypeError, ValueError) as error:
+            refuse("The authority returned an unusable control operation check: " + type(error).__name__)
+
+    def verify_result(self, catalog: Any, phase: str) -> None:
+        import time
+
+        from groundtruth_kb.project.operational_control_config import OperationalControlConfigError
+
+        values = self.bound["verification"]["control_values"] if self.bound is not None else None
+        expected = self.desired if phase == "forward" else self.initial
+        if (
+            phase not in {"forward", "rollback"}
+            or values is None
+            or expected is None
+            or self.deadline is None
+            or time.monotonic() >= self.deadline
+            or any(
+                key not in catalog.definitions or not self._same_number(catalog.definitions[key].value, expected[key])
+                for key in values
+            )
+        ):
+            raise OperationalControlConfigError(
+                "operation_verification_failed", "Control readback or the existing deadline failed"
+            )
+
+
+def _bounded_control_callbacks(
+    ctx: click.Context, root: Path, options: dict[str, Any]
+) -> _BoundedControlEffects | None:
+    supplied = [options.get(key) for key in ("activity", "native_context_id", "document", "fence")]
+    if not any(value is not None for value in supplied):
+        return None
+    if not all(value is not None for value in supplied) or options.get("activity") != "ops":
+        raise click.UsageError(
+            "Bound agent operations require --activity ops, --native-context-id, --document and --fence together"
+        )
+    return _BoundedControlEffects(ctx, root, options)
 
 
 @controls_group.command("show")
@@ -1283,10 +1484,15 @@ def controls_propose(ctx: click.Context, control_id: str, value: str, output_pat
 @click.option(
     "--expected-sha256", required=True, help="Current catalog_sha256 from controls show; refuses stale input."
 )
+@_operation_options
 @click.pass_context
-def controls_set(ctx: click.Context, input_path: Path, expected_sha256: str) -> None:
+def controls_set(ctx: click.Context, /, input_path: Path, expected_sha256: str, **options: Any) -> None:
     """Validate and atomically replace the selected artifact for subsequent operations."""
-    click.echo(json.dumps(_controls_call(ctx, "set", input_path, expected_sha256), indent=2, sort_keys=True))
+    click.echo(
+        json.dumps(
+            _controls_call(ctx, "set", input_path, expected_sha256, operation_options=options), indent=2, sort_keys=True
+        )
+    )
 
 
 @main.group()

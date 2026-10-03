@@ -20,10 +20,10 @@ plan against the BASELINE instead, which is the only place the shortfall is
 visible.
 
 M15 stage 1 (owner ruling D15 as amended by R3; D34 R2/R14): the one skills source
-is `[baseline] skills_root` (`.agents/skills`). A `pointer_stubs` profile renders
+is `[baseline] skills_root` (`.harness-baseline-configuration/skills`). A `pointer_stubs` profile renders
 one pointer stub per baseline skill under its `skills_stub_dir`; an `agents_skills`
-profile renders nothing for skills because the host discovers the source directly,
-so for it the shortfall would be a planned copy, not a missing one.
+profile renders the same complete catalog as frontmatter pointers under
+`.agents/skills`; no profile receives authored bodies or helpers.
 """
 
 from __future__ import annotations
@@ -86,9 +86,11 @@ def test_every_harness_projects_every_baseline_skill(harness: str, discovery: st
     assert stub_dir is None, f"{harness}: agents_skills declares a stub tree {stub_dir!r}"
     plan = project_harness.build_plan(harness)
     assert not plan.gaps, f"{harness}: projector gaps {plan.gaps}"
-    config_dir = _profiles()["harnesses"][harness]["config_dir"]
-    copies = sorted(rel for rel in plan.writes if rel.startswith(f"{config_dir}/skills/"))
-    assert copies == [], f"{harness}: the host reads .agents/skills natively; planned skill output {copies}"
+    projected = _projected_skill_names(harness, ".agents/skills")
+    assert projected == baseline, (harness, sorted(baseline - projected), sorted(projected - baseline))
+    assert not [
+        rel for rel in plan.writes if rel.startswith(f"{_profiles()['harnesses'][harness]['config_dir']}/skills/")
+    ]
 
 
 def test_every_declared_profile_key_is_read_by_the_projector() -> None:

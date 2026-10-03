@@ -19,7 +19,7 @@ import yaml
 from scripts.harness_projection import project_harness as projector
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-BASELINE_SKILLS = REPO_ROOT / ".agents" / "skills"
+BASELINE_SKILLS = REPO_ROOT / ".harness-baseline-configuration" / "skills"
 PROFILES = tomllib.loads((REPO_ROOT / "scripts/harness_projection/profiles.toml").read_text(encoding="utf-8"))[
     "harnesses"
 ]
@@ -79,14 +79,12 @@ def test_every_harness_discovers_shared_skills_or_receives_frontmatter_pointers(
     for skill in NAMED_SKILLS:
         source = (BASELINE_SKILLS / skill / "SKILL.md").read_text(encoding="utf-8")
         outputs = {path: text for path, text in plan.writes.items() if path.endswith(f"/{skill}/SKILL.md")}
-        if profile["skills_discovery"] == "agents_skills":
-            assert outputs == {}
-        else:
-            path = profile["skills_stub_dir"] + f"/{skill}/SKILL.md"
-            assert set(outputs) == {path}
-            assert _frontmatter(outputs[path]) == _frontmatter(source)
-            assert f".agents/skills/{skill}/SKILL.md" in outputs[path]
-            assert source.split("---", 2)[2].strip() not in outputs[path]
+        stub_dir = ".agents/skills" if profile["skills_discovery"] == "agents_skills" else profile["skills_stub_dir"]
+        path = stub_dir + f"/{skill}/SKILL.md"
+        assert set(outputs) == {path}
+        assert _frontmatter(outputs[path]) == _frontmatter(source)
+        assert f".harness-baseline-configuration/skills/{skill}/SKILL.md" in outputs[path]
+        assert source.split("---", 2)[2].strip() not in outputs[path]
 
 
 def test_retired_skill_registries_are_absent() -> None:

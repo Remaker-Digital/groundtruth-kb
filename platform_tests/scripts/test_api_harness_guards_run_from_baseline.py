@@ -36,7 +36,7 @@ PROVIDERS = (
 def root(tmp_path, monkeypatch):
     root = tmp_path / "selected host"
     shutil.copytree(ROOT / HOOKS, root / HOOKS, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    (root / ".agents/skills").mkdir(parents=True)
+    (root / ".harness-baseline-configuration/skills").mkdir(parents=True)
     (root / "scripts").mkdir()
     for name in (
         "implementation_start_gate.py",

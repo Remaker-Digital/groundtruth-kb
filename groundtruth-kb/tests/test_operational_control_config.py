@@ -793,3 +793,139 @@ def test_writer_refuses_roots_without_git_metadata_before_reading(tmp_path, monk
     if not _junction(entry, elsewhere):
         pytest.skip("The host cannot create a directory junction")
     refused("unsafe_path")
+
+
+def test_bounded_value_update_checks_effect_inside_writer_lock_and_reads_back(tmp_path, monkeypatch):
+    from contextlib import contextmanager
+
+    path = _write(tmp_path, _pair())
+    before = controls.load_operational_control_catalog(tmp_path)
+    active = False
+    original_lock = controls._writer_lock
+    observed = []
+
+    @contextmanager
+    def locked(lock_path):
+        nonlocal active
+        with original_lock(lock_path):
+            active = True
+            try:
+                yield
+            finally:
+                active = False
+
+    def check(current, replacement, phase):
+        assert active and path.read_bytes() == _pair()
+        assert current.definitions["left"].value == 2 and replacement.definitions["left"].value == 4
+        observed.append(phase)
+
+    def verify(catalog, phase):
+        assert active and phase == "forward" and path.read_bytes() == _pair("4", "7")
+        assert catalog.definitions["right"].value == 7
+
+    monkeypatch.setattr(controls, "_writer_lock", locked)
+    result = controls.set_operational_controls(
+        tmp_path, _pair("4", "7"), expected_sha256=before.catalog_sha256, before_effect=check, verify_result=verify
+    )
+    assert result["changed"] and observed == ["forward"]
+
+
+@pytest.mark.parametrize("change", ["metadata", "invariant", "key", "comment"])
+def test_bounded_update_refuses_every_nonvalue_change_before_native_effect(tmp_path, change):
+    path = _write(tmp_path, _pair())
+    original = path.read_bytes()
+    before = controls.load_operational_control_catalog(tmp_path)
+    document = tomlkit.parse(_pair("4", "7").decode())
+    if change == "metadata":
+        document["controls"][0]["description"] = "Different metadata"
+    elif change == "invariant":
+        document["invariants"][0]["operator"] = "lte"
+    elif change == "key":
+        document["controls"].append(_control("another", value="6"))
+    else:
+        document.add(tomlkit.comment("An unrelated comment change"))
+    with pytest.raises(controls.OperationalControlConfigError, match="operation_value_scope_required"):
+        controls.set_operational_controls(
+            tmp_path,
+            tomlkit.dumps(document).encode(),
+            expected_sha256=before.catalog_sha256,
+            before_effect=lambda *_args: pytest.fail("invalid scope reaches no effect check"),
+        )
+    assert path.read_bytes() == original and not list(path.parent.glob(".control-update-*"))
+
+
+def test_bounded_native_refusal_preserves_preimage_and_removes_temporary(tmp_path):
+    path = _write(tmp_path, _pair())
+    before = controls.load_operational_control_catalog(tmp_path)
+
+    def deny(*_args):
+        raise controls.OperationalControlConfigError("operation_bound_required", "No current bound")
+
+    with pytest.raises(controls.OperationalControlConfigError, match="operation_bound_required"):
+        controls.set_operational_controls(
+            tmp_path, _pair("4", "7"), expected_sha256=before.catalog_sha256, before_effect=deny
+        )
+    assert path.read_bytes() == _pair() and not list(path.parent.glob(".control-update-*"))
+
+
+def test_bounded_verification_failure_uses_fresh_compensation_check_and_restores_exact_bytes(tmp_path):
+    path = _write(tmp_path, _pair())
+    before = controls.load_operational_control_catalog(tmp_path)
+    observed = []
+
+    def check(current, replacement, phase):
+        observed.append(phase)
+        if phase == "rollback":
+            assert path.read_bytes() == _pair("4", "7")
+            assert current.definitions["left"].value == 4 and replacement.definitions["left"].value == 2
+
+    def verify(_catalog, phase):
+        if phase == "forward":
+            raise controls.OperationalControlConfigError("operation_verification_failed", "Controlled failure")
+        assert path.read_bytes() == _pair()
+
+    with pytest.raises(controls.OperationalControlConfigError, match="operation_compensated"):
+        controls.set_operational_controls(
+            tmp_path, _pair("4", "7"), expected_sha256=before.catalog_sha256, before_effect=check, verify_result=verify
+        )
+    assert observed == ["forward", "rollback"] and path.read_bytes() == _pair()
+
+
+def test_bounded_compensation_never_overwrites_an_external_edit(tmp_path):
+    path = _write(tmp_path, _pair())
+    before = controls.load_operational_control_catalog(tmp_path)
+    phases = []
+
+    def external_edit(_catalog, _phase):
+        path.write_bytes(_pair("4", "8"))
+        raise controls.OperationalControlConfigError("operation_verification_failed", "External edit observed")
+
+    with pytest.raises(controls.OperationalControlConfigError, match="operation_rollback_failed"):
+        controls.set_operational_controls(
+            tmp_path,
+            _pair("4", "7"),
+            expected_sha256=before.catalog_sha256,
+            before_effect=lambda _old, _new, phase: phases.append(phase),
+            verify_result=external_edit,
+        )
+    assert phases == ["forward"] and path.read_bytes() == _pair("4", "8")
+
+
+def test_bounded_compensation_refusal_leaves_explicit_residual_postimage(tmp_path):
+    path = _write(tmp_path, _pair())
+    before = controls.load_operational_control_catalog(tmp_path)
+
+    def check(_current, _replacement, phase):
+        if phase == "rollback":
+            raise controls.OperationalControlConfigError("operation_bound_expired", "Deadline elapsed")
+
+    def verify(_catalog, _phase):
+        raise controls.OperationalControlConfigError("operation_verification_failed", "Controlled failure")
+
+    with pytest.raises(
+        controls.OperationalControlConfigError, match="operation_rollback_failed.*operation_bound_expired"
+    ):
+        controls.set_operational_controls(
+            tmp_path, _pair("4", "7"), expected_sha256=before.catalog_sha256, before_effect=check, verify_result=verify
+        )
+    assert path.read_bytes() == _pair("4", "7") and not list(path.parent.glob(".control-update-*"))

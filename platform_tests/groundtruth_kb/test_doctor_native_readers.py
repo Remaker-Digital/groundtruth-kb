@@ -28,6 +28,7 @@ from groundtruth_kb.project.doctor import (
     check_standing_backlog_health,
 )
 
+from platform_tests.groundtruth_kb.bridge_fixtures import authorize_project
 from platform_tests.groundtruth_kb.native_fixtures import _serve_authority, put, seed, work_fields
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 
@@ -118,6 +119,7 @@ def test_standing_backlog_health_reads_real_implementation_membership(served, mo
     seed(client)
     result = put(client, "work-items", "WI-OPEN", work_fields(), project_id="PROJECT-1")
     assert result.status_code == 200, result.text
+    authorize_project(client)
     row = result.json()["work_item"]
     service.kernel.mutate_current(
         table="work_items",

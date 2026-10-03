@@ -19,7 +19,7 @@ from pathlib import Path
 
 BASELINE_PREFIX = ".harness-baseline-configuration/"
 # The one skills source (owner ruling D15/D34): stub frontmatter is rendered from it.
-SKILLS_PREFIX = ".agents/skills/"
+SKILLS_PREFIX = ".harness-baseline-configuration/skills/"
 PROJECTOR = Path("scripts/harness_projection/project_harness.py")
 PROFILES = Path("scripts/harness_projection/profiles.toml")
 PENDING_STATUS = "profile_pending"

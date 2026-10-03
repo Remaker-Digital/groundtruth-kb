@@ -2117,6 +2117,22 @@ gt home open
 
 The loopback sign-in URL is handed only to the browser, never printed.
 
+### gt home shortcut
+
+Create or verify a Windows shortcut that starts the installed services and opens
+the standard DeepSeek Harness SDK Home GUI.
+
+```powershell
+gt home shortcut
+gt home shortcut --path "E:\GT-KB\GroundTruth KB.lnk"
+```
+
+The default destination is the current user's Desktop. The shortcut uses the
+selected installation's Python, configuration and working directory. An
+existing matching shortcut is preserved; a conflicting shortcut returns a
+diagnostic before any change. Agent use requires the existing bounded `ops`
+selectors and a bound covering the literal destination.
+
 ---
 
 ### gt services status

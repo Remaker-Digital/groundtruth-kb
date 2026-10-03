@@ -2,7 +2,7 @@
 
 Goose 1.45.0 discovers project plugins only at .agents/plugins/<name>/ through a plugin.json manifest, with nested
 hooks/hooks.json (finding F9). The projector owns that one declared root under the same containment, cleanup and redirect
-checks as a host's config directory; everything else under .agents/ (the one skills source, other plugins) stays foreign.
+checks as a host's config directory; everything else under .agents/ (the shared native discovery catalog, other plugins) stays foreign to Goose.
 """
 
 import json
@@ -63,7 +63,10 @@ def test_goose_owns_exactly_one_declared_extra_root():
         assert project_harness.owning_root(foreign, GOOSE) is None, foreign
     for name, profile in PROFILES["harnesses"].items():
         if name != "goose":
-            assert project_harness.owned_roots(profile) == [profile["config_dir"]], name
+            expected_roots = [profile["config_dir"]]
+            if name in {"codex", "ollama", "openrouter", "alibaba-cloud-studio"}:
+                expected_roots.append(".agents/skills")
+            assert project_harness.owned_roots(profile) == expected_roots, name
     assert not project_harness.build_plan("goose").gaps
 
 

@@ -7,8 +7,8 @@ ROOT = Path(__file__).resolve().parents[2]
 
 LF_POLICY_PATHS = (
     ".gitattributes",
-    ".agents/skills/gtkb-spec-intake/SKILL.md",
-    ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+    ".harness-baseline-configuration/skills/gtkb-spec-intake/SKILL.md",
+    ".harness-baseline-configuration/skills/gtkb-spec-intake/helpers/spec_intake.py",
     ".claude/skills/gtkb-spec-intake/SKILL.md",
     ".cursor/skills/gtkb-spec-intake/SKILL.md",
     ".agent/skills/gtkb-spec-intake/SKILL.md",

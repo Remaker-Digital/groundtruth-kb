@@ -1,73 +1,25 @@
 # (c) 2026 Remaker Digital, a DBA of VanDusen & Palmeter, LLC. All rights reserved.
-"""Regression guard for the single harness baseline layout (WI-6228, Change E; D15).
+"""Single authored baseline, with generated discovery kept distinct (WI-6228).
 
-WHY THIS EXISTS. The baseline transition from ``.agents`` to
-``.harness-baseline-configuration`` landed **inverted**: the old tree was emptied
-before the repoint completed, leaving generators bound to a source root with zero
-files. Nothing failed loudly — one generator's empty-baseline guard is the only
-reason `.claude/skills` was not erased, because these generators prune anything
-absent from the baseline via ``unlink(missing_ok=True)``.
+The historical inverted baseline move emptied a source tree before its readers
+were repointed. Preserve that regression duty: a missing/empty source refuses,
+and current generators cannot silently declare an old source root.
 
-THE D15 LAYOUT. Owner ruling D15 (plan milestone M15 shape), as amended by R3
-under D34 (2026-09-19), splits the neutral baseline by artifact class and gives
-each class exactly one source:
+Rules, hooks, routing and authored Skills now live only under
+.harness-baseline-configuration. The root AGENTS.md and declared root pointer
+files remain authored carriers. Native .agents/skills and the Goose plugin are
+generated discovery output; references to those destinations are legitimate,
+but declaring .agents/skills as the authored skills_root is not.
 
-  - ``.agents/skills/<name>/SKILL.md`` (with its helpers and references) is the
-    ONE skills source. Hosts that discover that directory natively read it in
-    place; the others receive projector-rendered pointer stubs, never copies.
-  - ``.harness-baseline-configuration/{rules,hooks,routing.toml}`` stays the
-    source for rules (read on demand) and hook scripts (run in place).
-  - The root ``AGENTS.md`` is the moved baseline instruction file: tracked
-    source, not a projection (R1 option B).
-
-A second rules or hooks tree under ``.agents``, a skills tree left behind under
-``.harness-baseline-configuration``, or a second instruction file reproduces the
-WI-6228 defect shape exactly: two candidate roots for one class, one of them
-empty or stale, and generators silently bound to the wrong one.
-
-Two assertions make a repeat detectable rather than silent:
-
-  (i)  the tree has exactly the D15 shape (one skills root, one rules/hooks
-       root, one instruction file; no leftover or duplicate tree), and
-  (ii) no source file binds a retired baseline path.
-
-Assertion (ii) is the load-bearing one. A future rename that repoints some
-consumers and not others reproduces the original defect exactly, and (ii) is what
-turns that into a red test instead of a silently inert tree.
-
-WHAT COUNTS AS A BINDING. Not every ``.agents`` token is a baseline reference,
-and conflating them would make this guard both noisy and wrong. Two classes of
-legitimate use exist in-tree and are deliberately excluded:
-
-  - ``.agents/skills`` — since D15 this IS the skills source, so a binding to
-    that prefix is the correct shape rather than a retired one. The detector
-    excludes exactly that segment; ``.agents/rules``, ``.agents/hooks``,
-    ``.agents/commands`` and a bare ``.agents`` root binding stay retired.
-  - ``src.agents.containers.*`` — Python module paths for Agent Red's agent
-    containers. Dotted module names, not filesystem baseline paths.
-  - ``.agents/plugins`` — the host plugin discovery tree (owner ruling D52):
-    Goose discovers a project's hook plugin only at ``.agents/plugins/<name>/``,
-    so the projector renders GT-KB's Goose plugin there as a declared extra
-    output root. It holds generated output, never a baseline source, so a
-    reference to it binds no generator to a source root. The detector excludes
-    exactly that segment, as it does ``skills``.
-
-(A third class, the opt-in ``Path.home() / ".agents"`` extension-discovery path
-of the SQLite-era startup generator, left the tree with that generator in 2026-09.)
-
-The detector therefore matches the retired name only where it is used as a
-project-relative *path* into retired baseline content, which is the shape that
-actually binds a generator to a wrong source root.
-
-Authority: ``bridge/gtkb-wi6228-baseline-path-binding-repoint-002.md`` (GO),
-Implementation Guidance item 5, which requires assertion (ii) be demonstrated
-against a synthetic retired-path binding rather than merely passing today; owner
-ruling D15 as amended by R3 (D34, 2026-09-19) for the layout pinned by (i).
+The detector recognizes retired rules/hooks/root bindings and separately checks
+source-root declarations, so generated catalog references remain usable without
+restoring a second authored source. Dotted Agent Red module paths are unrelated.
 """
 
 from __future__ import annotations
 
 import re
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -75,15 +27,14 @@ import pytest
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 BASELINE = ".harness-baseline-configuration"
-SKILLS_ROOT = ".agents/skills"
+SKILLS_ROOT = ".harness-baseline-configuration/skills"
 ROOT_INSTRUCTIONS = "AGENTS.md"
 
 # Trees whose existence means a second source root for a class that has exactly
-# one under D15, or the emptied predecessor of the class that moved.
+# one in the universal baseline, or the emptied predecessor of the class that moved.
 FORBIDDEN_TREES = (
     ".agents/rules",
     ".agents/hooks",
-    ".harness-baseline-configuration/skills",
 )
 # The instruction file moved to the root under R1 (B); a copy left behind in the
 # baseline directory is a second instruction carrier.
@@ -101,7 +52,7 @@ FORBIDDEN_FILES = (".harness-baseline-configuration/AGENTS.md",)
 # The lookbehind excludes dotted module names: in `src.agents.containers` the
 # `.agents` is preceded by a word character, so it never matches.
 #
-# The trailing lookaheads exclude the D15 skills source and the D52 plugin
+# The trailing lookaheads exclude generated native Skills and the D52 plugin
 # discovery tree in both shapes (`.agents/skills...`, `.agents\plugins...`,
 # `Path(".agents") / "skills"`); the segment must be exactly `skills` or
 # `plugins`, so `.agents/skills-archive/` and `.agents/plugins-old/` still fire.
@@ -109,8 +60,14 @@ _BINDING_RE = re.compile(
     r"(?<![\w.])"  # not preceded by word char or dot -> excludes `src.agents`
     r"\.agents"
     r"(?=[\"'/\\])"  # used as a path: quoted segment, or followed by a separator
-    r"(?![/\\]+(?:skills|plugins)(?![\w-]))"  # ... unless the D15 skills source or the D52 plugin tree
+    r"(?![/\\]+(?:skills|plugins)(?![\w-]))"  # ... unless the generated native catalog or the D52 plugin tree
     r"(?![\"'][\s)]*/\s*[\"'](?:skills|plugins)[\"'])"  # ... also in the `Path(".agents") / "skills"` shape
+)
+
+# Explicit source-root fields/variables cannot point at the generated catalog.
+_SOURCE_SKILLS_BINDING_RE = re.compile(
+    r"\b(?:skills_root|SKILLS_ROOT|BASELINE_SKILLS|shared_skills)\s*=\s*[^\n]*"
+    r"\.agents(?:[/\\]+skills|[\"'][\s)]*/\s*[\"']skills[\"'])"
 )
 
 # Files permitted to mention a retired baseline for reasons other than binding.
@@ -119,14 +76,19 @@ ALLOWED_FILES = {
     # This guard names the retired baseline in order to detect it.
     "platform_tests/scripts/test_single_baseline_binding.py",
     # Governance classification rule `pattern = ".agents/**"`, which assigns a
-    # mutation class to every path under the `.agents` tree (since D15 that is
-    # the skills source; the rule also covers a reappearing rules/hooks tree so
+    # mutation class to every path under the generated `.agents` tree; it also
+    # covers a reappearing rules/hooks tree so
     # it classifies rather than falling through as `unclassified`). It is a
     # classifier entry, not a consumer binding: nothing projects from it. R3
     # keeps it (rulings R3 row: "taxonomy row ... kept").
     "config/governance/project-authorization-operation-taxonomy.toml",
-    # This negative guard rejects non-skill .agents paths; it does not read a baseline.
+    # This negative guard rejects generated .agents targets; it does not read a baseline.
     "scripts/check_commit_pathspec_safety.py",
+    # This read-only inventory enumerates generated target roots; it is not an authored-source binding.
+    "scripts/inventory_projection_authority_references.py",
+    # This inventory classifies .agents as generated output. The scanner test separately
+    # pins its actual roots and rejects an explicit authored-Skills declaration here.
+    "config/governance/neutral-source-inventory.toml",
 }
 
 SCANNED_DIRS = ("scripts", "config")
@@ -136,11 +98,11 @@ SCANNED_SUFFIXES = {".py", ".toml", ".json"}
 def _retired_baseline_bindings(text: str) -> list[str]:
     """Return every retired-baseline path binding found in ``text``.
 
-    Bindings to the D15 skills source (``.agents/skills``) are not retired and
-    are not returned. Split out from the filesystem walk so the detector itself
+    References to generated native Skills are not source bindings. Explicit old
+    authored source declarations remain refused. Split out so the detector itself
     can be exercised against synthetic input — see the reintroduction tests.
     """
-    return [m.group(0) for m in _BINDING_RE.finditer(text)]
+    return [m.group(0) for pattern in (_BINDING_RE, _SOURCE_SKILLS_BINDING_RE) for m in pattern.finditer(text)]
 
 
 def _scanned_files() -> list[Path]:
@@ -170,7 +132,7 @@ def test_baseline_shape_is_exactly_the_d15_layout() -> None:
 
     skills_root = PROJECT_ROOT / SKILLS_ROOT
     assert skills_root.is_dir(), (
-        f"skills source {SKILLS_ROOT!r} is absent. Under D15 it is the one skills "
+        f"skills source {SKILLS_ROOT!r} is absent. It is the one authored skills "
         "root; a projector run against a missing root would prune every stub, "
         "which is the WI-6228 defect this guard exists to prevent."
     )
@@ -182,7 +144,7 @@ def test_baseline_shape_is_exactly_the_d15_layout() -> None:
 
     surviving_trees = [name for name in FORBIDDEN_TREES if (PROJECT_ROOT / name).exists()]
     assert not surviving_trees, (
-        f"second or leftover baseline tree(s) present: {surviving_trees}. D15 gives "
+        f"second or leftover baseline tree(s) present: {surviving_trees}. The baseline gives "
         f"every artifact class one source ({SKILLS_ROOT} for skills; {BASELINE}/rules "
         f"and {BASELINE}/hooks for rules and hooks). Two candidate roots means a "
         "generator run can silently project from the wrong one."
@@ -200,6 +162,17 @@ def test_baseline_shape_is_exactly_the_d15_layout() -> None:
 
 def test_no_source_file_binds_a_retired_baseline_path() -> None:
     """Assertion (ii): no scanned source file binds a retired baseline path."""
+    inventory_text = (PROJECT_ROOT / "config/governance/neutral-source-inventory.toml").read_text(encoding="utf-8")
+    inventory = tomllib.loads(inventory_text)
+    assert inventory["roots"] == {
+        "harness_baseline": BASELINE,
+        "config": "config",
+        "scripts": "scripts",
+        "groundtruth_kb_src": "groundtruth-kb/src/groundtruth_kb",
+    }
+    assert ".agents/" in inventory["projection_prefixes"]["paths"]
+    assert not _SOURCE_SKILLS_BINDING_RE.search(inventory_text)
+
     offenders: dict[str, list[str]] = {}
     for path in _scanned_files():
         rel = path.relative_to(PROJECT_ROOT).as_posix()
@@ -255,22 +228,17 @@ def test_detector_fires_on_a_reintroduced_binding(synthetic: str) -> None:
 @pytest.mark.parametrize(
     "skills_source",
     [
-        'BASELINE_SKILLS = Path(".agents") / "skills"',
-        'prefix=".agents/skills/"',
-        r're.compile(r"\.agents/skills/([^/]+)/helpers/")',
-        'SKILLS_ROOT = ".agents/skills"',
-        "path = Path('.agents\\\\skills')",
+        'BASELINE_SKILLS = Path(".harness-baseline-configuration") / "skills"',
+        'prefix=".harness-baseline-configuration/skills/"',
+        r're.compile(r"\.harness-baseline-configuration/skills/([^/]+)/helpers/")',
+        'SKILLS_ROOT = ".harness-baseline-configuration/skills"',
+        "path = Path('.harness-baseline-configuration\\\\skills')",
     ],
 )
 def test_detector_allows_the_d15_skills_source(skills_source: str) -> None:
-    """Under D15 a binding to ``.agents/skills`` is the correct shape, not a retired one.
-
-    These are the exact strings the pre-D15 guard refused (the first three were
-    its own reintroduction fixtures). Consumers re-pointed at the skills source in
-    later M15 stages must not trip assertion (ii).
-    """
+    """The historical selector now pins five forms of the sole authored baseline Skill source."""
     assert not _retired_baseline_bindings(skills_source), (
-        f"detector flagged a binding to the D15 skills source as retired: {skills_source!r}"
+        f"detector flagged the authored baseline Skill source as retired: {skills_source!r}"
     )
 
 
@@ -314,3 +282,27 @@ def test_detector_does_not_fire_on_unrelated_agents_tokens(legitimate: str) -> N
     assert not _retired_baseline_bindings(legitimate), (
         f"detector wrongly flagged an unrelated token as a baseline binding: {legitimate!r}"
     )
+
+
+@pytest.mark.parametrize(
+    "declaration",
+    [
+        'skills_root = ".agents/skills"',
+        'BASELINE_SKILLS = Path(".agents") / "skills"',
+        'shared_skills = ".agents/skills"',
+    ],
+)
+def test_generated_native_catalog_cannot_be_declared_as_authored_source(declaration: str) -> None:
+    assert _retired_baseline_bindings(declaration)
+
+
+@pytest.mark.parametrize(
+    "output",
+    [
+        'AGENTS_SKILLS_OUTPUT_ROOT = ".agents/skills"',
+        'storage_path = ".agents/skills/example/SKILL.md"',
+        'projected = root / ".agents" / "skills"',
+    ],
+)
+def test_generated_native_catalog_references_do_not_bind_an_authored_source(output: str) -> None:
+    assert not _retired_baseline_bindings(output)

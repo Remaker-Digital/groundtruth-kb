@@ -43,8 +43,10 @@ authority. Correct conflicting instructions and enforcement at their source.
 Project authorization is the owner's `authorized` or `not authorized` field.
 It controls ordering of new work. New execution projects default to authorized;
 the standing intake project, `PROJECT-GTKB-NEW-WORK-INTAKE`, remains not
-authorized. Membership and formal-link changes preserve authorization. Programs
-have no authorization value. The owner applies authorization changes, membership
+authorized. An actual active-member-set change atomically deauthorizes each
+affected execution project. No-op, failed or stale changes preserve authorization;
+formal-link changes preserve it too. Only the owner lever reauthorizes a project.
+Programs have no authorization value. The owner applies authorization changes, membership
 moves and new execution projects in their own terminal; agent harnesses refuse
 `gt projects set-authorization`, `gt projects move-item` and a
 `gt projects record` that creates an execution project. The native project skill
@@ -63,6 +65,25 @@ That explicit relationship set is the starting point for applicability
 investigation. Independently investigate the complete affected formal closure;
 stored proposal citations cannot hide a removed canonical relationship or
 replace a missing, inactive or contradictory requirement.
+
+For an authored dispatchable successor, request the existing context reader with explicit
+`--recipient-role <pb|lo>` and canonical `--activity <activity>`. These inputs
+describe the next receiving context, never a default from the sender's role,
+incoming message, model or harness. The sender identifies critical work knowledge
+and adds repeatable `--critical-section <section-ID>` or `--critical-spec <ID>`
+selections. Include the informative output in the successor's complete authored
+body; the reader does not file a message or supply its envelope.
+
+Required shared, role/activity, linked work/project/test and prerequisite facts
+form a message-context floor. Selected excerpts are not the full
+`DCL-SPEC-RELEVANCE-CLOSURE-001` relevance result: its fixed-point union and ADR
+ID/version/digest/match-path evidence remain separate requirements. Resolve
+selected SAD and baseline references to current canonical records and investigate
+further applicability. Excerpts carry no authority,
+permission, passing result or complete-closure certificate. Missing or conflicting
+inputs remain explicit; failed composition has no silent fallback in either
+output mode. Named excerpts are the minimum context aid, not the full M29 typed
+intersection/compiler, project-delta or `no_delta` capability.
 
 Use `gt backlog record --id <WI-ID> --fields-file <JSON> --expected-version <N>
 --actor <context> --change-reason <reason>` to amend current open work. Progress,
@@ -151,8 +172,10 @@ Sources: `GOV-PROJECT-VERIFIED-COMPLETION-RETIREMENT-001`,
 ## Platform and derived surfaces
 
 Root `AGENTS.md` is the authored shared instruction file. Skills are authored
-once under `.agents/skills`; shared rules, hooks and routing remain under
-`.harness-baseline-configuration`. Named host configurations contain only the
+once under `.harness-baseline-configuration/skills`; shared rules, hooks and routing
+remain under `.harness-baseline-configuration`. Generated native-discovery
+pointer catalogs are never source trees; other host stubs point to
+the same baseline bodies and helpers. Named host configurations contain only the
 declared registrations and pointers, plus projector ownership bookkeeping.
 Change authored sources and regenerate; never manually edit generated output or
 load another harness's files as a fallback. Installed capability requires actual

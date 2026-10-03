@@ -9,7 +9,7 @@ The authored usage guide and terminology configuration live at
 `.harness-baseline-configuration/rules/canonical-terminology.md` and
 `.harness-baseline-configuration/rules/canonical-terminology.toml`. Read focused
 rules there on demand. They are not copied into each host's rules directory.
-Shared skills live under `.agents/skills`; root `AGENTS.md` directs native
+Shared skills live under `.harness-baseline-configuration/skills`; root `AGENTS.md` directs native
 binding, current-state retrieval and task-scoped loading. See
 [Harness projection](harness-projection.md).
 

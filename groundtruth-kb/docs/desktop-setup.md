@@ -52,7 +52,7 @@ local-first setup that supports:
   must have access to the repository before installation.
 - Select a supported harness profile and use its projector. For Claude Code,
   `.claude/` contains native registration and skill pointers; shared skills live
-  in `.agents/skills`, while rules and hook implementations remain under
+  in `.harness-baseline-configuration/skills`, while rules and hook implementations remain under
   `.harness-baseline-configuration`. Supply the account access required by the
   selected host.
 - To use another supported coding environment, select its projector profile;

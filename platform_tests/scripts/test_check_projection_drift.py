@@ -95,15 +95,21 @@ def test_staged_profile_removal_is_a_failure(project):
 
 @pytest.mark.parametrize(
     "staged, validated",
-    [(".agents/skills/x/SKILL.md", True), ("AGENTS.md", False), ("CLAUDE.md", False), (".goosehints", False)],
+    [
+        (".harness-baseline-configuration/skills/x/SKILL.md", True),
+        ("AGENTS.md", False),
+        ("CLAUDE.md", False),
+        (".goosehints", False),
+    ],
 )
 def test_staged_skill_source_triggers_validation(project, monkeypatch, staged, validated):
     """D15: a staged stub source re-validates every profile; the root carriers are not projection inputs."""
-    assert GATE.projection_source(".agents/skills/x/SKILL.md") and GATE.projection_source(
+    assert GATE.projection_source(".harness-baseline-configuration/skills/x/SKILL.md") and GATE.projection_source(
         ".harness-baseline-configuration/rules/r.md"
     )
     assert not any(
-        GATE.projection_source(path) for path in ("AGENTS.md", "CLAUDE.md", ".goosehints", ".agents/other.md")
+        GATE.projection_source(path)
+        for path in ("AGENTS.md", "CLAUDE.md", ".goosehints", ".agents/other.md", ".agents/skills/x/SKILL.md")
     )
     git(project, "-c", "user.email=test@invalid.example", "-c", "user.name=Test", "commit", "-qm", "base")
     write(project, staged, "---\nname: x\ndescription: X.\n---\n" if validated else "pointer bytes\n")

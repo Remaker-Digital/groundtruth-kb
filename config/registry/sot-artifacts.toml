@@ -713,7 +713,7 @@ lifecycle = "generated"
 storage_path = ".agent/skills/"
 coverage_mode = "recursive"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
-mutation_api = "gt harness project antigravity; source .agents/skills and .harness-baseline-configuration through the declared projector profile"
+mutation_api = "gt harness project antigravity; source .harness-baseline-configuration/skills and .harness-baseline-configuration through the declared projector profile"
 versioning_policy = "regenerated_from_source"
 backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
@@ -721,7 +721,7 @@ health_check_function = "gt harness project antigravity --check"
 owner_role = "automated_only"
 depends_on = []
 forbidden_substitutes = []
-notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .agents/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
+notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .harness-baseline-configuration/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
 
 
 [[artifacts]]
@@ -731,7 +731,7 @@ lifecycle = "generated"
 storage_path = ".claude/skills/"
 coverage_mode = "recursive"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
-mutation_api = "gt harness project claude; source .agents/skills and .harness-baseline-configuration through the declared projector profile"
+mutation_api = "gt harness project claude; source .harness-baseline-configuration/skills and .harness-baseline-configuration through the declared projector profile"
 versioning_policy = "regenerated_from_source"
 backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
@@ -739,7 +739,7 @@ health_check_function = "gt harness project claude --check"
 owner_role = "automated_only"
 depends_on = []
 forbidden_substitutes = []
-notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .agents/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
+notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .harness-baseline-configuration/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
 
 
 [[artifacts]]
@@ -1217,7 +1217,7 @@ lifecycle = "generated"
 storage_path = ".goose/skills/"
 coverage_mode = "recursive"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
-mutation_api = "gt harness project goose; source .agents/skills and .harness-baseline-configuration through the declared projector profile"
+mutation_api = "gt harness project goose; source .harness-baseline-configuration/skills and .harness-baseline-configuration through the declared projector profile"
 versioning_policy = "regenerated_from_source"
 backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
@@ -1225,7 +1225,7 @@ health_check_function = "gt harness project goose --check"
 owner_role = "automated_only"
 depends_on = []
 forbidden_substitutes = []
-notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .agents/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
+notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .harness-baseline-configuration/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
 
 
 [[artifacts]]
@@ -5933,7 +5933,7 @@ lifecycle = "generated"
 storage_path = ".cursor/skills/"
 coverage_mode = "recursive"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
-mutation_api = "gt harness project cursor; source .agents/skills and .harness-baseline-configuration through the declared projector profile"
+mutation_api = "gt harness project cursor; source .harness-baseline-configuration/skills and .harness-baseline-configuration through the declared projector profile"
 versioning_policy = "regenerated_from_source"
 backup_policy = "regenerable_from_source"
 restore_action = "regenerate_from_source"
@@ -5941,7 +5941,7 @@ health_check_function = "gt harness project cursor --check"
 owner_role = "automated_only"
 depends_on = []
 forbidden_substitutes = []
-notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .agents/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
+notes = "Frontmatter pointer stubs only; authored skill bodies, helpers and references stay in .harness-baseline-configuration/skills/. Exact generated membership is in the ownership manifest. This existing row replaces its exact path and all related exact rows under the same prefix atomically."
 
 
 [[artifacts]]
@@ -6214,10 +6214,28 @@ forbidden_substitutes = []
 notes = "Canonical neutral source; target adaptations are derived by the registered projector."
 
 [[artifacts]]
+id = "derived-native-skills-catalog"
+domain = "control_surface"
+lifecycle = "generated"
+storage_path = ".agents/skills/"
+coverage_mode = "recursive"
+authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
+mutation_api = "gt harness project codex; gt harness project ollama; gt harness project openrouter; gt harness project alibaba-cloud-studio; source .harness-baseline-configuration/skills and scripts/harness_projection/profiles.toml"
+versioning_policy = "regenerated_from_source"
+backup_policy = "regenerable_from_source"
+restore_action = "regenerate_from_source"
+health_check_function = "gt harness project codex --check"
+owner_role = "automated_only"
+depends_on = []
+forbidden_substitutes = []
+notes = "Shared non-authoritative native discovery catalog. The four native profiles emit identical frontmatter pointer stubs; authored bodies, helpers and references remain in .harness-baseline-configuration/skills/. Exact generated membership is declared by each existing projection manifest; this row grants no authored-source status or exclusive profile ownership."
+
+
+[[artifacts]]
 id = "neutral-baseline-skills"
 domain = "control_surface"
 lifecycle = "active"
-storage_path = ".agents/skills/"
+storage_path = ".harness-baseline-configuration/skills/"
 coverage_mode = "recursive"
 authority_spec_id = "GOV-HARNESS-NEUTRAL-BASELINE-001"
 mutation_api = "governed implementation edit of the neutral baseline"

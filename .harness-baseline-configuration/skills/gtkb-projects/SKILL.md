@@ -107,8 +107,9 @@ change.
 
 A move is one atomic replacement of the item's current parent. It names the
 membership version from work-item readback, not the work-item or project
-version. Both projects keep their authorization. A commit-terminal member is
-immutable. The move must preserve foreign work and satisfy current work
+version. An actual active-member-set change atomically deauthorizes each
+affected execution project. No-op, failed or stale changes preserve authorization;
+only the owner lever reauthorizes it. A commit-terminal member is immutable. The move must preserve foreign work and satisfy current work
 dependencies; inspect any refusal before changing the proposed topology. A new
 execution project starts authorized; the standing intake project is the
 exception.

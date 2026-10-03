@@ -29,7 +29,7 @@ def projection_root(tmp_path, monkeypatch):
     monkeypatch.setattr(projector, "PROJECT_ROOT", tmp_path)
     baseline = tmp_path / ".harness-baseline-configuration"
     (baseline / "hooks").mkdir(parents=True)
-    (tmp_path / ".agents/skills").mkdir(parents=True)
+    (tmp_path / ".harness-baseline-configuration/skills").mkdir(parents=True)
     (baseline / "routing.toml").write_bytes((ROOT / ".harness-baseline-configuration/routing.toml").read_bytes())
     (baseline / "hooks/manifest.toml").write_text(
         'schema_version=1\n[[hook]]\nevent="session_start"\nscript="identity_probe.py"\nblocking=true\n',

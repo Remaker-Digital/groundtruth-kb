@@ -17,7 +17,9 @@ PROFILES = project_harness.load_profiles()["harnesses"]
 
 @pytest.mark.parametrize("harness", sorted(PROFILES))
 def test_current_interview_skill_is_discovered_or_pointed_to(harness):
-    source = (ROOT / ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md").read_text(encoding="utf-8")
+    source = (ROOT / ".harness-baseline-configuration/skills/gtkb-grill-me-for-clarification/SKILL.md").read_text(
+        encoding="utf-8"
+    )
     body = source.split("---", 2)[2].strip()
     assert body
     plan = project_harness.build_plan(harness)
@@ -25,19 +27,23 @@ def test_current_interview_skill_is_discovered_or_pointed_to(harness):
     targets = {
         path: text for path, text in plan.writes.items() if path.endswith("/gtkb-grill-me-for-clarification/SKILL.md")
     }
-    if PROFILES[harness]["skills_discovery"] == "agents_skills":
-        assert targets == {}
-    else:
-        assert len(targets) == 1
-        path, text = next(iter(targets.items()))
-        assert path.startswith(PROFILES[harness]["skills_stub_dir"] + "/")
-        assert ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md" in text
-        assert source.split("---", 2)[1] in text and body not in text
+    stub_dir = (
+        ".agents/skills"
+        if PROFILES[harness]["skills_discovery"] == "agents_skills"
+        else PROFILES[harness]["skills_stub_dir"]
+    )
+    assert len(targets) == 1
+    path, text = next(iter(targets.items()))
+    assert path == stub_dir + "/gtkb-grill-me-for-clarification/SKILL.md"
+    assert ".harness-baseline-configuration/skills/gtkb-grill-me-for-clarification/SKILL.md" in text
+    assert source.split("---", 2)[1] in text and body not in text
     assert not any("decision-capture/" in path for path in plan.writes)
 
 
 def test_shared_interview_guidance_retains_scope_facts_question_application_and_summary():
-    source = (ROOT / ".agents/skills/gtkb-grill-me-for-clarification/SKILL.md").read_text(encoding="utf-8")
+    source = (ROOT / ".harness-baseline-configuration/skills/gtkb-grill-me-for-clarification/SKILL.md").read_text(
+        encoding="utf-8"
+    )
     normalized = " ".join(source.split())
     for duty in (
         "If it is missing, ask for it before starting",

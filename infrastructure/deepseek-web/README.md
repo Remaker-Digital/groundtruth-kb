@@ -4,7 +4,11 @@ GT-KB Home is GT-KB's primary interface (owner rulings D58 and D59). It is the D
 installed with GT-KB, started at logon by the same kind of task as GT-KB's authority and kept running, branded GT-KB by
 Remaker Digital, and extended with GT-KB's own pages. It listens on `127.0.0.1:3080` only.
 
-GT-KB has no single whole-product start or stop. The Home's triggers are:
+The standard GUI is the DeepSeek Harness SDK web app, extended by GT-KB's existing Home plugin.
+
+Use `gt services start all` and `gt services stop all` for the installed persistent service set, in dependency order.
+`gt home open --start-services` starts that set and opens the SDK GUI; `gt home shortcut` creates a shortcut to that
+installed route. The signed-in owner's GUI controls use the existing direct owner commands. The Home's triggers are:
 
 - logon of the owner account (task `GTKB-Home`);
 - a restart within five minutes if it stops without a requested stop;

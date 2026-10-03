@@ -10,7 +10,7 @@ from __future__ import annotations
 import pytest
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim, deliver
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
@@ -40,6 +40,7 @@ def test_unrelated_thread_append_does_not_invalidate_exact_delivery(bridge):
     _, client, contexts, _ = bridge
     request = _go_claim(client, contexts)
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     deliver(client, contexts, "unrelated", "pb2", 1, "NEW", work_item_id="WI-2")
     foreign = _state(client, "unrelated")
     response = client.post("/v1/bridge/target/deliver", json=request)

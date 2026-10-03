@@ -724,9 +724,13 @@ def test_gate_allows_quoted_python_mutation_literals(cmd: str, tmp_path: Path) -
         "python -c \"db.insert_work_item('WI-1')\"",
     ],
 )
-def test_gate_preserves_python_mutation_true_positives(cmd: str, tmp_path: Path) -> None:
+def test_gate_preserves_python_mutation_true_positives(
+    cmd: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(gate.subprocess, "run", lambda *_a, **_k: pytest.fail("Unknown targets must refuse before CLI"))
     payload = {
         "cwd": str(tmp_path),
+        "session_id": "native-current",
         "tool_name": "Bash",
         "tool_input": {"command": cmd},
     }

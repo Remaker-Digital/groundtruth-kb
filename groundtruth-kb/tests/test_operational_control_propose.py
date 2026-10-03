@@ -181,3 +181,191 @@ def test_stale_preview_is_refused_by_digest(tmp_path):
     assert stale.exit_code != 0
     assert "generation_conflict" in stale.output
     assert path.read_bytes() == _pair_bytes(right="6")
+
+
+def _bounded_native_answer(monkeypatch, root, config, *, verification_left=3):
+    from datetime import UTC, datetime, timedelta
+    from types import SimpleNamespace
+
+    from groundtruth_kb import cli_authority
+
+    requests = []
+
+    def request(_method, _path, *, body):
+        requests.append(body)
+        operation = body["operations"][0]
+        targets = ["control:left", "control:right"]
+        bound = {
+            "operation": "controls.set",
+            "targets": targets,
+            "preconditions": {
+                "installation_root": str(root),
+                "config_path": str(config),
+                "controller_paths": {target: str(root / controls.CATALOG_RELATIVE_PATH) for target in targets},
+                "states": {},
+            },
+            "permitted_effects": [
+                {
+                    "target": "control:left",
+                    "effect": "control.set",
+                    "value": requests[0]["operations"][0]["effects"][0]["value"],
+                },
+                {"target": "control:right", "effect": "control.set", "value": 5},
+                *[{"target": target, "effect": "control.restore"} for target in targets],
+            ],
+            "expiry": "claim",
+            "verification": {"control_values": {"left": verification_left, "right": 5}},
+            "containment": {"installation_only": True, "managed_processes_only": True},
+            "rollback": {"restore_initial_state": True, "only_invocation_changes": True},
+        }
+        now = datetime.now(UTC)
+        return {
+            "status": "current",
+            "scope": "operation",
+            "document": body["document"],
+            "fence": body["fence"],
+            "observed_at": now.isoformat(),
+            "deadline": (now + timedelta(minutes=5)).isoformat(),
+            "operations": [{**operation, "bound": bound, "formal_sources": [{"id": "SPEC-1", "version": 2}]}],
+        }
+
+    monkeypatch.setattr(cli_authority, "_client", lambda _ctx: SimpleNamespace(request=request))
+    return requests
+
+
+def _bounded_set(config, proposal, expected):
+    return [
+        "--config",
+        str(config),
+        "controls",
+        "set",
+        "--input",
+        str(proposal),
+        "--expected-sha256",
+        expected,
+        "--activity",
+        "ops",
+        "--native-context-id",
+        "ctx",
+        "--document",
+        "ops-chain",
+        "--fence",
+        "7",
+    ]
+
+
+def test_bounded_cli_set_checks_actual_values_catalog_identity_and_readback(tmp_path, monkeypatch):
+    path, config = _project(tmp_path)
+    proposal = tmp_path / "proposal.toml"
+    proposal.write_bytes(controls.propose_operational_control_value(tmp_path, "left", "3"))
+    before = controls.load_operational_control_catalog(tmp_path)
+    requests = _bounded_native_answer(monkeypatch, tmp_path, config)
+    applied = CliRunner().invoke(main, _bounded_set(config, proposal, before.catalog_sha256))
+    assert applied.exit_code == 0, (applied.output, applied.exception)
+    assert path.read_bytes() == proposal.read_bytes() and len(requests) == 1
+    body = requests[0]
+    assert body["activity"] == "ops" and body["document"] == "ops-chain" and body["fence"] == 7
+    assert body["installation_root"] == str(tmp_path) and body["config_path"] == str(config)
+    assert body["observed_controller_paths"] == {"control:" + key: str(path) for key in ("left", "right")}
+    assert body["operations"] == [
+        {
+            "operation": "controls.set",
+            "targets": ["control:left"],
+            "effects": [{"target": "control:left", "effect": "control.set", "value": 3}],
+        }
+    ]
+
+
+def test_bounded_cli_cannot_claim_value_scope_for_metadata_changes(tmp_path, monkeypatch):
+    path, config = _project(tmp_path)
+    before = controls.load_operational_control_catalog(tmp_path)
+    document = tomlkit.parse(controls.propose_operational_control_value(tmp_path, "left", "3").decode())
+    document["controls"][0]["description"] = "Outside the value-only operation"
+    proposal = tmp_path / "proposal.toml"
+    proposal.write_bytes(tomlkit.dumps(document).encode())
+    requests = _bounded_native_answer(monkeypatch, tmp_path, config)
+    refused = CliRunner().invoke(main, _bounded_set(config, proposal, before.catalog_sha256))
+    assert refused.exit_code != 0 and "operation_value_scope_required" in refused.output
+    assert path.read_bytes() == _pair_bytes() and requests == []
+
+
+def test_bounded_cli_refuses_boolean_readback_as_numeric_authority(tmp_path, monkeypatch):
+    path, config = _project(tmp_path)
+    before = controls.load_operational_control_catalog(tmp_path)
+    proposal = tmp_path / "proposal.toml"
+    proposal.write_bytes(controls.propose_operational_control_value(tmp_path, "left", "1"))
+    _bounded_native_answer(monkeypatch, tmp_path, config, verification_left=True)
+    refused = CliRunner().invoke(main, _bounded_set(config, proposal, before.catalog_sha256))
+    assert refused.exit_code != 0 and "operation_bound_mismatch" in refused.output
+    assert path.read_bytes() == _pair_bytes()
+
+
+def test_bounded_cli_compensation_asks_native_for_actual_restore(tmp_path, monkeypatch):
+    from groundtruth_kb import cli
+
+    path, config = _project(tmp_path)
+    before = controls.load_operational_control_catalog(tmp_path)
+    proposal = tmp_path / "proposal.toml"
+    proposal.write_bytes(controls.propose_operational_control_value(tmp_path, "left", "3"))
+    requests = _bounded_native_answer(monkeypatch, tmp_path, config)
+    original = cli._BoundedControlEffects.verify_result
+
+    def fail_forward(self, catalog, phase):
+        if phase == "forward":
+            raise controls.OperationalControlConfigError("operation_verification_failed", "Controlled failure")
+        original(self, catalog, phase)
+
+    monkeypatch.setattr(cli._BoundedControlEffects, "verify_result", fail_forward)
+    result = CliRunner().invoke(main, _bounded_set(config, proposal, before.catalog_sha256))
+    assert result.exit_code != 0 and "operation_compensated" in result.output
+    assert path.read_bytes() == _pair_bytes() and len(requests) == 2
+    assert requests[1]["operations"][0]["effects"] == [{"target": "control:left", "effect": "control.restore"}]
+
+
+def test_bounded_cli_refuses_deadline_expiry_during_bound_validation_before_catalog_write(tmp_path, monkeypatch):
+    import time
+
+    from groundtruth_kb import cli
+
+    path, config = _project(tmp_path)
+    original_bytes = path.read_bytes()
+    before = controls.load_operational_control_catalog(tmp_path)
+    proposal = tmp_path / "proposal.toml"
+    proposal.write_bytes(controls.propose_operational_control_value(tmp_path, "left", "3"))
+    requests = _bounded_native_answer(monkeypatch, tmp_path, config)
+    clock = {"now": 100.0}
+    monkeypatch.setattr(time, "monotonic", lambda: clock["now"])
+    same_number = cli._BoundedControlEffects._same_number
+
+    def finish_validation_after_deadline(left, right):
+        result = same_number(left, right)
+        # The native response grants five minutes; expire after its first deadline check,
+        # while the otherwise-valid bound readback predicates are being inspected.
+        clock["now"] = 400.0
+        return result
+
+    monkeypatch.setattr(cli._BoundedControlEffects, "_same_number", staticmethod(finish_validation_after_deadline))
+    refused = CliRunner().invoke(main, _bounded_set(config, proposal, before.catalog_sha256))
+    assert refused.exit_code != 0 and "operation_bound_mismatch" in refused.output
+    assert "The existing operation deadline expired" in refused.output
+    assert path.read_bytes() == original_bytes
+    assert len(requests) == 1
+    assert (requests[0]["document"], requests[0]["fence"]) == ("ops-chain", 7)
+
+
+def test_control_callback_retains_discovered_config_outside_project_root(tmp_path, monkeypatch):
+    import click
+
+    from groundtruth_kb import cli
+    from groundtruth_kb import config as config_module
+
+    root = tmp_path / "project"
+    selected = tmp_path / "configuration" / "groundtruth.toml"
+    monkeypatch.setattr(config_module, "_find_config", lambda: selected)
+    callback = cli._BoundedControlEffects(
+        click.Context(click.Command("mock")),
+        root,
+        {"activity": "ops", "native_context_id": "pb-context", "document": "ops-chain", "fence": 7},
+    )
+    assert callback.config_path == str(selected.resolve())
+    assert callback.root == root.resolve()

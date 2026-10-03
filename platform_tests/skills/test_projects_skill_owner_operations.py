@@ -12,7 +12,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILL = ROOT / ".agents/skills/gtkb-projects/SKILL.md"
+SKILL = ROOT / ".harness-baseline-configuration/skills/gtkb-projects/SKILL.md"
 BOUNDARY = "## Owner operations"
 PROGRAM_KIND = re.compile(r"--kind[ =]program\b")
 NEW_RECORD = re.compile(r"--expected-version[ =]0\b")

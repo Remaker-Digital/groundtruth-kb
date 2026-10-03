@@ -70,13 +70,15 @@ def test_registered_projector_points_to_architecture_authoring_and_audit_guidanc
         ("gtkb-adr", "# Architecture decision authoring"),
         ("gtkb-arch-audit", "# Architecture evidence review"),
     ):
-        source = root / ".agents/skills" / skill / "SKILL.md"
+        source = root / ".harness-baseline-configuration/skills" / skill / "SKILL.md"
         body = source.read_text(encoding="utf-8").split(heading, 1)[1].strip()
         assert "gt spec show" in body and "KnowledgeDB(" not in body
         outputs = {path: text for path, text in plan.writes.items() if path.endswith(f"/{skill}/SKILL.md")}
-        if profiles[harness]["skills_discovery"] == "agents_skills":
-            assert outputs == {}
-        else:
-            path = profiles[harness]["skills_stub_dir"] + f"/{skill}/SKILL.md"
-            assert set(outputs) == {path}
-            assert f".agents/skills/{skill}/SKILL.md" in outputs[path] and body not in outputs[path]
+        stub_dir = (
+            ".agents/skills"
+            if profiles[harness]["skills_discovery"] == "agents_skills"
+            else profiles[harness]["skills_stub_dir"]
+        )
+        path = stub_dir + f"/{skill}/SKILL.md"
+        assert set(outputs) == {path}
+        assert f".harness-baseline-configuration/skills/{skill}/SKILL.md" in outputs[path] and body not in outputs[path]

@@ -123,6 +123,8 @@
       "program-label": 1
     },
     "groundtruth-kb/src/groundtruth_kb/native_authority.py": {
+      ".gtkb-state": 1,
+      "deferred-literal": 1,
       "program-label": 4
     },
     "groundtruth-kb/src/groundtruth_kb/operating_status.py": {
@@ -245,6 +247,9 @@
     },
     "platform_tests/groundtruth_kb/test_native_project_formal_links.py": {
       "PAUTH": 1
+    },
+    "platform_tests/groundtruth_kb/test_native_resolution_reconciliation.py": {
+      "deferred-literal": 1
     },
     "platform_tests/groundtruth_kb/test_postgres_bridge_status_checks.py": {
       "DEFERRED": 3,
@@ -474,10 +479,10 @@
       "program-label": 2
     },
     "scripts/harness_projection/profiles.toml": {
-      "program-label": 5
+      "program-label": 4
     },
     "scripts/harness_projection/project_harness.py": {
-      "program-label": 17
+      "program-label": 13
     },
     "scripts/inventory_projection_authority_references.py": {
       ".gtkb-state": 2

@@ -10,7 +10,7 @@ source and regenerate through the supported projector.
 | --- | --- |
 | Root `AGENTS.md` | Shared session instructions, authored and tracked; no second rendered copy |
 | Root `CLAUDE.md` and `.goosehints` | Tracked root pointers whose exact bytes are declared in the profiles |
-| `.agents/skills/<name>/SKILL.md` and its resources | One shared Agent Skills tree |
+| `.harness-baseline-configuration/skills/<name>/SKILL.md` and its resources | One shared Agent Skills tree |
 | `.harness-baseline-configuration/rules` | Focused rules read on demand |
 | `.harness-baseline-configuration/hooks` and `hooks/manifest.toml` | Shared hook implementations and event contract |
 | `.harness-baseline-configuration/routing.toml` | Shared API-harness routing configuration |
@@ -38,11 +38,13 @@ Unmanaged files require explicit reconciliation and are not excused by a clean
 managed-output check. Do not delete a neighboring file or empty directory outside
 the selected projection's bounded ownership.
 
-Skills that require host-local discovery use a `SKILL.md` pointer stub. Its
+Every Skill discovery route uses a `SKILL.md` pointer stub. Native-discovery
+profiles share the identical generated `.agents/skills` catalog, while other
+hosts use their declared local stub directories. Its
 source YAML frontmatter is preserved verbatim, its body points to the shared
 skill, and the source digest covers frontmatter only. Skill resources remain
 under the shared tree. Hosted-application stubs point to
-`../../.agents/skills/<name>/SKILL.md`; they do not create a per-application skill
+`../../.harness-baseline-configuration/skills/<name>/SKILL.md`; they do not create a per-application skill
 body. Adapter-based hook targets resolve inside the host root without `..`;
 redirect and containment refusals remain in force.
 

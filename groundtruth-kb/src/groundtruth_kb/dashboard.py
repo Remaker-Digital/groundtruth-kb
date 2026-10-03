@@ -23,10 +23,11 @@ import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import IO, Any, TypedDict, cast
 
 import yaml
 
@@ -2689,8 +2690,32 @@ def initialize_dashboard(
     return result
 
 
-def install_grafana(paths: DashboardPaths, *, skip_download: bool = False, skip_plugin: bool = False) -> Path:
+def install_grafana(
+    paths: DashboardPaths,
+    *,
+    skip_download: bool = False,
+    skip_plugin: bool = False,
+    config_path: Path | None = None,
+    before_effect: Callable[[str, list[str], list[dict[str, str]], str], Any] | None = None,
+    on_observer: Callable[[Callable[[], dict[str, Any]]], Any] | None = None,
+    ready: Callable[[], Any] | None = None,
+    deadline: Callable[[], float | None] | None = None,
+) -> Path:
     """Install Grafana OSS locally and install the SQLite datasource plugin."""
+    hooks = (before_effect, on_observer, ready, deadline)
+    if any(hook is not None for hook in hooks):
+        if not all(callable(hook) for hook in hooks) or config_path is None:
+            raise ValueError("bounded_dashboard_install_complete_callbacks_and_config_required")
+        return _install_grafana_bounded(
+            paths,
+            config_path=Path(config_path),
+            skip_download=skip_download,
+            skip_plugin=skip_plugin,
+            before_effect=cast(Callable[..., Any], before_effect),
+            on_observer=cast(Callable[..., Any], on_observer),
+            ready=cast(Callable[[], Any], ready),
+            deadline=cast(Callable[[], float | None], deadline),
+        )
     paths.grafana_home.mkdir(parents=True, exist_ok=True)
     grafana_bin = find_grafana_server(paths.grafana_home)
     downloaded = False
@@ -2737,6 +2762,595 @@ def install_grafana(paths: DashboardPaths, *, skip_download: bool = False, skip_
     return grafana_bin
 
 
+def _installation_tree_identity(root: Path) -> dict[str, tuple[Any, ...]]:
+    """Capture physical identity and bytes; redirected or special entries are never removed."""
+    result: dict[str, tuple[Any, ...]] = {}
+    for path in [root, *sorted(root.rglob("*"))]:
+        if path.is_symlink() or path.is_junction():
+            raise ValueError("grafana_installation_redirected_path")
+        observed = path.stat()
+        relative = path.relative_to(root).as_posix()
+        if path.is_file():
+            result[relative] = (
+                "file",
+                observed.st_dev,
+                observed.st_ino,
+                observed.st_size,
+                observed.st_mtime_ns,
+                hashlib.sha256(path.read_bytes()).hexdigest(),
+            )
+        elif path.is_dir():
+            result[relative] = ("directory", observed.st_dev, observed.st_ino)
+        else:
+            raise ValueError("grafana_installation_special_entry")
+    return result
+
+
+def _bounded_installation_destination(paths: DashboardPaths, config_path: Path) -> Path:
+    root = paths.project_root.resolve()
+    expected = root / ".groundtruth" / "tools" / "grafana"
+    if (
+        not root.is_dir()
+        or not config_path.is_absolute()
+        or not paths.grafana_home.is_absolute()
+        or paths.grafana_home != expected
+        or paths.grafana_home.resolve() != expected
+    ):
+        raise ValueError("bounded_dashboard_install_standard_destination_required")
+    for path in (root, root / ".groundtruth", expected.parent, expected):
+        if path.is_symlink() or path.is_junction():
+            raise ValueError("grafana_installation_redirected_path")
+        if path.exists() and not path.is_dir():
+            raise ValueError("grafana_installation_parent_is_not_directory")
+    return expected
+
+
+def _bounded_installation_seconds(deadline: Callable[[], float | None], maximum: float) -> float:
+    due = deadline()
+    if due is None or not math.isfinite(due) or due <= time.monotonic():
+        raise RuntimeError("bounded_dashboard_install_deadline_expired")
+    seconds = min(maximum, due - time.monotonic())
+    if seconds <= 0:
+        raise RuntimeError("bounded_dashboard_install_deadline_expired")
+    return seconds
+
+
+def _bounded_installation_remove(
+    root: Path,
+    captured: dict[str, tuple[Any, ...]],
+    check: Callable[..., None],
+    deadline: Callable[[], float | None],
+    *,
+    phase: str,
+) -> None:
+    if _installation_tree_identity(root) != captured:
+        raise RuntimeError(f"grafana_installation_cleanup_postimage_changed: inspect {root}")
+    check("installation.remove", phase=phase)
+    if _installation_tree_identity(root) != captured:
+        raise RuntimeError(f"grafana_installation_cleanup_postimage_changed: inspect {root}")
+    _bounded_installation_seconds(deadline, 1)
+    shutil.rmtree(root)
+    if root.exists() or root.is_symlink() or root.is_junction():
+        raise RuntimeError(f"grafana_installation_cleanup_unconfirmed: inspect {root}")
+
+
+def _bounded_installation_copy(
+    source: Path,
+    target: Path,
+    check: Callable[..., None],
+    deadline: Callable[[], float | None],
+) -> None:
+    """Copy only inspected ordinary entries into this invocation's fresh tree."""
+    check("installation.publish")
+    for path in [source, *sorted(source.rglob("*"))]:
+        if path.is_symlink() or path.is_junction():
+            raise ValueError("grafana_installation_redirected_path")
+        destination = target / path.relative_to(source)
+        _bounded_installation_seconds(deadline, 1)
+        if path.is_dir():
+            destination.mkdir()
+        elif path.is_file():
+            with path.open("rb") as input_file, destination.open("xb") as output:
+                while chunk := input_file.read(1024 * 1024):
+                    _bounded_installation_seconds(deadline, 1)
+                    output.write(chunk)
+        else:
+            raise ValueError("grafana_installation_special_entry")
+
+
+def _bounded_installation_process(
+    args: list[str],
+    home: Path,
+    log: Any,
+    check: Callable[..., None],
+    deadline: Callable[[], float | None],
+    *,
+    env: dict[str, str] | None = None,
+) -> tuple[subprocess.Popen[bytes], int, str, tuple[Path, dict[str, tuple[Any, ...]]]]:
+    check("installation.publish", "process.start")
+    _bounded_installation_seconds(deadline, 180)
+    temporary = Path(tempfile.mkdtemp(prefix="process-temp-", dir=Path(log.name).parent)).resolve()
+    temporary_identity = _installation_tree_identity(temporary)
+    if env is None:
+        env = {
+            key: value
+            for key, value in os.environ.items()
+            if key.upper() in {"PATH", "SYSTEMROOT", "WINDIR", "PATHEXT", "COMSPEC"}
+        }
+    else:
+        env = dict(env)
+    env.update(TEMP=str(temporary), TMP=str(temporary))
+    name = job_containment.job_name("GTKB-Dashboard-Installer-", temporary)
+    _bounded_installation_seconds(deadline, 180)
+    job = job_containment.create_job(name, inheritable=False)
+
+    def resume(process: subprocess.Popen[bytes]) -> bool:
+        # The held suspended child is positively identified before it can run.
+        # samefile admits only physical equivalence, including extended DOS paths.
+        identity = _process_identity(process.pid)
+        if identity is None or identity.get("pid") != process.pid or not identity.get("created_at"):
+            return False
+        try:
+            if not Path(identity.get("executable", "")).samefile(Path(args[0])):
+                return False
+            check("installation.publish", "process.start")
+            _bounded_installation_seconds(deadline, 180)
+            if _process_identity(process.pid) != identity:
+                return False
+            _bounded_installation_seconds(deadline, 1)
+        except BaseException:  # intentional-catch: refuse admission; shared launcher ends only its suspended child
+            # The shared launcher ends a refused child while still suspended.
+            # This is admission-owned containment, never an existing-service stop.
+            return False
+        return _resume_primary_thread(process)
+
+    try:
+        process = job_containment.start_contained(
+            args,
+            env,
+            job,
+            inherit_job=False,
+            cwd=home,
+            stdout=log,
+            stderr=subprocess.STDOUT,
+            assign=_assign_to_job,
+            resume=resume,
+        )
+        return process, job, name, (temporary, temporary_identity)
+    except BaseException as error:
+        try:
+            if _job_member_pids(job):
+                _stop_job(job, name, timeout=15)  # intrinsic owned-launch containment
+            if _job_member_pids(job):
+                raise RuntimeError("contained_processes_remain")
+        except BaseException as cleanup:  # intentional-catch: report unconfirmed owned-job cleanup
+            raise RuntimeError(
+                f"grafana_installer_launch_cleanup_unconfirmed: job={name}; inspect {home}; {cleanup}"
+            ) from error
+        finally:
+            # No child inherits this invocation's job handle. Last-handle close
+            # provides intrinsic containment even if termination was unconfirmed.
+            _close_handle(job)
+        raise
+
+
+def _bounded_installation_process_end(
+    process: subprocess.Popen[bytes],
+    job: int,
+    name: str,
+    temporary: tuple[Path, dict[str, tuple[Any, ...]]],
+    check: Callable[..., None],
+    deadline: Callable[[], float | None],
+    *,
+    phase: str,
+) -> BaseException | None:
+    refusal = None
+    try:
+        if _job_member_pids(job):
+            try:
+                _bounded_installation_seconds(deadline, 15)
+                check("process.stop", phase=phase)
+                seconds = _bounded_installation_seconds(deadline, 15)
+            except BaseException as error:  # intentional-catch: preserve refusal during owned-job teardown
+                refusal = error
+                seconds = 15  # existing containment teardown wait, never a new grant/TTL
+            _stop_job(job, name, timeout=seconds)
+        process.wait(timeout=10)
+        if _job_member_pids(job):
+            raise RuntimeError("contained_processes_remain")
+    except BaseException as error:  # intentional-catch: report unconfirmed owned containment
+        raise RuntimeError(f"grafana_installer_cleanup_unconfirmed: job={name}; pid={process.pid}; {error}") from error
+    finally:
+        # Exclusively owned, non-inherited job release is intrinsic to admission.
+        # An unconfirmed stop still fails and leaves its staged files untouched.
+        _close_handle(job)
+    if refusal is not None:
+        # The caller must fail the operation even though intrinsic containment
+        # ended its processes. No expired/refused file removal follows here.
+        return refusal
+    root, initial = temporary
+    current = _installation_tree_identity(root)
+    if current.get(".") != initial.get("."):
+        raise RuntimeError(f"grafana_installer_process_temp_identity_changed: inspect {root}")
+    # Opaque process outputs are captured only after every job member ended.
+    try:
+        _bounded_installation_remove(root, current, check, deadline, phase=phase)
+    except BaseException as error:  # intentional-catch: retain the temp residual when its requested inverse is refused
+        raise RuntimeError(
+            f"grafana_installer_process_end_confirmed_temp_cleanup_refused: job={name}; inspect {root}; {error}"
+        ) from error
+    return None
+
+
+def _bounded_download_grafana(stage: Path, check: Callable[..., None], deadline: Callable[[], float | None]) -> Path:
+    archive_path = stage / "release.tar.gz"
+    digest = hashlib.sha256()
+    check("installation.publish")
+    with urllib.request.urlopen(GRAFANA_ARCHIVE_URL, timeout=_bounded_installation_seconds(deadline, 30)) as response:
+        _bounded_installation_seconds(deadline, 1)
+        with archive_path.open("xb") as output:
+            while chunk := response.read(1024 * 1024):
+                _bounded_installation_seconds(deadline, 1)
+                digest.update(chunk)
+                output.write(chunk)
+    if digest.hexdigest() != GRAFANA_ARCHIVE_SHA256:
+        raise ValueError("Grafana archive checksum does not match the pinned release")
+    extracted = stage / "extracted"
+    check("installation.publish")
+    _bounded_installation_seconds(deadline, 1)
+    extracted.mkdir()
+    with tarfile.open(archive_path) as archive:
+        for member in archive:
+            if not (member.isfile() or member.isdir()):
+                raise ValueError("grafana_archive_special_entry")
+            filtered = tarfile.data_filter(member, str(extracted))
+            if filtered is None:
+                raise ValueError("grafana_archive_filtered_entry")
+            destination = extracted / filtered.name
+            if not destination.resolve().is_relative_to(extracted.resolve()):
+                raise ValueError("Invalid Grafana extraction path")
+            _bounded_installation_seconds(deadline, 1)
+            if filtered.isdir():
+                destination.mkdir(parents=True, exist_ok=True)
+            else:
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                _bounded_installation_seconds(deadline, 1)
+                with cast(IO[bytes], archive.extractfile(filtered)) as input_file, destination.open("xb") as output:
+                    while chunk := input_file.read(1024 * 1024):
+                        _bounded_installation_seconds(deadline, 1)
+                        output.write(chunk)
+    binary = find_grafana_server(extracted)
+    if binary is None:
+        raise ValueError("Grafana archive does not contain the expected installation")
+    home = binary.parent.parent.resolve()
+    if not home.is_relative_to(extracted):
+        raise ValueError("Invalid Grafana extraction path")
+    _installation_tree_identity(home)
+    return home
+
+
+def _bounded_install_sqlite_plugin(
+    home: Path,
+    check: Callable[..., None],
+    deadline: Callable[[], float | None],
+    *,
+    on_quiescent: Callable[[], None] | None = None,
+) -> None:
+    server = find_grafana_server(home)
+    if server is None:
+        raise FileNotFoundError("Grafana server was not found in the owned stage")
+    command = [str(server), "cli"] if server.stem == "grafana" else [str(home / "bin" / "grafana-cli.exe")]
+    if not Path(command[0]).is_file():
+        raise FileNotFoundError("Grafana CLI was not found in the owned stage")
+    plugins = home / "data" / "plugins"
+    check("installation.publish")
+    plugins.mkdir(parents=True, exist_ok=True)
+    _bounded_installation_seconds(deadline, 1)
+    with (home / "plugin-install.log").open("xb") as log:
+        process, job, name, process_temporary = _bounded_installation_process(
+            [
+                *command,
+                "--homepath",
+                str(home),
+                "--pluginsDir",
+                str(plugins),
+                "plugins",
+                "install",
+                SQLITE_PLUGIN_ID,
+                SQLITE_PLUGIN_VERSION,
+            ],
+            home,
+            log,
+            check,
+            deadline,
+        )
+        phase = "forward"
+        try:
+            code = process.wait(timeout=_bounded_installation_seconds(deadline, 180))
+            if code:
+                raise subprocess.CalledProcessError(code, command)
+        except BaseException:
+            phase = "rollback"
+            raise
+        finally:
+            refused = _bounded_installation_process_end(
+                process, job, name, process_temporary, check, deadline, phase=phase
+            )
+            if refused is not None:
+                raise RuntimeError(
+                    f"grafana_installer_containment_confirmed_effect_refused: job={name}; {refused}"
+                ) from refused
+            log.close()
+            if on_quiescent is not None:
+                on_quiescent()
+    metadata = json.loads((plugins / SQLITE_PLUGIN_ID / "plugin.json").read_text(encoding="utf-8"))
+    if metadata.get("id") != SQLITE_PLUGIN_ID or metadata.get("info", {}).get("version") != SQLITE_PLUGIN_VERSION:
+        raise ValueError("Installed SQLite plugin identity differs from the pinned version")
+
+
+def _pinned_installation_observation(home: Path) -> tuple[Path, dict[str, Any]]:
+    """An observation is checked against current bytes, never trusted as a permission."""
+    binary = find_grafana_server(home)
+    if binary is None:
+        raise ValueError("grafana_existing_installation_not_pinned")
+    value = json.loads((home / "installed.json").read_text(encoding="utf-8"))
+    plugin = value.get("plugin") if isinstance(value, dict) else None
+    binary_hash = hashlib.sha256(binary.read_bytes()).hexdigest()
+    if (
+        not isinstance(plugin, dict)
+        or value.get("grafana_binary") != str(binary)
+        or value.get("grafana_binary_sha256") != binary_hash
+        or value.get("archive") != {"url": GRAFANA_ARCHIVE_URL, "sha256": GRAFANA_ARCHIVE_SHA256}
+        or value.get("archive_verified_by_this_install") is not True
+        or value.get("plugin_verification") != "verified"
+        or value.get("plugin_install_skipped") is not False
+        or plugin.get("id") != SQLITE_PLUGIN_ID
+        or plugin.get("version") != SQLITE_PLUGIN_VERSION
+        or plugin.get("verifier_version") != GRAFANA_VERSION
+        or plugin.get("verifier_binary_sha256") != binary_hash
+        or plugin.get("signature") != {"signature": "valid", "signatureType": "community", "signatureOrg": "frser"}
+        or plugin.get("files_sha256") != _plugin_file_identities(home / "data" / "plugins" / SQLITE_PLUGIN_ID)
+    ):
+        raise ValueError("grafana_existing_installation_not_pinned")
+    metadata = json.loads((home / "data" / "plugins" / SQLITE_PLUGIN_ID / "plugin.json").read_text(encoding="utf-8"))
+    if metadata.get("id") != SQLITE_PLUGIN_ID or metadata.get("info", {}).get("version") != SQLITE_PLUGIN_VERSION:
+        raise ValueError("grafana_existing_installation_not_pinned")
+    return binary, value
+
+
+def _install_grafana_bounded(
+    paths: DashboardPaths,
+    *,
+    config_path: Path,
+    skip_download: bool,
+    skip_plugin: bool,
+    before_effect: Callable[..., Any],
+    on_observer: Callable[..., Any],
+    ready: Callable[[], Any],
+    deadline: Callable[[], float | None],
+) -> Path:
+    """Publish one cold pinned installation or verify an unchanged pinned installation."""
+    if sys.platform != "win32":
+        raise RuntimeError("Bounded Grafana installation is implemented for Windows AMD64 only")
+    destination = _bounded_installation_destination(paths, config_path)
+    existing = destination.exists()
+    initial = _installation_tree_identity(destination) if existing else None
+    old_binary = _pinned_installation_observation(destination)[0] if existing else None
+    if skip_download or skip_plugin:
+        raise ValueError("bounded_dashboard_install_skip_options_unsupported")
+    verified = False
+
+    def observe() -> dict[str, Any]:
+        actual = _bounded_installation_destination(paths, config_path)
+        result = verified and actual.exists() and _installation_tree_identity(actual) == published_identity
+        if result:
+            _pinned_installation_observation(actual)
+        return {
+            "installation_root": str(paths.project_root.resolve()),
+            "config_path": str(config_path.resolve()),
+            "observed_controller_paths": {"service:dashboard": str(actual)},
+            "states": {},
+            "installation": {"predicate": "pinned_grafana_sqlite", "verified": bool(result)},
+        }
+
+    def check(*effects: str, phase: str = "forward") -> None:
+        _bounded_installation_destination(paths, config_path)
+        if (
+            before_effect(
+                "dashboard.install",
+                ["service:dashboard"],
+                [{"target": "service:dashboard", "effect": effect} for effect in effects],
+                phase,
+            )
+            is False
+        ):
+            raise RuntimeError("bounded_dashboard_install_effect_refused")
+        _bounded_installation_seconds(deadline, 180)
+
+    published_identity = None
+    if on_observer(observe) is False:
+        raise RuntimeError("bounded_dashboard_install_observer_refused")
+    check(phase="preflight")
+    check("installation.publish")
+    # Match the existing Windows downloader's long-path handling throughout the
+    # owned temporary lifecycle; physical identities are used for restoration.
+    stage_parent = str(paths.project_root.resolve())
+    if not stage_parent.startswith("\\\\?\\"):
+        stage_parent = "\\\\?\\" + stage_parent
+    stage_root = Path(tempfile.mkdtemp(prefix=".grafana-install-", dir=stage_parent)).resolve()
+    stage: Path | None = stage_root
+    stage_identity = _installation_tree_identity(stage_root)
+    published = False
+    created_parents: list[tuple[Path, tuple[int, int]]] = []
+
+    def record_quiescent_outputs(home: Path, *, plugin_outputs: bool, plugin_log: bool = False) -> None:
+        nonlocal stage_identity
+        current = _installation_tree_identity(stage_root)
+        # Prior physical entries and bytes remain protected, even inside an
+        # output parent. Cold installation never replaces an existing plugin.
+        if any(current.get(name) != identity for name, identity in stage_identity.items()):
+            raise RuntimeError(f"grafana_installation_phase_preimage_changed: inspect {stage}")
+        relative = home.relative_to(stage_root).as_posix()
+        parents = {relative + "/data", relative + "/data/plugins"}
+        plugin = relative + "/data/plugins/" + SQLITE_PLUGIN_ID
+        log = relative + "/plugin-install.log"
+        for name in current.keys() - stage_identity.keys():
+            item = current[name]
+            permitted = plugin_outputs and (
+                name in parents | {plugin}
+                and item[0] == "directory"
+                or plugin_log
+                and name == log
+                and item[0] == "file"
+                or name.startswith(plugin + "/")
+            )
+            if not permitted:
+                raise RuntimeError(f"grafana_installation_phase_unexpected_output: inspect {stage_root / name}")
+        _bounded_installation_seconds(deadline, 1)
+        stage_identity = current
+
+    try:
+        home = _bounded_download_grafana(stage_root, check, deadline)
+        stage_identity = _installation_tree_identity(stage_root)
+        if existing:
+            # The prior binary/plugin observation does not prove every release
+            # byte. Compare against the hash-verified pinned archive itself.
+            current_files = _plugin_file_identities(destination)
+            release_files = _plugin_file_identities(home)
+            plugin_prefix = "data/plugins/" + SQLITE_PLUGIN_ID + "/"
+            actual_release = {
+                name: digest
+                for name, digest in current_files.items()
+                if name not in {"installed.json", "plugin-install.log"} and not name.startswith(plugin_prefix)
+            }
+            current_dirs = {
+                name for name, item in cast(dict[str, tuple[Any, ...]], initial).items() if item[0] == "directory"
+            }
+            expected_dirs = {name for name, item in _installation_tree_identity(home).items() if item[0] == "directory"}
+            allowed_dirs = expected_dirs | {"data", "data/plugins", "data/plugins/" + SQLITE_PLUGIN_ID}
+            if actual_release != release_files or any(
+                name not in allowed_dirs and not name.startswith(plugin_prefix) for name in current_dirs
+            ):
+                raise ValueError("grafana_existing_installation_release_differs_from_pin")
+            plugins = home / "data" / "plugins"
+            check("installation.publish")
+            plugins.mkdir(parents=True, exist_ok=True)
+            _bounded_installation_copy(
+                destination / "data" / "plugins" / SQLITE_PLUGIN_ID, plugins / SQLITE_PLUGIN_ID, check, deadline
+            )
+            if _installation_tree_identity(destination) != initial:
+                raise RuntimeError("grafana_existing_installation_changed")
+            record_quiescent_outputs(home, plugin_outputs=True)
+        else:
+            _bounded_install_sqlite_plugin(
+                home,
+                check,
+                deadline,
+                on_quiescent=lambda: record_quiescent_outputs(home, plugin_outputs=True, plugin_log=True),
+            )
+        binary = find_grafana_server(home)
+        if binary is None:
+            raise FileNotFoundError("Grafana server was not found in the owned stage")
+        plugin = _verify_sqlite_plugin(
+            binary,
+            home / "data" / "plugins" / SQLITE_PLUGIN_ID,
+            check=check,
+            deadline=deadline,
+        )
+        if _installation_tree_identity(stage_root) != stage_identity:
+            raise RuntimeError("grafana_installation_verifier_stage_changed")
+        _bounded_installation_seconds(deadline, 1)
+        if existing:
+            if _installation_tree_identity(destination) != initial:
+                raise RuntimeError("grafana_existing_installation_changed")
+            published_identity = initial
+            verified = True
+        else:
+            final_binary = destination / binary.relative_to(home)
+            observation = {
+                "observed_at": datetime.now(UTC).isoformat(),
+                "grafana_binary": str(final_binary),
+                "grafana_binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
+                "archive": {"url": GRAFANA_ARCHIVE_URL, "sha256": GRAFANA_ARCHIVE_SHA256},
+                "archive_verified_by_this_install": True,
+                "plugin": plugin,
+                "plugin_verification": "verified",
+                "plugin_install_skipped": False,
+                "purpose": (
+                    "Installation provenance observation; no runtime or canonical authority depends on this file."
+                ),
+            }
+            check("installation.publish")
+            with (home / "installed.json").open("x", encoding="utf-8") as output:
+                json.dump(observation, output, indent=2, allow_nan=False)
+                output.write("\n")
+                output.flush()
+                os.fsync(output.fileno())
+            stage_identity = _installation_tree_identity(stage_root)
+            candidate = _installation_tree_identity(home)
+            for parent in (destination.parent.parent, destination.parent):
+                if not parent.exists():
+                    check("installation.publish")
+                    parent.mkdir()
+                    observed = parent.stat()
+                    created_parents.append((parent, (observed.st_dev, observed.st_ino)))
+            check("installation.publish")
+            _bounded_installation_destination(paths, config_path)
+            if destination.exists() or destination.is_symlink() or destination.is_junction():
+                raise RuntimeError("grafana_installation_destination_appeared")
+            if _installation_tree_identity(home) != candidate:
+                raise RuntimeError("grafana_installation_stage_changed")
+            _bounded_installation_seconds(deadline, 1)
+            # Windows directory rename fails if any destination exists. os.replace
+            # is deliberately never used to publish this cold installation.
+            home.rename(destination)
+            published = True
+            published_identity = candidate
+            if _installation_tree_identity(destination) != published_identity:
+                raise RuntimeError("grafana_installation_publication_changed")
+            _pinned_installation_observation(destination)
+            verified = True
+            stage_identity = _installation_tree_identity(stage_root)
+        _bounded_installation_remove(stage_root, stage_identity, check, deadline, phase="forward")
+        stage = None
+        if ready() is False:
+            raise RuntimeError("bounded_dashboard_install_result_refused")
+        _bounded_installation_seconds(deadline, 1)
+        return cast(Path, old_binary) if existing else final_binary
+    except BaseException as error:
+        verified = False
+        residual = []
+        if published:
+            try:
+                _bounded_installation_remove(
+                    destination, cast(dict[str, tuple[Any, ...]], published_identity), check, deadline, phase="rollback"
+                )
+                published = False
+            except BaseException as cleanup:  # intentional-catch: report destination rollback residual
+                residual.append(f"destination={destination}: {cleanup}")
+        if stage is not None:
+            try:
+                _bounded_installation_remove(stage, stage_identity, check, deadline, phase="rollback")
+            except BaseException as cleanup:  # intentional-catch: report the retained owned-stage residual
+                residual.append(f"stage={stage}: {cleanup}")
+        for parent, identity in reversed(created_parents):
+            try:
+                observed = parent.stat()
+                if (observed.st_dev, observed.st_ino) != identity or any(parent.iterdir()):
+                    raise RuntimeError("parent_postimage_changed")
+                check("installation.remove", phase="rollback")
+                observed = parent.stat()
+                if (observed.st_dev, observed.st_ino) != identity or any(parent.iterdir()):
+                    raise RuntimeError("parent_postimage_changed")
+                _bounded_installation_seconds(deadline, 1)
+                parent.rmdir()
+            except BaseException as cleanup:  # intentional-catch: report changed or unremovable parent residual
+                residual.append(f"parent={parent}: {cleanup}")
+        if residual:
+            raise RuntimeError(f"grafana_installation_residual: {error}; " + "; ".join(residual)) from error
+        raise
+
+
 def _plugin_file_identities(root: Path) -> dict[str, str]:
     """Inspect ordinary files only; a redirected entry cannot identify this plugin."""
     identities = {}
@@ -2750,12 +3364,20 @@ def _plugin_file_identities(root: Path) -> dict[str, str]:
     return identities
 
 
-def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: float = 60) -> dict[str, Any]:
+def _verify_sqlite_plugin(
+    grafana_bin: Path,
+    plugin_root: Path,
+    *,
+    timeout: float = 60,
+    check: Callable[..., None] | None = None,
+    deadline: Callable[[], float | None] | None = None,
+) -> dict[str, Any]:
     """Ask the pinned Grafana runtime to verify exactly these bytes, then stop it.
 
     This installation observation is neither dashboard readiness nor a review
     of plugin behavior. Temporary credentials and data never become runtime state.
     """
+    bounded_deadline = cast(Callable[[], float | None], deadline)
     before = _plugin_file_identities(plugin_root)
     metadata = json.loads((plugin_root / "plugin.json").read_text(encoding="utf-8"))
     if (
@@ -2767,18 +3389,33 @@ def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: floa
         raise ValueError("Installed SQLite plugin identity differs from the pinned version")
     binary_hash = hashlib.sha256(grafana_bin.read_bytes()).hexdigest()
     home = grafana_bin.parent.parent.resolve()
+    if check is not None:
+        check("installation.publish")
     temporary = Path(tempfile.mkdtemp(prefix="plugin-verification-", dir=home)).resolve()
     process = None
+    job = None
+    job_name = None
+    process_temporary = None
+    containment_refusal = None
     identity = None
     cleanup_confirmed = True
     try:
         copied = temporary / "plugins" / SQLITE_PLUGIN_ID
-        shutil.copytree(plugin_root, copied)
+        if check is None:
+            shutil.copytree(plugin_root, copied)
+        else:
+            _bounded_installation_seconds(bounded_deadline, 1)
+            copied.parent.mkdir()
+            _bounded_installation_copy(plugin_root, copied, check, bounded_deadline)
         if _plugin_file_identities(copied) != before:
             raise ValueError("grafana_plugin_changed_during_copy")
         for leaf in ("data", "logs", "provisioning"):
+            if check is not None:
+                _bounded_installation_seconds(bounded_deadline, 1)
             (temporary / leaf).mkdir()
         config = temporary / "grafana.ini"
+        if check is not None:
+            _bounded_installation_seconds(bounded_deadline, 1)
         config.write_text(
             "app_mode = production\n[server]\nhttp_addr = 127.0.0.1\n"
             "[analytics]\nreporting_enabled = false\ncheck_for_updates = false\n"
@@ -2818,23 +3455,37 @@ def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: floa
                 raise ValueError("grafana_verifier_invalid_response")
             return body
 
+        if check is not None:
+            _bounded_installation_seconds(bounded_deadline, 1)
         with (temporary / "verifier.log").open("wb") as log:
-            process = subprocess.Popen(
-                args,
-                cwd=home,
-                env=env,
-                stdout=log,
-                stderr=subprocess.STDOUT,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
+            if check is not None:
+                # A launch exception gives this caller no returned process/job
+                # proof. Keep its files unless normal finalization confirms end.
+                cleanup_confirmed = False
+                process, job, job_name, process_temporary = _bounded_installation_process(
+                    args, home, log, check, bounded_deadline, env=env
+                )
+            else:
+                process = subprocess.Popen(
+                    args,
+                    cwd=home,
+                    env=env,
+                    stdout=log,
+                    stderr=subprocess.STDOUT,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
         cleanup_confirmed = False
         identity = _process_identity(process.pid)
-        deadline = time.monotonic() + timeout
-        while time.monotonic() < deadline:
+        verifier_deadline = time.monotonic() + timeout
+        if check is not None:
+            verifier_deadline = min(
+                verifier_deadline, time.monotonic() + _bounded_installation_seconds(bounded_deadline, timeout)
+            )
+        while time.monotonic() < verifier_deadline:
             if process.poll() is not None:
                 raise RuntimeError("grafana_verifier_exited_before_readiness")
             try:
-                health = request("/api/health", min(2, max(0.1, deadline - time.monotonic())))
+                health = request("/api/health", min(2, max(0.1, verifier_deadline - time.monotonic())))
             except (OSError, ValueError, http.client.HTTPException):
                 # Not ready yet. Until Grafana binds its port, a loopback connect can land on its own ephemeral
                 # source port and read its own request line back as the status line (BadStatusLine).
@@ -2848,7 +3499,8 @@ def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: floa
         if health.get("version") != GRAFANA_VERSION:
             raise ValueError("grafana_verifier_version_differs_from_pin")
         try:
-            settings = request(f"/api/plugins/{SQLITE_PLUGIN_ID}/settings", 5)
+            seconds = 5 if check is None else _bounded_installation_seconds(bounded_deadline, 5)
+            settings = request(f"/api/plugins/{SQLITE_PLUGIN_ID}/settings", seconds)
         except urllib.error.HTTPError as error:
             raise ValueError(f"grafana_plugin_verification_http_{error.code}") from None
         except (OSError, ValueError, http.client.HTTPException):
@@ -2878,18 +3530,48 @@ def _verify_sqlite_plugin(grafana_bin: Path, plugin_root: Path, *, timeout: floa
     finally:
         if process is not None:
             try:
-                if process.poll() is None and (identity is None or not _terminate_pid(process.pid, identity)):
+                if check is not None:
+                    containment_refusal = _bounded_installation_process_end(
+                        process,
+                        cast(int, job),
+                        cast(str, job_name),
+                        cast(tuple[Path, dict[str, tuple[Any, ...]]], process_temporary),
+                        check,
+                        bounded_deadline,
+                        phase="rollback" if sys.exc_info()[0] else "forward",
+                    )
+                    job = None
+                elif process.poll() is None and (identity is None or not _terminate_pid(process.pid, identity)):
                     raise RuntimeError("termination_not_confirmed")
                 process.wait(timeout=10)
                 cleanup_confirmed = True
-            except (OSError, RuntimeError, subprocess.TimeoutExpired):
+            except (OSError, RuntimeError, subprocess.TimeoutExpired) as error:
+                if check is not None:
+                    raise RuntimeError(
+                        f"grafana_verifier_finalization_refused: {error}; inspect {temporary}"
+                    ) from error
                 raise RuntimeError(
                     f"grafana_verifier_cleanup_unconfirmed: pid={process.pid}; inspect {temporary}"
                 ) from None
+        if job is not None and process is None:
+            if _job_member_pids(job):
+                raise RuntimeError(f"grafana_verifier_cleanup_unconfirmed: job={job_name}; inspect {temporary}")
+            _close_handle(job)
+        if containment_refusal is not None:
+            raise RuntimeError(
+                f"grafana_verifier_containment_confirmed_effect_refused: "
+                f"job={job_name}; {containment_refusal}; inspect {temporary}"
+            ) from containment_refusal
         if cleanup_confirmed:
             if temporary.parent != home or not temporary.name.startswith("plugin-verification-"):
                 raise RuntimeError("grafana_verifier_temporary_path_changed")
-            shutil.rmtree(temporary)
+            if check is None:
+                shutil.rmtree(temporary)
+            else:
+                captured = _installation_tree_identity(temporary)
+                _bounded_installation_remove(
+                    temporary, captured, check, bounded_deadline, phase="rollback" if sys.exc_info()[0] else "forward"
+                )
     if _plugin_file_identities(plugin_root) != before:
         raise ValueError("grafana_plugin_changed_during_verification")
     if hashlib.sha256(grafana_bin.read_bytes()).hexdigest() != binary_hash:

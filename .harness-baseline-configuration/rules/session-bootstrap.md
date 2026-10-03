@@ -141,6 +141,43 @@ no prompt block, local database or session progress flag. Respect the explicit
 application configuration or invocation opt-out and keep JSON invocations
 noninteractive. No additional enrollment record or answer archive is created.
 
+## Compose the dispatchable successor's context
+
+Before authoring a dispatchable successor, identify the critical knowledge needed
+from the current work context and request informative body context for that successor's
+explicit receiving role and activity:
+
+```text
+gt context work-item <work-item-id> --recipient-role <pb|lo> --activity <activity> --critical-section <section-ID> --critical-spec <formal-ID>
+```
+
+Use canonical activity tokens `ops`, `deliberation`, `build`, `test`, `spec` or
+`project`. The critical options are optional and repeatable. Select an existing
+named SAD section ID and current canonical formal ID for each addition. They
+expand the required shared, receiving-role/activity and linked canonical floor;
+they never replace it. The role/activity describe the successor being authored,
+not this sender's received message or session role, and the read grants no role,
+activity, claim or operational authority.
+
+Include the informative output in the body of the complete agent-authored
+successor. Author its exact routing envelope independently; the reader does not
+file the message or repair a header. The receiver loads the delivered successor
+and re-queries current canonical facts for its assigned action. A source excerpt,
+hash or reference list is not authority, a passing test, a recall certificate or
+proof of complete affected closure. Non-dispatchable messages have no receiving
+role/activity: use ordinary current-context reads without inventing an envelope.
+Independently investigate additional
+applicability and semantic intersections through current formal sources.
+
+Composition reads named sections of the existing SAD and the authored baseline
+from the service's configured root, resolves cited formal references through the
+canonical reader, and reports missing, invalid, stale or conflicting inputs with
+their recovery routes. A failed composition cannot fall back to a full document,
+projection, alternate path, cached packet or ordinary context, including with
+`--json`. This minimum reader does not generate a typed project delta or
+`no_delta`, compile the complete intersection graph or evaluate the full formal
+corpus. Those broader capabilities remain separate planned work.
+
 ## Continue through the bridge
 
 The received bridge instruction supplies the next action. Read the current

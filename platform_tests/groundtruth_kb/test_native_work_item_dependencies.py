@@ -12,8 +12,8 @@ from groundtruth_kb.bridge.native import NativeBridgeService
 from groundtruth_kb.native_authority import Mutation, SpecMutation, _related, _write
 from groundtruth_kb.postgres_kernel import PostgresKernelError
 
+from platform_tests.groundtruth_kb.bridge_fixtures import authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
-from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver
 from platform_tests.groundtruth_kb.finalization_fixtures import base, commit_product, git, integration, post, verify
 from platform_tests.groundtruth_kb.native_fixtures import history_count, project, put, work_fields
 from platform_tests.groundtruth_kb.native_fixtures import native as native
@@ -24,6 +24,7 @@ pytestmark = [pytest.mark.integration, pytest.mark.timeout(120)]
 def dependent(client, *, project_id="PROJECT-1"):
     result = put(client, "work-items", "WI-2", work_fields(depends_on_work_items=["WI-1"]), project_id=project_id)
     assert result.status_code == 200, result.text
+    authorize_project(client, project_id)
 
 
 def readiness(client):
@@ -39,12 +40,13 @@ def test_same_project_predecessors_allow_one_complete_project_commit(bridge, pat
     before = history_count(service)
     refused = claim(client, "chain-2", "pb1", 0, "NEW", work_item_id="WI-2")
     assert refused.json()["error"]["code"] == "work_item_dependencies_unsatisfied"
-    assert readiness(client)["predecessors"][0]["reason"] == "predecessor_not_verified"
+    assert readiness(client)["predecessors"][0]["reason"] == "predecessor_review_missing"
     assert client.get("/v1/bridge/chain-2/show").status_code == 404
     assert history_count(service) == before
     verify(client, contexts, root, 1, "code.py")
     ready = readiness(client)
     assert ready["ready"] and ready["predecessors"][0]["required_result"] == "independent_review"
+    assert client.get("/v1/work-items/WI-1").json()["work_item"]["resolution_status"] == "open"
     assert client.get("/v1/work-items/WI-2/context").json()["work_item_readiness"] == ready
     assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "active"
     assert client.get("/v1/project-dependencies").json()["records"] == []
@@ -81,6 +83,7 @@ def test_labels_without_review_do_not_satisfy_predecessors_or_block_unrelated_wo
     expected = "predecessor_review_missing" if status == "verified" else "predecessor_not_verified"
     assert report["predecessors"][0]["reason"] == expected
     assert put(client, "work-items", "WI-3", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     assert client.get("/v1/work-items/WI-3/readiness").json()["ready"]
     assert claim(client, "unrelated", "pb1", 0, "NEW", work_item_id="WI-3").status_code == 200
 
@@ -126,6 +129,7 @@ def test_closed_predecessor_with_irregular_membership_reports_a_reason_without_r
     assert refused.json()["error"]["code"] == "work_item_dependencies_unsatisfied"
     assert client.get("/v1/work-items/WI-1/context").json()["error"]["code"] == "invalid_membership"
     assert put(client, "work-items", "WI-3", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     assert client.get("/v1/work-items/WI-3/readiness").json()["ready"]
     assert claim(client, "unrelated", "pb1", 0, "NEW", work_item_id="WI-3").status_code == 200
 
@@ -177,7 +181,12 @@ def test_cross_project_result_requires_commit_and_reaches_a_fresh_context(bridge
     local = old / ("code.py" if overlap else "unrelated-project-work.txt")
     local.write_text("Preserve this project's unfinished work\n", encoding="utf-8")
     verify(client, contexts, root, 1, "code.py")
-    assert readiness(client)["predecessors"][0]["reason"] == "predecessor_project_not_committed"
+    uncommitted = readiness(client)
+    assert not uncommitted["ready"]
+    predecessor = uncommitted["predecessors"][0]
+    assert predecessor["current_status"] == "open"
+    assert predecessor["required_result"] == "project_commit"
+    assert predecessor["reason"] == "predecessor_not_verified"
     prepared = post(client, "prepare-commit").json()
     checkout = Path(prepared["checkout"]["path"])
     git(checkout, "add", "--", "code.py", "tests/test_effect.py")

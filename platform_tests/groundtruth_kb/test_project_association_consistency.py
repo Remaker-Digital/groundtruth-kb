@@ -10,6 +10,7 @@ import pytest
 from groundtruth_kb.native_authority import MembershipMove
 from groundtruth_kb.postgres_kernel import TABLE_SPECS, PostgresKernelError, PostgresTransaction
 
+from platform_tests.groundtruth_kb.bridge_fixtures import authorize_project
 from platform_tests.groundtruth_kb.native_fixtures import history_count, put, seed, work_fields
 from platform_tests.groundtruth_kb.native_fixtures import membership_cli as membership_cli
 from platform_tests.groundtruth_kb.native_fixtures import native as native
@@ -55,6 +56,7 @@ def test_cli_creation_requires_exact_membership_and_reports_canonical_result(
     membership_cli, tmp_path, project, fields, expected_error
 ):
     service, client, cli, _ = membership_cli
+    project_before = client.get("/v1/projects/PROJECT-1").json()["project"]
     before = history_count(service)
     result = creation(cli, tmp_path / "fields.json", project=project, **fields)
     after = client.get("/v1/work-items/WI-NATIVE-MEMBERSHIP")
@@ -63,6 +65,7 @@ def test_cli_creation_requires_exact_membership_and_reports_canonical_result(
         assert expected_error in result.stdout + result.stderr
         assert after.status_code == 404
         assert history_count(service) == before
+        assert client.get("/v1/projects/PROJECT-1").json()["project"] == project_before
         with service.kernel.transaction(read_only=True) as tx:
             assert not tx.list("project_work_item_memberships", filters={"work_item_id": "WI-NATIVE-MEMBERSHIP"})
     else:
@@ -72,7 +75,10 @@ def test_cli_creation_requires_exact_membership_and_reports_canonical_result(
         assert readback["membership"]["project_id"] == "PROJECT-1"
         assert readback["membership"]["work_item_id"] == readback["work_item"]["id"] == "WI-NATIVE-MEMBERSHIP"
         assert readback["membership"]["status"] == "active"
-        assert history_count(service) == before + 2
+        project_after = client.get("/v1/projects/PROJECT-1").json()["project"]
+        assert project_after["authorization"] == "not authorized"
+        assert project_after["version"] == project_before["version"] + 1
+        assert history_count(service) == before + 3
         with service.kernel.transaction(read_only=True) as tx:
             assert (
                 len(
@@ -83,11 +89,44 @@ def test_cli_creation_requires_exact_membership_and_reports_canonical_result(
                 )
                 == 1
             )
+        assert put(client, "projects", "PROJECT-2", {"name": "Receiving CLI project"}).status_code == 200
+        authorize_project(client)
+        projects_before = {
+            name: client.get(f"/v1/projects/{name}").json()["project"] for name in ("PROJECT-1", "PROJECT-2")
+        }
+        move_history = history_count(service)
+        moved = cli(
+            "projects",
+            "move-item",
+            "--work-item-id",
+            "WI-NATIVE-MEMBERSHIP",
+            "--from-project",
+            "PROJECT-1",
+            "--to-project",
+            "PROJECT-2",
+            "--expected-version",
+            str(readback["membership"]["version"]),
+            "--actor",
+            "qualification",
+            "--change-reason",
+            "Owner reconciles membership",
+            "--json",
+        )
+        assert moved.returncode == 0, moved.stderr
+        current = client.get("/v1/work-items/WI-NATIVE-MEMBERSHIP").json()
+        assert json.loads(moved.stdout)["membership"] == current["membership"]
+        assert current["membership"]["project_id"] == "PROJECT-2"
+        for name, previous in projects_before.items():
+            project_after = client.get(f"/v1/projects/{name}").json()["project"]
+            assert project_after["authorization"] == "not authorized"
+            assert project_after["version"] == previous["version"] + 1
+        assert history_count(service) == move_history + 4
 
 
 def test_membership_write_failure_rolls_back_created_work_and_history(native, monkeypatch):
     service, client, _, _ = native
     seed(client)
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
     before = history_count(service)
     original = PostgresTransaction.mutate
     interrupted = []
@@ -108,6 +147,7 @@ def test_membership_write_failure_rolls_back_created_work_and_history(native, mo
     assert interrupted == [True]
     assert history_count(service) == before
     assert client.get("/v1/work-items/WI-ATOMIC").status_code == 404
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == project
     with service.kernel.transaction(read_only=True) as tx:
         assert not tx.list("project_work_item_memberships", filters={"work_item_id": "WI-ATOMIC"})
 
@@ -269,7 +309,12 @@ def test_concurrent_moves_of_one_open_item_leave_exactly_one_active_membership(n
     _project(client, "PROJECT-2")
     _project(client, "PROJECT-3")
     assert put(client, "work-items", "WI-MOVE", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     current = client.get("/v1/work-items/WI-MOVE").json()["membership"]
+    projects_before = {
+        name: client.get(f"/v1/projects/{name}").json()["project"] for name in ("PROJECT-1", "PROJECT-2", "PROJECT-3")
+    }
+    before = history_count(service)
 
     def move(destination):
         try:
@@ -296,14 +341,27 @@ def test_concurrent_moves_of_one_open_item_leave_exactly_one_active_membership(n
         active = tx.list("project_work_item_memberships", filters={"work_item_id": "WI-MOVE", "status": "active"})
     assert len(active) == 1 and active[0]["project_id"] in {"PROJECT-2", "PROJECT-3"}
     assert client.get("/v1/work-items/WI-MOVE").json()["membership"]["id"] == active[0]["id"]
+    affected = {"PROJECT-1", active[0]["project_id"]}
+    for name, previous in projects_before.items():
+        project = client.get(f"/v1/projects/{name}").json()["project"]
+        if name in affected:
+            assert project["authorization"] == "not authorized" and project["version"] == previous["version"] + 1
+        else:
+            assert project == previous
+    assert history_count(service) == before + 4
 
 
-def test_interrupted_move_rolls_back_to_the_original_membership(native, monkeypatch):
+@pytest.mark.parametrize("fault", ["membership", "authorization"])
+def test_interrupted_move_rolls_back_to_the_original_membership(native, monkeypatch, fault):
     service, client, _, _ = native
     seed(client)
     _project(client, "PROJECT-2")
     assert put(client, "work-items", "WI-INTERRUPTED", work_fields(), project_id="PROJECT-1").status_code == 200
+    authorize_project(client)
     original = client.get("/v1/work-items/WI-INTERRUPTED").json()["membership"]
+    projects_before = {
+        name: client.get(f"/v1/projects/{name}").json()["project"] for name in ("PROJECT-1", "PROJECT-2")
+    }
     before = history_count(service)
     original_mutate = PostgresTransaction.mutate
     membership_writes = []
@@ -311,9 +369,12 @@ def test_interrupted_move_rolls_back_to_the_original_membership(native, monkeypa
     def fail_between_removal_and_insertion(tx, **request):
         if request["table"] == "project_work_item_memberships":
             membership_writes.append(request["new_state"]["status"])
-            if len(membership_writes) == 2:
+            if fault == "membership" and len(membership_writes) == 2:
                 # The removal is already written inside this transaction; the destination write fails.
                 raise PostgresKernelError("fixture_move_failure", "Qualification fault between removal and insertion")
+        if fault == "authorization" and request["table"] == "projects" and request["identity"]["id"] == "PROJECT-2":
+            assert tx.get("projects", {"id": "PROJECT-1"})["authorization"] == "not authorized"
+            raise PostgresKernelError("fixture_move_failure", "Qualification fault after source deauthorization")
         return original_mutate(tx, **request)
 
     monkeypatch.setattr(PostgresTransaction, "mutate", fail_between_removal_and_insertion)
@@ -333,6 +394,7 @@ def test_interrupted_move_rolls_back_to_the_original_membership(native, monkeypa
     monkeypatch.setattr(PostgresTransaction, "mutate", original_mutate)
     assert client.get("/v1/work-items/WI-INTERRUPTED").json()["membership"] == original
     assert history_count(service) == before
+    assert {name: client.get(f"/v1/projects/{name}").json()["project"] for name in projects_before} == projects_before
     with service.kernel.transaction(read_only=True) as tx:
         rows = tx.list("project_work_item_memberships", filters={"work_item_id": "WI-INTERRUPTED"})
     assert [row["status"] for row in rows] == ["active"] and rows[0]["version"] == original["version"]

@@ -37,5 +37,10 @@ def test_wi7164_canonical_emergency_bootstrap_operational_event(bridge):
         assert replay.json() == {"status": "already_delivered", "document": "repair", "version": version}
     assert (root / "code.py").read_bytes() == original
     work = client.get("/v1/work-items/WI-1").json()
-    assert work["work_item"]["resolution_status"] == "verified"
+    assert work["work_item"]["resolution_status"] == "open"
+    assert work["work_item"]["completion_evidence"] is None
+    review = client.get("/v1/bridge/repair/show").json()["attempt"]
+    assert review["head_status"] == "VERIFIED" and review["disposition"] == "active"
+    assert review["terminal_commit"] is None
+    assert accepted.json()["project_ready_for_commit"] is True
     assert client.get("/v1/projects/PROJECT-1").json()["project"]["status"] == "active"

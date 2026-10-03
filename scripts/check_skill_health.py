@@ -30,7 +30,7 @@ from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
-DEFAULT_SKILL_ROOTS: tuple[str, ...] = (".agents/skills",)
+DEFAULT_SKILL_ROOTS: tuple[str, ...] = (".harness-baseline-configuration/skills",)
 
 # --- Detection patterns ------------------------------------------------------
 
@@ -218,7 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         "--skills-root",
         action="append",
         dest="skill_roots",
-        help="Skill root to scan (repeatable). Defaults to the shared authored .agents/skills.",
+        help="Skill root to scan (repeatable). Defaults to the shared authored .harness-baseline-configuration/skills.",
     )
     parser.add_argument("--run-id", default=None, help="Run label included in the report.")
     parser.add_argument(

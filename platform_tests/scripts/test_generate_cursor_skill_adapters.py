@@ -27,7 +27,7 @@ def cursor_profiles(monkeypatch):
 def _fixture(root: Path, names=("alpha", "beta")):
     (root / ".harness-baseline-configuration").mkdir(parents=True, exist_ok=True)
     for name in names:
-        directory = root / ".agents/skills" / name
+        directory = root / ".harness-baseline-configuration/skills" / name
         directory.mkdir(parents=True)
         (directory / "SKILL.md").write_bytes(
             (
@@ -85,7 +85,7 @@ def test_cursor_plan_uses_only_neutral_sources_and_does_not_write(tmp_path, monk
 
 def test_cursor_pointer_keeps_frontmatter_and_resources_remain_authored(tmp_path, monkeypatch, cursor_profiles):
     _fixture(tmp_path, ("alpha",))
-    source = tmp_path / ".agents/skills/alpha"
+    source = tmp_path / ".harness-baseline-configuration/skills/alpha"
     before = _bytes(source)
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
     assert project_harness.run("cursor", "write") == 0
@@ -93,7 +93,7 @@ def test_cursor_pointer_keeps_frontmatter_and_resources_remain_authored(tmp_path
     assert raw.startswith(b"---\n") and b"\r" not in raw
     text = raw.decode()
     assert yaml.safe_load(text.split("---", 2)[1]) == {"name": "alpha", "description": "alpha skill"}
-    assert ".agents/skills/alpha/SKILL.md" in text
+    assert ".harness-baseline-configuration/skills/alpha/SKILL.md" in text
     assert "scripts/harness_projection/project_harness.py" in text
     assert "Run {{HARNESS_SKILLS_DIR}}" not in text
     assert _bytes(source) == before, "authored helpers and references are never rewritten"
@@ -155,7 +155,7 @@ def test_cursor_refresh_preserves_unlisted_work_and_removes_retired_outputs(tmp_
 @pytest.mark.parametrize("defect", ["frontmatter-token", "name-mismatch"])
 def test_cursor_source_gaps_refuse_all_projection_writes(tmp_path, monkeypatch, cursor_profiles, defect):
     _fixture(tmp_path, ("alpha",))
-    source = tmp_path / ".agents/skills/alpha/SKILL.md"
+    source = tmp_path / ".harness-baseline-configuration/skills/alpha/SKILL.md"
     if defect == "frontmatter-token":
         source.write_text("---\nname: alpha\ndescription: '{{UNKNOWN_CONTROL}}'\n---\nBody.\n", encoding="utf-8")
     else:

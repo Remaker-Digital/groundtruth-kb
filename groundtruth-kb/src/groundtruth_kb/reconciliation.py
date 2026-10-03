@@ -496,18 +496,17 @@ def find_duplicate_specs(
 
 
 def find_expired_provisionals(source: SpecSource) -> ReconciliationReport:
-    """Find active provisional specs whose replacement has a verified implementation.
+    """Report provisional candidates whose replacement has a caller-asserted marker.
 
     A provisional spec is one with ``authority == 'provisional'`` and a
-    ``provisional_until`` reference to its replacement.  It is 'expired' when
-    the referenced replacement record exists and carries
-    ``implementation_verified_at``: the native marker that the replacement's
-    implementation was verified.  The SQLite lifecycle statuses
-    ``implemented``/``verified`` do not exist natively (``status`` is
-    ``active``, ``superseded`` or ``retired``), so the verification timestamp
-    is the equivalent signal.  A replacement without it, or a dangling
-    reference, does NOT expire the provisional: it remains load-bearing until
-    its replacement has actually shipped.
+    ``provisional_until`` reference to its replacement. The existing detector
+    reports it when that replacement carries ``implementation_verified_at``.
+    The service stamps this caller assertion after checking executable TEST
+    linkage and active plan membership; it does not execute tests or establish
+    independent review, acceptance or shipped work. The ``expired_provisional``
+    finding is a reconciliation candidate, never automatic retirement or PASS.
+    A missing marker or dangling reference produces no finding here; that absence
+    does not establish whether the replacement was delivered.
 
     Note on field separation: ``provisional`` is an AUTHORITY value, not a
     STATUS value.  Do not filter on ``spec.status == 'provisional'`` — no

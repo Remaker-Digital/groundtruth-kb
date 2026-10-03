@@ -7,7 +7,7 @@ harness, model or registry does not assign a role. Do not switch roles to make
 self-review appear independent.
 
 Use the `gtkb-bridge`, `gtkb-proposal-review` and `gtkb-verify` skills and the
-`file-bridge-protocol` rule. Load these skills from `.agents/skills`. A host
+`file-bridge-protocol` rule. Load these skills from `.harness-baseline-configuration/skills`. A host
 stub only points there. Obtain current task requirements through
 `gt context work-item` and active messages through `gt bridge show`. Harnesses
 have no direct contact or dependency on one another; all work exchange uses the

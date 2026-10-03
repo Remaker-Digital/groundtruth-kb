@@ -20,11 +20,13 @@ def seed(root, monkeypatch):
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", root)
     monkeypatch.setattr(project_harness, "load_profiles", lambda: copy.deepcopy(PROFILES))
     (root / ".harness-baseline-configuration/hooks").mkdir(parents=True)
-    skill = root / ".agents/skills/alpha"
+    skill = root / ".harness-baseline-configuration/skills/alpha"
     skill.mkdir(parents=True)
     (skill / "SKILL.md").write_bytes(
         b"\xef\xbb\xbf"
-        + (FRONTMATTER + "Read .agents/skills/alpha/references/notes.md.\n").replace("\n", "\r\n").encode()
+        + (FRONTMATTER + "Read .harness-baseline-configuration/skills/alpha/references/notes.md.\n")
+        .replace("\n", "\r\n")
+        .encode()
     )
     (skill / "helpers").mkdir()
     (skill / "helpers/run.py").write_bytes(b"print('example')\r\n")
@@ -55,10 +57,10 @@ def test_pointer_preserves_frontmatter_and_never_copies_body_or_resources(projec
     rendered = (destination / "SKILL.md").read_text(encoding="utf-8")
     assert rendered.startswith(FRONTMATTER)
     assert yaml.safe_load(rendered.split("---", 2)[1])["allowed-tools"] == ["Read", "Bash"]
-    assert ".agents/skills/alpha/SKILL.md" in rendered
-    assert "Read .agents/skills/alpha/references/notes.md." not in rendered
+    assert ".harness-baseline-configuration/skills/alpha/SKILL.md" in rendered
+    assert "Read .harness-baseline-configuration/skills/alpha/references/notes.md." not in rendered
     assert sorted(p.name for p in destination.iterdir()) == ["SKILL.md"]
-    assert (source / "SKILL.md").read_bytes() == before[".agents/skills/alpha/SKILL.md"]
+    assert (source / "SKILL.md").read_bytes() == before[".harness-baseline-configuration/skills/alpha/SKILL.md"]
     manifest_path = next(p for p in plan.writes if p.endswith("/.projection-manifest.json"))
     manifest = json.loads((root / manifest_path).read_text(encoding="utf-8"))
     assert set(manifest["paths"]) == set(plan.writes)
@@ -159,9 +161,93 @@ def test_failed_replace_preserves_target_and_foreign_temporary(projection, monke
 
 
 @pytest.mark.parametrize("name", NATIVE_HOSTS)
-def test_native_skill_hosts_emit_no_skill_tree(name, tmp_path, monkeypatch):
+def test_native_skill_hosts_emit_only_baseline_pointer_files(name, tmp_path, monkeypatch):
     source = seed(tmp_path, monkeypatch)
     plan = project_harness.build_plan(name)
     assert not plan.gaps, plan.gaps
-    assert not [path for path in plan.writes if "/skills/" in path]
+    catalog = {path: text for path, text in plan.writes.items() if path.startswith(".agents/skills/")}
+    assert set(catalog) == {".agents/skills/alpha/SKILL.md"}
+    assert catalog[".agents/skills/alpha/SKILL.md"].startswith(FRONTMATTER)
+    assert (
+        "Read and follow `.harness-baseline-configuration/skills/alpha/SKILL.md`"
+        in catalog[".agents/skills/alpha/SKILL.md"]
+    )
+    assert "Authored reference." not in catalog[".agents/skills/alpha/SKILL.md"]
+    assert not [path for path in plan.writes if "/helpers/" in path or "/references/" in path]
     assert (source / "helpers/run.py").read_bytes() == b"print('example')\r\n"
+
+
+def test_native_profiles_share_identical_catalog_bytes_and_body_edits_are_read_in_place(tmp_path, monkeypatch):
+    source = seed(tmp_path, monkeypatch)
+    assert len(NATIVE_HOSTS) == 4
+    first = {}
+    for name in NATIVE_HOSTS:
+        plan = project_harness.build_plan(name)
+        assert not plan.gaps, (name, plan.gaps)
+        catalog = {path: text for path, text in plan.writes.items() if path.startswith(".agents/skills/")}
+        assert set(catalog) == {".agents/skills/alpha/SKILL.md"}
+        manifest = json.loads(plan.writes[PROFILES["harnesses"][name]["config_dir"] + "/.projection-manifest.json"])
+        assert set(catalog) <= set(manifest["paths"])
+        first[name] = catalog
+    assert all(catalog == first[NATIVE_HOSTS[0]] for catalog in first.values())
+    (source / "SKILL.md").write_text(FRONTMATTER + "Changed authored body.\n", encoding="utf-8")
+    (source / "helpers/run.py").write_text("print('changed')\n", encoding="utf-8")
+    for name in NATIVE_HOSTS:
+        plan = project_harness.build_plan(name)
+        catalog = {path: text for path, text in plan.writes.items() if path.startswith(".agents/skills/")}
+        assert catalog == first[name]
+
+
+def test_only_fixed_native_catalog_sharing_is_allowed(tmp_path, monkeypatch):
+    seed(tmp_path, monkeypatch)
+    profiles = copy.deepcopy(PROFILES)
+    first, second = NATIVE_HOSTS[:2]
+    profiles["harnesses"][second]["extra_output_roots"] = [profiles["harnesses"][first]["config_dir"]]
+    monkeypatch.setattr(project_harness, "load_profiles", lambda: profiles)
+    plan = project_harness.build_plan(second)
+    assert any("extra_output_root_overlaps" in gap for gap in plan.gaps), plan.gaps
+    assert not (tmp_path / ".agents").exists()
+
+
+def test_native_catalog_retires_only_named_resources_and_preserves_unmanaged_neighbors(tmp_path, monkeypatch):
+    source = seed(tmp_path, monkeypatch)
+    name = NATIVE_HOSTS[0]
+    profile = PROFILES["harnesses"][name]
+    resources = {
+        ".agents/skills/gtkb-promote/references/validation-rules.md",
+        ".agents/skills/gtkb-query/references/api-reference.md",
+        ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+        ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+        ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+        ".agents/skills/gtkb-spec/references/assertion-format.md",
+        ".agents/skills/gtkb-work-item/references/taxonomy.md",
+    }
+    for native in NATIVE_HOSTS:
+        assert resources <= set(PROFILES["harnesses"][native]["leftover_paths"])
+        assert not any(
+            path.startswith(".agents/skills") for path in PROFILES["harnesses"][native].get("leftover_trees", [])
+        )
+    for path in resources:
+        target = tmp_path / path
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(b"Former tracked resource.\n")
+    neighbor = tmp_path / ".agents/skills/gtkb-spec-intake/helpers/local.py"
+    neighbor.write_bytes(b"Unmanaged neighbor.\n")
+    extra = tmp_path / ".agents/skills/local/SKILL.md"
+    extra.parent.mkdir(parents=True)
+    extra.write_bytes(b"Independent local skill.\n")
+    before = snapshots(tmp_path)
+    plan = project_harness.build_plan(name)
+    assert not plan.gaps, plan.gaps
+    assert resources <= set(plan.removes)
+    assert neighbor.relative_to(tmp_path).as_posix() not in plan.removes
+    assert extra.relative_to(tmp_path).as_posix() not in plan.removes
+    assert snapshots(tmp_path) == before
+    assert project_harness.run(name, "write") == 0
+    assert all(not (tmp_path / path).exists() for path in resources)
+    assert neighbor.read_bytes() == b"Unmanaged neighbor.\n"
+    assert extra.read_bytes() == b"Independent local skill.\n"
+    assert (source / "helpers/run.py").read_bytes() == b"print('example')\r\n"
+    manifest = json.loads((tmp_path / profile["config_dir"] / ".projection-manifest.json").read_text())
+    assert neighbor.relative_to(tmp_path).as_posix() not in manifest["paths"]
+    assert extra.relative_to(tmp_path).as_posix() not in manifest["paths"]

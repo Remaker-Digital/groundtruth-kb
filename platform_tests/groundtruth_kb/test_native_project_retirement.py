@@ -170,12 +170,13 @@ def test_project_retirement_is_status_only_and_refuses_open_members_first(native
     link = put(client, "project-formal-links", "LINK-1", {"project_id": "PROJECT-1", "artifact_ref": "SPEC-1"})
     assert link.status_code == 200, link.text
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    project_version = client.get("/v1/projects/PROJECT-1").json()["project"]["version"]
     before = state(client, service, "PROGRAM-1", "PROJECT-1")
     # Open members refuse first: the program holds an active child, the project an open item.
     program = retire(client, "PROGRAM-1", version=1)
     assert program.status_code == 422 and error(program)["code"] == "members_open", program.text
     assert error(program)["details"] == {"id": "PROGRAM-1", "work_item_ids": [], "project_ids": ["PROJECT-1"]}
-    blocked = retire(client, "PROJECT-1", version=1)
+    blocked = retire(client, "PROJECT-1", version=project_version)
     assert blocked.status_code == 422 and error(blocked)["code"] == "members_open", blocked.text
     assert error(blocked)["details"] == {"id": "PROJECT-1", "work_item_ids": ["WI-1"], "project_ids": []}
     assert state(client, service, "PROGRAM-1", "PROJECT-1") == before
@@ -192,7 +193,7 @@ def test_project_retirement_is_status_only_and_refuses_open_members_first(native
     assert row["status"] == "retired" and row["version"] == shown["project"]["version"] + 1
     assert row["changed_by"] == "qualification" and row["change_reason"] == REASON
     assert unchanged(row) == unchanged(shown["project"])
-    assert (row["kind"], row["authorization"], row["parent_project_id"]) == ("project", "authorized", "PROGRAM-1")
+    assert (row["kind"], row["authorization"], row["parent_project_id"]) == ("project", "not authorized", "PROGRAM-1")
     assert row["completed_at"] is None
     # Memberships, links, dependencies and children are exactly as before; only the row changed.
     assert client.get("/v1/projects/PROJECT-1").json() == {**shown, "project": row}
@@ -264,7 +265,7 @@ def test_project_retirement_refusals_leave_row_and_history_unchanged(native):
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
     planted = plant(service, client, "WI-1", resolution_status="wont_fix")
     assert planted["membership"]["status"] == "active"
-    result = retire(client, "PROJECT-1", version=1)
+    result = retire(client, "PROJECT-1", version=client.get("/v1/projects/PROJECT-1").json()["project"]["version"])
     assert result.status_code == 200, result.text
     assert client.get("/v1/work-items/WI-1").json() == planted
     assert client.get("/v1/projects/PROJECT-1").json()["memberships"] == [planted["membership"]]
@@ -366,6 +367,7 @@ def test_concurrent_project_retirement_records_one_transition(native):
 def test_real_cli_projects_retire_reads_back_and_refuses_when_authority_is_unavailable(membership_cli):
     service, client, cli, stop = membership_cli
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    project_version = client.get("/v1/projects/PROJECT-1").json()["project"]["version"]
 
     def command(record_id, version, *extra, reason=REASON):
         return cli(
@@ -402,9 +404,9 @@ def test_real_cli_projects_retire_reads_back_and_refuses_when_authority_is_unava
         stale,
         "cas_conflict",
         "Read the current project before retiring it",
-        {"id": "PROJECT-1", "expected": 9, "actual": 1},
+        {"id": "PROJECT-1", "expected": 9, "actual": project_version},
     )
-    members = command("PROJECT-1", 1, "--json")
+    members = command("PROJECT-1", project_version, "--json")
     assert_cli_error(
         members,
         "members_open",

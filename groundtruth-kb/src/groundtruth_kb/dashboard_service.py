@@ -9,13 +9,19 @@ import html
 import ipaddress
 import json
 import logging
+import math
 import os
+import sys
 import threading
-from collections.abc import Mapping
+import time
+from collections.abc import Callable, Mapping
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from groundtruth_kb.job_containment import ProcessIdentity
 from urllib.parse import parse_qs, urlparse
 
 from groundtruth_kb import dashboard_control_plane as registry
@@ -375,11 +381,16 @@ def _make_handler(state: RefreshState) -> type[BaseHTTPRequestHandler]:
     return RefreshHandler
 
 
-def _run_scheduler(state: RefreshState, stop_event: threading.Event) -> None:
+def _run_scheduler(
+    state: RefreshState, stop_event: threading.Event, *, startup_done: threading.Event | None = None
+) -> None:
     try:
         state.refresh_now("startup")
     except Exception as exc:  # intentional-catch: a failed startup refresh is logged; the scheduler keeps its interval
         logger.error("Startup dashboard refresh failed: %s", exc)
+    finally:
+        if startup_done is not None:
+            startup_done.set()
     while not stop_event.wait(state.interval_seconds):
         try:
             state.refresh_now("scheduled")
@@ -408,7 +419,11 @@ def run_service(
     *,
     config_path: Path | None = None,
     grafana_port: int = DEFAULT_GRAFANA_PORT,
-) -> None:
+    before_effect: Callable[[str, list[str], list[dict[str, str]], str], Any] | None = None,
+    on_observer: Callable[[Callable[[], dict[str, Any]]], Any] | None = None,
+    ready: Callable[[], Any] | None = None,
+    deadline: Callable[[], float | None] | None = None,
+) -> dict[str, Any] | None:
     """Serve only the installed display and fixed control operations for this root."""
     host = _loopback_host(host)
     # The service entry point supplies default stderr logging without replacing configured handlers.
@@ -424,6 +439,20 @@ def run_service(
         grafana_port=grafana_port,
         refresh_port=port,
     )
+    if any(hook is not None for hook in (before_effect, on_observer, ready, deadline)):
+        if not all(callable(hook) for hook in (before_effect, on_observer, ready, deadline)):
+            raise ValueError("bounded_dashboard_serve_requires_before_effect_observer_ready_and_deadline")
+        if config_path is None:
+            raise ValueError("bounded_dashboard_serve_requires_selected_config")
+        return _run_bounded_service(
+            state,
+            host,
+            port,
+            cast(Callable[[str, list[str], list[dict[str, str]], str], Any], before_effect),
+            cast(Callable[[Callable[[], dict[str, Any]]], Any], on_observer),
+            cast(Callable[[], Any], ready),
+            cast(Callable[[], float | None], deadline),
+        )
     # Refuse an occupied address before starting refresh effects.
     server = ThreadingHTTPServer((host, port), _make_handler(state))
     stop_event = threading.Event()
@@ -438,6 +467,234 @@ def run_service(
         stop_event.set()
         server.server_close()
         scheduler.join(timeout=5)
+    return None
+
+
+def _run_bounded_service(
+    state: RefreshState,
+    host: str,
+    port: int,
+    before_effect: Callable[[str, list[str], list[dict[str, str]], str], Any],
+    on_observer: Callable[[Callable[[], dict[str, Any]]], Any],
+    ready: Callable[[], Any],
+    deadline: Callable[[], float | None],
+) -> dict[str, Any]:
+    """Admit one foreground service start, then release only its own runtime resources.
+
+    The callbacks check admission and the first completed refresh on the calling
+    thread. Admission expiry bounds startup, without a runtime lifetime or
+    per-refresh agent check after readiness.
+    Normal interruption releases this invocation's listener and scheduler; it
+    does not stop a registered Dashboard job, Grafana, or another process.
+    """
+    from groundtruth_kb.job_containment import process_identity
+
+    server: ThreadingHTTPServer | None = None
+    scheduler: threading.Thread | None = None
+    scheduler_started = False
+    close_attempted = False
+    close_completed = False
+    stop_event = threading.Event()
+    startup_done = threading.Event()
+    startup_succeeded = False
+    admitted_ready = False
+    phase = "startup"
+    error = ""
+    cleanup_errors: list[str] = []
+    initial_identity: ProcessIdentity | None = None
+    configured = {
+        "project_root": str(state.project_root.resolve()),
+        "runtime_root": str(state.paths.runtime_root.resolve()),
+        "dashboard_db": str(state.db_path.resolve()),
+        "config_path": str(state.config_path.resolve()) if state.config_path is not None else None,
+        "interval_seconds": state.interval_seconds,
+        "grafana_port": state.grafana_port,
+    }
+
+    def listener_closed() -> bool:
+        if server is None:
+            return True
+        try:
+            return server.socket.fileno() < 0
+        except (AttributeError, OSError):
+            return False
+
+    def listener_bound() -> bool:
+        if server is None or listener_closed():
+            return False
+        try:
+            address = server.socket.getsockname()
+            return address[0] == host and address[1] == port and server.server_port == port
+        except (AttributeError, OSError, IndexError):
+            return False
+
+    def observe() -> dict[str, Any]:
+        identity = process_identity(os.getpid())
+        if identity is None or (initial_identity is not None and identity != initial_identity):
+            raise RuntimeError("bounded_dashboard_serve_current_process_identity_unconfirmed")
+        health = {
+            "status": "ok",
+            "refreshing": state.refreshing,
+            "last_result": dict(state.last_result) if state.last_result is not None else None,
+            "last_error": state.last_error,
+            "project_root": str(state.project_root),
+            "runtime_root": str(state.paths.runtime_root),
+            "dashboard_db": str(state.db_path),
+            "config_path": str(state.config_path) if state.config_path is not None else None,
+            "interval_seconds": state.interval_seconds,
+            "grafana_port": state.grafana_port,
+        }
+        scheduler_live = scheduler is not None and scheduler.is_alive()
+        listening = listener_bound()
+        handler_exit_unconfirmed = server is not None and close_attempted and not close_completed
+        healthy_refresh = (
+            startup_succeeded
+            and isinstance(health["last_result"], dict)
+            and health["last_result"].get("status") == "completed"
+            and not health["refreshing"]
+            and not health["last_error"]
+        )
+        return {
+            "installation_root": configured["project_root"],
+            "config_path": configured["config_path"],
+            "observed_controller_paths": {"service:dashboard": str(Path(sys.executable).resolve())},
+            "states": {
+                "service:dashboard": {
+                    "running": listening or scheduler_live or handler_exit_unconfirmed,
+                    "ready": listening
+                    and scheduler_live
+                    and healthy_refresh
+                    and all(health[key] == value for key, value in configured.items())
+                    and state.refresh_port == port,
+                    "task_enabled": None,
+                    "processes": [dict(identity)],
+                }
+            },
+            "health": health,
+            "listener": {"host": host, "port": port, "bound": listening, "closed": listener_closed()},
+            "scheduler_exited": not scheduler_live,
+            "request_handlers_exited": server is None or close_completed,
+        }
+
+    try:
+        initial_identity = process_identity(os.getpid())
+        if initial_identity is None:
+            raise RuntimeError("bounded_dashboard_serve_current_process_identity_unconfirmed")
+        if on_observer(observe) is False:
+            raise RuntimeError("bounded_dashboard_serve_observer_refused")
+        if (
+            before_effect(
+                "dashboard.serve",
+                ["service:dashboard"],
+                [{"target": "service:dashboard", "effect": "service.start"}],
+                "forward",
+            )
+            is False
+        ):
+            raise RuntimeError("bounded_dashboard_serve_start_refused")
+        admission_deadline = cast(float, deadline())
+        if (
+            type(admission_deadline) not in (int, float)
+            or not math.isfinite(admission_deadline)
+            or admission_deadline <= time.monotonic()
+        ):
+            raise RuntimeError("bounded_dashboard_serve_admission_deadline_unavailable_or_expired")
+        # Binding and the scheduler belong to the single admitted service start.
+        # No requests are dispatched until the startup refresh and ready check pass.
+        handler = _make_handler(state)
+        # Reuse the existing POST body socket timeout for initial request headers.
+        handler.timeout = 10
+        server = ThreadingHTTPServer((host, port), handler)
+        # Use the server's existing request-thread join; a closed listener alone
+        # cannot establish that refresh/control handlers have finished.
+        server.daemon_threads = False
+        server.block_on_close = True
+        server.timeout = 0.2
+        scheduler = threading.Thread(
+            target=_run_scheduler, args=(state, stop_event), kwargs={"startup_done": startup_done}, daemon=True
+        )
+        scheduler.start()
+        scheduler_started = True
+        logger.info("GT-KB dashboard service listening on http://%s:%s/", host, server.server_port)
+        while not startup_done.wait(0.05):
+            if time.monotonic() >= admission_deadline:
+                raise RuntimeError("bounded_dashboard_serve_startup_admission_expired")
+            if not scheduler.is_alive():
+                raise RuntimeError("bounded_dashboard_serve_scheduler_exited_before_readiness")
+        if time.monotonic() >= admission_deadline:
+            raise RuntimeError("bounded_dashboard_serve_startup_admission_expired")
+        startup_succeeded = (
+            isinstance(state.last_result, dict)
+            and state.last_result.get("status") == "completed"
+            and state.last_result.get("trigger") == "startup"
+            and not state.refreshing
+            and not state.last_error
+        )
+        if not observe()["states"]["service:dashboard"]["ready"]:
+            raise RuntimeError(state.last_error or "bounded_dashboard_serve_startup_refresh_not_ready")
+        if ready() is False:
+            raise RuntimeError("bounded_dashboard_serve_readiness_refused")
+        if not observe()["states"]["service:dashboard"]["ready"]:
+            raise RuntimeError("bounded_dashboard_serve_readiness_changed")
+        if time.monotonic() >= admission_deadline:
+            raise RuntimeError("bounded_dashboard_serve_startup_admission_expired")
+        admitted_ready = True
+        phase = "runtime"
+        while True:
+            if not scheduler.is_alive():
+                raise RuntimeError("bounded_dashboard_serve_scheduler_exited")
+            server.handle_request()
+    except KeyboardInterrupt:
+        if not admitted_ready:
+            error = "bounded_dashboard_serve_interrupted_before_readiness"
+    except Exception as exc:  # intentional-catch: return the failed start/runtime with confirmed owned cleanup
+        error = str(exc)
+    finally:
+        stop_event.set()
+        if server is not None:
+            close_attempted = True
+            try:
+                server.server_close()
+                close_completed = True
+            except (
+                Exception,
+                KeyboardInterrupt,
+            ) as exc:  # intentional-catch: failed/interrupted handler join is unconfirmed cleanup
+                cleanup_errors.append("listener/request close: " + (str(exc) or type(exc).__name__))
+        if scheduler is not None:
+            try:
+                if scheduler_started or scheduler.is_alive():
+                    scheduler.join(timeout=5)
+            except (
+                Exception,
+                KeyboardInterrupt,
+            ) as exc:  # intentional-catch: report interrupted/unconfirmed thread exit rather than claim stopped
+                cleanup_errors.append("scheduler join: " + (str(exc) or type(exc).__name__))
+
+    server_closed = listener_closed()
+    scheduler_exited = scheduler is None or not scheduler.is_alive()
+    request_handlers_exited = server is None or close_completed
+    stopped = server_closed and scheduler_exited and request_handlers_exited
+    if not stopped:
+        cleanup_errors.append("owned foreground resources did not all stop")
+    final: dict[str, Any] | None = None
+    try:
+        final = observe()
+    except Exception as exc:  # intentional-catch: keep cleanup result while disclosing unavailable identity readback
+        cleanup_errors.append("final observation: " + str(exc))
+    if cleanup_errors:
+        phase = "cleanup"
+    return {
+        "ok": admitted_ready and not error and not cleanup_errors,
+        "ready": admitted_ready,
+        "stopped": stopped,
+        "server_closed": server_closed,
+        "scheduler_exited": scheduler_exited,
+        "request_handlers_exited": request_handlers_exited,
+        "phase": "complete" if admitted_ready and not error and not cleanup_errors else phase,
+        "detail": "; ".join(([error] if error else []) + cleanup_errors),
+        "final": final,
+    }
 
 
 def main(argv: list[str] | None = None) -> int:

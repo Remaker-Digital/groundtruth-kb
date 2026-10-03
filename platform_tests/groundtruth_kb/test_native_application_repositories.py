@@ -28,7 +28,7 @@ from groundtruth_kb.project.native_finalization import NativeProjectFinalization
 from groundtruth_kb.session.worktree import project_worktree
 from psycopg import sql
 
-from platform_tests.groundtruth_kb.bridge_fixtures import authored, claim
+from platform_tests.groundtruth_kb.bridge_fixtures import authored, authorize_project, claim
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
 from platform_tests.groundtruth_kb.finalization_fixtures import base, git, integration
 from platform_tests.groundtruth_kb.native_fixtures import native as native
@@ -248,6 +248,7 @@ def applications(bridge):
         assert response.status_code == 200, response.text
         response = put(client, "work-items", work_id, work_fields(title=name + " effect"), project_id=project_id)
         assert response.status_code == 200, response.text
+        authorize_project(client, project_id)
         contexts = {}
         for label in ("pb1", "lo1", "pb2", "lo2", "lo3"):
             response = client.post(
@@ -422,6 +423,7 @@ def test_application_fresh_successor_and_normal_cli_commit_use_one_authority_and
                 records = json.loads(listed.stdout)
                 assert [row["id"] for row in records] == expected
                 assert all(row["repository_ref"] == reference for row in records)
+            project_version = client.get(f"/v1/projects/{app['project']}").json()["project"]["version"]
             result = subprocess.run(
                 [
                     sys.executable,
@@ -436,7 +438,7 @@ def test_application_fresh_successor_and_normal_cli_commit_use_one_authority_and
                     "--native-context-id",
                     app["contexts"]["lo3"]["native_context_id"],
                     "--expected-version",
-                    "1",
+                    str(project_version),
                     "--message-file",
                     str(body),
                     "--json",
@@ -519,7 +521,13 @@ def test_active_attempt_prevents_repository_reassignment_without_changing_projec
     app = apps["Alpha"]
     reserve(client, app, "pb1", 0, "NEW")
     before = client.get("/v1/projects/" + app["project"]).json()
-    result = put(client, "projects", app["project"], {"repository_ref": "application:Beta"}, expected_version=1)
+    result = put(
+        client,
+        "projects",
+        app["project"],
+        {"repository_ref": "application:Beta"},
+        expected_version=before["project"]["version"],
+    )
     assert result.json()["error"]["code"] == "project_repository_frozen", result.text
     assert client.get("/v1/projects/" + app["project"]).json() == before
 
@@ -598,6 +606,7 @@ def test_overlapping_ready_effects_in_the_same_application_repository_are_refuse
         client, "work-items", other["work"], work_fields(title="Competing effect"), project_id=other["project"]
     )
     assert created.status_code == 200, created.text
+    authorize_project(client, other["project"])
     for selected in (app, other):
         send(client, selected, "pb1", 1, "NEW")
         send(client, selected, "lo1", 2, "GO")
@@ -618,7 +627,8 @@ def test_missing_application_commit_hook_refuses_before_any_repository_head_adva
     _service, client, host, apps, _contexts = applications
     app = apps["Alpha"]
     ready(client, app)
-    request = {"native_context_id": app["contexts"]["lo3"]["native_context_id"], "expected_version": 1}
+    project = client.get(f"/v1/projects/{app['project']}").json()["project"]
+    request = {"native_context_id": app["contexts"]["lo3"]["native_context_id"], "expected_version": project["version"]}
     prepared = client.post(f"/v1/projects/{app['project']}/prepare-commit", json=request)
     assert prepared.status_code == 200, prepared.text
     assert prepared.json()["status"] == "ready_to_commit"

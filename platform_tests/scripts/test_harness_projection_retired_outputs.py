@@ -148,8 +148,19 @@ def test_linked_projection_root_cannot_remove_another_harness_file(tmp_path, mon
 def test_openrouter_retires_its_generic_files_and_preserves_current_providers(tmp_path, monkeypatch):
     profile = {**project_harness.load_profiles()["harnesses"]["openrouter"], "name": "openrouter"}
     retired = profile["leftover_paths"]
-    assert len(retired) == 121
-    assert all(path.startswith(".api-harness/") for path in retired)
+    native_retired = [
+        ".agents/skills/gtkb-promote/references/validation-rules.md",
+        ".agents/skills/gtkb-query/references/api-reference.md",
+        ".agents/skills/gtkb-session-wrap/references/audit-checklist.md",
+        ".agents/skills/gtkb-session-wrap/references/handoff-template.md",
+        ".agents/skills/gtkb-spec-intake/helpers/spec_intake.py",
+        ".agents/skills/gtkb-spec/references/assertion-format.md",
+        ".agents/skills/gtkb-work-item/references/taxonomy.md",
+    ]
+    api_retired = [path for path in retired if path.startswith(".api-harness/")]
+    assert len(api_retired) == 121
+    assert len(retired) == 128
+    assert set(retired) == set(api_retired) | set(native_retired)
     monkeypatch.setattr(project_harness, "PROJECT_ROOT", tmp_path)
     retained = [f".api-harness/{name}/hooks/local.py" for name in ("openrouter", "ollama", "alibaba-cloud-studio")] + [
         ".api-harness/hooks/local.py",

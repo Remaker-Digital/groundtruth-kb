@@ -43,8 +43,8 @@ pytestmark = [pytest.mark.integration, pytest.mark.timeout(300)]
 
 ROOT = Path(__file__).resolve().parents[2]
 BASELINE = ROOT / ".harness-baseline-configuration"
-# D15: the one skills source; the baseline directory holds rules and hooks only.
-WRAP_SKILL = ROOT / ".agents/skills/gtkb-session-wrap"
+# The one authored skills source is inside the universal baseline.
+WRAP_SKILL = ROOT / ".harness-baseline-configuration/skills/gtkb-session-wrap"
 FLAGS = getattr(subprocess, "CREATE_NO_WINDOW", 0)
 EXCLUDED = ("scratchpad/", ".worktrees/", ".git/", "server.toml", "client.toml", "service.log")
 PERSISTED_CONTINUATION = re.compile(r"prompt|handoff|archive|transcript|wrap", re.I)

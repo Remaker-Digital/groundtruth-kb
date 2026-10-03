@@ -42,6 +42,8 @@ HARNESS_PROJECTION_DIRS: tuple[str, ...] = (
     ".goose",
     ".cursor",
     ".agent",
+    ".agents",
+    ".antigravity",
     ".api-harness",
 )
 
@@ -52,7 +54,6 @@ _TARGET_RE = re.compile(
 # The authored neutral sources and projector. A reference that names one of
 # these on the same line is paired with its real carrier.
 CANONICAL_MARKERS: tuple[str, ...] = (
-    ".agents/skills/",
     ".harness-baseline-configuration/",
     "scripts/harness_projection/",
 )
@@ -184,7 +185,7 @@ def domain_coverage(project_root: Path) -> dict[str, int]:
     baseline_files = 0
     other_files = 0
     for _path, source_path in _walk_candidate_files(project_root):
-        if source_path.startswith((".harness-baseline-configuration/", ".agents/skills/")):
+        if source_path.startswith((".harness-baseline-configuration/",)):
             baseline_files += 1
         else:
             other_files += 1
@@ -249,7 +250,7 @@ def build_report(references: list[Reference]) -> dict[str, object]:
     for ref in references:
         by_classification[ref.classification] += 1
         by_harness[ref.harness] = by_harness.get(ref.harness, 0) + 1
-        if ref.source_path.startswith((".harness-baseline-configuration/", ".agents/skills/")):
+        if ref.source_path.startswith((".harness-baseline-configuration/",)):
             baseline_side += 1
     return {
         "schema_version": 1,

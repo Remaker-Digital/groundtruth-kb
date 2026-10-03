@@ -35,7 +35,7 @@ def _make_skill(tmp_path: Path, rel: str, body: str) -> Path:
 
 def test_detects_inline_db_mutation() -> None:
     text = f"## Step 3\n{_PY_FENCE}\nwi = db.insert_work_item(id='WI-1')\n{_FENCE_CLOSE}\n"
-    findings = chk.scan_text(text, ".agents/skills/x/SKILL.md")
+    findings = chk.scan_text(text, ".harness-baseline-configuration/skills/x/SKILL.md")
     assert any(f.finding_type == "db_mutation" for f in findings)
 
 
@@ -75,7 +75,7 @@ def test_clean_skill_passes() -> None:
 def test_emits_structured_report(tmp_path: Path, capsys) -> None:
     _make_skill(
         tmp_path,
-        ".agents/skills/dirty/SKILL.md",
+        ".harness-baseline-configuration/skills/dirty/SKILL.md",
         f"{_PY_FENCE}\ndb.insert_test(id='T')\n{_FENCE_CLOSE}\n",
     )
     before = sorted(path.relative_to(tmp_path).as_posix() for path in tmp_path.rglob("*"))
@@ -94,7 +94,7 @@ def test_emits_structured_report(tmp_path: Path, capsys) -> None:
 def test_checker_is_read_only(tmp_path: Path, capsys) -> None:
     skill = _make_skill(
         tmp_path,
-        ".agents/skills/x/SKILL.md",
+        ".harness-baseline-configuration/skills/x/SKILL.md",
         f"{_PY_FENCE}\ndb.insert_work_item(id='W')\n{_FENCE_CLOSE}\n",
     )
     before_bytes = skill.read_bytes()
@@ -117,17 +117,19 @@ def test_checker_is_read_only(tmp_path: Path, capsys) -> None:
 def test_warn_only_exit_zero(tmp_path: Path) -> None:
     _make_skill(
         tmp_path,
-        ".agents/skills/x/SKILL.md",
+        ".harness-baseline-configuration/skills/x/SKILL.md",
         f"{_PY_FENCE}\ndb.insert_work_item(id='W')\n{_FENCE_CLOSE}\n",
     )
-    report = chk.run([".agents/skills"], "run-x", "2026-05-29T00:00:00+00:00", tmp_path)
+    report = chk.run([".harness-baseline-configuration/skills"], "run-x", "2026-05-29T00:00:00+00:00", tmp_path)
     assert report.findings
     assert chk.exit_code_for(report, warn_only=True) == 0
     assert chk.exit_code_for(report, warn_only=False) == 1
 
 
 def test_clean_tree_exit_zero(tmp_path: Path) -> None:
-    _make_skill(tmp_path, ".agents/skills/clean/SKILL.md", "Use `gt backlog add` to capture work.\n")
-    report = chk.run([".agents/skills"], "run-clean", "2026-05-29T00:00:00+00:00", tmp_path)
+    _make_skill(
+        tmp_path, ".harness-baseline-configuration/skills/clean/SKILL.md", "Use `gt backlog add` to capture work.\n"
+    )
+    report = chk.run([".harness-baseline-configuration/skills"], "run-clean", "2026-05-29T00:00:00+00:00", tmp_path)
     assert report.findings == []
     assert chk.exit_code_for(report, warn_only=False) == 0

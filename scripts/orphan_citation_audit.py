@@ -31,7 +31,6 @@ DEFAULT_SCAN_DIRS = (
     "platform_tests",
     "tests",
     ".harness-baseline-configuration",
-    ".agents/skills",
 )
 EXCLUDED_DIRS = {
     ".git",

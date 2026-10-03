@@ -28,7 +28,7 @@ from groundtruth_kb.bridge.vocabulary import (
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BASELINE_DOC = PROJECT_ROOT / ".harness-baseline-configuration" / "rules" / "file-bridge-protocol.md"
 ROOT_INSTRUCTIONS = PROJECT_ROOT / "AGENTS.md"
-BRIDGE_SKILL = PROJECT_ROOT / ".agents" / "skills" / "gtkb-bridge" / "SKILL.md"
+BRIDGE_SKILL = PROJECT_ROOT / ".harness-baseline-configuration" / "skills" / "gtkb-bridge" / "SKILL.md"
 # A list of status tokens as the guidance writes it: "A, B and C".
 STATUS_LIST = r"(?<![A-Za-z-])((?:[A-Z][A-Z-]*(?:, | and ))*[A-Z][A-Z-]*)"
 

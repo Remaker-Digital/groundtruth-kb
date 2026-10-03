@@ -15,7 +15,7 @@ Nothing is "done" until specification-derived tests have actually run.
 
 The coordination surface is the **native bridge**: proposals, reviews, reports
 and verifications are versioned items in the GT-KB authority, authored and read
-through `gt bridge` and the four role skills in [`.agents/skills/`](.agents/skills/)
+through `gt bridge` and the four role skills in [`.harness-baseline-configuration/skills/`](.harness-baseline-configuration/skills/)
 (`gtkb-bridge`, `gtkb-bridge-propose`, `gtkb-proposal-review` and `gtkb-verify`).
 There are no bridge files, and the native bridge refuses `bridge/` paths. See
 [`.harness-baseline-configuration/rules/file-bridge-protocol.md`](.harness-baseline-configuration/rules/file-bridge-protocol.md)

@@ -88,7 +88,7 @@ _DIRECT_HARNESS_SCRIPT_SHIMS = frozenset(
 )
 _DIRECT_GTKB_HELPER_SCRIPT_MARKERS = (
     ".harness-baseline-configuration/hooks/",
-    ".agents/skills/",
+    ".harness-baseline-configuration/skills/",
     ".claude/hooks/",
     ".claude/skills/",
     ".codex/gtkb-hooks/",

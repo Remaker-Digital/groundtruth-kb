@@ -55,10 +55,10 @@ permission record, owner decision or completed result.
 
 | Received state | Receiving role and next authored response |
 |---|---|
-| NEW or REVISED | Loyal Opposition reviews the proposal and authors GO or NO-GO. |
+| NEW or REVISED | Loyal Opposition uses [gtkb-proposal-review](../gtkb-proposal-review/SKILL.md) and authors GO or NO-GO. |
 | NO-GO | Prime Builder addresses the rejection in REVISED. |
 | GO | Prime Builder implements the accepted scope and authors READY. |
-| READY | Loyal Opposition independently tests the work and authors VERIFIED or NOT-READY. |
+| READY | Loyal Opposition uses [gtkb-verify](../gtkb-verify/SKILL.md), independently tests the work and authors VERIFIED or NOT-READY. |
 | NOT-READY | Prime Builder corrects the work/report and authors READY. |
 | VERDICT-REJECTED | A Loyal Opposition context independently corrects the rejected verdict using the current proposal or report phase. |
 
@@ -93,6 +93,29 @@ integration before restarting. Committed work remains terminal.
 
 ## Author and deliver the next message
 
+Before authoring a dispatchable successor, identify critical knowledge from the
+current work context and read:
+
+```text
+gt context work-item <WI-ID> --recipient-role <pb|lo> --activity <activity> --critical-section <section-ID> --critical-spec <formal-ID>
+```
+
+Critical flags are optional and repeatable. The role and canonical activity name
+the next receiving context; never default them from the sender, incoming message,
+model or harness. Include the informative composed output in the complete
+authored body. The reader neither files a message nor supplies its envelope.
+Required shared, role/activity, linked work/project/test and prerequisite facts
+form a message-context floor. Selected excerpts are not the full
+`DCL-SPEC-RELEVANCE-CLOSURE-001` relevance result: its fixed-point union and ADR
+ID/version/digest/match-path evidence remain separate requirements. Resolve
+selected SAD and baseline references to current canonical records and investigate
+further applicability. Excerpts grant no
+authority, permission, passing result or complete-closure certificate. Missing or
+conflicting composition has no silent fallback, including `--json`. The full M29
+typed intersection/compiler, project-delta and `no_delta` capability remains
+planned. A non-dispatchable message has no next receiving agent: use the ordinary
+canonical reads above and do not invent a recipient or envelope for composition.
+
 For NEW or REVISED, use `gtkb-bridge-propose` and its current task-context and
 observed-version requirements. Check the parent's authorization only before NEW.
 Later responses use the initiated chain; do not recreate authorization checks.
@@ -110,6 +133,16 @@ messages omit both envelope lines and the recipient field. Advisory author
 provenance remains mandatory. Supply each key once.
 READY uses `bridge_kind: implementation_report`; verdicts use `lo_verdict`.
 The service validates the complete message without composing or repairing it.
+
+At GO and VERIFIED, use both an independent context and a different actual
+reviewing model from the current proposal or READY report's producer. The owner
+or qualified dispatcher selects the executing model; the agent reports that
+observed identity. The writer compares existing `author_model` values at delivery
+and refuses equal declarations. Unequal text is cooperative provenance, not proof
+of actual execution or model identity. Do not change a label to evade a refusal or add a model attestation. A verdict correction or
+re-verification compares with the current proposal/report producer, not with the
+previous reviewer. If actual model selection is unknown, disclose that limit and
+resolve selection before a positive milestone; no new approval record is needed.
 
 `author_harness_id` is attribution, not a role. Use the registered id your
 launcher exported as `GTKB_AUTHOR_HARNESS_ID`, or the id the dispatched task
@@ -189,7 +222,11 @@ represented by `null`. An executable-bit-only change invalidates the review. Cha
 reconciled before further effects; no old claim or snapshot grants an exception.
 
 When the service reports that every member is independently VERIFIED, the
-verifying context reads current project state and commits the complete project:
+verifying context ordinarily reads current project state and commits the complete
+project. A dispatched fresh independent Loyal Opposition context may recover
+finalization from current canonical and Git facts; there is no original-context
+affinity. Use the service's typed recovery result to distinguish an existing
+reviewed commit from work that requires fresh verification:
 
 ```text
 gt projects commit <project-id> --native-context-id <context-id> --expected-version <project-version> --message-file <authored-commit-message> --json
@@ -211,12 +248,16 @@ Release an unfinished claim with `gt bridge release <document>
 canonical work and attempt state and obtains its own next-artifact claim.
 
 A changed predecessor, expired claim or invalid stored target requires a fresh
-read and a lawful response. Where canonical state demonstrates a broken or
-invalidated non-VERIFIED attempt and no live claim remains, use `gt bridge
-abandon --help` for the supported abandonment operation and begin a fresh NEW
-from current requirements. Do not inherit GO, claims or effects from discarded
-messages. An unavailable authority never justifies local file publication or
-hidden state. Leave subsequent dispatch to the owner or dispatcher.
+read and a lawful response. Reviewed work whose scope remains lawful returns
+to independent verification for changed bytes or a failed commit. Where current
+canonical facts establish changed or unprovable formal intent or an irreparable
+attempt, no live claim remains, and no actual or possible integrated Git result
+requires reconciliation, use `gt bridge abandon --help` for guarded canonical
+abandonment and begin a fresh NEW on the same uncommitted work item. Preserve
+its work bytes and parent; do not inherit GO, claims or effects from abandoned
+messages. Reconcile an uncertain Git result before abandoning or retrying.
+An unavailable authority never justifies local file publication or hidden state.
+Leave subsequent dispatch to the owner or dispatcher.
 
 ## Confirm delivery before reporting completion
 

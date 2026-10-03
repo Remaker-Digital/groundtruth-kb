@@ -45,7 +45,7 @@ max_turns = 600
         encoding="utf-8",
     )
     for name in ("gtkb-bridge", "gtkb-proposal-review", "gtkb-verify"):
-        relative = Path(".agents") / "skills" / name / "SKILL.md"
+        relative = Path(".harness-baseline-configuration") / "skills" / name / "SKILL.md"
         target = root / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes((Path(__file__).resolve().parents[2] / relative).read_bytes())

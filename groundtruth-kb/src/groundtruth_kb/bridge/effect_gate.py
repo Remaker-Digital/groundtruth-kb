@@ -13,7 +13,7 @@ import sys
 from collections import Counter
 from collections.abc import Callable
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from groundtruth_kb.governance.output import emit_effect_gate_result
 
@@ -79,11 +79,12 @@ GIT_FINALIZATION_CHAINING_MARKERS = (";", "&&", "||", "|")
 
 GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
 
-# Owner decision D61 (2026-09-25, observer B90): starting and stopping GT-KB's services, Home and dashboard, and
-# replacing its operational controls, are owner operations, done from the GT-KB Home's controls page or the owner's own
-# terminal. They are neither file nor Git effects, so the gate passed them for any agent shell. It now refuses them in
-# every harness context, bound or not, whatever the target. Read-only forms stay allowed (gt services status, gt
-# controls show, Get-ScheduledTask, Get-Service, schtasks /query).
+# Owner decision D61 (2026-09-25, observer B90) originally reserved service/Home/dashboard changes and operational
+# controls for the owner. This table retains that classification; the September 30 correction permits only the wired
+# _ORDINARY_CONTROLLER_COMMANDS through explicit ops/context/document/fence selectors and current native bounds.
+# Recognizing a wired command grants no permission: _owner_operation delegates it to the ordinary collector, which
+# refuses missing or uninspectable selectors before any native call. Other commands classified here remain owner-only. Read-only forms stay allowed (gt services status, gt controls show, Get-ScheduledTask, Get-Service,
+# schtasks /query).
 # c123 (batch design WP1, G27): gt service serve starts the authority API itself, and gt dashboard install downloads
 # and installs the dashboard's server; both are service operations of the same kind.
 # c123 (owner decision A2): gt home open starts the Home when it is down, so it is a Home operation as well; gt db
@@ -92,7 +93,7 @@ GIT_FINALIZATION_EXECUTION_MARKERS = ("$(", "`")
 GT_OWNER_OPERATIONS = {
     "services": frozenset({"start", "stop"}),
     "service": frozenset({"serve"}),
-    "home": frozenset({"start", "stop", "open"}),
+    "home": frozenset({"start", "stop", "open", "shortcut"}),
     "dashboard": frozenset({"start", "stop", "serve", "install"}),
     "controls": frozenset({"set"}),
 }
@@ -908,7 +909,21 @@ def _mask_help_arguments(view: str) -> str:
 
 def _write_view(command: str) -> str:
     """The view the write patterns read: quoted interiors and help arguments blanked, positions kept (c123)."""
-    return _mask_help_arguments(_mask_quoted_spans(command, mask_double=True))
+    view = _mask_help_arguments(_mask_quoted_spans(command, mask_double=True))
+    if "gt" not in command.lower() and "groundtruth_kb" not in command.lower():
+        return view
+    for line, _text in _walked_commands(command):
+        tokens = _shell_split(line) if line != UNINSPECTABLE_SHELL_COMMAND else None
+        ordinary = _ordinary_gt_operation(tokens) if tokens else None
+        if not tokens or ordinary is None or ordinary.get("error"):
+            continue
+        # Validated literal GT arguments are not PowerShell cmdlets. Keep every
+        # actual redirect in the original command and in the file-target scans.
+        literal = _without_redirects(tokens)
+        pattern = r"\s+".join(re.escape(word) for word in literal)
+        for match in re.finditer(pattern, command):
+            view = view[: match.start()] + " " * (match.end() - match.start()) + view[match.end() :]
+    return view
 
 
 # c123 (batch design WP1, residual rows 2, 7 and 9): commands that write through an option rather than by their name.
@@ -2937,11 +2952,30 @@ def _creates_execution_project(arguments: list[str]) -> bool:
     return creates and (kind or "").lower() != "program"
 
 
+def _repairs_existing_membership(arguments: list[str]) -> bool:
+    """An explicit parent on an existing backlog amendment may repair membership.
+
+    Creation with one readable version 0 remains ordinary intake. Existing
+    status-only corrections omit the parent. No fields file or service call is
+    needed to identify this owner membership lever.
+    """
+    words = [_clean_shell_token(word) for word in arguments]
+    names = [word.split("=", 1)[0] for word in words]
+    if "--project-id" not in names:
+        return False
+    if names.count("--expected-version") != 1 or names.count("--project-id") != 1:
+        return True
+    version = _arg_value(words, "--expected-version")
+    return version is None or not version.isdigit() or int(version) != 0
+
+
 def _owner_lever(command: str, *, _depth: int = 0) -> str | None:
     """Name the owner lever over project authorization a shell command uses, in any command the line runs (c123).
 
     Owner decision E1 (GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001): gt projects set-authorization, move-item, and
-    record when it creates an execution project. Like the owner-operation rule it follows nested shells, chains,
+    record when it creates an execution project. An existing backlog amendment
+    with an explicit parent is the same membership lever, including irregular
+    parent repair. Like the owner-operation rule it follows nested shells, chains,
     launchers and argument lists through _walked_commands, and it fails closed on its own: a command the walk cannot
     read, or a gt command whose module, group or action the shell supplies, returns UNINSPECTABLE_SHELL_COMMAND.
     """
@@ -2955,6 +2989,8 @@ def _owner_lever(command: str, *, _depth: int = 0) -> str | None:
         words = None if arguments == [UNINSPECTABLE_SHELL_COMMAND] else _gt_command_words(arguments, 2)
         if words is None:
             return UNINSPECTABLE_SHELL_COMMAND
+        if words == ["backlog", "record"] and _repairs_existing_membership(arguments):
+            return "gt backlog record (membership reconciliation)"
         if len(words) == 2 and words[1] in GT_OWNER_LEVERS.get(words[0], ()):
             if words[1] != "record" or _creates_execution_project(arguments):
                 return "gt " + " ".join(words)
@@ -3088,9 +3124,12 @@ def _owner_operation(command: str, *, _depth: int = 0) -> str | None:
         tokens = _shell_split(line)
         if not tokens:
             continue
-        found = (
-            _gt_owner_operation(tokens) or _machine_configuration_write(tokens) or _process_or_cluster_control(tokens)
-        )
+        gt_operation = _gt_owner_operation(tokens)
+        # Recognizing a supported controller is not permission: the collector
+        # below requires literal selectors and asks the current native service.
+        if _ordinary_gt_operation(tokens) is not None:
+            gt_operation = None
+        found = gt_operation or _machine_configuration_write(tokens) or _process_or_cluster_control(tokens)
         if found is not None:
             return found
         verb = _service_control_verb(tokens)
@@ -3123,6 +3162,313 @@ def _arg_value(args: list[str], flag: str) -> str | None:
         if token.startswith(flag + "="):
             return token.split("=", 1)[1]
     return None
+
+
+_ORDINARY_CONTROLLER_COMMANDS = frozenset(
+    {
+        ("services", "start"),
+        ("services", "stop"),
+        ("home", "start"),
+        ("home", "stop"),
+        ("home", "open"),
+        ("home", "shortcut"),
+        ("dashboard", "start"),
+        ("dashboard", "stop"),
+        ("dashboard", "serve"),
+        ("dashboard", "install"),
+        ("controls", "set"),
+    }
+)
+_ORDINARY_SERVICE_NAMES = frozenset({"authority", "home", "dashboard", "ollama", "postgresql"})
+_ORDINARY_SELECTOR_OPTIONS = frozenset({"--activity", "--native-context-id", "--document", "--fence"})
+
+
+def _ordinary_gt_operation(tokens: list[str]) -> dict[str, Any] | None:
+    """Collect one wired controller invocation, never a client-supplied authority bound."""
+    arguments = _gt_arguments(tokens)
+    words = _gt_command_words(arguments, 2) if arguments and arguments != [UNINSPECTABLE_SHELL_COMMAND] else None
+    if not arguments or words is None or tuple(words) not in _ORDINARY_CONTROLLER_COMMANDS:
+        return None
+
+    def refused(code: str, reason: str) -> dict[str, Any]:
+        return {"error": {"decision": "block", "reason_code": code, "reason": reason}}
+
+    pair = tuple(words)
+    options: dict[str, str] = {}
+    flags: set[str] = set()
+    operands: list[str] = []
+    args = _without_redirects(arguments)
+    value_options = (
+        set(_ORDINARY_SELECTOR_OPTIONS) | {"--config"} | ({"--path"} if pair == ("home", "shortcut") else set())
+    )
+    if pair == ("controls", "set"):
+        value_options |= {"--input", "--expected-sha256"}
+    if pair[0] == "dashboard":
+        if pair[1] == "start":
+            value_options |= {
+                "--runtime-root",
+                "--db-path",
+                "--grafana-home",
+                "--grafana-port",
+                "--refresh-port",
+                "--interval-minutes",
+            }
+        elif pair[1] == "stop":
+            value_options.add("--runtime-root")
+        elif pair[1] == "serve":
+            value_options |= {"--runtime-root", "--db-path", "--port", "--grafana-port", "--interval-minutes"}
+        elif pair[1] == "install":
+            value_options.add("--grafana-home")
+    flag_options = (
+        {"--json"}
+        if pair[0] == "services"
+        or pair in {("dashboard", "start"), ("dashboard", "stop"), ("dashboard", "install"), ("home", "shortcut")}
+        else set()
+    )
+    if pair == ("dashboard", "install"):
+        flag_options |= {"--skip-download", "--skip-plugin"}
+    if pair == ("home", "open"):
+        flag_options.add("--start-services")
+    index = 0
+    while index < len(args):
+        raw = args[index]
+        if _unresolved_value(raw):
+            return refused(
+                "operation_request_uninspectable", "Every ordinary controller selector and target must be literal."
+            )
+        word = _clean_shell_token(raw)
+        name, separator, attached = word.partition("=")
+        if name in value_options:
+            if name in options:
+                return refused("operation_request_uninspectable", f"An ordinary command cannot repeat {name}.")
+            if separator:
+                value = attached
+            elif index + 1 < len(args):
+                index += 1
+                if _unresolved_value(args[index]):
+                    return refused("operation_request_uninspectable", f"The value of {name} must be literal.")
+                value = _clean_shell_token(args[index])
+            else:
+                return refused("operation_selector_required", f"Supply the literal value of {name}.")
+            if not value or value.startswith("-"):
+                return refused("operation_selector_required", f"Supply the literal value of {name}.")
+            options[name] = value
+        elif word in flag_options:
+            if word in flags:
+                return refused("operation_request_uninspectable", f"An ordinary command cannot repeat {word}.")
+            flags.add(word)
+        elif word.startswith("-"):
+            return refused("operation_request_uninspectable", f"The wired ordinary controller does not support {word}.")
+        else:
+            operands.append(word)
+        index += 1
+    if any(option not in options for option in _ORDINARY_SELECTOR_OPTIONS):
+        return refused(
+            "operation_selector_required",
+            "Every ordinary controller command requires explicit --activity ops, --native-context-id, --document and --fence.",
+        )
+    if options["--activity"] != "ops":
+        return refused(
+            "operation_activity_required", "An ordinary controller command requires explicit --activity ops."
+        )
+    fence = options["--fence"]
+    if re.fullmatch(r"[0-9]+", fence) is None or int(fence) < 1:
+        return refused("operation_selector_required", "The literal claim fence must be a positive integer.")
+    if "--config" in options and not Path(options["--config"]).is_absolute():
+        return refused(
+            "operation_request_uninspectable", "Name the selected configuration with an exact absolute path."
+        )
+    if operands[:2] != list(pair):
+        return refused("operation_request_uninspectable", "Name the controller group and verb literally.")
+    targets: list[str]
+    effects: list[dict[str, str]]
+    control_input: dict[str, str] = {}
+    if pair == ("controls", "set"):
+        if len(operands) != 2:
+            return refused("operation_request_uninspectable", "The controls setter has no positional targets.")
+        proposed, expected = options.get("--input"), options.get("--expected-sha256")
+        if proposed is None or not Path(proposed).is_absolute():
+            return refused("operation_selector_required", "Ordinary controls.set requires an exact absolute --input.")
+        if expected is None or re.fullmatch(r"sha256:[0-9a-f]{64}", expected) is None:
+            return refused("operation_selector_required", "Supply the exact current catalog --expected-sha256.")
+        operation, targets, effects = "controls.set", [], []
+        control_input = {"control_input": proposed, "expected_sha256": expected}
+    elif pair[0] == "services":
+        if len(operands) not in {2, 3} or len(operands) == 3 and operands[2] not in _ORDINARY_SERVICE_NAMES | {"all"}:
+            return refused(
+                "operation_request_uninspectable", "A service controller names all or one supported literal service."
+            )
+        name = operands[2] if len(operands) == 3 else "all"
+        operation = "services." + pair[1] + ("-all" if name == "all" else "")
+        targets = ["service:" + name]
+        effects = []
+    elif pair[0] == "dashboard":
+        if len(operands) != 2:
+            return refused(
+                "operation_request_uninspectable", "The Dashboard controller has no positional operation targets."
+            )
+        # The existing CLI validates selected settings before any effect. This
+        # hook asks only for the exact operation scope, with no invented effect.
+        operation, targets, effects = "dashboard." + pair[1], ["service:dashboard"], []
+    elif len(operands) != 2:
+        return refused("operation_request_uninspectable", "The Home controller has no positional operation targets.")
+    elif pair[1] == "shortcut":
+        path = options.get("--path")
+        if path is None or not Path(path).is_absolute() or Path(path).suffix.lower() != ".lnk":
+            return refused(
+                "operation_selector_required",
+                "Ordinary shortcut creation requires an exact absolute --path ending in .lnk.",
+            )
+        operation = "services.shortcut"
+        targets = ["shortcut:" + path]
+        effects = []
+    else:
+        aggregate = "--start-services" in flags
+        operation = "home.open.start-services" if aggregate else "home." + pair[1]
+        targets = ["service:all" if aggregate else "service:home"]
+        effects = []
+        if pair[1] == "open":
+            targets.append("browser:home")
+    return {
+        "selectors": {
+            "native_context_id": options["--native-context-id"],
+            "document": options["--document"],
+            "fence": int(fence),
+            "config": options.get("--config"),
+        },
+        "request": {"operation": operation, "targets": targets, "effects": effects, **control_input},
+    }
+
+
+def _ordinary_operations_from_payload(payload: dict[str, Any]) -> dict[str, Any]:
+    """Collect every wired invocation and require one exact context/document/fence/config selection."""
+    command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
+    collected: dict[str, Any] = {"operations": [], "selectors": None}
+    if not command:
+        return collected
+    for line, _text in _walked_commands(command):
+        if line == UNINSPECTABLE_SHELL_COMMAND:
+            return {
+                "error": {
+                    "decision": "block",
+                    "reason_code": "operation_request_uninspectable",
+                    "reason": "The command contains an operation the gate cannot inspect.",
+                }
+            }
+        tokens = _shell_split(line)
+        ordinary = _ordinary_gt_operation(tokens) if tokens else None
+        if ordinary is None:
+            continue
+        if ordinary.get("error"):
+            return ordinary
+        if collected["selectors"] is not None and collected["selectors"] != ordinary["selectors"]:
+            return {
+                "error": {
+                    "decision": "block",
+                    "reason_code": "operation_selector_mismatch",
+                    "reason": "Every ordinary command in one tool call must use the same exact context, document, fence and config.",
+                }
+            }
+        collected["selectors"] = ordinary["selectors"]
+        collected["operations"].append(ordinary["request"])
+    return collected
+
+
+def _control_operation_targets(
+    operations: list[dict[str, Any]],
+    selectors: dict[str, Any],
+    cwd: Path,
+    env: dict[str, str],
+) -> dict[str, Any]:
+    """Read actual changed keys through the existing selected diff; a byte no-op carries no operation."""
+    resolved: list[dict[str, Any]] = []
+
+    def refused(code: str, reason: str) -> dict[str, Any]:
+        return {"error": {"decision": "block", "reason_code": code, "reason": reason}}
+
+    for operation in operations:
+        if "control_input" not in operation:
+            resolved.append(operation)
+            continue
+        argv = [sys.executable, "-m", "groundtruth_kb"]
+        if selectors["config"] is not None:
+            argv.extend(["--config", selectors["config"]])
+        argv.extend(["controls", "diff", "--input", operation["control_input"]])
+        try:
+            answer = subprocess.run(
+                argv,
+                cwd=cwd,
+                env=env,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if answer.returncode:
+                return {"error": _native_refusal(answer.stderr, [], check="control diff")}
+            difference = json.loads(answer.stdout)
+        except (OSError, subprocess.TimeoutExpired) as error:
+            return refused(
+                "control_diff_unavailable",
+                f"The selected controls diff could not answer ({type(error).__name__}); retry after restoring that read route.",
+            )
+        except ValueError:
+            return refused("invalid_control_diff", "The selected controls diff did not return JSON.")
+        if (
+            not isinstance(difference, dict)
+            or any(
+                not isinstance(difference.get(key), str)
+                or re.fullmatch(r"sha256:[0-9a-f]{64}", difference[key]) is None
+                for key in ("before_sha256", "after_sha256")
+            )
+            or not isinstance(difference.get("controls"), dict)
+            or not isinstance(difference.get("invariants"), dict)
+            or set(difference["invariants"]) != {"before", "after"}
+        ):
+            return refused(
+                "invalid_control_diff", "The selected controls diff did not describe the current and proposed catalogs."
+            )
+        if difference["before_sha256"] != operation["expected_sha256"]:
+            return refused(
+                "generation_conflict", "The selected control catalog changed; read its current digest before retrying."
+            )
+        if difference["invariants"]["before"] != difference["invariants"]["after"]:
+            return refused("operation_value_scope_required", "Ordinary controls.set preserves the current invariants.")
+        targets: list[str] = []
+        for key, change in difference["controls"].items():
+            if (
+                not isinstance(key, str)
+                or re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", key) is None
+                or not isinstance(change, dict)
+                or set(change) != {"before", "after"}
+                or not isinstance(change["before"], dict)
+                or not isinstance(change["after"], dict)
+                or "value" not in change["before"]
+                or "value" not in change["after"]
+            ):
+                return refused(
+                    "operation_value_scope_required", "Ordinary controls.set changes values of existing keys only."
+                )
+            before, after = change["before"], change["after"]
+            if {name: value for name, value in before.items() if name != "value"} != {
+                name: value for name, value in after.items() if name != "value"
+            } or before["value"] == after["value"]:
+                return refused(
+                    "operation_value_scope_required",
+                    "Ordinary controls.set preserves each control's metadata and changes its numeric value.",
+                )
+            targets.append("control:" + key)
+        if not targets:
+            if difference["after_sha256"] != difference["before_sha256"]:
+                return refused(
+                    "operation_value_scope_required", "An ordinary no-op must preserve the complete catalog bytes."
+                )
+            # There is no effect to authorize. The controller still receives every
+            # explicit selector and its existing writer CAS refuses later drift.
+            continue
+        resolved.append({"operation": "controls.set", "targets": sorted(targets), "effects": []})
+    return {"operations": resolved}
 
 
 def _redirect_targets(stage: str) -> list[str]:
@@ -6001,6 +6347,11 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             "(GOV-PROJECT-IMPLEMENTATION-AUTHORIZATION-001): the owner runs it in their own terminal. State the change "
             "and the exact command for the owner to run.",
         )
+    ordinary = _ordinary_operations_from_payload(payload)
+    if ordinary.get("error"):
+        return cast(dict[str, Any], ordinary["error"])
+    operations = ordinary["operations"]
+    selectors = ordinary["selectors"]
     credential = _credential_material_access(payload)
     if credential is not None:
         return blocked(
@@ -6067,7 +6418,32 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
     paths, mutating = changed_paths({**payload, "project_root": str(cwd)})
     # c123 (owner decision A1): a program run needs a live claim too, checked after the writes.
     program = _program_run(payload)
-    if not mutating and program is None:
+    if mutating or program is not None or selectors is not None:
+        native = str(os.environ.get("GTKB_NATIVE_CONTEXT_ID") or payload.get("session_id") or "").strip()
+        supplied = str(payload.get("session_id") or "").strip()
+        if not native or (supplied and supplied != native):
+            # c123 (owner decision A1): an unbound context runs no program either.
+            running = f" A program run ({program}) needs a live claim of the bound context." if program else ""
+            return blocked(
+                "invalid_native_context", "The tool must carry the current harness-native context identifier." + running
+            )
+        if selectors is not None and selectors["native_context_id"] != native:
+            return blocked(
+                "invalid_native_context",
+                "Every ordinary command must name the current harness-native context identifier.",
+            )
+    env = dict(os.environ)
+    env["GT_PROJECT_ROOT"] = str(root)
+    env["PYTHONIOENCODING"] = "utf-8"
+    # Controller selection follows the actual CLI's cwd and inherited settings.
+    # File and program checks retain their existing root-scoped environment.
+    operation_env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    if any("control_input" in operation for operation in operations):
+        controls = _control_operation_targets(operations, selectors, cwd, operation_env)
+        if controls.get("error"):
+            return cast(dict[str, Any], controls["error"])
+        operations = controls["operations"]
+    if not mutating and program is None and not operations:
         return {}
     if mutating and not paths:
         command = _command_from_payload(payload, _tool_input(payload), _tool_name(payload).lower())
@@ -6086,37 +6462,46 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             f"This call carries {_unknown_target_cause(payload)}, so the gate cannot check every target it writes. "
             "Name each target literally in a command the gate reads, or use the editor tool.",
         )
-    native = str(os.environ.get("GTKB_NATIVE_CONTEXT_ID") or payload.get("session_id") or "").strip()
-    supplied = str(payload.get("session_id") or "").strip()
-    if not native or (supplied and supplied != native):
-        # c123 (owner decision A1): an unbound context runs no program either.
-        running = f" A program run ({program}) needs a live claim of the bound context." if program else ""
-        return blocked(
-            "invalid_native_context", "The tool must carry the current harness-native context identifier." + running
+    # A mixed call keeps the existing file check independent of controller config selection.
+    checks = [(False, root, env)] if mutating else []
+    if operations:
+        checks.append((True, cwd, operation_env))
+    for checking_operations, check_cwd, check_env in checks:
+        argv = [sys.executable, "-m", "groundtruth_kb"]
+        if checking_operations and selectors["config"] is not None:
+            argv.extend(["--config", selectors["config"]])
+        argv.extend(
+            [
+                "bridge",
+                "check-effects",
+                "--native-context-id",
+                native,
+                "--cwd",
+                str(cwd),
+                "--json",
+            ]
         )
-    env = dict(os.environ)
-    env["GT_PROJECT_ROOT"] = str(root)
-    env["PYTHONIOENCODING"] = "utf-8"
-    if mutating:
-        argv = [
-            sys.executable,
-            "-m",
-            "groundtruth_kb",
-            "bridge",
-            "check-effects",
-            "--native-context-id",
-            native,
-            "--cwd",
-            str(cwd),
-            "--json",
-        ]
-        for path in paths:
-            argv.extend(["--path", path])
+        if checking_operations:
+            argv.extend(
+                [
+                    "--activity",
+                    "ops",
+                    "--document",
+                    selectors["document"],
+                    "--fence",
+                    str(selectors["fence"]),
+                    "--operations-json",
+                    json.dumps(operations, ensure_ascii=False, separators=(",", ":")),
+                ]
+            )
+        else:
+            for path in paths:
+                argv.extend(["--path", path])
         try:
             result = subprocess.run(
                 argv,
-                cwd=root,
-                env=env,
+                cwd=check_cwd,
+                env=check_env,
                 capture_output=True,
                 text=True,
                 encoding="utf-8",
@@ -6125,13 +6510,31 @@ def gate_decision(payload: dict[str, Any]) -> dict[str, Any]:
             )
             if result.returncode:
                 # c123 (item 7): click's prefix stripped, the native code kept.
-                return _native_refusal(result.stderr, paths)
+                return _native_refusal(result.stderr, [] if checking_operations else paths)
             current = json.loads(result.stdout)
-            if (
-                not isinstance(current, dict)
-                or current.get("status") != "current"
-                or current.get("scope") not in {"scratch", "implementation"}
-            ):
+            valid = isinstance(current, dict) and current.get("status") == "current"
+            if checking_operations:
+                answers = current.get("operations") if isinstance(current, dict) else None
+                valid = valid and (
+                    current.get("scope") == "operation"
+                    and current.get("document") == selectors["document"]
+                    and current.get("fence") == selectors["fence"]
+                    and isinstance(current.get("deadline"), str)
+                    and isinstance(current.get("observed_at"), str)
+                    and isinstance(answers, list)
+                    and len(answers) == len(operations)
+                    and all(
+                        isinstance(answer, dict)
+                        and answer.get("operation") == operation["operation"]
+                        and isinstance(answer.get("targets"), list)
+                        and answer["targets"]
+                        and all(isinstance(target, str) and target != "service:all" for target in answer["targets"])
+                        for answer, operation in zip(answers, operations, strict=True)
+                    )
+                )
+            else:
+                valid = valid and current.get("scope") in {"scratch", "implementation"}
+            if not valid:
                 return blocked("invalid_effect_response", "The native CLI did not return a current effect check.")
         except subprocess.TimeoutExpired:
             # c123 (item 9, entry 4): each failure names its cause.

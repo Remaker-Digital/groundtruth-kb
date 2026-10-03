@@ -124,7 +124,7 @@ def test_stub_renderer_reads_only_skill_manifests(engine, tmp_path):
     renderer = renderer[: renderer.index("\ndef ", 1)]
     assert 'glob("*/SKILL.md")' in renderer and "rglob(" not in renderer
 
-    skills_root = tmp_path / ".agents/skills"
+    skills_root = tmp_path / ".harness-baseline-configuration/skills"
     for rel, text in {
         "alpha/SKILL.md": "---\nname: alpha\ndescription: Alpha.\n---\n\nOnly the source carries this body.\n",
         "alpha/helpers/run.py": "print('helper-only-source')\n",
@@ -137,7 +137,12 @@ def test_stub_renderer_reads_only_skill_manifests(engine, tmp_path):
         path = skills_root / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
-    profile = {"name": "claude", "config_dir": ".claude", "skills_stub_dir": ".claude/skills"}
+    profile = {
+        "name": "claude",
+        "config_dir": ".claude",
+        "skills_stub_dir": ".claude/skills",
+        "skills_discovery": "pointer_stubs",
+    }
     plan = engine.Plan()
     engine.render_skill_stubs(profile, skills_root, "stamp", plan)
     assert not plan.gaps, plan.gaps
@@ -145,7 +150,7 @@ def test_stub_renderer_reads_only_skill_manifests(engine, tmp_path):
     stub = plan.writes[".claude/skills/alpha/SKILL.md"]
     assert stub.startswith("---\nname: alpha\ndescription: Alpha.\n---\n")
     assert "Only the source carries this body." not in stub and "helper-only-source" not in stub
-    assert "Read and follow `.agents/skills/alpha/SKILL.md`" in stub
+    assert "Read and follow `.harness-baseline-configuration/skills/alpha/SKILL.md`" in stub
 
 
 @pytest.mark.parametrize(

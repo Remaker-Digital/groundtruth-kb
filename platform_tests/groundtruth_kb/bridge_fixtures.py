@@ -23,6 +23,22 @@ from groundtruth_kb.postgres_kernel import TABLE_SPECS
 from platform_tests.groundtruth_kb.native_fixtures import put, seed, work_fields
 
 
+def authorize_project(client, project_id="PROJECT-1"):
+    """Apply the fixture owner's explicit authorization after assembling membership."""
+    project = client.get(f"/v1/projects/{project_id}").json()["project"]
+    authorized = client.put(
+        f"/v1/projects/{project_id}/authorization",
+        json={
+            "expected_version": project["version"],
+            "actor": "qualification",
+            "reason": "Owner authorizes the assembled fixture project",
+            "authorization": "authorized",
+        },
+    )
+    assert authorized.status_code == 200, authorized.text
+    return authorized.json()
+
+
 @pytest.fixture
 def bridge(native, tmp_path, request):
     service, _, _, _ = native
@@ -66,6 +82,7 @@ def bridge(native, tmp_path, request):
     with TestClient(create_authority_app(service, project_root=tmp_path)) as client:
         seed(client)
         assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+        authorize_project(client)
         contexts = {}
         for name in ("pb1", "lo1", "pb2", "lo2", "pb3", "lo3"):
             result = client.post(
@@ -102,7 +119,7 @@ def authored(context, document, version, status, **extra):
         "author_identity": "qualified-agent",
         "author_harness_id": "HARNESS-1",
         "author_session_context_id": context["session_context_id"],
-        "author_model": "qualification-model",
+        "author_model": "qualification-" + context.get("role", "header-only"),
         "Project": "PROJECT-1",
         "Work Item": "WI-1",
     }

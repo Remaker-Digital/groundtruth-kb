@@ -1394,7 +1394,7 @@ def _legacy_root_reference_is_allowed(relative_path: Path, lines: list[str], lin
 def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     """WI-5668: WARN while any pre-rename bare skill-directory references remain.
 
-    The GTKB-SKILL-RENAME-REFERENCE-SWEEP program renamed the ``.agents/skills/``
+    The GTKB-SKILL-RENAME-REFERENCE-SWEEP program renamed the former ``.agents/skills/``
     directories to a ``gtkb-`` prefix (``DELIB-202667105`` / ``DELIB-202667106``).
     This deterministic completion gate (``GOV-DETERMINISTIC-SERVICES-PRINCIPLE-001``)
     counts remaining tracked references to the bare pre-rename skill dirs and WARNs
@@ -1410,14 +1410,14 @@ def _check_skill_rename_reference_sweep(target: Path) -> ToolCheck:
     intentionally retain bare references are excluded.
     """
     name = "skill-rename reference sweep"
-    skills_dir = target / ".agents" / "skills"
+    skills_dir = target / ".harness-baseline-configuration" / "skills"
     if not skills_dir.is_dir():
         return ToolCheck(
             name=name,
             required=False,
             found=False,
             status="info",
-            message="no .agents/skills/ directory; nothing to verify",
+            message="no .harness-baseline-configuration/skills/ directory; nothing to verify",
         )
 
     prefix = "gtkb-"
@@ -2137,7 +2137,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".agents" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
+    skill_md = target / ".harness-baseline-configuration" / "skills" / "gtkb-bridge-propose" / "SKILL.md"
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -2150,7 +2150,7 @@ def _check_bridge_propose_skill_present(target: Path, profile_name: str) -> Tool
             found=False,
             status="warning",
             message=(
-                f".agents/skills/gtkb-bridge-propose/ missing: {', '.join(missing)}. "
+                f".harness-baseline-configuration/skills/gtkb-bridge-propose/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )
@@ -2184,8 +2184,10 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             message="not applicable to base profile",
         )
 
-    skill_md = target / ".agents" / "skills" / "gtkb-spec-intake" / "SKILL.md"
-    helper_py = target / ".agents" / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
+    skill_md = target / ".harness-baseline-configuration" / "skills" / "gtkb-spec-intake" / "SKILL.md"
+    helper_py = (
+        target / ".harness-baseline-configuration" / "skills" / "gtkb-spec-intake" / "helpers" / "spec_intake.py"
+    )
 
     missing: list[str] = []
     if not skill_md.exists():
@@ -2200,7 +2202,7 @@ def _check_spec_intake_skill_present(target: Path, profile_name: str) -> ToolChe
             found=False,
             status="warning",
             message=(
-                f".agents/skills/gtkb-spec-intake/ missing: {', '.join(missing)}. "
+                f".harness-baseline-configuration/skills/gtkb-spec-intake/ missing: {', '.join(missing)}. "
                 f"Run `gt project upgrade --apply` to restore."
             ),
         )

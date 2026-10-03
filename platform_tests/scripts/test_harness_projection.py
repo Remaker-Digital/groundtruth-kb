@@ -11,7 +11,8 @@ Native host invocation and complete baseline acceptance remain separate:
 
 M15 stage 1 (owner ruling D15 as amended by R3; D34 rulings R1-R15): a projection
 is registrations and pointers only. Skills are pointer stubs rendered from the one
-skills source ``.agents/skills`` (or nothing, where the host reads it natively),
+skills source ``.harness-baseline-configuration/skills``, including the shared
+``.agents/skills`` pointer catalog used for native discovery,
 hook scripts run in place from ``.harness-baseline-configuration/hooks`` with
 ``--harness <profile>`` appended to every registration (R10), rules are never
 projected, and the only rendered pointer outside the stub tree is a declared
@@ -38,7 +39,7 @@ if str(ENGINE_DIR) not in sys.path:
 import project_harness  # noqa: E402
 
 BASELINE = PROJECT_ROOT / ".harness-baseline-configuration"
-SKILLS_ROOT = ".agents/skills"
+SKILLS_ROOT = ".harness-baseline-configuration/skills"
 HOOKS_ROOT = ".harness-baseline-configuration/hooks"
 SHARED_GATE = "scripts/implementation_start_gate.py"
 IMPLEMENTED = [
@@ -204,7 +205,7 @@ def test_empty_removed_output_directories_do_not_block_projection(tmp_path, monk
 
 
 def test_api_harness_projection_idempotent_and_clean() -> None:
-    """The provider projection is reproducible and refers only to its own output."""
+    """The provider registration and shared native pointer catalog are reproducible."""
     plan_a = project_harness.build_plan("openrouter")
     plan_b = project_harness.build_plan("openrouter")
     assert plan_a.writes, "openrouter plan rendered no files"
@@ -221,18 +222,21 @@ def test_api_harness_projection_idempotent_and_clean() -> None:
         "residue as legitimate projector output (WI-6895)"
     )
 
-    # D15: GT-KB is the runtime for the API profiles, so nothing is copied. The
-    # R6 (ii): the runtime reads the baseline routing source directly.
-    assert set(plan_a.writes) == {
+    # D15: GT-KB reads runtime source directly; M31 additionally renders the
+    # fixed shared native catalog as pointers to the one authored Skill baseline.
+    catalog_paths = {f".agents/skills/{name}/SKILL.md" for name in _authored_skill_names()}
+    assert set(plan_a.writes) == catalog_paths | {
         ".api-harness/openrouter/settings.json",
         ".api-harness/openrouter/.projection-manifest.json",
     }
     assert manifest["classes"] == {
         "registration": [".api-harness/openrouter/settings.json"],
         "ownership": [".api-harness/openrouter/.projection-manifest.json"],
-        "pointer": [],
+        "pointer": sorted(catalog_paths),
     }
-    assert not [p for p in plan_a.writes if "/rules/" in p or "/skills/" in p or "/hooks/" in p]
+    assert not [
+        p for p in plan_a.writes if p not in catalog_paths and ("/rules/" in p or "/skills/" in p or "/hooks/" in p)
+    ]
     for command in _registration_commands(plan_a, "openrouter"):
         assert f"$GTKB_PROJECT_ROOT/{HOOKS_ROOT}/" in command or f"$GTKB_PROJECT_ROOT/{SHARED_GATE}" in command
         assert command.endswith(" --harness openrouter"), command
@@ -263,15 +267,20 @@ def test_codex_projection_idempotent_and_clean() -> None:
     assert not plan_a.gaps, f"projector gaps present: {plan_a.gaps}"
     assert plan_a.writes == plan_b.writes, "codex projection is not byte-idempotent"
 
-    # R14 (a): Codex discovers .agents/skills natively, so the plan is registration
-    # and ownership only - no stub tree, no rules, no hook copies.
-    assert set(plan_a.writes) == {".codex/hooks.json", ".codex/config.toml", ".codex/.projection-manifest.json"}
+    # Native discovery receives the same neutral pointer catalog as the other native profiles.
+    expected_skills = {f".agents/skills/{name}/SKILL.md" for name in _authored_skill_names()}
+    assert set(plan_a.writes) == {
+        ".codex/hooks.json",
+        ".codex/config.toml",
+        ".codex/.projection-manifest.json",
+        *expected_skills,
+    }
     assert not [p for p in plan_a.writes if p.startswith(".codex/skills/")]
     verification_skill = (PROJECT_ROOT / SKILLS_ROOT / "gtkb-verify/SKILL.md").read_text(encoding="utf-8")
     assert "gt bridge deliver" in verification_skill
     assert "gt bridge artifacts" in verification_skill
     manifest = json.loads(plan_a.writes[".codex/.projection-manifest.json"])
-    assert manifest["classes"]["pointer"] == []
+    assert set(manifest["classes"]["pointer"]) == expected_skills
     for command in _registration_commands(plan_a, "codex"):
         assert f"\"'{HOOKS_ROOT}/" in command or f"\"'{SHARED_GATE}'\"" in command, command
         assert command.endswith("\"'--harness'\" \"'codex'\""), command
@@ -752,10 +761,12 @@ def test_projected_advisory_guidance_has_no_ledger_producer_or_grilling_hook(tmp
             target = tmp_path / relative
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(source, target)
-    # The skills source travels beside the baseline (working-tree bytes: the draft's
-    # index lists nothing under .agents/skills until the gated commit stages the move).
+    # Read the authored working-tree source, including not-yet-staged relocation bytes.
     shutil.copytree(
-        PROJECT_ROOT / SKILLS_ROOT, tmp_path / SKILLS_ROOT, ignore=shutil.ignore_patterns("__pycache__", "*.pyc")
+        PROJECT_ROOT / SKILLS_ROOT,
+        tmp_path / SKILLS_ROOT,
+        dirs_exist_ok=True,
+        ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
     )
     for relative in ("AGENTS.md", "CLAUDE.md", ".goosehints"):
         shutil.copyfile(PROJECT_ROOT / relative, tmp_path / relative)
@@ -775,12 +786,9 @@ def test_projected_advisory_guidance_has_no_ledger_producer_or_grilling_hook(tmp
             assert "advisory-router-scan.py" not in content and "advisory_grilling_gate_lint.py" not in content
     source_text = (tmp_path / SKILLS_ROOT / "gtkb-advisory-proposal/SKILL.md").read_text(encoding="utf-8")
     advisory = [text for path, text in plan.writes.items() if path.endswith("/gtkb-advisory-proposal/SKILL.md")]
-    if harness in STUB_HOSTS:
-        assert len(advisory) == 1, harness
-        assert project_harness.frontmatter_block(advisory[0]) == project_harness.frontmatter_block(source_text)
-        assert f"Read and follow `{SKILLS_ROOT}/gtkb-advisory-proposal/SKILL.md`" in advisory[0]
-    else:
-        assert advisory == [], f"{harness} reads {SKILLS_ROOT} natively; no skill output is projected"
+    assert len(advisory) == 1, harness
+    assert project_harness.frontmatter_block(advisory[0]) == project_harness.frontmatter_block(source_text)
+    assert f"Read and follow `{SKILLS_ROOT}/gtkb-advisory-proposal/SKILL.md`" in advisory[0]
     # Canon-content assertions belong to the SOURCE skill, not to a projection of it.
     assert "Either" in source_text and "no work-item reservation" in source_text
     assert "governance_advisory" in source_text
@@ -850,8 +858,9 @@ def test_application_projection_targets(tmp_path, monkeypatch, harness):
     profile = project_harness.load_profiles()["harnesses"][harness]
     plan = project_harness.build_plan(harness)
     assert not plan.gaps, plan.gaps
-    if profile["skills_discovery"] == "pointer_stubs":
-        stubs = _stubs(plan, profile["skills_stub_dir"])
+    stub_dir = ".agents/skills" if profile["skills_discovery"] == "agents_skills" else profile["skills_stub_dir"]
+    if stub_dir:
+        stubs = _stubs(plan, stub_dir)
         assert len(stubs) == len(_authored_skill_names())
         for name, text in stubs.items():
             assert f"Read and follow `../../{SKILLS_ROOT}/{name}/SKILL.md`" in text, name

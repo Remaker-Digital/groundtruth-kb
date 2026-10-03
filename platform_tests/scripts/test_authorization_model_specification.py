@@ -44,9 +44,22 @@ def test_clause_1_authorization_is_a_project_row_field(body: str) -> None:
     assert "programs have no authorization value" in body
 
 
-def test_clause_1_only_owner_direction_sets_it(body: str) -> None:
+def test_clause_1_owner_changes_and_mechanical_membership_deauthorization(body: str) -> None:
     assert "owner direction sets it" in body
-    assert "agent-initiated membership change cannot set authorization" in body
+    assert "authorization, membership moves and execution-project creation are owner levers" in body
+    assert "the owner runs these levers in their own terminal" in body
+    assert "no agent membership operation can set a project to authorized" in body
+    assert (
+        "a successful creation, addition, removal, movement or reconciliation that actually changes an execution "
+        "project's active work-item membership atomically sets each execution project whose member set changes "
+        "to not authorized" in body
+    )
+    assert "a retained parent whose member set does not change keeps its authorization" in body
+    assert "a no-op, stale or failed membership request changes no authorization or history" in body
+    assert (
+        "nonmembership project, formal-link, dependency and work-item planning amendments preserve authorization"
+        in body
+    )
 
 
 def test_clause_2_no_authorization_instrument_exists(body: str) -> None:
@@ -67,7 +80,12 @@ def test_clause_3_authorization_carries_no_scope_semantics(body: str) -> None:
 
 
 def test_clause_3_scope_lives_on_membership_and_target_paths(body: str) -> None:
-    assert "each work item belongs to exactly one execution project" in body
+    assert "each open work item belongs to exactly one execution project" in body
+    assert "ordinary completion preserves its established current parent" in body
+    assert (
+        "explicitly retained closed historical irregular membership is inspected and reconciled before any accepted "
+        "return to open, never fabricated merely for migration" in body
+    )
     assert "change scope is the proposal's target_paths together with its applicable current formal authority" in body
 
 

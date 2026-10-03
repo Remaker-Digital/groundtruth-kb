@@ -2,7 +2,7 @@
 
 M15 stage 1 (owner ruling D15 as amended by R3; D34 rulings R1-R15): a projection is
 the minimum a host's limitation requires - registrations and pointers only, never
-copies. The fixture declares the D15 shape (one skills source at ``.agents/skills``,
+copies. The fixture declares the D15 shape (one skills source at ``.harness-baseline-configuration/skills``,
 hook scripts run in place from the baseline, tracked root pointers declared in
 ``[root_pointers]``) and the cases pin every finding the acceptance checker reports:
 the classification pass (``unclassified_output``), the stub contract
@@ -29,7 +29,7 @@ import pytest
 from scripts import check_harness_parity as parity
 
 ROOT = Path(__file__).resolve().parents[2]
-SKILLS_ROOT = ".agents/skills"
+SKILLS_ROOT = ".harness-baseline-configuration/skills"
 HOOKS_ROOT = ".harness-baseline-configuration/hooks"
 PROFILE_PATH = "scripts/harness_projection/profiles.toml"
 SOURCE = f"{SKILLS_ROOT}/inspect-work/SKILL.md"
@@ -45,7 +45,7 @@ PROFILE = """
 schema_version = 1
 [baseline]
 root = ".harness-baseline-configuration"
-skills_root = ".agents/skills"
+skills_root = ".harness-baseline-configuration/skills"
 hooks_root = ".harness-baseline-configuration/hooks"
 hook_manifest = "hooks/manifest.toml"
 [root_pointers]
@@ -101,7 +101,7 @@ RICH_SKILL = (
     "Use the CLI.\n"
 )
 POINTER_LINE = (
-    "Read and follow `.agents/skills/inspect-work/SKILL.md` - this stub only registers the skill "
+    "Read and follow `.harness-baseline-configuration/skills/inspect-work/SKILL.md` - this stub only registers the skill "
     "`inspect-work` for the example host; the skill body, helpers and references live there.\n"
 )
 EXPECTED_COMMAND = (
@@ -652,15 +652,16 @@ def test_provider_routing_is_never_a_projection_registration(tree):
     assert target(result)["classes"] == {"registration": 1, "ownership": 1, "pointer": 1}
 
 
-def test_native_skills_discovery_plans_no_skill_output(tree):
+def test_native_skills_discovery_plans_the_generated_pointer_catalog(tree):
     set_profile(tree, AGENTS_SKILLS_PROFILE)
     plan = derive(tree)
     assert not plan.gaps, plan.gaps
     assert not [rel for rel in plan.writes if rel.startswith(".example/skills/")]
     result = report(tree, installed=False)
     assert result["status"] == "pass", result
-    assert target(result)["skills"] == 0
-    assert target(result)["classes"] == {"registration": 1, "ownership": 1, "pointer": 0}
+    assert ".agents/skills/inspect-work/SKILL.md" in plan.writes
+    assert target(result)["skills"] == 1
+    assert target(result)["classes"] == {"registration": 1, "ownership": 1, "pointer": 1}
 
 
 def test_skill_copy_under_native_discovery_is_unexpected(tree, monkeypatch):
@@ -668,8 +669,8 @@ def test_skill_copy_under_native_discovery_is_unexpected(tree, monkeypatch):
     planned(tree, monkeypatch, lambda plan: plan.writes.__setitem__(STUB, SKILL))
     result = report(tree, installed=False)
     assert result["status"] == "fail"
-    assert "unexpected_skill_copy" in codes(result)
-    assert target(result)["skills"] == 0
+    assert "unclassified_output" in codes(result)
+    assert target(result)["skills"] == 1
 
 
 @pytest.mark.parametrize(
@@ -695,7 +696,7 @@ def test_invalid_skills_discovery_declaration_fails_closed(tree, profile):
 @pytest.mark.parametrize(
     "baseline",
     [
-        ('skills_root = ".agents/skills"', 'skills_root = ".other/skills"'),
+        ('skills_root = ".harness-baseline-configuration/skills"', 'skills_root = ".other/skills"'),
         ('hooks_root = ".harness-baseline-configuration/hooks"', 'hooks_root = ".example/hooks"'),
     ],
 )
@@ -707,7 +708,7 @@ def test_baseline_roots_are_read_by_name_and_pinned(tree, baseline):
 
 
 def test_missing_skills_source_fails_closed_rather_than_pruning(tree):
-    shutil.rmtree(tree / ".agents")
+    shutil.rmtree(tree / SKILLS_ROOT)
     result = report(tree, installed=False)
     assert result["status"] == "fail"
     assert codes(result) & {"unavailable_projector", "invalid_projection", "empty_baseline"}
@@ -827,3 +828,25 @@ def test_projector_rejects_a_redirected_authored_source_before_writes(tree):
     with pytest.raises(engine.ProjectionError, match="skills_root is redirected"):
         engine.build_plan("example")
     assert not (tree / ".example").exists()
+
+
+def test_native_catalog_body_copy_is_refused(tree, monkeypatch):
+    set_profile(tree, AGENTS_SKILLS_PROFILE)
+    planned(tree, monkeypatch, lambda plan: plan.writes.__setitem__(".agents/skills/inspect-work/SKILL.md", SKILL))
+    result = report(tree, installed=False)
+    assert result["status"] == "fail"
+    assert "skill_stub_body" in codes(result)
+
+
+def test_native_catalog_unmanaged_extra_is_preserved_and_reported(tree):
+    set_profile(tree, AGENTS_SKILLS_PROFILE)
+    engine = parity._load_projector(tree)
+    assert engine.run("example", "write") == 0
+    foreign = write(tree, ".agents/skills/local/SKILL.md", "Independent local skill.")
+    before = foreign.read_bytes()
+    result = report(tree)
+    assert result["status"] == "fail"
+    assert "unmanaged_output" in codes(result), result
+    assert foreign.read_bytes() == before
+    assert engine.run("example", "write") == 0
+    assert foreign.read_bytes() == before

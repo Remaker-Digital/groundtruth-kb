@@ -3,15 +3,20 @@
 from __future__ import annotations
 
 import subprocess
+import sys
+import time
+from collections.abc import Callable
 from dataclasses import asdict
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, NoReturn, cast
 from urllib.parse import quote
 
 import click
 
 from groundtruth_kb.authority_client import AuthorityClient, AuthorityClientError
 from groundtruth_kb.config import GTConfig
+from groundtruth_kb.dashboard_link import DEFAULT_GRAFANA_PORT
 from groundtruth_kb.postgres_kernel import canonical_json_bytes, parse_json_bytes
 
 if TYPE_CHECKING:
@@ -94,6 +99,17 @@ def _fields(path: Path) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise click.ClickException("The fields file must contain a JSON object")
     return value
+
+
+def _operation_options(command: Any) -> Any:
+    for option in (
+        click.option("--activity", type=click.Choice(["ops"])),
+        click.option("--native-context-id"),
+        click.option("--document"),
+        click.option("--fence", type=click.IntRange(1)),
+    ):
+        command = option(command)
+    return command
 
 
 def _domain_group(name: str, domain: str, *, read_only: bool = False, help: str | None = None) -> click.Group:
@@ -488,7 +504,7 @@ def retire_work_item(ctx: click.Context, /, record_id: str, json_output: bool, *
     )
 
 
-# c123 (owner decision E1): a move can carry intake work into an authorized project, so it is an owner operation.
+# c123 (owner decision E1): membership moves are owner operations.
 @projects_group.command("move-item")
 @click.option("--work-item-id", required=True)
 @click.option("--from-project", "source_project_id", required=True)
@@ -500,10 +516,10 @@ def retire_work_item(ctx: click.Context, /, record_id: str, json_output: bool, *
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
 def move_item(ctx: click.Context, /, work_item_id: str, json_output: bool, **body: Any) -> None:
-    """Move one open work item atomically, preserving both projects' authorization.
+    """Move one open work item atomically and deauthorize both affected projects.
 
-    Owner operation: a move can carry work into an authorized project, so agent harnesses refuse it (GT-KB's effect
-    gate) and the owner runs it in their own terminal.
+    Owner operation: agent harnesses refuse membership moves through GT-KB's effect gate.
+    The owner runs the move in their own terminal.
     """
     _emit(_call(ctx, "POST", f"/v1/work-items/{quote(work_item_id, safe='')}/move", body=body), json_output)
 
@@ -599,12 +615,70 @@ def commit_project(
 
 @context_group.command("work-item")
 @click.argument("work_item_id")
+@click.option(
+    "--recipient-role",
+    type=click.Choice(["pb", "lo"]),
+    help="Explicit role of the successor being authored, not the sender's current role.",
+)
+@click.option(
+    "--activity",
+    type=click.Choice(["build", "test", "spec", "deliberation", "project", "ops"]),
+    help="Explicit receiving activity for informative composition.",
+)
+@click.option(
+    "--critical-section",
+    "critical_sections",
+    multiple=True,
+    help="Add an existing named SAD section ID, for example 2.4; repeat to add sources.",
+)
+@click.option(
+    "--critical-spec",
+    "critical_specs",
+    multiple=True,
+    help="Add a current canonical formal ID; linked requirements cannot be suppressed.",
+)
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
-def work_context(ctx: click.Context, work_item_id: str, json_output: bool) -> None:
-    """Read current work, linked formal requirements, test instructions and prerequisites together."""
-    result = _call(ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/context")
-    if not json_output:
+def work_context(
+    ctx: click.Context,
+    work_item_id: str,
+    recipient_role: str | None,
+    activity: str | None,
+    critical_sections: tuple[str, ...],
+    critical_specs: tuple[str, ...],
+    json_output: bool,
+) -> None:
+    """Read current facts, or compose informative body context for an explicit successor."""
+    compose = recipient_role is not None or activity is not None or bool(critical_sections or critical_specs)
+    if compose and (recipient_role is None or activity is None):
+        raise click.ClickException(
+            "Composition requires both --recipient-role and --activity; no sender-role default is used"
+        )
+    if any(not value or "," in value for value in (*critical_sections, *critical_specs)):
+        raise click.ClickException(
+            "Each --critical-section or --critical-spec must name one nonempty literal ID; "
+            "repeat the option for additional sources"
+        )
+    query = {
+        "recipient_role": recipient_role,
+        "activity": activity,
+        "critical_sections": ",".join(critical_sections) if critical_sections else None,
+        "critical_specs": ",".join(critical_specs) if critical_specs else None,
+    }
+    result = _call(
+        ctx, "GET", f"/v1/work-items/{quote(work_item_id, safe='')}/context", query=query if compose else None
+    )
+    if compose:
+        composed = result.get("message_context")
+        message = composed.get("text") if isinstance(composed, dict) else None
+        if not isinstance(message, str) or not message:
+            raise click.ClickException(
+                "context_unavailable: The selected service returned no composed context; "
+                "no ordinary-context fallback is used"
+            )
+    if compose and not json_output:
+        click.echo(message, nl=False)
+    elif not json_output:
         for key in (
             "program",
             "project",
@@ -770,12 +844,38 @@ def bridge_show(ctx: click.Context, document: str, content: bool, json_output: b
 @native_bridge_group.command("check-effects")
 @click.option("--native-context-id", required=True)
 @click.option("--cwd", required=True, help="Actual absolute working directory of the tool.")
-@click.option("--path", "paths", multiple=True, required=True, help="Concrete tool target; repeat for each target.")
+@click.option("--path", "paths", multiple=True, help="Concrete tool target; repeat for each target.")
+@click.option("--activity", type=click.Choice(["ops", "deliberation", "build", "test", "spec", "project"]))
+@click.option("--document")
+@click.option("--fence", type=click.IntRange(1))
+@click.option("--operations-json", help="Requested ordinary operations and effects, without approval values.")
 @click.option("--json", "json_output", is_flag=True)
 @click.pass_context
 def bridge_check_effects(ctx: click.Context, /, json_output: bool, **body: Any) -> None:
-    """Check current scratch/implementation scope without granting or recording permission."""
+    """Check current file or bounded operation scope without recording permission."""
     body["paths"] = list(body["paths"])
+    encoded = body.pop("operations_json")
+    body = {key: value for key, value in body.items() if value is not None}
+    if encoded is not None:
+        try:
+            operations = parse_json_bytes(encoded.encode("utf-8"))
+        except ValueError as error:
+            raise click.UsageError("--operations-json must be a JSON array") from error
+        if not isinstance(operations, list) or not operations:
+            raise click.UsageError("--operations-json must contain at least one requested operation")
+        from groundtruth_kb.config import _find_config
+
+        selected = (ctx.find_root().obj or {}).get("config") or _find_config()
+        config = _config(ctx)
+        installation_root = Path(config.project_root).resolve()
+        body.update(
+            operations=operations,
+            installation_root=str(installation_root),
+            config_path=str((Path(selected) if selected else installation_root / "groundtruth.toml").resolve()),
+            observed_controller_paths=_operation_controller_paths(_services_installation(ctx), operations),
+        )
+    elif not body["paths"]:
+        raise click.UsageError("Supply concrete --path targets or --operations-json")
     _emit(_call(ctx, "POST", "/v1/bridge/check-effects", body=body), json_output)
 
 
@@ -968,21 +1068,92 @@ def dashboard_refresh(
     _refresh_dashboard(ctx, db_path, runtime_root, json_output, probe_live=probe_live)
 
 
+def _dashboard_ops_supplied(options: dict[str, Any]) -> bool:
+    return any(value is not None for value in options.values())
+
+
+def _require_standard_dashboard_settings(
+    paths: Any,
+    defaults: Any,
+    *,
+    grafana_port: int = DEFAULT_GRAFANA_PORT,
+    refresh_port: int = 8766,
+    interval_minutes: int = 60,
+) -> None:
+    from groundtruth_kb.dashboard import DEFAULT_REFRESH_INTERVAL_MINUTES, DEFAULT_REFRESH_PORT
+
+    different = [
+        name
+        for name in ("db_path", "runtime_root", "grafana_home")
+        if getattr(paths, name).resolve() != getattr(defaults, name).resolve()
+    ]
+    different.extend(
+        name
+        for name, selected, standard in (
+            ("grafana_port", grafana_port, DEFAULT_GRAFANA_PORT),
+            ("refresh_port", refresh_port, DEFAULT_REFRESH_PORT),
+            ("interval_minutes", interval_minutes, DEFAULT_REFRESH_INTERVAL_MINUTES),
+        )
+        if selected != standard
+    )
+    if different:
+        raise click.ClickException(
+            "Bound Dashboard operations support only the installed standard settings; "
+            f"custom {', '.join(different)} cannot be represented or restored by the current service bound. "
+            "The selected values were not applied."
+        )
+
+
 @dashboard_group.command("install")
 @click.option("--grafana-home", type=click.Path(path_type=Path))
 @click.option("--skip-download", is_flag=True)
 @click.option("--skip-plugin", is_flag=True)
 @click.option("--json", "json_output", is_flag=True)
+@_operation_options
 @click.pass_context
 def dashboard_install(
-    ctx: click.Context, grafana_home: Path | None, skip_download: bool, skip_plugin: bool, json_output: bool
+    ctx: click.Context,
+    /,
+    grafana_home: Path | None,
+    skip_download: bool,
+    skip_plugin: bool,
+    json_output: bool,
+    **options: Any,
 ) -> None:
     """Install Grafana OSS and its SQLite plugin into the selected local installation."""
     from groundtruth_kb.dashboard import install_grafana, resolve_dashboard_paths
 
     paths = resolve_dashboard_paths(_config(ctx), grafana_home=grafana_home)
     try:
-        binary = install_grafana(paths, skip_download=skip_download, skip_plugin=skip_plugin)
+        if _dashboard_ops_supplied(options):
+            from groundtruth_kb.config import _find_config
+
+            installation = _services_installation(ctx)
+            checks = cast(
+                _BoundedServiceEffects,
+                _bounded_service_effects(ctx, installation, operation="dashboard.install", **options),
+            )
+            if paths.grafana_home.resolve() != (installation.root / ".groundtruth" / "tools" / "grafana").resolve():
+                raise click.ClickException(
+                    "Bound Dashboard install supports only the standard Grafana destination; "
+                    "custom grafana_home was not applied."
+                )
+            if skip_download or skip_plugin:
+                raise click.ClickException(
+                    "Bound Dashboard install requires the pinned Grafana and SQLite plugin verification; "
+                    "skip flags were not applied."
+                )
+            selected = (ctx.find_root().obj or {}).get("config") or _find_config()
+            binary = install_grafana(
+                paths,
+                config_path=selected,
+                before_effect=checks,
+                on_observer=checks.bind_installation_observer,
+                ready=checks.verify,
+                deadline=lambda: checks.deadline,
+            )
+        else:
+            binary = install_grafana(paths, skip_download=skip_download, skip_plugin=skip_plugin)
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         raise click.ClickException(str(error)) from error
     _emit(
@@ -999,9 +1170,11 @@ def dashboard_install(
 @click.option("--refresh-port", type=click.IntRange(1, 65535), default=8766, show_default=True)
 @click.option("--interval-minutes", type=click.IntRange(min=1), default=60, show_default=True)
 @click.option("--json", "json_output", is_flag=True)
+@_operation_options
 @click.pass_context
 def dashboard_start(
     ctx: click.Context,
+    /,
     db_path: Path | None,
     runtime_root: Path | None,
     grafana_home: Path | None,
@@ -1009,6 +1182,7 @@ def dashboard_start(
     refresh_port: int,
     interval_minutes: int,
     json_output: bool,
+    **options: Any,
 ) -> None:
     """Start the local display and Grafana, returning only after readiness checks."""
     from groundtruth_kb.config import _find_config
@@ -1016,8 +1190,28 @@ def dashboard_start(
 
     config = _config(ctx)
     paths = resolve_dashboard_paths(config, db_path=db_path, runtime_root=runtime_root, grafana_home=grafana_home)
-    selected_config = (ctx.find_root().obj or {}).get("config") or _find_config()
     try:
+        if _dashboard_ops_supplied(options):
+            from groundtruth_kb.services_control import start
+
+            installation = _services_installation(ctx)
+            checks = cast(
+                _BoundedServiceEffects,
+                _bounded_service_effects(ctx, installation, operation="dashboard.start", **options),
+            )
+            _require_standard_dashboard_settings(
+                paths,
+                resolve_dashboard_paths(config),
+                grafana_port=grafana_port,
+                refresh_port=refresh_port,
+                interval_minutes=interval_minutes,
+            )
+            bounded_result = start(installation, "dashboard", before_effect=checks, on_complete=checks.verify)
+            _emit(bounded_result, json_output)
+            if not bounded_result.get("ok", False) or not bounded_result.get("started", False):
+                raise click.exceptions.Exit(1)
+            return
+        selected_config = (ctx.find_root().obj or {}).get("config") or _find_config()
         result = start_dashboard(
             paths,
             config,
@@ -1026,6 +1220,8 @@ def dashboard_start(
             interval_minutes=interval_minutes,
             config_path=selected_config,
         )
+    except click.exceptions.Exit:
+        raise
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         raise click.ClickException(str(error)) from error
     _emit(asdict(result), json_output)
@@ -1034,13 +1230,32 @@ def dashboard_start(
 @dashboard_group.command("stop")
 @click.option("--runtime-root", type=click.Path(path_type=Path))
 @click.option("--json", "json_output", is_flag=True)
+@_operation_options
 @click.pass_context
-def dashboard_stop(ctx: click.Context, runtime_root: Path | None, json_output: bool) -> None:
+def dashboard_stop(ctx: click.Context, /, runtime_root: Path | None, json_output: bool, **options: Any) -> None:
     """End every process of this runtime's dashboard job and report each one."""
     from groundtruth_kb.dashboard import resolve_dashboard_paths, stop_dashboard
 
     try:
-        stopped = stop_dashboard(resolve_dashboard_paths(_config(ctx), runtime_root=runtime_root))
+        config = _config(ctx)
+        paths = resolve_dashboard_paths(config, runtime_root=runtime_root)
+        if _dashboard_ops_supplied(options):
+            from groundtruth_kb.services_control import stop
+
+            installation = _services_installation(ctx)
+            checks = cast(
+                _BoundedServiceEffects,
+                _bounded_service_effects(ctx, installation, operation="dashboard.stop", **options),
+            )
+            _require_standard_dashboard_settings(paths, resolve_dashboard_paths(config))
+            result = stop(installation, "dashboard", before_effect=checks, on_complete=checks.verify)
+            _emit(result, json_output)
+            if not result.get("ok", False) or not result.get("stopped", False):
+                raise click.exceptions.Exit(1)
+            return
+        stopped = stop_dashboard(paths)
+    except click.exceptions.Exit:
+        raise
     except (OSError, ValueError, RuntimeError, subprocess.SubprocessError) as error:
         raise click.ClickException(str(error)) from error
     _emit({"stopped": [asdict(process) for process in stopped]}, json_output)
@@ -1052,14 +1267,17 @@ def dashboard_stop(ctx: click.Context, runtime_root: Path | None, json_output: b
 @click.option("--port", type=click.IntRange(1, 65535), default=8766, show_default=True)
 @click.option("--grafana-port", type=click.IntRange(1, 65535), default=8767, show_default=True)
 @click.option("--interval-minutes", type=click.IntRange(min=1), default=60, show_default=True)
+@_operation_options
 @click.pass_context
 def dashboard_serve(
     ctx: click.Context,
+    /,
     db_path: Path | None,
     runtime_root: Path | None,
     port: int,
     grafana_port: int,
     interval_minutes: int,
+    **options: Any,
 ) -> None:
     """Serve the installed display on loopback, refreshing the selected native authority."""
     from groundtruth_kb.config import _find_config
@@ -1070,6 +1288,38 @@ def dashboard_serve(
     paths = resolve_dashboard_paths(config, db_path=db_path, runtime_root=runtime_root)
     selected_config = (ctx.find_root().obj or {}).get("config") or _find_config()
     try:
+        if _dashboard_ops_supplied(options):
+            installation = _services_installation(ctx)
+            checks = cast(
+                _BoundedServiceEffects,
+                _bounded_service_effects(ctx, installation, operation="dashboard.serve", **options),
+            )
+            _require_standard_dashboard_settings(
+                paths,
+                resolve_dashboard_paths(config),
+                grafana_port=grafana_port,
+                refresh_port=port,
+                interval_minutes=interval_minutes,
+            )
+            result = run_service(
+                config,
+                paths.db_path,
+                paths.runtime_root,
+                port=port,
+                interval_minutes=interval_minutes,
+                config_path=selected_config,
+                grafana_port=grafana_port,
+                before_effect=checks,
+                on_observer=checks.bind_foreground_observer,
+                ready=checks.verify,
+                deadline=lambda: checks.deadline,
+            )
+            if not isinstance(result, dict) or any(
+                result.get(key) is not True for key in ("ok", "ready", "stopped", "server_closed", "scheduler_exited")
+            ):
+                detail = result.get("detail") if isinstance(result, dict) else "no inspected controller result"
+                raise click.ClickException("Foreground Dashboard start or cleanup failed: " + str(detail))
+            return
         run_service(
             config,
             paths.db_path,
@@ -1092,10 +1342,435 @@ def services_group() -> None:
 
 
 def _services_installation(ctx: click.Context) -> Installation:
+    from groundtruth_kb.config import _find_config
     from groundtruth_kb.services_control import installation_from_config  # local import keeps CLI start-up light
 
-    config = _config(ctx)
-    return installation_from_config(Path(config.project_root), config.authority_url)
+    selected = (ctx.find_root().obj or {}).get("config") or _find_config()
+    config = GTConfig.load(config_path=selected, discover=False)
+    return installation_from_config(
+        Path(config.project_root), config.authority_url, Path(selected) if selected is not None else None
+    )
+
+
+def _operation_controller_paths(installation: Installation, operations: list[dict[str, Any]]) -> dict[str, str]:
+    """Read actual installed identities for a check; observations grant no scope."""
+    from groundtruth_kb import services_control
+
+    if any(
+        not isinstance(operation, dict)
+        or not isinstance(operation.get("targets"), list)
+        or any(not isinstance(target, str) for target in operation["targets"])
+        for operation in operations
+    ):
+        raise click.UsageError("Each requested operation must contain a list of literal target strings")
+    targets = {target for operation in operations for target in operation.get("targets", [])}
+    service_targets = {target for target in targets if isinstance(target, str) and target.startswith("service:")}
+    observations: dict[str, str] = {}
+    invocation_operations = {
+        name
+        for name in ("dashboard.serve", "dashboard.install")
+        if any(operation.get("operation") == name for operation in operations)
+    }
+    invocation_operation = next(iter(invocation_operations)) if len(invocation_operations) == 1 else None
+    dashboard_conflict = (
+        "The requested Dashboard operations use different controllers; "
+        "invoke those operations in separate tool calls so each scope check identifies its actual controller"
+    )
+    if len(invocation_operations) > 1:
+        raise click.ClickException(dashboard_conflict)
+    if invocation_operation is not None:
+        if any(
+            operation.get("operation") != invocation_operation and "service:dashboard" in operation["targets"]
+            for operation in operations
+        ):
+            raise click.ClickException(dashboard_conflict)
+        identity = (
+            Path(sys.executable)
+            if invocation_operation == "dashboard.serve"
+            else installation.root / ".groundtruth" / "tools" / "grafana"
+        )
+        observations["service:dashboard"] = str(identity.resolve())
+        service_targets.discard("service:dashboard")
+    if service_targets:
+        try:
+            controllers, _ = services_control._inventory(installation, services_control.default_runner)
+        except (services_control.ServiceControlError, OSError, ValueError, subprocess.SubprocessError) as error:
+            raise click.ClickException(str(error)) from error
+        if (
+            invocation_operation is not None
+            and "service:all" in service_targets
+            and any(controller.name == "dashboard" for controller in controllers)
+        ):
+            raise click.ClickException(dashboard_conflict)
+        for controller in controllers:
+            target = "service:" + controller.name
+            if "service:all" not in service_targets and target not in service_targets:
+                continue
+            identity = {
+                "authority": installation.authority_launcher,
+                "home": installation.home_script,
+                "postgresql": installation.postgresql_data,
+            }.get(controller.name, Path(controller.executable))
+            if not identity.is_absolute():
+                raise click.ClickException(f"The {controller.name} controller identity is not an absolute path")
+            observations[target] = str(identity.resolve())
+    if any(target.startswith("control:") for target in targets):
+        from groundtruth_kb.project.operational_control_config import (
+            CATALOG_RELATIVE_PATH,
+            OperationalControlConfigError,
+            load_operational_control_catalog,
+        )
+
+        try:
+            catalog = load_operational_control_catalog(installation.root)
+        except OperationalControlConfigError as error:
+            raise click.ClickException(str(error)) from error
+        catalog_path = str((installation.root / CATALOG_RELATIVE_PATH).resolve())
+        observations.update({"control:" + key: catalog_path for key in catalog.definitions})
+    for target in targets:
+        if target == "browser:home":
+            observations[target] = str(installation.home_script.resolve())
+        elif isinstance(target, str) and target.startswith("shortcut:"):
+            observations[target] = str(
+                (installation.root / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe").resolve()
+            )
+    return observations
+
+
+class _BoundedServiceEffects:
+    """Fresh checks for one explicit invocation; no reusable permission is produced."""
+
+    def __init__(
+        self,
+        ctx: click.Context,
+        installation: Installation,
+        *,
+        activity: str,
+        native_context_id: str,
+        document: str,
+        fence: int,
+        operation: str | None = None,
+        extra_targets: tuple[str, ...] = (),
+    ) -> None:
+        self.ctx, self.installation = ctx, installation
+        self.activity, self.native_context_id = activity, native_context_id
+        self.document, self.fence = document, fence
+        self.operation, self.extra_targets = operation, extra_targets
+        self.bounds: dict[str, dict[str, Any]] = {}
+        self.deadline: float | None = None
+        self.terminal: tuple[str, frozenset[str], frozenset[tuple[str, str]], float] | None = None
+        self.initial: dict[str, dict[str, Any]] | None = None
+        self.shortcut_route: dict[str, Any] | None = None
+        self.targets: tuple[str, ...] | None = None
+        self.foreground_observer: Callable[[], dict[str, Any]] | None = None
+        self.installation_observer: Callable[[], dict[str, Any]] | None = None
+
+    def bind_foreground_observer(self, observer: Callable[[], dict[str, Any]]) -> None:
+        from groundtruth_kb.services_control import ServiceControlError
+
+        if self.operation != "dashboard.serve" or not callable(observer) or self.foreground_observer is not None:
+            raise ServiceControlError("Only one foreground Dashboard invocation may supply this observer")
+        self.foreground_observer = observer
+
+    def bind_installation_observer(self, observer: Callable[[], dict[str, Any]]) -> None:
+        from groundtruth_kb.services_control import ServiceControlError
+
+        if self.operation != "dashboard.install" or not callable(observer) or self.installation_observer is not None:
+            raise ServiceControlError("Only one Dashboard installation invocation may supply this observer")
+        self.installation_observer = observer
+
+    @staticmethod
+    def _effects(effects: list[dict[str, Any]]) -> frozenset[tuple[str, str]]:
+        from groundtruth_kb.services_control import ServiceControlError
+
+        if any(set(effect) - {"target", "effect"} for effect in effects):
+            raise ServiceControlError("This controller does not support value-bearing effects")
+        try:
+            found = frozenset((effect["target"], effect["effect"]) for effect in effects)
+        except (KeyError, TypeError) as error:
+            raise ServiceControlError("The effect check returned malformed constituent effects") from error
+        if len(found) != len(effects):
+            raise ServiceControlError("The effect check repeated constituent effects")
+        return found
+
+    def _observe(self, targets: list[str]) -> dict[str, Any]:
+        from groundtruth_kb.services_control import observe_targets
+
+        if self.installation_observer is not None:
+            if self.operation != "dashboard.install" or targets != ["service:dashboard"]:
+                from groundtruth_kb.services_control import ServiceControlError
+
+                raise ServiceControlError("The Dashboard installation observer cannot inspect another controller")
+            return self.installation_observer()
+        if self.operation == "dashboard.install":
+            from groundtruth_kb.services_control import ServiceControlError
+
+            raise ServiceControlError("Dashboard install requires its actual invocation observer")
+        if self.foreground_observer is not None:
+            if self.operation != "dashboard.serve" or targets != ["service:dashboard"]:
+                from groundtruth_kb.services_control import ServiceControlError
+
+                raise ServiceControlError("The foreground Dashboard observer cannot inspect another controller")
+            return self.foreground_observer()
+        if self.operation == "dashboard.serve":
+            from groundtruth_kb.services_control import ServiceControlError
+
+            raise ServiceControlError("Foreground Dashboard serve requires its actual invocation observer")
+        services = [target for target in targets if target.startswith("service:")]
+        observation = observe_targets(self.installation, services)
+        paths = observation["observed_controller_paths"]
+        for target in targets:
+            if target == "browser:home":
+                paths[target] = str(self.installation.home_script.resolve())
+            elif target.startswith("shortcut:"):
+                paths[target] = str(
+                    (self.installation.root / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe").resolve()
+                )
+            elif target not in paths:
+                from groundtruth_kb.services_control import ServiceControlError
+
+                raise ServiceControlError("This command has no supported observer for " + target)
+        return observation
+
+    def _validate_bound(
+        self, bound: dict[str, Any], operation: str, targets: list[str], observation: dict[str, Any]
+    ) -> None:
+        from groundtruth_kb.services_control import ServiceControlError
+
+        def refuse(message: str) -> None:
+            raise ServiceControlError(message)
+
+        if bound.get("operation") != operation or set(bound.get("targets", [])) != set(targets):
+            refuse("The canonical bound does not describe this command's complete target set")
+        preconditions = bound.get("preconditions", {})
+        expected_paths = preconditions.get("controller_paths", {})
+        actual_paths = observation["observed_controller_paths"]
+        if (
+            not isinstance(observation.get("installation_root"), str)
+            or Path(observation["installation_root"]).resolve() != self.installation.root.resolve()
+            or Path(preconditions.get("installation_root", "")).resolve() != self.installation.root.resolve()
+            or Path(preconditions.get("config_path", "")).resolve() != Path(observation["config_path"]).resolve()
+            or set(expected_paths) != set(actual_paths)
+            or any(Path(expected_paths[key]).resolve() != Path(actual_paths[key]).resolve() for key in actual_paths)
+        ):
+            refuse("The canonical bound differs from the freshly identified installation/controllers")
+        states = observation["states"]
+        if self.initial is None:
+            for target, expected in preconditions.get("states", {}).items():
+                current = states.get(target)
+                if current is None or expected not in {"any", "running", "stopped"}:
+                    refuse("The controller cannot establish a declared initial-state predicate")
+                if expected != "any" and current["running"] != (expected == "running"):
+                    refuse("The declared initial service state does not match the identified controller")
+        verification = bound.get("verification", {})
+        installing = operation == "dashboard.install"
+        if installing:
+            installation = observation.get("installation")
+            destination = self.installation.root / ".groundtruth" / "tools" / "grafana"
+            if (
+                set(actual_paths) != {"service:dashboard"}
+                or Path(actual_paths["service:dashboard"]).resolve() != destination.resolve()
+                or states != {}
+                or verification.get("installation") != "pinned_grafana_sqlite"
+                or not isinstance(installation, dict)
+                or installation.get("predicate") != "pinned_grafana_sqlite"
+                or not isinstance(installation.get("verified"), bool)
+            ):
+                refuse("The installer cannot establish the declared pinned Grafana/SQLite verification")
+        elif verification.get("installation") is not None:
+            refuse("This service command cannot perform a declared installation verification")
+        service_targets = set() if installing else {target for target in targets if target.startswith("service:")}
+        desired = (
+            "stopped"
+            if operation in {"services.stop", "services.stop-all", "home.stop", "dashboard.stop"}
+            else "running"
+        )
+        if verification.get("states", {}) != {target: desired for target in service_targets}:
+            refuse("The declared verification does not match this service command's result")
+        for target, enabled in verification.get("task_enabled", {}).items():
+            if target not in states or states[target]["task_enabled"] is None or enabled != (desired == "running"):
+                refuse("The controller cannot perform the declared task-enabled verification")
+        if verification.get("control_values"):
+            refuse("This service command cannot verify control-value mutations")
+        if "browser:home" in targets and verification.get("browser_origin") != "http://127.0.0.1:3080/":
+            refuse("The browser verification must name the exact Home origin")
+        if "browser:home" not in targets and verification.get("browser_origin") is not None:
+            refuse("This service command cannot perform a declared browser verification")
+        shortcuts = any(target.startswith("shortcut:") for target in targets)
+        if shortcuts:
+            route = self.shortcut_route
+            if (
+                route is None
+                or verification.get("shortcut_arguments") != route["arguments"]
+                or any(
+                    not isinstance(verification.get("shortcut_" + key), str)
+                    or Path(verification["shortcut_" + key]).resolve() != Path(route[key]).resolve()
+                    for key in ("target", "working_directory")
+                )
+            ):
+                refuse("The shortcut verification differs from this installation's exact command")
+        elif any(verification.get("shortcut_" + key) for key in ("target", "arguments", "working_directory")):
+            refuse("This service command cannot perform a declared shortcut verification")
+        for field, keys in (
+            ("containment", ("installation_only", "managed_processes_only")),
+            ("rollback", ("restore_initial_state", "only_invocation_changes")),
+        ):
+            if bound.get(field) != {key: True for key in keys}:
+                refuse("The controller does not support the declared containment/rollback behavior")
+
+    def __call__(self, operation: str, targets: list[str], effects: list[dict[str, str]], phase: str) -> None:
+        from groundtruth_kb.services_control import ServiceControlError
+
+        if phase not in {"preflight", "forward", "rollback", "terminal_shutdown"}:
+            raise ServiceControlError("The controller supplied an unsupported effect phase")
+        allowed_operations = {
+            "home.start": {"services.start", "home.start"},
+            "home.stop": {"services.stop", "home.stop"},
+            "dashboard.start": {"services.start", "dashboard.start"},
+            "dashboard.stop": {"services.stop", "dashboard.stop"},
+            "home.open": {"services.start", "home.open"},
+            "home.open.start-services": {"services.start-all", "services.start", "home.open.start-services"},
+        }.get(self.operation or "", {self.operation} if self.operation is not None else {operation})
+        if operation not in allowed_operations:
+            raise ServiceControlError("The controller callback belongs to a different command")
+        operation = self.operation or operation
+        if phase == "terminal_shutdown" and operation not in {"services.stop", "services.stop-all"}:
+            raise ServiceControlError("Only a service shutdown has an unavailable-authority continuation")
+        targets = list(dict.fromkeys([*targets, *self.extra_targets]))
+        if self.targets is None:
+            self.targets = tuple(targets)
+        elif self.operation == "home.open.start-services" and set(targets) <= set(self.targets):
+            targets = list(self.targets)
+        elif set(targets) != set(self.targets):
+            raise ServiceControlError("This invocation's selected target set changed")
+        if self.deadline is not None and time.monotonic() >= self.deadline:
+            raise ServiceControlError("The operation deadline expired before this effect")
+        actual = self._effects(effects)
+        observation = self._observe(targets)
+        selected_config = observation["config_path"]
+        body = {
+            "native_context_id": self.native_context_id,
+            "activity": self.activity,
+            "document": self.document,
+            "fence": self.fence,
+            "cwd": str(self.installation.root.resolve()),
+            "installation_root": str(self.installation.root.resolve()),
+            "config_path": selected_config,
+            "observed_controller_paths": observation["observed_controller_paths"],
+            "operations": [{"operation": operation, "targets": targets, "effects": effects}],
+        }
+        started = time.monotonic()
+        try:
+            answer = _client(self.ctx).request("POST", "/v1/bridge/check-effects", body=body)
+        except AuthorityClientError as error:
+            terminal = self.terminal
+            if (
+                error.code == "authority_unavailable"
+                and terminal is not None
+                and phase in {"terminal_shutdown", "rollback"}
+                and operation == terminal[0]
+                and frozenset(targets) == terminal[1]
+                and actual <= terminal[2]
+                and time.monotonic() < min(terminal[3], cast(float, self.deadline))
+            ):
+                self._validate_bound(self.bounds[operation], operation, targets, observation)
+                if time.monotonic() >= min(terminal[3], cast(float, self.deadline)):
+                    raise ServiceControlError("The operation deadline expired before this effect") from error
+                return
+            raise ServiceControlError(f"{error.code}: {error}") from error
+        except click.ClickException as error:
+            raise ServiceControlError(str(error)) from error
+        try:
+            if (
+                answer["status"] != "current"
+                or answer["scope"] != "operation"
+                or answer["document"] != self.document
+                or answer["fence"] != self.fence
+                or len(answer["operations"]) != 1
+            ):
+                raise ValueError("selectors")
+            checked = answer["operations"][0]
+            if (
+                checked["operation"] != operation
+                or set(checked["targets"]) != set(targets)
+                or self._effects(checked["effects"]) != actual
+            ):
+                raise ValueError("operation")
+            observed_at, deadline = (datetime.fromisoformat(answer[key]) for key in ("observed_at", "deadline"))
+            if any(
+                value.tzinfo is None or value.utcoffset() != UTC.utcoffset(value) for value in (observed_at, deadline)
+            ):
+                raise ValueError("timestamps")
+            due = started + (deadline - observed_at).total_seconds()
+            self.deadline = min(self.deadline, due) if self.deadline is not None else due
+            if time.monotonic() >= self.deadline:
+                raise ValueError("expired deadline")
+            self._validate_bound(checked["bound"], operation, targets, observation)
+            if time.monotonic() >= self.deadline:
+                raise ValueError("expired deadline")
+        except (AttributeError, KeyError, TypeError, ValueError) as error:
+            raise ServiceControlError("The authority returned an unusable or expired operation check") from error
+        self.bounds[operation] = checked["bound"]
+        if self.initial is None:
+            self.initial = observation["states"]
+        if phase == "terminal_shutdown" and self.terminal is None:
+            self.terminal = (operation, frozenset(targets), actual, self.deadline)
+
+    def verify(self) -> None:
+        from groundtruth_kb.services_control import ServiceControlError
+
+        for bound in self.bounds.values():
+            observation = self._observe(bound["targets"])
+            states = observation["states"]
+            verification = bound["verification"]
+            if bound["operation"] == "dashboard.install":
+                self._validate_bound(bound, bound["operation"], bound["targets"], observation)
+                if observation["installation"]["verified"] is not True:
+                    raise ServiceControlError(
+                        "The final pinned Grafana/SQLite installation failed its declared verification"
+                    )
+            for target, expected in verification.get("states", {}).items():
+                if states[target]["running"] != (expected == "running") or (
+                    expected == "running" and not states[target]["ready"]
+                ):
+                    raise ServiceControlError("The final service state failed its declared verification: " + target)
+            for target, expected in verification.get("task_enabled", {}).items():
+                if states[target]["task_enabled"] != expected:
+                    raise ServiceControlError(
+                        "The final task-enabled state failed its declared verification: " + target
+                    )
+        if self.deadline is not None and time.monotonic() >= self.deadline:
+            raise ServiceControlError("The operation deadline expired before its final verification")
+
+
+def _bounded_service_effects(
+    ctx: click.Context,
+    installation: Installation,
+    *,
+    activity: str | None,
+    native_context_id: str | None,
+    document: str | None,
+    fence: int | None,
+    operation: str | None = None,
+    extra_targets: tuple[str, ...] = (),
+) -> _BoundedServiceEffects | None:
+    supplied = (activity, native_context_id, document, fence)
+    if not any(value is not None for value in supplied):
+        return None
+    if not all(value is not None for value in supplied) or activity != "ops":
+        raise click.UsageError(
+            "Bound agent operations require --activity ops, --native-context-id, --document and --fence together"
+        )
+    return _BoundedServiceEffects(
+        ctx,
+        installation,
+        activity=activity,
+        native_context_id=cast(str, native_context_id),
+        document=cast(str, document),
+        fence=cast(int, fence),
+        operation=operation,
+        extra_targets=extra_targets,
+    )
 
 
 @services_group.command("status")
@@ -1113,29 +1788,57 @@ def services_status(ctx: click.Context, name: str | None, json_output: bool) -> 
 
 
 @services_group.command("start")
-@click.argument("name")
+@click.argument("name", required=False, default="all")
 @click.option("--json", "json_output", is_flag=True)
+@_operation_options
 @click.pass_context
-def services_start(ctx: click.Context, name: str, json_output: bool) -> None:
-    """Start one service and wait for its readiness where it has one."""
+def services_start(ctx: click.Context, /, name: str, json_output: bool, **options: Any) -> None:
+    """Start all installed persistent services, or one named service, and check readiness."""
     from groundtruth_kb.services_control import ServiceControlError, start
 
     try:
-        _emit(start(_services_installation(ctx), name), json_output)
+        installation = _services_installation(ctx)
+        checks = _bounded_service_effects(
+            ctx, installation, operation="services.start-all" if name == "all" else "services.start", **options
+        )
+        result = start(
+            installation,
+            name,
+            **cast(
+                "dict[str, Any]", {"before_effect": checks, "on_complete": checks.verify} if checks is not None else {}
+            ),
+        )
+        _emit(result, json_output)
+        if not result.get("started", False) or (name == "all" and not result.get("ok", False)):
+            raise click.exceptions.Exit(1)
     except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
         raise click.ClickException(str(error)) from error
 
 
 @services_group.command("stop")
-@click.argument("name")
+@click.argument("name", required=False, default="all")
 @click.option("--json", "json_output", is_flag=True)
+@_operation_options
 @click.pass_context
-def services_stop(ctx: click.Context, name: str, json_output: bool) -> None:
-    """Stop one service so that it stays stopped (its logon task is paused until the next start)."""
+def services_stop(ctx: click.Context, /, name: str, json_output: bool, **options: Any) -> None:
+    """Stop all installed persistent services, or one named service, until the next start."""
     from groundtruth_kb.services_control import ServiceControlError, stop
 
     try:
-        _emit(stop(_services_installation(ctx), name), json_output)
+        installation = _services_installation(ctx)
+        checks = _bounded_service_effects(
+            ctx, installation, operation="services.stop-all" if name == "all" else "services.stop", **options
+        )
+        result = stop(
+            installation,
+            name,
+            **cast(
+                "dict[str, Any]", {"before_effect": checks, "on_complete": checks.verify} if checks is not None else {}
+            ),
+        )
+        _emit(result, json_output)
+        if not result.get("stopped", False) or (name == "all" and not result.get("ok", False)):
+            raise click.exceptions.Exit(1)
     except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
         raise click.ClickException(str(error)) from error
 
@@ -1170,21 +1873,51 @@ def _home(ctx: click.Context, action: str) -> subprocess.CompletedProcess[str]:
 
 
 @home_group.command("start")
+@_operation_options
 @click.pass_context
-def home_start(ctx: click.Context) -> None:
+def home_start(ctx: click.Context, /, **options: Any) -> None:
     """Start the Home server after proving its GT-KB guard and plugin are active."""
-    result = _home(ctx, "start")
-    click.echo(result.stdout.strip() or result.stderr.strip())
-    ctx.exit(result.returncode)
+    from groundtruth_kb.services_control import ServiceControlError, start
+
+    try:
+        installation = _services_installation(ctx)
+        checks = _bounded_service_effects(ctx, installation, operation="home.start", **options)
+        result = start(
+            installation,
+            "home",
+            **cast(
+                "dict[str, Any]", {"before_effect": checks, "on_complete": checks.verify} if checks is not None else {}
+            ),
+        )
+        _emit(result, True)
+        if not result.get("started", False):
+            raise click.exceptions.Exit(1)
+    except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
+        raise click.ClickException(str(error)) from error
 
 
 @home_group.command("stop")
+@_operation_options
 @click.pass_context
-def home_stop(ctx: click.Context) -> None:
-    """Stop the Home server (graceful teardown first)."""
-    result = _home(ctx, "stop")
-    click.echo(result.stdout.strip() or result.stderr.strip())
-    ctx.exit(result.returncode)
+def home_stop(ctx: click.Context, /, **options: Any) -> None:
+    """Stop the identified Home server and confirm its process exit."""
+    from groundtruth_kb.services_control import ServiceControlError, stop
+
+    try:
+        installation = _services_installation(ctx)
+        checks = _bounded_service_effects(ctx, installation, operation="home.stop", **options)
+        result = stop(
+            installation,
+            "home",
+            **cast(
+                "dict[str, Any]", {"before_effect": checks, "on_complete": checks.verify} if checks is not None else {}
+            ),
+        )
+        _emit(result, True)
+        if not result.get("stopped", False):
+            raise click.exceptions.Exit(1)
+    except (ServiceControlError, OSError, subprocess.SubprocessError) as error:
+        raise click.ClickException(str(error)) from error
 
 
 @home_group.command("status")
@@ -1197,18 +1930,304 @@ def home_status(ctx: click.Context) -> None:
 
 
 @home_group.command("open")
+@click.option("--start-services", is_flag=True, help="Start the installed persistent service set before opening Home.")
+@_operation_options
 @click.pass_context
-def home_open(ctx: click.Context) -> None:
-    """Open the Home UI in the default browser, starting the server first if needed."""
+def home_open(ctx: click.Context, /, start_services: bool, **options: Any) -> None:
+    """Open Home, optionally starting the installed persistent services first."""
     import webbrowser
+    from urllib.parse import urlsplit
 
-    if _home(ctx, "url").returncode != 0 and _home(ctx, "start").returncode != 0:
-        raise click.ClickException("The GT-KB Home server could not be started; see: gt home status")
-    result = _home(ctx, "url")
-    if result.returncode != 0:
-        raise click.ClickException("The GT-KB Home server is not running; see: gt home status")
-    webbrowser.open(result.stdout.strip())  # the loopback sign-in URL goes only to the browser, never to the terminal
+    from groundtruth_kb.services_control import ServiceControlError, start
+
+    operation = "home.open.start-services" if start_services else "home.open"
+    installation = None
+    checks = None
+    if any(value is not None for value in options.values()):
+        installation = _services_installation(ctx)
+        checks = _bounded_service_effects(
+            ctx, installation, operation=operation, extra_targets=("browser:home",), **options
+        )
+
+    def finish_open() -> None:
+        result = _home(ctx, "url")
+        if result.returncode != 0:
+            raise ServiceControlError("The GT-KB Home server is not running; see: gt home status")
+        url = result.stdout.strip()
+        parsed = urlsplit(url)
+        if (
+            parsed.scheme != "http"
+            or parsed.hostname != "127.0.0.1"
+            or parsed.port != 3080
+            or parsed.username
+            or parsed.password
+        ):
+            raise ServiceControlError("The Home launcher returned a URL outside its supported loopback origin")
+        if checks is not None:
+            targets = list(checks.targets or ("service:home", "browser:home"))
+            checks(operation, targets, [{"target": "browser:home", "effect": "browser.open"}], "forward")
+            checks.verify()
+        # The private loopback sign-in URL goes only to the browser.
+        if not webbrowser.open(url):
+            raise ServiceControlError("The browser could not open GT-KB Home; open http://127.0.0.1:3080/ manually")
+
+    try:
+        if start_services:
+            installation = installation or _services_installation(ctx)
+            services = start(
+                installation,
+                "all",
+                **cast(
+                    "dict[str, Any]",
+                    {"before_effect": checks, "on_complete": finish_open} if checks is not None else {},
+                ),
+            )
+            if not services.get("started", False) or not services.get("ok", False):
+                _emit(services, True)
+                raise click.exceptions.Exit(1)
+            if checks is None:
+                if _home(ctx, "url").returncode != 0:
+                    started = start(installation, "home")
+                    if not started.get("started", False):
+                        raise ServiceControlError("The GT-KB Home server could not be started; see: gt home status")
+                finish_open()
+        elif _home(ctx, "url").returncode != 0:
+            installation = installation or _services_installation(ctx)
+            started = start(
+                installation,
+                "home",
+                **cast(
+                    "dict[str, Any]",
+                    {"before_effect": checks, "on_complete": finish_open} if checks is not None else {},
+                ),
+            )
+            if not started.get("started", False):
+                _emit(started, True)
+                raise click.exceptions.Exit(1)
+            if checks is None:
+                finish_open()
+        else:
+            finish_open()
+    except (ServiceControlError, OSError, ValueError, subprocess.SubprocessError) as error:
+        raise click.ClickException(str(error)) from error
     click.echo("Opened GT-KB Home: http://127.0.0.1:3080/")
+
+
+@home_group.command("shortcut")
+@click.option("--path", type=click.Path(path_type=Path), help="Shortcut path; defaults to GT-KB.lnk on the Desktop.")
+@click.option("--json", "json_output", is_flag=True)
+@_operation_options
+@click.pass_context
+def home_shortcut(ctx: click.Context, /, path: Path | None, json_output: bool, **options: Any) -> None:
+    """Create an inspected shortcut to this installation's service start-and-open command."""
+    import json
+
+    from groundtruth_kb.services_control import ServiceControlError
+
+    installation = _services_installation(ctx)
+    checks = _bounded_service_effects(ctx, installation, operation="services.shortcut", **options)
+    if checks is not None and (path is None or not path.is_absolute()):
+        raise click.UsageError("Bound shortcut creation requires an explicit absolute --path")
+    config_path = installation.dashboard_config_path.resolve()
+    target = installation.root / "groundtruth-kb" / ".venv" / "Scripts" / "python.exe"
+    if not target.is_file() or not config_path.is_file():
+        raise click.ClickException(
+            "The installed Python and selected groundtruth.toml must exist before shortcut creation"
+        )
+    if path is not None and path.suffix.lower() != ".lnk":
+        raise click.UsageError("The shortcut path must end in .lnk")
+    existed_before = path.exists() if path is not None else None
+    argument_values = ["-m", "groundtruth_kb", "--config", str(config_path), "home", "open", "--start-services"]
+    arguments = subprocess.list2cmdline(argument_values)
+    if checks is not None:
+        checks.shortcut_route = {
+            "target": str(target.resolve()),
+            "arguments": argument_values,
+            "working_directory": str(installation.root.resolve()),
+        }
+        try:
+            checks(
+                "services.shortcut",
+                ["shortcut:" + str(cast(Path, path).resolve())],
+                [{"target": "shortcut:" + str(cast(Path, path).resolve()), "effect": "shortcut.create"}],
+                "forward",
+            )
+        except ServiceControlError as error:
+            raise click.ClickException(str(error)) from error
+
+    def literal(value: str) -> str:
+        return "'" + value.replace("'", "''") + "'"
+
+    destination = (
+        literal(str(path.resolve()))
+        if path is not None
+        else "[IO.Path]::Combine([Environment]::GetFolderPath('Desktop'), 'GT-KB.lnk')"
+    )
+    script = f"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$shortcutPath = {destination}
+$expectedTarget = {literal(str(target.resolve()))}
+$expectedArguments = {literal(arguments)}
+$expectedDirectory = {literal(str(installation.root.resolve()))}
+$createdByInvocation = $false
+$createdIdentity = $null
+$captureCreationIdentity = {"$true" if checks is not None else "$false"}
+try {{
+$shellObject = New-Object -ComObject WScript.Shell
+$alreadyExists = Test-Path -LiteralPath $shortcutPath
+$shortcutObject = $shellObject.CreateShortcut($shortcutPath)
+if ($alreadyExists -and ($shortcutObject.TargetPath -ne $expectedTarget -or
+    $shortcutObject.Arguments -cne $expectedArguments -or $shortcutObject.WorkingDirectory -ne $expectedDirectory)) {{
+    throw 'The existing shortcut points to a different command; no change was made'
+}}
+if (-not $alreadyExists) {{
+    $shortcutObject.TargetPath = $expectedTarget
+    $shortcutObject.Arguments = $expectedArguments
+    $shortcutObject.WorkingDirectory = $expectedDirectory
+    $shortcutObject.WindowStyle = 7
+    $shortcutObject.Description = 'Start GT-KB services and open Home'
+    $shortcutObject.Save()
+    $createdByInvocation = $true
+    if ($captureCreationIdentity) {{
+        $createdIdentity = @{{sha256=(Get-FileHash -LiteralPath $shortcutPath -Algorithm SHA256).Hash;
+                             target=$expectedTarget; arguments=$expectedArguments; \
+working_directory=$expectedDirectory}}
+    }}
+}}
+$readback = $shellObject.CreateShortcut($shortcutPath)
+if ($readback.TargetPath -ne $expectedTarget -or $readback.Arguments -cne $expectedArguments -or
+    $readback.WorkingDirectory -ne $expectedDirectory) {{
+    throw 'Shortcut readback differs from the supported installed command'
+}}
+[pscustomobject]@{{ok=$true; path=$shortcutPath; target=$readback.TargetPath; arguments=$readback.Arguments;
+    working_directory=$readback.WorkingDirectory; created=$createdByInvocation; \
+created_identity=$createdIdentity}} | ConvertTo-Json -Compress
+}} catch {{
+    [pscustomobject]@{{ok=$false; path=$shortcutPath; error=$_.Exception.Message;
+        created=$createdByInvocation; created_identity=$createdIdentity}} | ConvertTo-Json -Compress
+    exit 1
+}}
+"""
+    try:
+        result = subprocess.run(
+            ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            timeout=30,
+        )
+    except (OSError, subprocess.SubprocessError) as error:
+        message = str(error)
+        if checks is not None and existed_before is False:
+            message += (
+                "; creation identity was not confirmed, so no shortcut was removed. "
+                f"Inspect {cast(Path, path).resolve()} through owner file management before retrying"
+            )
+        raise click.ClickException(message) from error
+    try:
+        readback = json.loads(result.stdout)
+    except (ValueError, TypeError):
+        readback = None
+        failure = "Shortcut command did not return an inspected result"
+        if result.returncode != 0 and result.stderr:
+            failure += ": " + result.stderr.strip()[:2000]
+    else:
+        failure = (
+            (readback.get("error") or (result.stderr or result.stdout).strip())
+            if isinstance(readback, dict)
+            else "Shortcut command returned an unusable result"
+        )
+        if not isinstance(failure, str):
+            failure = "Shortcut command returned an unusable failure diagnostic"
+        if result.returncode == 0 and isinstance(readback, dict) and readback.get("ok", True):
+            if checks is None or (
+                all(isinstance(readback.get(key), str) for key in ("path", "target", "arguments", "working_directory"))
+                and Path(readback["path"]).resolve() == cast(Path, path).resolve()
+                and Path(readback.get("target", "")).resolve() == target.resolve()
+                and readback.get("arguments") == arguments
+                and Path(readback.get("working_directory", "")).resolve() == installation.root.resolve()
+            ):
+                try:
+                    if checks is not None:
+                        checks.verify()
+                except ServiceControlError as error:
+                    failure = str(error)
+                else:
+                    _emit(readback, json_output)
+                    return
+            else:
+                failure = "Shortcut readback failed its declared installed-route verification"
+    if checks is not None:
+        proof = readback.get("created_identity") if isinstance(readback, dict) else None
+        digest = proof.get("sha256") if isinstance(proof, dict) else None
+        if (
+            existed_before is False
+            and isinstance(readback, dict)
+            and readback.get("created") is True
+            and isinstance(digest, str)
+            and len(digest) == 64
+            and all(char in "0123456789abcdefABCDEF" for char in digest)
+            and cast(dict[str, Any], proof).get("target") == str(target.resolve())
+            and cast(dict[str, Any], proof).get("arguments") == arguments
+            and cast(dict[str, Any], proof).get("working_directory") == str(installation.root.resolve())
+        ):
+            try:
+                checks(
+                    "services.shortcut",
+                    ["shortcut:" + str(cast(Path, path).resolve())],
+                    [{"target": "shortcut:" + str(cast(Path, path).resolve()), "effect": "shortcut.remove"}],
+                    "rollback",
+                )
+                cleanup = f"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
+$shortcutPath = {literal(str(cast(Path, path).resolve()))}
+$expectedHash = {literal(digest)}
+$shellObject = New-Object -ComObject WScript.Shell
+$current = $shellObject.CreateShortcut($shortcutPath)
+if ($current.TargetPath -ne {literal(str(target.resolve()))} -or
+    $current.Arguments -cne {literal(arguments)} -or
+    $current.WorkingDirectory -ne {literal(str(installation.root.resolve()))}) {{
+    throw 'Residual shortcut no longer matches this invocation; no removal was performed'
+}}
+if ((Get-FileHash -LiteralPath $shortcutPath -Algorithm SHA256).Hash -ne $expectedHash) {{
+    throw 'Residual shortcut bytes changed; no removal was performed'
+}}
+Remove-Item -LiteralPath $shortcutPath -ErrorAction Stop
+if (Test-Path -LiteralPath $shortcutPath) {{ throw 'Shortcut removal was not confirmed' }}
+[pscustomobject]@{{removed=$true; path=$shortcutPath}} | ConvertTo-Json -Compress
+"""
+                removed = subprocess.run(
+                    ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", cleanup],
+                    capture_output=True,
+                    text=True,
+                    encoding="utf-8",
+                    timeout=30,
+                )
+                if removed.returncode != 0:
+                    raise ServiceControlError((removed.stderr or removed.stdout).strip())
+                confirmation = json.loads(removed.stdout)
+                if (
+                    not isinstance(confirmation, dict)
+                    or confirmation.get("removed") is not True
+                    or not isinstance(confirmation.get("path"), str)
+                    or Path(confirmation["path"]).resolve() != cast(Path, path).resolve()
+                ):
+                    raise ServiceControlError("Shortcut removal was not confirmed")
+            except (ServiceControlError, OSError, ValueError, subprocess.SubprocessError) as error:
+                failure += (
+                    f"; bounded cleanup refused or unconfirmed: {error}. "
+                    f"Inspect {cast(Path, path).resolve()} through owner file management before retrying"
+                )
+            else:
+                failure += "; the newly created shortcut was removed and the original absent state was restored"
+        elif existed_before is False:
+            failure += (
+                "; creation identity was not confirmed, so no shortcut was removed. "
+                f"Inspect {cast(Path, path).resolve()} through owner file management before retrying"
+            )
+    raise click.ClickException(failure)
 
 
 NATIVE_COMMANDS["home"] = home_group
@@ -1663,7 +2682,7 @@ def application_project_upgrade(
             click.echo(f"  {key}: {path}")
 
 
-def _refuse(ctx: click.Context, json_output: bool, code: str, message: str, exit_code: int) -> None:
+def _refuse(ctx: click.Context, json_output: bool, code: str, message: str, exit_code: int) -> NoReturn:
     if json_output:
         _emit({"status": "refused", "error": {"code": code, "message": message}}, True)
         ctx.exit(exit_code)

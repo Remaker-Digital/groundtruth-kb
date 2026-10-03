@@ -11,7 +11,7 @@ registration and the declared native config.toml), OWNERSHIP (the
 ``<config_dir>/.projection-manifest.json`` bookkeeping file, the R15 (a)
 exemption) or POINTER (a skill pointer stub or a declared ``[pointer_files]``
 entry); anything else is ``unclassified_output``. Skill bodies, rules and hook
-scripts are read in place from ``.agents/skills`` and
+scripts are read in place from ``.harness-baseline-configuration/skills`` and
 ``.harness-baseline-configuration/{rules,hooks}``. The root ``AGENTS.md`` and the
 ``[root_pointers]`` files (R1 option B) are tracked authored sources outside the
 projector's output; this checker pins their bytes (``declared_pointer_drift``) in
@@ -21,8 +21,10 @@ a pointer that grows back into a canon carrier.
 A target owns its configuration root plus any declared ``extra_output_roots``
 (owner ruling D52: Goose discovers its hook plugin only at
 ``.agents/plugins/<name>/``). Writes, removals, declared paths and the installed
-unmanaged-output walk are confined to those owned roots; an owned root may not be
-redirected, overlap another target's owned roots, or overlap ``.agents/skills``.
+unmanaged-output walk are confined to those owned roots; an output root may not be
+redirected or overlap the authored baseline Skills. The fixed generated
+``.agents/skills`` catalog is the sole shared output scope among native-discovery
+profiles; their native configuration roots remain independent.
 """
 
 from __future__ import annotations
@@ -41,7 +43,7 @@ from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ".harness-baseline-configuration"
-SKILLS_ROOT = ".agents/skills"
+SKILLS_ROOT = ".harness-baseline-configuration/skills"
 HOOKS_ROOT = ".harness-baseline-configuration/hooks"
 INSTRUCTION_FILE = "AGENTS.md"
 ENGINE = "scripts/harness_projection/project_harness.py"
@@ -54,6 +56,7 @@ ENGINE_SURFACE = (
     "skill_fields",
     "frontmatter_block",
     "is_projection_junk",
+    "owned_roots",
 )
 SKILLS_DISCOVERY = frozenset({"agents_skills", "pointer_stubs"})
 WRITE_CLASSES = ("registration", "ownership", "pointer")
@@ -218,7 +221,8 @@ def _owned_roots(profile: dict) -> list[PurePosixPath]:
     extra = profile.get("extra_output_roots") or []
     if not isinstance(extra, list):
         raise ValueError("extra_output_roots must be a list of repository-relative directories")
-    return [_relative(profile["config_dir"]), *(_relative(value) for value in extra)]
+    shared = [".agents/skills"] if profile.get("skills_discovery") == "agents_skills" else []
+    return [_relative(profile["config_dir"]), *(_relative(value) for value in extra), *map(_relative, shared)]
 
 
 def _installed_issues(root: Path, owned: list[PurePosixPath], plan) -> list[dict[str, str]]:
@@ -275,6 +279,11 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
             for other_root in _owned_roots(other):
                 for owned_root in owned:
                     if owned_root.is_relative_to(other_root) or other_root.is_relative_to(owned_root):
+                        if (
+                            owned_root == other_root == PurePosixPath(".agents/skills")
+                            and profile.get("skills_discovery") == other.get("skills_discovery") == "agents_skills"
+                        ):
+                            continue
                         raise ValueError(f"Output roots overlap: {harness}, {other_name}")
         discovery = profile.get("skills_discovery")
         if discovery not in SKILLS_DISCOVERY:
@@ -337,8 +346,10 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
             expected[name] = engine.frontmatter_block(text)
         if not expected:
             issues.append(_issue("empty_baseline", SKILLS_ROOT, "No canonical skills were found"))
-        if discovery == "pointer_stubs":
-            stub_dir = str(_relative(profile["skills_stub_dir"])) + "/"
+        if discovery in SKILLS_DISCOVERY:
+            stub_dir = (
+                ".agents/skills" if discovery == "agents_skills" else str(_relative(profile["skills_stub_dir"]))
+            ) + "/"
             observed = {}
             for rel, text in plan.writes.items():
                 parts = rel[len(stub_dir) :].split("/") if rel.startswith(stub_dir) else []
@@ -357,11 +368,6 @@ def _check_target(root: Path, engine, profiles: dict, harness: str, installed: b
                 if _pointer_line(name) not in _stub_body(stub):
                     issues.append(_issue("skill_stub_body", rel, "Stub body lacks the pointer line"))
             result["skills"] = len(observed)
-        else:
-            message = "The host reads .agents/skills natively; no skill output is projected"
-            for rel in sorted(rel for rel in plan.writes if rel.startswith(f"{config_dir}/skills/")):
-                issues.append(_issue("unexpected_skill_copy", rel, message))
-            result["skills"] = 0
 
         for rel, text in plan.writes.items():
             if rel.endswith(".json"):

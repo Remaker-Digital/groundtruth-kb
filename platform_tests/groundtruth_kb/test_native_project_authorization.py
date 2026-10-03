@@ -40,10 +40,21 @@ def test_authorization_changes_only_current_project_ordering_and_preserves_membe
     service, client, _, _ = native
     seed(client)
     assert put(client, "work-items", "WI-1", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert change(client, "authorized").status_code == 200
     work = client.get("/v1/work-items/WI-1").json()
     original = client.get("/v1/projects/PROJECT-1").json()["project"]
     program = client.get("/v1/projects/PROGRAM-1").json()["project"]
     assert original["authorization"] == "authorized" and program["authorization"] is None
+    amended = put(
+        client,
+        "work-items",
+        "WI-1",
+        {"title": "Clarified artifact correction"},
+        expected_version=work["work_item"]["version"],
+    )
+    assert amended.status_code == 200, amended.text
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == original
+    work = client.get("/v1/work-items/WI-1").json()
     before = history_count(service)
     result = change(client, "not authorized")
     assert result.status_code == 200, result.text
@@ -69,6 +80,11 @@ def test_authorization_changes_only_current_project_ordering_and_preserves_membe
     )
     assert client.get("/v1/projects/PROJECT-1").json()["project"]["authorization"] == "not authorized"
     assert put(client, "projects", "PROJECT-2", {"name": "Receiving project"}).status_code == 200
+    assert change(client, "authorized").status_code == 200
+    projects_before = {
+        name: client.get(f"/v1/projects/{name}").json()["project"] for name in ("PROJECT-1", "PROJECT-2")
+    }
+    before_move = history_count(service)
     moved = client.post(
         "/v1/work-items/WI-1/move",
         json={
@@ -81,8 +97,10 @@ def test_authorization_changes_only_current_project_ordering_and_preserves_membe
     )
     assert moved.status_code == 200, moved.text
     assert client.get("/v1/work-items/WI-1").json()["membership"]["project_id"] == "PROJECT-2"
-    assert client.get("/v1/projects/PROJECT-1").json()["project"]["authorization"] == "not authorized"
-    assert client.get("/v1/projects/PROJECT-2").json()["project"]["authorization"] == "authorized"
+    for name, previous in projects_before.items():
+        project = client.get(f"/v1/projects/{name}").json()["project"]
+        assert project["authorization"] == "not authorized" and project["version"] == previous["version"] + 1
+    assert history_count(service) == before_move + 4
     assert change(client, "authorized").json()["authorization"] == "authorized"
 
 
@@ -231,7 +249,9 @@ def test_native_authorization_rechecks_new_delivery_and_preserves_same_claim_ret
     refused = client.post("/v1/bridge/new-ordering/deliver", json=body)
     assert refused.status_code == 422 and refused.json()["error"]["code"] == "project_not_authorized"
     assert client.get("/v1/bridge/new-ordering/show", params={"include_content": True}).json() == before
+    project = client.get("/v1/projects/PROJECT-1").json()["project"]
     assert put(client, "work-items", "WI-2", work_fields(), project_id="PROJECT-1").status_code == 200
+    assert client.get("/v1/projects/PROJECT-1").json()["project"] == project
     new_claim = claim(client, "another-new", "pb2", 0, "NEW", work_item_id="WI-2")
     assert new_claim.status_code == 422 and new_claim.json()["error"]["code"] == "project_not_authorized"
     assert change(client, "authorized").status_code == 200

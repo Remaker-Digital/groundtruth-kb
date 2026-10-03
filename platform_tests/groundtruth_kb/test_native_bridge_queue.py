@@ -9,8 +9,8 @@ from groundtruth_kb.bridge.native import NativeBridgeService
 from groundtruth_kb.dashboard_swimlane import _snapshot_from_report
 from psycopg import sql
 
+from platform_tests.groundtruth_kb.bridge_fixtures import authorize_project, claim, deliver
 from platform_tests.groundtruth_kb.bridge_fixtures import bridge as bridge
-from platform_tests.groundtruth_kb.bridge_fixtures import claim, deliver
 from platform_tests.groundtruth_kb.finalization_fixtures import commit_product, post, two_members, verify
 from platform_tests.groundtruth_kb.native_fixtures import native as native
 from platform_tests.groundtruth_kb.native_fixtures import put, work_fields
@@ -231,6 +231,7 @@ def test_report_distinguishes_review_completion_from_confirmed_project_commit(br
 def test_revision_is_a_new_fifo_action_and_queue_reads_preserve_all_rows(bridge):
     service, client, contexts, _root = bridge
     add(client, 2)
+    authorize_project(client)
     deliver(client, contexts, "older-attempt", "pb1", 1, "NEW")
     deliver(client, contexts, "older-attempt", "lo1", 2, "NO-GO")
     deliver(client, contexts, "waiting-review", "pb1", 1, "NEW", work_item_id="WI-2")
@@ -247,6 +248,7 @@ def test_revision_is_a_new_fifo_action_and_queue_reads_preserve_all_rows(bridge)
 def test_canonical_priority_dominates_fifo_and_live_claim_is_excluded(bridge):
     service, client, contexts, _root = bridge
     add(client, 2, priority="P0")
+    authorize_project(client)
     deliver(client, contexts, "old-p1", "pb1", 1, "NEW")
     deliver(client, contexts, "new-p0", "pb1", 1, "NEW", work_item_id="WI-2")
     assert [r["id"] for r in queue(client)["eligible"]] == ["new-p0", "old-p1"]
@@ -265,6 +267,7 @@ def test_canonical_priority_dominates_fifo_and_live_claim_is_excluded(bridge):
 def test_exact_timestamp_ties_use_stable_identity(bridge):
     service, client, contexts, _root = bridge
     add(client, 2)
+    authorize_project(client)
     deliver(client, contexts, "z-first", "pb1", 1, "NEW")
     deliver(client, contexts, "a-second", "pb1", 1, "NEW", work_item_id="WI-2")
     with service.kernel.transaction() as tx:
@@ -279,6 +282,7 @@ def test_fresh_verification_enters_after_waiting_review_and_retry_preserves_age(
     service, client, contexts, root = bridge
     verify(client, contexts, root, 1, "code.py")
     add(client, 2)
+    authorize_project(client)
     deliver(client, contexts, "waiting-review", "pb1", 1, "NEW", work_item_id="WI-2")
     (root / "code.py").write_text("changed = 2\n", encoding="utf-8")
     # Exercise the production request operation in its real database transaction.
@@ -292,6 +296,7 @@ def test_fresh_verification_enters_after_waiting_review_and_retry_preserves_age(
         row = dict(tx.cursor.fetchone())
         NativeProjectFinalization._request_verification(tx, [row], "verified_bytes_changed", {"paths": ["code.py"]})
     add(client, 3)
+    authorize_project(client)
     deliver(client, contexts, "later-review", "pb1", 1, "NEW", work_item_id="WI-3")
     first = queue(client)["eligible"]
     assert [r["id"] for r in first] == ["waiting-review", "chain-1", "later-review"]

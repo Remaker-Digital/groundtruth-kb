@@ -221,7 +221,7 @@ A newly scaffolded application does not contain that host projector. Use its
 application initializer or upgrade route above.
 
 For this shared-source layout, root `AGENTS.md` is authored once, skills live
-in `.agents/skills`, and rules, hooks and routing live under
+in `.harness-baseline-configuration/skills`, and rules, hooks and routing live under
 `.harness-baseline-configuration`. The projector derives the selected native
 registration from those sources. See [Harness projection](reference/harness-projection.md).
 

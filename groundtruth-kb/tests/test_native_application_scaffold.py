@@ -373,11 +373,11 @@ def test_selected_claude_harness_points_to_host_skills_and_reads_host_rules(clau
     """Applications receive registrations/pointers; authored guidance and helpers stay in the host."""
     native, created, target = claude_application
     host = native.host
-    source = host / ".agents/skills"
+    source = host / ".harness-baseline-configuration/skills"
     authored = (source / "gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
     assert "gt bridge deliver" in authored
     stub = (target / ".claude/skills/gtkb-bridge-propose/SKILL.md").read_text(encoding="utf-8")
-    assert "../../.agents/skills/gtkb-bridge-propose/SKILL.md" in stub
+    assert "../../.harness-baseline-configuration/skills/gtkb-bridge-propose/SKILL.md" in stub
     assert "gt bridge deliver" not in stub
     intake = (source / "gtkb-spec-intake/SKILL.md").read_text(encoding="utf-8")
     assert intake.strip()
